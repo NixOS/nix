@@ -8,6 +8,12 @@ mkdir -p "$flakeDir"
 writeSimpleFlake "$flakeDir"
 pushd "$flakeDir"
 
+# Styled output carries no ANSI escapes when it is not going to a terminal
+(( $(nix flake show | grep -c $'\x1b') == 0 ))
+(( $(CLICOLOR_FORCE=1 nix flake show | grep -c $'\x1b') > 0 ))
+(( $(nix flake metadata | grep -c $'\x1b') == 0 ))
+(( $(CLICOLOR_FORCE=1 nix flake metadata | grep -c $'\x1b') > 0 ))
+
 
 # By default: Only show the packages content for the current system and no
 # legacyPackages at all

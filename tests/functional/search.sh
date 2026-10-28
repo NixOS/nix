@@ -29,6 +29,9 @@ nix search -f search.nix '' ^ | grepQuiet hello
 ## Tests for multiple regex/match highlighting
 
 e=$'\x1b' # grep doesn't support \e, \033 or even \x1b
+# Highlighting is only added on a terminal, or when forced
+(( $(nix search -f search.nix '' 'oo' | grep -c "$e") == 0 ))
+export CLICOLOR_FORCE=1
 # Multiple overlapping regexes
 (( $(nix search -f search.nix '' 'oo' 'foo' 'oo' | grep -c "$e\[32;1mfoo$e\\[0;1m") == 1 ))
 (( $(nix search -f search.nix '' 'broken b' 'en bar' | grep -c "$e\[32;1mbroken bar$e\\[0m") == 1 ))
@@ -39,6 +42,7 @@ e=$'\x1b' # grep doesn't support \e, \033 or even \x1b
 # Searching for 'b' should yield the 'b' in bar and the two 'b's in 'broken bar'
 # NOTE: This does not work with `grep -c` because it counts the two 'b's in 'broken bar' as one matched line
 (( $(nix search -f search.nix '' 'b' | grep -Eo "$e\[32;1mb$e\[(0|0;1)m" | wc -l) == 3 ))
+unset CLICOLOR_FORCE
 
 ## Tests for --exclude
 (( $(nix search -f search.nix ^ -e hello | grep -c hello) == 0 ))
