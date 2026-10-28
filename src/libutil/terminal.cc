@@ -139,6 +139,17 @@ static std::string_view eatEscape(std::string_view::const_iterator & i, std::str
     return {start, i};
 }
 
+static unsigned int cursorForwardCount(std::string_view e)
+{
+    unsigned int n = 0;
+    for (char c : e.substr(2, e.size() - 3)) {
+        if (c < '0' || c > '9')
+            return 1;
+        n = std::min(n * 10 + (c - '0'), 1000u);
+    }
+    return std::max(n, 1u);
+}
+
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
 {
     std::string t;
@@ -153,6 +164,15 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
             if (!filterAll && last == 'm')
                 t += e;
+            else if (last == 'C') {
+                // Cursor forward: some programs (e.g. Wine) move over a cell
+                // instead of printing a space, so keep the gap as spaces.
+                for (auto n = cursorForwardCount(e); n > 0; --n) {
+                    if (++w > (size_t) width)
+                        return t;
+                    t += ' ';
+                }
+            }
         }
 
         else if (*i == '\t') {
