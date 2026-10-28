@@ -8,6 +8,7 @@
 #include "nix/util/logging.hh"
 #include "nix/util/util.hh"
 #include "nix/util/socket.hh"
+#include "nix/util/split.hh"
 
 #include "nix/store/s3-url.hh"
 #include <optional>
@@ -49,6 +50,7 @@ enum struct HttpStatus : long {
     ProxyAuthRequired = 407,
     RequestTimeout = 408,
     Gone = 410,
+    RangeNotSatisfiable = 416,
     TooManyRequests = 429,
     NotImplemented = 501,
     ServiceUnavailable = 503,
@@ -236,6 +238,14 @@ struct curlFileTransfer : public FileTransfer
          * (cleared) by maybeRetry() so it applies to at most one retry attempt.
          */
         std::optional<uint32_t> retryAfterMs;
+
+        /**
+         * The complete length of the resource, parsed from an unsatisfied-range
+         * `Content-Range` header (RFC 9110, section 14.4). Servers send this
+         * header with a 416 (Range Not Satisfiable) response. Reset on each new
+         * HTTP status line.
+         */
+        std::optional<curl_off_t> unsatisfiedRangeLength;
 
         /**
          * When dataCallback is specified, this tracks the amount of bytes funneled to it.
@@ -440,6 +450,7 @@ struct curlFileTransfer : public FileTransfer
                 acceptRanges = false;
                 hasContentEncoding = false;
                 retryAfterMs = std::nullopt;
+                unsatisfiedRangeLength = std::nullopt;
                 appendCurrentUrl();
             } else {
 
@@ -458,6 +469,13 @@ struct curlFileTransfer : public FileTransfer
 
                     else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
+
+                    else if (name == "content-range") {
+                        auto value = toLower(trim(line.substr(i + 1)));
+                        std::string_view rest = value;
+                        if (splitPrefix(rest, "bytes */") && rest.find_first_not_of("0123456789") == rest.npos)
+                            unsatisfiedRangeLength = string2Int<curl_off_t>(rest);
+                    }
 
                     else if (name == "link" || name == "x-amz-meta-link") {
                         auto value = trim(line.substr(i + 1));
@@ -876,6 +894,16 @@ struct curlFileTransfer : public FileTransfer
             }
         }
 
+        /**
+         * For a 416, `Content-Range` describes the resource; `Content-Length`
+         * describes the error body (RFC 9110, section 15.5.17).
+         */
+        bool resumedAtEnd(long httpStatus) const
+        {
+            return request.method == HttpMethod::Get && writtenToSink > 0
+                   && httpStatus == HttpStatus::RangeNotSatisfiable && unsatisfiedRangeLength == writtenToSink;
+        }
+
         void finish(CURLcode code)
         {
             auto finishTime = std::chrono::steady_clock::now();
@@ -906,6 +934,12 @@ struct curlFileTransfer : public FileTransfer
                 curl_off_t dlSize = 0;
                 curl_easy_getinfo(req, CURLINFO_SIZE_DOWNLOAD_T, &dlSize);
                 act().progress(dlSize, dlSize);
+                done = true;
+                callback(std::move(result));
+            }
+
+            else if (code == CURLE_OK && resumedAtEnd(httpStatus)) {
+                act().progress(writtenToSink, writtenToSink);
                 done = true;
                 callback(std::move(result));
             }
