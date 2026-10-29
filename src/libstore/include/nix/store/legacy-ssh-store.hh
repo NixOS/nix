@@ -191,9 +191,10 @@ public:
 
     void queryRealisationUncached(
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
-    // TODO: Implement
     {
-        unsupported("queryRealisation");
+        /* The serve protocol doesn't support querying realisations,
+           so act as if this store doesn't have any. */
+        callback(nullptr);
     }
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override
