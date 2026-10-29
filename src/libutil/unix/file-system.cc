@@ -8,6 +8,11 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#ifdef __linux__
+#  include <linux/capability.h>
+#  include <sys/syscall.h>
+#endif
+
 #ifdef __FreeBSD__
 #  include <sys/param.h>
 #  include <sys/mount.h>
@@ -263,8 +268,7 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
     std::exception_ptr ex;
 
     /* Whether directories don't need to be made writable/readable/traversable
-       for them be emptied. In the future we can also skip that when we have
-       CAP_DAC_OVERRIDE on Linux. */
+       for them to be emptied. */
     bool forceDontChmod = false;
 
 #ifdef __APPLE__
@@ -273,6 +277,13 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
        launched app bundle's mode even when deleting the bundle is allowed. */
     if (::geteuid() == 0)
         forceDontChmod = true;
+#elif defined(__linux__)
+    /* UID 0 alone does not guarantee permission to bypass directory modes.
+       Query the calling thread, and keep chmod if the query fails. */
+    __user_cap_header_struct header{.version = _LINUX_CAPABILITY_VERSION_3, .pid = 0};
+    __user_cap_data_struct caps[_LINUX_CAPABILITY_U32S_3]{};
+    if (::syscall(SYS_capget, &header, caps) == 0)
+        forceDontChmod = caps[CAP_TO_INDEX(CAP_DAC_OVERRIDE)].effective & CAP_TO_MASK(CAP_DAC_OVERRIDE);
 #endif
 
     _deletePath(dirfd.get(), path, bytesFreed, ex, forceDontChmod MOUNTEDPATHS_ARG);
