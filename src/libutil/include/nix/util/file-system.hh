@@ -273,19 +273,20 @@ void syncParent(const std::filesystem::path & path);
  */
 void recursiveSync(const std::filesystem::path & path);
 
-/**
- * Delete a path; i.e., in the case of a directory, it is deleted
- * recursively. It's not an error if the path does not exist. The
- * second variant returns the number of bytes and blocks freed.
- */
-void deletePath(const std::filesystem::path & path);
+struct DeletePathResult
+{
+    /** Estimation of how many bytes of disk space have been reclaimed. */
+    uint64_t bytesFreed = 0;
+};
 
 /**
- * @param[out] bytesFreed Estimation of how many bytes of disk space have
- *                        been reclaimed. Initialised to zero internally, so
- *                        the caller doesn't need to initialise it.
+ * Delete a path; i.e., in the case of a directory, it is deleted
+ * recursively. It's not an error if the path does not exist.
+ *
+ * @return Statistics about what was deleted. Callers that don't need
+ *         them can ignore the result.
  */
-void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
+DeletePathResult deletePath(const std::filesystem::path & path);
 
 /**
  * Create a directory and all its parents, if necessary.

@@ -587,10 +587,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         results.paths.insert(path);
 
-        uint64_t bytesFreed = 0;
-        deleteStorePath(realPath, bytesFreed, isKnownPath);
-
-        results.bytesFreed += bytesFreed;
+        results.bytesFreed += deleteStorePath(realPath, isKnownPath).bytesFreed;
 
         if (results.bytesFreed > options.maxFreed) {
             printInfo("deleted more than %d bytes; stopping", options.maxFreed);

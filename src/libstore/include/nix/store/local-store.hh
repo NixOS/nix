@@ -382,12 +382,11 @@ public:
      * @param isKnownPath true if this is a known store path, false if it's
      *        garbage/unknown content found in the store directory
      *
-     * @param[out] bytesFreed An estimation of how many bytes of disk space have been reclaimed.
-     *             It should be considered to be only a rough estimate.
-     *             Initialised to zero by this function so that the caller may not need to initialise
-     *             it.
+     * @return Statistics about what was deleted. `bytesFreed` is an
+     *         estimation of how many bytes of disk space have been
+     *         reclaimed, and should be considered only a rough estimate.
      */
-    virtual void deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath);
+    virtual DeletePathResult deleteStorePath(const std::filesystem::path & path, bool isKnownPath);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking
