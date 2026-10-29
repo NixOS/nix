@@ -111,7 +111,11 @@ in
         builder.wait_for_unit("multi-user.target")
         builder.wait_for_unit("network-addresses-eth1.service")
 
-        client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
+        # `-n` keeps ssh off the driver's stdin. The timeout and retries stop
+        # a stuck first connection from hanging the test.
+        client.wait_until_succeeds(
+            f"timeout 30 ssh -n -o StrictHostKeyChecking=no {builder.name} 'echo hello world'", timeout=180
+        )
 
         # Perform a build
         out = client.succeed("nix-build ${expr nodes.client 1} 2> build-output")
@@ -137,6 +141,13 @@ in
 
         # Check that we get phase reporting in the log file
         client.succeed("grep -q '@nix {\"action\":\"setPhase\",\"phase\":\"buildPhase\"}' log-output")
+
+        # The build runs in-process on the ssh-ng machine, not through a hook.
+        out2 = client.succeed("nix-build ${expr nodes.client 2} -vvv 2> debug-output")
+        builder.succeed(f"test -e {out2.strip()}")
+        client.succeed("grep -q \"on 'ssh-ng://root@builder'\" debug-output")
+        client.succeed("grep -q 'remote build done' debug-output")
+        client.fail("grep -q 'starting build hook' debug-output")
       '';
   };
 }
