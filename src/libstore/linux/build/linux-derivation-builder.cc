@@ -953,6 +953,10 @@ void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
             buildResult.cpuSystem = stats.cpuSystem;
+            buildResult.memoryPeak = stats.memoryPeak;
+            buildResult.ioReadBytes = stats.ioReadBytes;
+            buildResult.ioWriteBytes = stats.ioWriteBytes;
+            buildResult.oomKills = stats.oomKills;
         }
         return;
     }

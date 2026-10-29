@@ -28,6 +28,7 @@ const WorkerProto::Version WorkerProto::latest = {
             std::string{WorkerProto::featureRealisationWithPath},
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
             std::string{WorkerProto::featureAddTempRoots},
+            std::string{WorkerProto::featureBuildResourceUsage},
         },
 };
 
@@ -205,6 +206,30 @@ void WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::write(
     }
 }
 
+std::optional<uint64_t>
+WorkerProto::Serialise<std::optional<uint64_t>>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto tag = readNum<uint8_t>(conn.from);
+    switch (tag) {
+    case 0:
+        return std::nullopt;
+    case 1:
+        return readNum<uint64_t>(conn.from);
+    default:
+        throw Error("Invalid optional tag from remote");
+    }
+}
+
+void WorkerProto::Serialise<std::optional<uint64_t>>::write(
+    const StoreDirConfig & store, WorkerProto::WriteConn conn, const std::optional<uint64_t> & optValue)
+{
+    if (!optValue.has_value()) {
+        conn.to << uint8_t{0};
+    } else {
+        conn.to << uint8_t{1} << *optValue;
+    }
+}
+
 DerivedPath WorkerProto::Serialise<DerivedPath>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto s = readString(conn.from);
@@ -317,6 +342,12 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
         res.cpuSystem = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
     }
+    if (conn.version.features.contains(WorkerProto::featureBuildResourceUsage)) {
+        res.memoryPeak = WorkerProto::Serialise<std::optional<uint64_t>>::read(store, conn);
+        res.ioReadBytes = WorkerProto::Serialise<std::optional<uint64_t>>::read(store, conn);
+        res.ioWriteBytes = WorkerProto::Serialise<std::optional<uint64_t>>::read(store, conn);
+        res.oomKills = WorkerProto::Serialise<std::optional<uint64_t>>::read(store, conn);
+    }
 
     if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
         success.builtOutputs = WorkerProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
@@ -367,6 +398,12 @@ void WorkerProto::Serialise<BuildResult>::write(
         if (conn.version >= WorkerProto::Version{.number = {1, 37}}) {
             WorkerProto::write(store, conn, res.cpuUser);
             WorkerProto::write(store, conn, res.cpuSystem);
+        }
+        if (conn.version.features.contains(WorkerProto::featureBuildResourceUsage)) {
+            WorkerProto::write(store, conn, res.memoryPeak);
+            WorkerProto::write(store, conn, res.ioReadBytes);
+            WorkerProto::write(store, conn, res.ioWriteBytes);
+            WorkerProto::write(store, conn, res.oomKills);
         }
 
         if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {

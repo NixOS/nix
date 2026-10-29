@@ -1094,4 +1094,76 @@ VERSIONED_CHARACTERIZATION_TEST(
         t;
     }))
 
+static std::string
+writeBuildResult(const StoreDirConfig & store, const WorkerProto::Version & version, const BuildResult & result)
+{
+    StringSink to;
+    WorkerProto::write(store, WorkerProto::WriteConn{.to = to, .version = version}, result);
+    return std::move(to.s);
+}
+
+static BuildResult
+readBuildResult(const StoreDirConfig & store, const WorkerProto::Version & version, std::string_view encoded)
+{
+    StringSource from{encoded};
+    return WorkerProto::Serialise<BuildResult>::read(store, WorkerProto::ReadConn{.from = from, .version = version});
+}
+
+static const std::vector<BuildResult> buildResultsWithResourceUsage{
+    BuildResult{
+        .inner{BuildResult::Success{.status = BuildResult::Success::Built}},
+        .timesBuilt = 1,
+        .startTime = 30,
+        .stopTime = 50,
+        .cpuUser = std::chrono::microseconds(500),
+        .cpuSystem = std::chrono::microseconds(604),
+        .memoryPeak = 1073741824,
+        .ioReadBytes = 4096,
+        .oomKills = 0,
+    },
+    BuildResult{
+        .inner{BuildResult::Failure{{
+            .status = BuildResult::Failure::PermanentFailure,
+            .msg = HintFmt("builder was killed"),
+        }}},
+        .timesBuilt = 1,
+        .startTime = 30,
+        .stopTime = 50,
+        .memoryPeak = 2147483648,
+        .ioWriteBytes = 8192,
+        .oomKills = 3,
+    },
+};
+
+TEST_F(WorkerProtoTest, buildResult_resource_usage_round_trip)
+{
+    WorkerProto::Version version{
+        .number = {.major = 1, .minor = 38},
+        .features = {"realisation-with-path-not-hash", "build-resource-usage"},
+    };
+
+    for (auto & result : buildResultsWithResourceUsage)
+        EXPECT_EQ(readBuildResult(store, version, writeBuildResult(store, version, result)), result);
+}
+
+TEST_F(WorkerProtoTest, buildResult_resource_usage_needs_feature)
+{
+    WorkerProto::Version version{
+        .number = {.major = 1, .minor = 38},
+        .features = {"realisation-with-path-not-hash"},
+    };
+
+    for (auto & result : buildResultsWithResourceUsage) {
+        auto withoutResourceUsage = result;
+        withoutResourceUsage.memoryPeak = std::nullopt;
+        withoutResourceUsage.ioReadBytes = std::nullopt;
+        withoutResourceUsage.ioWriteBytes = std::nullopt;
+        withoutResourceUsage.oomKills = std::nullopt;
+
+        auto encoded = writeBuildResult(store, version, result);
+        EXPECT_EQ(encoded, writeBuildResult(store, version, withoutResourceUsage));
+        EXPECT_EQ(readBuildResult(store, version, encoded), withoutResourceUsage);
+    }
+}
+
 } // namespace nix

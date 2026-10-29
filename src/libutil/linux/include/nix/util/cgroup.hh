@@ -17,6 +17,7 @@ StringMap getCgroups(const std::filesystem::path & cgroupFile);
 struct CgroupStats
 {
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
+    std::optional<uint64_t> memoryPeak, ioReadBytes, ioWriteBytes, oomKills;
 };
 
 /**

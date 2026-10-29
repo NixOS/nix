@@ -1,0 +1,15 @@
+{
+  "cpuSystem": 604000000,
+  "cpuUser": 500000000,
+  "errorMsg": "builder was killed",
+  "ioReadBytes": 4096,
+  "ioWriteBytes": 8192,
+  "isNonDeterministic": false,
+  "memoryPeak": 1073741824,
+  "oomKills": 1,
+  "startTime": 30,
+  "status": "PermanentFailure",
+  "stopTime": 50,
+  "success": false,
+  "timesBuilt": 1
+}
