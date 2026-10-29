@@ -267,6 +267,15 @@ struct InputScheme
         return std::nullopt;
     }
 
+    /**
+     * A URL for `path` if it is the root of a repository of this
+     * scheme, e.g. a directory containing `.git`.
+     */
+    virtual std::optional<ParsedURL> localRepoURL(const std::filesystem::path & path) const
+    {
+        return std::nullopt;
+    }
+
     virtual std::optional<std::string>
     getAccessToken(const fetchers::Settings & settings, const std::string & host, const std::string & url) const
     {
@@ -282,6 +291,13 @@ using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
  * Use this for docs, not for finding a specific scheme
  */
 const InputSchemeMap & getAllInputSchemes();
+
+/**
+ * Schemes are tried in name order, so a directory that holds more
+ * than one repository (e.g. `.git` and `.hg`) always resolves the
+ * same way.
+ */
+std::optional<ParsedURL> getLocalRepoURL(const std::filesystem::path & path);
 
 struct PublicKey
 {

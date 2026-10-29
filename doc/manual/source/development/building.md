@@ -130,7 +130,6 @@ Nix can be built for various platforms, as specified in [`flake.nix`]:
 [`flake.nix`]: https://github.com/nixos/nix/blob/master/flake.nix
 
 - `x86_64-linux`
-- `x86_64-darwin`
 - `i686-linux`
 - `aarch64-linux`
 - `aarch64-darwin`

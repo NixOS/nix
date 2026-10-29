@@ -29,7 +29,7 @@ nix log "$outp"
 
 if isDaemonNewer "2.26"; then
     # Build works despite ill-formed structured build log entries.
-    expectStderr 0 nix build -f ./logging/unusual-logging.nix --no-link | grepQuiet 'warning: Unable to handle a JSON message from the derivation builder:'
+    expectStderr 0 nix build -f ./logging/unusual-logging.nix --no-link | grepQuiet -i 'warning: unable to handle a JSON message from the derivation builder:'
 fi
 
 # Test json-log-path.

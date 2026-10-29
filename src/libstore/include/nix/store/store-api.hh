@@ -14,6 +14,7 @@
 #include "nix/util/repair-flag.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/store-reference.hh"
+#include "nix/store/substituter.hh"
 #include "nix/util/source-path.hh"
 
 #include <nlohmann/json_fwd.hpp>
@@ -27,8 +28,6 @@ namespace nix {
 
 MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
-MakeError(SubstituteGone, Error);
-MakeError(SubstituterDisabled, Error);
 
 MakeError(InvalidStoreReference, Error);
 
@@ -40,12 +39,11 @@ struct DrvOutput;
 namespace derivation {
 template<typename Inputs, typename Out>
 struct Derivation;
-struct FullInputs;
 struct Output;
 } // namespace derivation
 
 using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
-using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
+using Derivation = derivation::Derivation<std::set<SingleDerivedPath>, derivation::Output>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;
@@ -55,8 +53,6 @@ class Store;
 typedef std::map<std::string, StorePath> OutputPathMap;
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
-
-enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 
 enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
 
@@ -172,7 +168,7 @@ public:
     /**
      * A setting for the Nix store directory. Automatically canonicalises the
      * path and rejects the empty string. Stored as `std::string` because
-     * store directory are valid file paths on *some* OS, but not neccessarily the OS of this build of Nix.
+     * store directory are valid file paths on *some* OS, but not necessarily the OS of this build of Nix.
      *
      * (For example, consider `SSHStore` from Linux to Windows, or vice versa, the foreign path will not be a valid
      * `std::filesystem::path`.)
@@ -203,7 +199,7 @@ public:
     StoreDirSetting storeDir_;
 
     /**
-     * @pathType see FilePathType
+     * @param pathType see FilePathType
      */
     StoreConfigBase(const StoreReference::Params & params, FilePathType pathType);
 };
@@ -501,7 +497,7 @@ public:
      * implements nix-copy-closure's --use-substitutes
      * flag.
      *
-     * @TODO suspicious to have a Store method that uses `getBuilder`.
+     * @todo suspicious to have a Store method that uses `getBuilder`.
      */
     void substitutePaths(const StorePathSet & paths);
 
@@ -814,9 +810,18 @@ public:
      * ```
      *
      */
-    virtual void addTempRoot(const StorePath & path)
+    void addTempRoot(const StorePath & path)
     {
-        debug("not creating temporary root, store doesn't support GC");
+        addTempRoots({path});
+    }
+
+    /**
+     * Add multiple store paths as temporary roots of the garbage collector.
+     * The roots disappears as soon as we exit.
+     */
+    virtual void addTempRoots(const StorePathSet & paths)
+    {
+        debug("not creating temporary roots, store doesn't support GC");
     }
 
     /**
@@ -898,7 +903,7 @@ public:
      * Read a derivation, after ensuring its existence through
      * ensurePath().
      *
-     * @TODO suspicious to have a Store method that uses `getBuilder`.
+     * @todo suspicious to have a Store method that uses `getBuilder`.
      */
     Derivation derivationFromPath(const StorePath & drvPath);
 

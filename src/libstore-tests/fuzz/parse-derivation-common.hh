@@ -11,12 +11,11 @@ int fuzzParseDerivationCommon(std::string_view s, std::string storeDir = "/nix/s
         StoreDirConfig config{storeDir};
         auto drv = derivation::parse(config, std::string(s), "test");
 
-#if 0 /* This is broken now. See https://github.com/NixOS/nix/issues/16237. */
-        for (const auto & [drvPath, _] : drv.inputs.drvs.map)
-            assert(drvPath.isDerivation());
-#endif
+        for (const auto & input : drv.inputs)
+            if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw()))
+                assert(built->getBaseStorePath().isDerivation());
 
-        /* TODO: Make sure all invariants are upheld and it round-trips with unparse(). */
+        assert(derivation::unparse(drv, config) == s);
     } catch (const nix::Error &) {
     }
     return 0;

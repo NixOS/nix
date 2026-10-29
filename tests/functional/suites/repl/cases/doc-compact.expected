@@ -1,0 +1,13 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :l doc-comments.nix
+Added 13 variables.
+compact, constant, curriedArgs, documentedFormals, floatedIn, lib, measurement, multiply, nonStrict, strict, strictPost, strictPre, unambiguous
+
+nix-repl> :doc compact
+Function `compact`\
+  … defined at /path/to/repl/suite/cases/doc-comments.nix:27:5
+
+
+boom

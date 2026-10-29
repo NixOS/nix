@@ -348,7 +348,7 @@ public:
      *
      * \todo this would probably be better in the CommandClass.
      * getRoot() could be an abstract method that peels off at most one
-     * layer before recuring.
+     * layer before recurring.
      */
     MultiCommand * parent = nullptr;
 

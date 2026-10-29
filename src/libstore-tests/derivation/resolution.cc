@@ -1,0 +1,397 @@
+#include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
+
+#include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/tests/libstore.hh"
+#include "nix/util/tests/json-characterization.hh"
+
+namespace nix {
+
+class TryResolveTest : public LibStoreTest, public CharacterizationTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "derivation" / "try-resolve";
+
+public:
+
+    /**
+     * A simple in-memory *derived* build trace. (e.g. we have
+     * `SingleDerivedPath::Built` not `StorePath` keys, because that is
+     * how the `tryResolved` callback works.)
+     *
+     * For a real-world build trace, derived build traces are much more
+     * work to get correct, and should be at most a caching layer atop
+     * an underlying source-of-truth build trace. (This is as described
+     * in the manual.)
+     *
+     * However, this is just for some simple in-memory unit tests, with
+     * tiny amounts of data we can hand-review, so it's fine. The point
+     * is unit testing `tryResolve`, not unit testing "deep queries"
+     * from a non-derived build trace (what is done in
+     * `outputs-query.cc`) anyways --- that would be a separate unit
+     * test.
+     */
+    struct BuildTrace
+    {
+        std::map<SingleDerivedPath::Built, StorePath> dict;
+
+        bool operator==(const BuildTrace &) const = default;
+    };
+
+protected:
+
+    EnableExperimentalFeature caFeature{"ca-derivations"};
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+
+    /**
+     * Just here because we do this a few times in a tests.
+     */
+    static DerivationOutput caFloatingOutput()
+    {
+        return DerivationOutput{DerivationOutput::CAFloating{
+            .method = ContentAddressMethod::Raw::NixArchive,
+            .hashAlgo = HashAlgorithm::SHA256,
+        }};
+    }
+
+    /**
+     * Build a callback from a BuildTrace lookup.
+     */
+    static auto makeCallback(const BuildTrace & table)
+    {
+        return
+            [&table](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
+                if (auto p = get(table.dict, SingleDerivedPath::Built{drvPath, outputName}))
+                    return *p;
+                return std::nullopt;
+            };
+    }
+
+    /**
+     * Helper for the `exportReferencesGraph` + placeholder subpath tests.
+     */
+    void exportRefGraphSubpathTest(std::string_view stem, const Derivation & drv, const StructuredAttrs * parsed);
+
+    /**
+     * Checkpoint before/buildTrace/after and assert the resolved derivation
+     * matches expected.
+     */
+    void resolveExpect(
+        std::string_view stem, const Derivation & drv, const BuildTrace & buildTrace, const BasicDerivation & expected)
+    {
+        nix::checkpointJson(*this, std::string{stem} + "-before", drv);
+        nix::checkpointJson(*this, std::string{stem} + "-buildTrace", buildTrace);
+
+        auto resolved = tryResolve(drv, *store, makeCallback(buildTrace));
+        ASSERT_TRUE(resolved);
+
+        nix::checkpointJson(*this, std::string{stem} + "-after", *resolved);
+
+        EXPECT_EQ(*resolved, expected);
+    }
+};
+
+} // namespace nix
+
+JSON_IMPL(nix::TryResolveTest::BuildTrace);
+
+namespace nlohmann {
+
+using nix::SingleDerivedPath;
+using nix::StorePath;
+using nix::TryResolveTest;
+
+void adl_serializer<TryResolveTest::BuildTrace>::to_json(json & j, const TryResolveTest::BuildTrace & t)
+{
+    j = t.dict;
+}
+
+TryResolveTest::BuildTrace adl_serializer<TryResolveTest::BuildTrace>::from_json(const json & j)
+{
+    return TryResolveTest::BuildTrace{
+        .dict = j.get<std::map<SingleDerivedPath::Built, StorePath>>(),
+    };
+}
+
+} // namespace nlohmann
+
+namespace nix {
+
+TEST_F(TryResolveTest, noInputs)
+{
+    resolveExpect(
+        "no-inputs",
+        [&] {
+            return Derivation{
+                .outputs = {{"out", caFloatingOutput()}},
+                .platform = "x86_64-linux",
+                .builder = "/bin/bash",
+                .env = {{"FOO", "bar"}},
+                .name = "no-inputs",
+            };
+        }(),
+        {},
+        [&] {
+            BasicDerivation expected;
+            expected.name = "no-inputs";
+            expected.platform = "x86_64-linux";
+            expected.builder = "/bin/bash";
+            expected.outputs = {{"out", caFloatingOutput()}};
+            expected.env = {{"FOO", "bar"}};
+            return expected;
+        }());
+}
+
+TEST_F(TryResolveTest, withInputs)
+{
+    // dep1 has two outputs (out, dev), dep2 has one (out)
+    StorePath dep1DrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1.drv"};
+    StorePath dep1OutPath{"f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-out"};
+    StorePath dep1DevPath{"j1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-dev"};
+    StorePath dep2DrvPath{"h1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2.drv"};
+    StorePath dep2OutPath{"i1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2-out"};
+
+    auto placeholder1Out = DownstreamPlaceholder::unknownCaOutput(dep1DrvPath, "out").render();
+    auto placeholder1Dev = DownstreamPlaceholder::unknownCaOutput(dep1DrvPath, "dev").render();
+    auto placeholder2Out = DownstreamPlaceholder::unknownCaOutput(dep2DrvPath, "out").render();
+
+    derivation::Outputs<> multiOutputs = {
+        {"out", caFloatingOutput()},
+        {"dev", caFloatingOutput()},
+    };
+
+    auto dep1DrvPathRef = makeConstantStorePathRef(dep1DrvPath);
+    auto dep2DrvPathRef = makeConstantStorePathRef(dep2DrvPath);
+
+    resolveExpect(
+        "with-inputs",
+        Derivation{
+            .outputs = multiOutputs,
+            .inputs{
+                SingleDerivedPath::Built{
+                    .drvPath = dep1DrvPathRef,
+                    .output = "out",
+                },
+                SingleDerivedPath::Built{
+                    .drvPath = dep1DrvPathRef,
+                    .output = "dev",
+                },
+                SingleDerivedPath::Built{
+                    .drvPath = dep2DrvPathRef,
+                    .output = "out",
+                },
+            },
+            .platform = "x86_64-linux",
+            .builder = "/bin/bash",
+            .env =
+                {
+                    {"DEP1_OUT", "prefix-" + placeholder1Out + "-suffix"},
+                    {"DEP1_DEV", placeholder1Dev},
+                    {"DEP2", placeholder2Out},
+                },
+            .structuredAttrs = StructuredAttrs{{
+                {"dep1out", placeholder1Out},
+                {"nested", nlohmann::json::object({{"dep2", "before " + placeholder2Out + " after"}})},
+            }},
+            .name = "with-inputs",
+        },
+        {.dict{
+            {
+                SingleDerivedPath::Built{
+                    .drvPath = dep1DrvPathRef,
+                    .output = "out",
+                },
+                dep1OutPath,
+            },
+            {
+                SingleDerivedPath::Built{
+                    .drvPath = dep1DrvPathRef,
+                    .output = "dev",
+                },
+                dep1DevPath,
+            },
+            {
+                SingleDerivedPath::Built{
+                    .drvPath = dep2DrvPathRef,
+                    .output = "out",
+                },
+                dep2OutPath,
+            },
+        }},
+        [&] {
+            BasicDerivation expected;
+            expected.name = "with-inputs";
+            expected.platform = "x86_64-linux";
+            expected.builder = "/bin/bash";
+            expected.outputs = multiOutputs;
+            expected.inputs = {dep1OutPath, dep1DevPath, dep2OutPath};
+            expected.env = {
+                {"DEP1_OUT", "prefix-" + store->printStorePath(dep1OutPath) + "-suffix"},
+                {"DEP1_DEV", store->printStorePath(dep1DevPath)},
+                {"DEP2", store->printStorePath(dep2OutPath)},
+            };
+            expected.structuredAttrs = StructuredAttrs{{
+                {"dep1out", store->printStorePath(dep1OutPath)},
+                {"nested",
+                 nlohmann::json::object({{"dep2", "before " + store->printStorePath(dep2OutPath) + " after"}})},
+            }};
+            return expected;
+        }());
+}
+
+TEST_F(TryResolveTest, resolutionFailure)
+{
+    StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
+
+    Derivation drv{
+        .outputs = {{"out", caFloatingOutput()}},
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+        },
+        .platform = "x86_64-linux",
+        .builder = "/bin/bash",
+        .name = "resolution-failure",
+    };
+
+    BuildTrace buildTrace;
+
+    checkpointJson(*this, "resolution-failure-before", drv);
+    checkpointJson(*this, "resolution-failure-buildTrace", buildTrace);
+
+    auto resolved = tryResolve(drv, *store, makeCallback(buildTrace));
+    EXPECT_FALSE(resolved);
+}
+
+/**
+ * Test that `derivationOptionsFromStructuredAttrs` can parse
+ * `exportReferencesGraph` entries that reference a CA derivation output
+ * with a subpath appended (e.g. `${dep}/foo`), and that the parsed
+ * options resolve correctly.
+ *
+ * Regression test for #15003: the placeholder + subpath was not found
+ * in the placeholder map (exact-match only), and the fallback to
+ * `toStorePath()` failed because placeholders don't start with
+ * `/nix/store/`.
+ */
+void TryResolveTest::exportRefGraphSubpathTest(
+    std::string_view stem, const Derivation & drv, const StructuredAttrs * parsed)
+{
+    StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
+    StorePath depOutPath{"f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out"};
+
+    nix::checkpointJson(*this, std::string{stem} + "-before", drv);
+
+    auto options = derivationOptionsFromStructuredAttrs(*store, drv.inputs, drv.env, parsed, true);
+
+    nix::checkpointJson(*this, std::string{stem} + "-before-options", options);
+
+    SingleDerivedPath expectedPath = SingleDerivedPath::Built{
+        .drvPath = makeConstantStorePathRef(depDrvPath),
+        .output = "out",
+    };
+
+    ASSERT_EQ(options.exportReferencesGraph.size(), 1);
+    auto it = options.exportReferencesGraph.find("refs");
+    ASSERT_NE(it, options.exportReferencesGraph.end());
+    ASSERT_EQ(it->second.size(), 1);
+    EXPECT_EQ(*it->second.begin(), expectedPath);
+
+    // Also test that resolution works
+    BuildTrace buildTrace{.dict{
+        {
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+            depOutPath,
+        },
+    }};
+
+    nix::checkpointJson(*this, std::string{stem} + "-buildTrace", buildTrace);
+
+    auto resolved = tryResolve(drv, *store, makeCallback(buildTrace));
+    ASSERT_TRUE(resolved);
+
+    nix::checkpointJson(*this, std::string{stem} + "-resolved", *resolved);
+
+    // Re-parse options from the resolved derivation, where placeholders
+    // have been substituted with concrete store paths.
+    auto resolvedOptions = derivationOptionsFromStructuredAttrs(
+        *store,
+        /* inputDrvs */ {},
+        resolved->env,
+        resolved->structuredAttrs ? &*resolved->structuredAttrs : nullptr,
+        true);
+
+    nix::checkpointJson(*this, std::string{stem} + "-resolved-options", resolvedOptions);
+
+    EXPECT_EQ(
+        resolvedOptions.exportReferencesGraph,
+        (decltype(resolvedOptions.exportReferencesGraph){
+            {"refs", std::set<SingleDerivedPath>{SingleDerivedPath::Opaque{depOutPath}}}}));
+}
+
+TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath)
+{
+    StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
+    auto placeholder = DownstreamPlaceholder::unknownCaOutput(depDrvPath, "out").render();
+
+    Derivation drv{
+        .outputs = {{"out", caFloatingOutput()}},
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+        },
+        .platform = "x86_64-linux",
+        .builder = "/bin/bash",
+        .env = {{"exportReferencesGraph", "refs " + placeholder + "/foo"}},
+        .name = "export-ref-subpath",
+    };
+
+    exportRefGraphSubpathTest("export-ref-subpath", drv, nullptr);
+}
+
+TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath_structuredAttrs)
+{
+    StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
+    auto placeholder = DownstreamPlaceholder::unknownCaOutput(depDrvPath, "out").render();
+
+    Derivation drv{
+        .outputs = {{"out", caFloatingOutput()}},
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+        },
+        .platform = "x86_64-linux",
+        .builder = "/bin/bash",
+        .structuredAttrs = StructuredAttrs{{
+            {
+                "exportReferencesGraph",
+                nlohmann::json::object({{"refs", nlohmann::json::array({placeholder + "/foo"})}}),
+            },
+        }},
+        .name = "export-ref-subpath-sa",
+    };
+    // env depends on structuredAttrs, so set it after construction
+    drv.env = {
+        {std::string{StructuredAttrs::envVarName}, nlohmann::json(drv.structuredAttrs->structuredAttrs).dump()},
+    };
+
+    exportRefGraphSubpathTest("export-ref-subpath-sa", drv, &*drv.structuredAttrs);
+}
+
+} // namespace nix

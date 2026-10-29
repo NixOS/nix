@@ -11,11 +11,11 @@
 namespace nix {
 
 /**
- * Line buffering and log tracking for build output.
+ * @brief Line buffering and log tracking for build output.
  *
  * This class handles:
  * - Owning the build Activity for logging
- * - Buffering partial lines (handling \r and \n)
+ * - Buffering partial lines (handling \\r and \\n)
  * - Maintaining a tail of recent log lines (for error messages)
  * - Processing JSON log messages via handleJSONLogMessage
  *

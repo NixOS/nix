@@ -186,7 +186,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             }
         };
 
-        for (auto & cursor : installable->getCursors(*state))
+        for (auto & cursor : installable->getCursors(*state, AutoCall::Yes))
             visit(*cursor, cursor->getAttrPath(), true);
 
         if (json)

@@ -63,12 +63,18 @@ configdata_pub.set(
 subdir('nix-meson-build-support/libatomic')
 
 if host_machine.system() == 'windows'
+  # Boost.Asio, included by the public `async.hh`, needs Winsock
+  # unconditionally, so consumers must link it too.
   socket = cxx.find_library('ws2_32')
-  deps_other += socket
+  deps_public_no_pkgconfig += socket
+  # `NtCreateFile` and `RtlNtStatusToDosError`, used by the `*at`-style file
+  # system functions in `windows/file-system-at.cc`, live here.
+  nt = cxx.find_library('ntdll')
+  deps_private_no_pkgconfig += nt
 elif host_machine.system() == 'sunos'
   socket = cxx.find_library('socket')
   network_service_library = cxx.find_library('nsl')
-  deps_other += [ socket, network_service_library ]
+  deps_private_no_pkgconfig += [ socket, network_service_library ]
 endif
 
 blake3 = dependency(
@@ -89,9 +95,8 @@ boost = dependency(
   include_type : 'system',
   version : '>=1.87.0',
 )
-# boost is a public dependency, but not a pkg-config dependency unfortunately, so we
-# put in `deps_other`.
-deps_other += boost
+# boost is a public dependency, but not a pkg-config dependency unfortunately.
+deps_public_no_pkgconfig += boost
 
 openssl = dependency(
   'libcrypto',
@@ -138,6 +143,16 @@ nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
 cxx = meson.get_compiler('cpp')
+
+fs = import('fs')
+
+sh_program = get_option('sh-program')
+if host_machine.system() != 'windows' and not fs.is_absolute(sh_program)
+  # sh_program is exec'd directly and handed to ssh as $SHELL,
+  # neither of which does a PATH lookup. It's only meaningful on Linux.
+  error('sh-program must be an absolute path, got \'' + sh_program + '\'')
+endif
+configdata_priv.set_quoted('SH_PROGRAM', sh_program)
 
 config_priv_h = configure_file(
   configuration : configdata_priv,
@@ -237,7 +252,7 @@ this_library = library(
   'nixutil',
   sources,
   soversion : nix_soversion,
-  dependencies : deps_public + deps_private + deps_other,
+  dependencies : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
   include_directories : include_dirs,
   link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
@@ -247,11 +262,14 @@ this_library = library(
 
 install_headers(headers, subdir : 'nix/util', preserve_path : true)
 
+libraries_public = []
 libraries_private = []
 if host_machine.system() == 'windows'
-  # `libraries_private` cannot contain ad-hoc dependencies (from
-  # `find_library), so we need to do this manually
-  libraries_private += [ '-lws2_32' ]
+  # The pkg-config `Libs` fields cannot contain ad-hoc dependencies (from
+  # `find_library`), so these are spelled out by hand. Winsock is public
+  # for the same reason as above: consumers of the headers need it too.
+  libraries_public += [ '-lws2_32' ]
+  libraries_private += [ '-lntdll' ]
 endif
 
 subdir('nix-meson-build-support/export')

@@ -5,3 +5,10 @@ option(
   type : 'feature',
   description : 'determine microarchitecture levels with libcpuid (only relevant on x86_64)',
 )
+
+option(
+  'sh-program',
+  type : 'string',
+  value : '/bin/sh',
+  description : 'the POSIX shell used to run command strings such as $PAGER and ssh LocalCommand (must be an absolute path)',
+)

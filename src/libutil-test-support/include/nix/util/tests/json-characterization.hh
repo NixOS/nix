@@ -118,9 +118,6 @@ struct JsonCharacterizationTest : virtual CharacterizationTest
 {
     /**
      * Golden test for reading
-     *
-     * @param test hook that takes the contents of the file and does the
-     * actual work
      */
     void readJsonTest(std::string_view testStem, const T & expected, auto... args)
     {
@@ -129,9 +126,6 @@ struct JsonCharacterizationTest : virtual CharacterizationTest
 
     /**
      * Golden test for writing
-     *
-     * @param test hook that produces contents of the file and does the
-     * actual work
      */
     void writeJsonTest(std::string_view testStem, const T & value)
     {

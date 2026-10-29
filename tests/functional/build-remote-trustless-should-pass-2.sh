@@ -10,7 +10,7 @@ restartDaemon
 
 # Remote doesn't trust us
 file=build-hook.nix
-prog=$(readlink -e ./nix-daemon-untrusting.sh)
+prog=$(readlink -e ./common/nix2-daemon-untrusting.sh)
 proto=ssh-ng
 
 source build-remote-trustless.sh

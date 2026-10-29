@@ -22,7 +22,9 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/socket.hh"
+
 #include <variant>
+#include <utility>
 
 #ifndef _WIN32
 #  include <sys/socket.h>
@@ -132,10 +134,10 @@ void RemoteStore::initConnection(Connection & conn)
 void RemoteStore::setOptions(Connection & conn)
 {
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
-            << settings.getWorkerSettings().tryFallback << verbosity << settings.getWorkerSettings().maxBuildJobs
-            << settings.getWorkerSettings().maxSilentTime << true << (settings.verboseBuild ? lvlError : lvlVomit)
-            << 0 // obsolete log type
-            << 0 /* obsolete print build trace */
+            << settings.getWorkerSettings().tryFallback << std::to_underlying(verbosity)
+            << settings.getWorkerSettings().maxBuildJobs << settings.getWorkerSettings().maxSilentTime << true
+            << std::to_underlying(settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
+            << 0                                                                    /* obsolete print build trace */
             << settings.getLocalSettings().buildCores << settings.getWorkerSettings().useSubstitutes;
 
     std::map<std::string, nix::Config::SettingInfo> overrides;
@@ -150,6 +152,7 @@ void RemoteStore::setOptions(Connection & conn)
     overrides.erase(settings.getWorkerSettings().useSubstitutes.name);
     overrides.erase(loggerSettings.showTrace.name);
     overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
+    overrides.erase(settings.useXDGBaseDirectories.name);
     overrides.erase("plugin-files");
     conn.to << overrides.size();
     for (auto & i : overrides)
@@ -744,13 +747,31 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
         ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
 }
 
-void RemoteStore::addTempRoot(const StorePath & path)
+void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
-    auto conn(getConnection());
-    if (conn->tempRootsPinned.get(path))
+    if (paths.empty())
         return;
-    conn->addTempRoot(*this, &conn.daemonException, path);
-    conn->tempRootsPinned.upsert(path, true);
+
+    auto conn(getConnection());
+
+    if (conn->protoVersion.features.contains(WorkerProto::featureAddTempRoots)) {
+        StorePathSet newPaths;
+        for (auto & path : paths)
+            if (!conn->tempRootsPinned.get(path))
+                newPaths.insert(path);
+
+        if (newPaths.empty())
+            return;
+
+        conn->to << WorkerProto::Op::AddTempRoots;
+        WorkerProto::write(*this, *conn, newPaths);
+        conn.processStderr();
+        readInt(conn->from);
+
+        for (auto & path : newPaths)
+            conn->tempRootsPinned.upsert(path, true);
+    }
+    /* Note: there is no fallback for old daemons to prevent performance regressions. */
 }
 
 Roots RemoteStore::findRoots(bool censor)

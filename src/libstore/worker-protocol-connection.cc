@@ -82,7 +82,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
 
         else if (msg == STDERR_START_ACTIVITY) {
             auto act = readNum<ActivityId>(from);
-            auto lvl = (Verbosity) readInt(from);
+            auto lvl = verbosityFromIntClamped(readInt(from));
             auto type = (ActivityType) readInt(from);
             auto s = readString(from);
             auto fields = readFields(from);

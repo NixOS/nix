@@ -72,6 +72,15 @@ struct ExtraPathInfoValue : ExtraPathInfo
 };
 
 /**
+ * Whether an installable that evaluates to a function should be called
+ * with its default arguments.
+ */
+enum class AutoCall : bool {
+    No = false,
+    Yes = true,
+};
+
+/**
  * An Installable which corresponds a Nix language value, in addition to
  * a collection of \ref DerivedPath "derived paths".
  */
@@ -86,21 +95,25 @@ struct InstallableValue : Installable
 
     virtual ~InstallableValue() {}
 
-    virtual std::pair<Value *, PosIdx> toValue(EvalState & state) = 0;
+    virtual std::pair<Value *, PosIdx> toValue(EvalState & state, AutoCall autoCall) = 0;
 
     /**
      * Get a cursor to each value this Installable could refer to.
      * However if none exists, throw exception instead of returning
      * empty vector.
      */
-    virtual std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state);
+    virtual std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state, AutoCall autoCall);
 
     /**
      * Get the first and most preferred cursor this Installable could
      * refer to, or throw an exception if none exists.
      */
-    virtual ref<eval_cache::AttrCursor> getCursor(EvalState & state);
+    virtual ref<eval_cache::AttrCursor> getCursor(EvalState & state, AutoCall autoCall);
 
+    /**
+     * Get the app this Installable refers to. Implies `AutoCall::Yes`,
+     * since an app has to be a package or an app definition.
+     */
     UnresolvedApp toApp(EvalState & state);
 
     static InstallableValue & require(Installable & installable);

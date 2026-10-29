@@ -50,14 +50,57 @@ public:
  * cached in pure mode. This means that they should not depend on the configuration or the overall environment.
  */
 MakeError(EvalError, EvalBaseError);
-MakeError(ParseError, Error);
 MakeError(AssertionError, EvalError);
 MakeError(ThrownError, AssertionError);
 MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, EvalError);
 MakeError(MissingArgumentError, EvalError);
-MakeError(InfiniteRecursionError, EvalError);
+
+class ParseError final : public CloneableError<ParseError, Error>
+{
+    bool isUnexpectedEOF = false;
+
+    void anchor() override;
+
+public:
+    using CloneableError::CloneableError;
+
+    ParseError && setIncomplete(bool val) &&
+    {
+        isUnexpectedEOF = val;
+        return std::move(*this);
+    }
+
+    /**
+     * Whether the parser expected more input.
+     */
+    bool isIncomplete() const noexcept
+    {
+        return isUnexpectedEOF;
+    }
+};
+
+class InfiniteRecursionError : public CloneableError<InfiniteRecursionError, EvalError>
+{
+    void anchor() override;
+
+public:
+
+    /**
+     * Memory location of the Value that was found to be a blackhole, used to
+     * mark where the recursion starts in the printed trace. Only pointer
+     * identity is of interest.
+     */
+    const Value * const v;
+
+    template<typename... Args>
+    explicit InfiniteRecursionError(EvalState & state, const Value * v, const Args &... args)
+        : CloneableError(state, args...)
+        , v(v)
+    {
+    }
+};
 
 /**
  * Resource exhaustion error when evaluation exceeds max-call-depth.

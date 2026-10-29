@@ -10,7 +10,7 @@
 
 namespace nix {
 
-struct PathSubstitutionGoal : public Goal
+class PathSubstitutionGoal : public Goal
 {
     /**
      * The store path that should be realised through a substitute.
@@ -35,12 +35,24 @@ struct PathSubstitutionGoal : public Goal
      */
     std::optional<ContentAddress> ca;
 
+    enum class SubstitutionResult {
+        SubstituterFailed,
+        SubstituteGone,
+        Ok,
+    };
+
+    using Result = std::pair<ExitCode, BuildResult>;
+
+    Co<Result> substitute();
+    Co<SubstitutionResult> tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info);
+
 public:
     PathSubstitutionGoal(
         const StorePath & storePath,
         Worker & worker,
         RepairFlag repair = NoRepair,
         std::optional<ContentAddress> ca = std::nullopt);
+
     ~PathSubstitutionGoal();
 
     std::string key() override
@@ -48,14 +60,15 @@ public:
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
     }
 
+    const StorePath & getStorePath() const &
+    {
+        return storePath;
+    }
+
     /**
      * The states.
      */
-    Co init();
-    Co gotInfo();
-    Co tryToRun(
-        StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
-    Co finished();
+    Co<ExitCode> init();
 
     /* Called by destructor, can't be overridden */
     void cleanup() override final;

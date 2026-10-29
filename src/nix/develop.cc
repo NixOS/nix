@@ -1,4 +1,6 @@
 #include "nix/cmd/command.hh"
+
+#include "cli-config-private.hh"
 #include "nix/util/config-global.hh"
 #include "nix/expr/eval.hh"
 #include "nix/cmd/installable-flake.hh"
@@ -268,7 +270,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
     drv.env.emplace("name", drv.name);
-    drv.inputs.srcs.insert(std::move(getEnvShPath));
+    drv.inputs.insert(SingleDerivedPath::Opaque{std::move(getEnvShPath)});
     for (auto & [outputName, output] : drv.outputs) {
         std::visit(
             overloaded{
@@ -300,8 +302,8 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
 
     // `get-env.sh` will write its JSON output to an arbitrary output
     // path, so return the first non-empty output path.
-    for (auto & [_0, path] : deepQueryDerivationOutputMap(*evalStore, shellDrvPath)) {
-        auto accessor = evalStore->requireStoreObjectAccessor(path);
+    for (auto & [_0, path] : deepQueryDerivationOutputMap(*store, shellDrvPath, &*evalStore)) {
+        auto accessor = store->requireStoreObjectAccessor(path);
         if (auto st = accessor->maybeLstat(CanonPath::root); st && st->fileSize.value_or(0))
             return path;
     }
@@ -639,7 +641,7 @@ struct CmdDevelop : Common, MixEnvironment
         // prevent garbage collection until shell exits
         setEnv("NIX_GCROOT", store->printStorePath(gcroot).c_str());
 
-        std::filesystem::path shell = "bash";
+        std::filesystem::path shell = FALLBACK_BASH;
         bool foundInteractive = false;
 
         try {

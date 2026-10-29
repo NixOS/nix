@@ -115,7 +115,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     if (baseDir) {
         /* Check if 'url' is a path (either absolute or relative
            to 'baseDir'). If so, search upward to the root of the
-           repo (i.e. the directory containing .git). */
+           repo. */
 
         path = absPath(path, get(baseDir), true);
 
@@ -146,7 +146,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     if (pathExists(path / "flake.nix")) {
                         found = true;
                         break;
-                    } else if (pathExists(path / ".git"))
+                    } else if (fetchers::getLocalRepoURL(path))
                         throw Error(
                             "path %s is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)",
                             PathFmt(path));
@@ -168,14 +168,11 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
             std::string subdir;
 
             while (flakeRoot.parent_path() != flakeRoot) {
-                if (pathExists(flakeRoot / ".git")) {
-                    auto parsedURL = ParsedURL{
-                        .scheme = "git+file",
-                        .authority = ParsedURL::Authority{},
-                        .path = pathToUrlPath(flakeRoot),
-                        .query = query,
-                        .fragment = fragment,
-                    };
+                if (auto repoURL = fetchers::getLocalRepoURL(flakeRoot)) {
+                    auto parsedURL = std::move(*repoURL);
+                    auto schemeQuery = std::move(parsedURL.query);
+                    parsedURL.query = query;
+                    parsedURL.fragment = fragment;
 
                     if (subdir != "") {
                         if (parsedURL.query.count("dir"))
@@ -183,8 +180,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
-                    if (pathExists(flakeRoot / ".git" / "shallow"))
-                        parsedURL.query.insert_or_assign("shallow", "1");
+                    for (auto & [name, value] : schemeQuery)
+                        parsedURL.query.insert_or_assign(name, value);
 
                     return fromParsedURL(std::move(parsedURL), isFlake);
                 }
@@ -239,18 +236,27 @@ static std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(std::stri
 std::optional<std::pair<FlakeRef, std::string>>
 parseURLFlakeRef(std::string_view url, const std::optional<std::filesystem::path> & baseDir, bool isFlake)
 {
+    std::optional<ParsedURL> parsed;
     try {
-        auto parsed = parseURL(url, /*lenient=*/true);
-        if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file")) {
-            /* Here we know that the path must not contain encoded '/' or NUL bytes. */
-            auto path = urlPathToPath(parsed.path);
-            if (!path.is_absolute())
-                parsed.path = pathToUrlPath(absPath(path, get(baseDir)));
-        }
-        return fromParsedURL(std::move(parsed), isFlake);
+        parsed = parseURL(url, /*lenient=*/true);
     } catch (BadURL &) {
+        /* The string is not a URL, so try to interpret it as a path
+           instead (in the caller). Note that errors that occur while
+           *interpreting* a syntactically valid URL (such as an
+           unsupported query parameter) are not caught here; they
+           should be shown to the user rather than masked by a
+           confusing error about the flake ref not being a valid
+           path. */
         return std::nullopt;
     }
+
+    if (baseDir && (parsed->scheme == "path" || parsed->scheme == "git+file")) {
+        /* Here we know that the path must not contain encoded '/' or NUL bytes. */
+        auto path = urlPathToPath(parsed->path);
+        if (!path.is_absolute())
+            parsed->path = pathToUrlPath(absPath(path, get(baseDir)));
+    }
+    return fromParsedURL(std::move(*parsed), isFlake);
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(

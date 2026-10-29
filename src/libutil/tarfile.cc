@@ -1,7 +1,6 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/file-system.hh"
@@ -11,12 +10,12 @@ namespace nix {
 
 namespace {
 
-int callback_open(struct archive *, void * self)
+int callback_open(struct archive *, void * self) noexcept
 {
     return ARCHIVE_OK;
 }
 
-ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer)
+ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer) noexcept
 {
     auto self = (TarArchive *) _self;
     *buffer = self->buffer.data();
@@ -25,13 +24,15 @@ ssize_t callback_read(struct archive * archive, void * _self, const void ** buff
         return self->source->read((char *) self->buffer.data(), self->buffer.size());
     } catch (EndOfFile &) {
         return 0;
-    } catch (std::exception & err) {
-        archive_set_error(archive, EIO, "Source threw exception: %s", err.what());
-        return -1;
+    } catch (...) {
+        /* This will also propagate boost::context::detail::forced_unwind if we happen to switch
+           coroutine stacks inside read above. */
+        self->readException = std::current_exception();
+        return ARCHIVE_FAILED;
     }
 }
 
-int callback_close(struct archive *, void * self)
+int callback_close(struct archive *, void * self) noexcept
 {
     return ARCHIVE_OK;
 }
@@ -45,8 +46,12 @@ void TarArchive::check(int err, const std::string & reason, bool warningsAreFata
         throw EndOfFile("reached end of archive");
     else if (err == ARCHIVE_WARN && !warningsAreFatal)
         warn(reason, archive_error_string(archive));
-    else if (err != ARCHIVE_OK)
+    else if (err != ARCHIVE_OK) {
+        auto exception = std::exchange(readException, nullptr);
+        if (exception)
+            std::rethrow_exception(exception);
         throw Error(reason, archive_error_string(archive));
+    }
 }
 
 static void enableSupportedFormats(struct archive * archive)
@@ -125,6 +130,12 @@ TarArchive::TarArchive(Source & source, bool raw, std::optional<CompressionAlgo>
         "Failed to open archive (%s)");
 }
 
+#ifndef _WIN32
+#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func
+#else
+#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func##_w
+#endif
+
 TarArchive::TarArchive(const std::filesystem::path & path)
     : archive{archive_read_new()}
     , buffer(defaultBufferSize)
@@ -132,25 +143,21 @@ TarArchive::TarArchive(const std::filesystem::path & path)
     archive_read_support_filter_all(archive);
     enableSupportedFormats(archive);
     archive_read_set_option(archive, NULL, "mac-ext", NULL);
-    check(archive_read_open_filename(archive, path.string().c_str(), 16384), "failed to open archive: %s");
+    check(
+        NIX_LIBARCHIVE_NATIVE_PATH_FUNC(archive_read_open_filename)(archive, path.c_str(), 16384),
+        "failed to open archive: %s");
 }
 
 void TarArchive::close()
 {
-    check(archive_read_close(this->archive), "Failed to close archive (%s)");
+    check(archive_read_close(archive), "Failed to close archive (%s)");
 }
 
 TarArchive::~TarArchive()
 {
-    if (this->archive)
-        archive_read_free(this->archive);
+    if (archive)
+        archive_read_free(archive);
 }
-
-#ifndef _WIN32
-#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func
-#else
-#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func##_w
-#endif
 
 static void extract_archive(TarArchive & archive, const std::filesystem::path & destDir)
 {
@@ -207,7 +214,7 @@ void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem:
     extract_archive(archive, destDir);
 }
 
-time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & parseSink)
+time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
 {
     time_t lastModified = 0;
 
@@ -244,10 +251,8 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
             break;
 
         case AE_IFREG: {
-            parseSink.createRegularFile(cpath, [&](auto & crf) {
-                if (archive_entry_mode(entry) & S_IXUSR)
-                    crf.isExecutable();
-
+            bool isExecutable = archive_entry_mode(entry) & S_IXUSR;
+            parseSink.createRegularFile(cpath, isExecutable, [&](auto & crf) {
                 while (true) {
                     auto n = archive_read_data(archive.archive, buf.data(), buf.size());
                     if (n < 0)
@@ -278,6 +283,16 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
     }
 
     return lastModified;
+}
+
+TarSink::~TarSink() {}
+
+NullTarSink::~NullTarSink() {}
+
+void NullTarSink::createRegularFile(const CanonPath & path, bool isExecutable, fun<void(Sink &)> callback)
+{
+    NullSink sink;
+    callback(sink);
 }
 
 } // namespace nix

@@ -97,14 +97,9 @@ configdata_pub.set(
   description : 'FIXME: It\'s a bit peculiar that this needs to be exposed. The reason is that that it effects whether the settings struct in a header has a particular field. This is also odd, because it means when there is no ACL support one will just get an "unknown setting" warning from their configuration.',
 )
 
-if host_machine.system() == 'darwin'
-  sandbox = cxx.find_library('sandbox')
-  deps_other += [ sandbox ]
-endif
-
 if host_machine.system() == 'windows'
   wsock32 = cxx.find_library('wsock32')
-  deps_other += [ wsock32 ]
+  deps_private_no_pkgconfig += [ wsock32 ]
 endif
 
 subdir('nix-meson-build-support/libatomic')
@@ -119,9 +114,8 @@ boost = dependency(
   ],
   include_type : 'system',
 )
-# boost is a public dependency, but not a pkg-config dependency unfortunately, so we
-# put in `deps_other`.
-deps_other += boost
+# boost is a public dependency, but not a pkg-config dependency unfortunately.
+deps_public_no_pkgconfig += boost
 
 # This is quite new, but curl has a bunch of known issues with write pausing and decompression.
 # Please use libcurl >= 8.17. See https://github.com/curl/curl/issues/19334, https://github.com/curl/curl/issues/16280, https://github.com/curl/curl/issues/16955 if in doubt.
@@ -153,7 +147,7 @@ deps_private += seccomp
 if host_machine.system() == 'freebsd'
   # libjail is not in freebsd.libc, but there's no discovery mechanism
   libjail = declare_dependency(link_args : [ '-ljail' ])
-  deps_other += libjail
+  deps_private_no_pkgconfig += libjail
 endif
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
@@ -171,7 +165,7 @@ aws_crt_cpp = dependency(
 )
 
 if s3_aws_auth.enabled()
-  deps_other += aws_crt_cpp
+  deps_private_no_pkgconfig += aws_crt_cpp
 endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
@@ -240,13 +234,15 @@ if host_machine.system() != 'windows'
   configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
 endif
 
-lsof = find_program('lsof', required : false)
-configdata_priv.set_quoted(
-  'LSOF',
-  lsof.found() ? lsof.full_path()
-  # Just look up on the PATH
-: 'lsof',
-)
+lsof_program = get_option('lsof-program')
+if lsof_program == ''
+  lsof = find_program('lsof', required : false)
+  # Just look up on the PATH if not found at build time
+  lsof_program = lsof.found() ? lsof.full_path() : 'lsof'
+endif
+configdata_priv.set_quoted('LSOF', lsof_program)
+
+configdata_priv.set_quoted('SSH_PROGRAM', get_option('ssh-program'))
 
 config_priv_h = configure_file(
   configuration : configdata_priv,
@@ -259,6 +255,7 @@ sources = files(
   'binary-cache-store.cc',
   'build-result.cc',
   'build/build-log.cc',
+  'build/derivation-builder-impl.cc',
   'build/derivation-builder.cc',
   'build/derivation-building-goal.cc',
   'build/derivation-check.cc',
@@ -280,8 +277,11 @@ sources = files(
   'daemon.cc',
   'derivation-options.cc',
   'derivation/aterm.cc',
+  'derivation/full-inputs.cc',
   'derivation/json.cc',
+  'derivation/masked.cc',
   'derivation/output.cc',
+  'derivation/resolution.cc',
   'derivations.cc',
   'derived-path-map.cc',
   'derived-path.cc',
@@ -336,6 +336,7 @@ sources = files(
   'store-reference.cc',
   'store-registration.cc',
   'submit-store.cc',
+  'substituter.cc',
   'uds-remote-store.cc',
   'worker-protocol-connection.cc',
   'worker-protocol.cc',
@@ -374,7 +375,7 @@ this_library = library(
   sources,
   config_priv_h,
   soversion : nix_soversion,
-  dependencies : deps_public + deps_private + deps_other,
+  dependencies : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
   include_directories : include_dirs,
   link_args : linker_export_flags,
   prelink : true, # For C++ static initializers

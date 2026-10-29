@@ -1,0 +1,47 @@
+# Obvious garbage first
+@nix [1,2,3]
+@nix 42
+@nix null
+@nix 1.2345
+@nix {}
+@nix ][
+
+# Not number id
+@nix {"action":"stop","id":"1"}
+@nix {"action":"stop","id":-1}
+@nix {"action":"stop","id":1.111111}
+@nix {"action":"stop","id":18446744073709551615}
+@nix {"action":"stop","id":18446744073709551616}
+
+# Not a string action
+@nix {"action":5}
+@nix {"action":["hi","there",1.2345]}
+@nix {"action": null}
+
+# Unknown action
+@nix {"action":"explode"}
+
+# Stopping a non-existent activity
+@nix {"action":"stop","id":1}
+
+# Duplicate level keys
+@nix {"action":"msg","level":0,"level":9999,"msg":"x"}
+
+# Garbage result type
+@nix {"action":"result","id":42,"type":999999999999,"fields":[]}
+@nix {"action":"result","id":42,"type":99999999999999999999999999999.000001,"fields":[]}
+
+# Garbage start type
+@nix {"action":"start","type":42424242,"level":0,"id":1,"text":"","fields":[]}
+@nix {"action":"start","type":-1,"":[]}
+@nix {"action":"start","type":4,"":[]}
+@nix {"action":"start","type":99,"":[]}
+@nix {"action":"start","type":-1.256,"":[]}
+
+# Legitimate action for a change
+@nix {"action":"start","type":101,"level":0,"id":424242,"text":"something","fields":["something","something"]}
+
+# setPhase
+@nix {"action":"setPhase","phase":"something"}
+@nix {"action":"setPhase","phase":"something","phase":"somethingelse"}
+@nix {"action":"setPhase","phase":1,"phase":"somethingelse"}

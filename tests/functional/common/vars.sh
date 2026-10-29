@@ -44,7 +44,7 @@ if ! isTestOnNixOS; then
   export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
   unset NIX_USER_CONF_FILES
   export _NIX_TEST_SHARED=$TEST_ROOT/shared
-  if [[ -n $NIX_STORE ]]; then
+  if [[ -n ${NIX_STORE:-} ]]; then
       export _NIX_TEST_NO_SANDBOX=1
   fi
   export _NIX_IN_TEST=$TEST_ROOT/shared
@@ -75,7 +75,7 @@ export IMPURE_VAR2=bar
 # shellcheck disable=SC2034
 cacheDir=$TEST_ROOT/binary-cache
 
-if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user true; then
+if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user --pid --fork --mount-proc true; then
     _canUseSandbox=1
 fi
 

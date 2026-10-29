@@ -1,0 +1,1 @@
+Derive([("out","C:\\ProgramData\\nix\\store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo","","")],[],["C:\\ProgramData\\nix\\store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-bar"],"x86_64-windows","builder.exe",["arg"],[("out","C:\\ProgramData\\nix\\store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo")])

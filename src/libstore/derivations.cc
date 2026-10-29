@@ -1,6 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/masked.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
@@ -90,9 +91,9 @@ bool Derivation<Inputs, Out>::isBuiltin() const
 
 static auto infoForDerivation(const StoreDirConfig & store, const Derivation & drv)
 {
-    auto references = drv.inputs.srcs;
-    for (auto & i : drv.inputs.drvs.map)
-        references.insert(i.first);
+    StorePathSet references;
+    for (const auto & input : drv.inputs)
+        references.insert(input.getBaseStorePath());
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
@@ -306,139 +307,9 @@ void Derivation<Inputs, Out>::applyRewrites(const StringMap & rewrites)
     }
 }
 
-Full unresolve(const Basic & drv)
+bool hasDynamicDrvDep(const std::set<SingleDerivedPath> & inputs)
 {
-    return drv.mapInputs([](const StorePathSet & inputs) -> FullInputs { return {.srcs = inputs, .drvs = {}}; });
-}
-
-bool shouldResolve(const Full & drv)
-{
-    /* No input drvs means nothing to resolve. */
-    if (drv.inputs.drvs.map.empty())
-        return false;
-
-    auto drvType = type(drv);
-
-    bool typeNeedsResolve = std::visit(
-        overloaded{
-            [&](const Type::InputAddressed & ia) {
-                /* Must resolve if deferred. */
-                return ia.deferred;
-            },
-            [&](const Type::ContentAddressed & ca) {
-                return ca.fixed
-                           /* Can optionally resolve if fixed, which is good
-                              for avoiding unnecessary rebuilds. */
-                           ? experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
-                           /* Must resolve if floating. */
-                           : true;
-            },
-            [&](const Type::Impure &) { return true; },
-        },
-        drvType.raw);
-
-    return typeNeedsResolve ||
-           /* Also need to resolve if any inputs are outputs of dynamic derivations. */
-           hasDynamicDrvDep(drv.inputs.drvs.map);
-}
-
-template<bool fillIn>
-static void processDerivationOutputPaths(Store & store, auto && drv, std::string_view drvName);
-
-static bool tryResolveInput(
-    const StoreDirConfig & store,
-    StorePathSet & inputSrcs,
-    StringMap & inputRewrites,
-    const DownstreamPlaceholder * placeholderOpt,
-    ref<const SingleDerivedPath> drvPath,
-    const DerivedPathMap<StringSet>::ChildNode & inputNode,
-    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
-        queryResolutionChain)
-{
-    auto getPlaceholder = [&](const std::string & outputName) {
-        return placeholderOpt ? DownstreamPlaceholder::unknownDerivation(*placeholderOpt, outputName) : [&] {
-            auto * p = std::get_if<SingleDerivedPath::Opaque>(&drvPath->raw());
-            // otherwise we should have had a placeholder to build-upon already
-            assert(p);
-            return DownstreamPlaceholder::unknownCaOutput(p->path, outputName);
-        }();
-    };
-
-    for (auto & outputName : inputNode.value) {
-        auto actualPathOpt = queryResolutionChain(drvPath, outputName);
-        if (!actualPathOpt)
-            return false;
-        auto actualPath = *actualPathOpt;
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-            inputRewrites.emplace(getPlaceholder(outputName).render(), store.printStorePath(actualPath));
-        }
-        inputSrcs.insert(std::move(actualPath));
-    }
-
-    for (auto & [outputName, childNode] : inputNode.childMap) {
-        auto nextPlaceholder = getPlaceholder(outputName);
-        if (!tryResolveInput(
-                store,
-                inputSrcs,
-                inputRewrites,
-                &nextPlaceholder,
-                make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{drvPath, outputName}),
-                childNode,
-                queryResolutionChain))
-            return false;
-    }
-    return true;
-}
-
-std::optional<Basic> tryResolve(const Full & drv, Store & store, Store * evalStore)
-{
-    return tryResolve(
-        drv,
-        store,
-        [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
-            try {
-                return resolveDerivedPath(store, SingleDerivedPath::Built{drvPath, outputName}, evalStore);
-            } catch (Error &) {
-                return std::nullopt;
-            }
-        });
-}
-
-std::optional<Basic> tryResolve(
-    const Full & drv,
-    Store & store,
-    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
-        queryResolutionChain)
-{
-    Basic resolved{
-        .outputs = drv.outputs,
-        .inputs = drv.inputs.srcs,
-        .platform = drv.platform,
-        .builder = drv.builder,
-        .args = drv.args,
-        .env = drv.env,
-        .structuredAttrs = drv.structuredAttrs,
-        .name = drv.name,
-    };
-
-    StringMap inputRewrites;
-
-    for (auto & [inputDrv, inputNode] : drv.inputs.drvs.map)
-        if (!tryResolveInput(
-                store,
-                resolved.inputs,
-                inputRewrites,
-                nullptr,
-                make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{inputDrv}),
-                inputNode,
-                queryResolutionChain))
-            return std::nullopt;
-
-    resolved.applyRewrites(inputRewrites);
-
-    processDerivationOutputPaths</*fillIn=*/true>(store, resolved, resolved.name);
-
-    return resolved;
+    return std::ranges::any_of(inputs, [](const auto & input) { return input.isDynamicDrvOutput(); });
 }
 
 /**
@@ -463,19 +334,39 @@ std::optional<Basic> tryResolve(
  * mismatch).
  */
 template<bool fillIn>
-static void processDerivationOutputPaths(Store & store, auto && drv, std::string_view drvName)
+static void processDerivationOutputPaths(
+    const StoreDirConfig & store,
+    /* A `ReadDerivation` for `Full`, and `std::monostate` for `Basic`,
+       which has no input derivations to look one up for. Taking it as a
+       type parameter rather than an optional means the `Basic` case
+       cannot use it even by mistake: the branch that would is never
+       instantiated. */
+    auto && readDerivation,
+    auto && drv,
+    std::string_view drvName)
 {
     /* output optional is for whether we set it yet. Inner optional is
        for whether the input-addressed derivation has an input address
        now or is deferred --- can only calculate input address later. */
-    std::optional<std::optional<Hash>> hashModulo_;
+    std::optional<std::optional<Hash>> maskedHash;
 
-    auto hashModulo = [&]() -> const std::optional<Hash> & {
-        if (!hashModulo_) {
+    auto maskHash = [&]() -> const std::optional<Hash> & {
+        if (!maskedHash) {
             // somewhat expensive so we do lazily
-            hashModulo_ = derivation::hashModulo(store, drv);
+            if constexpr (std::is_same_v<std::decay_t<decltype(drv)>, derivation::Basic>) {
+                /* A resolved derivation has no input derivations to
+                   substitute, so this cannot fail, and needs no
+                   lookup. */
+                maskedHash.emplace(
+                    derivation::masked::hashDerivation(store, derivation::masked::fullyMaskDerivation(store, drv)));
+            } else {
+                auto maskedDerivation = derivation::masked::fullyMaskDerivation(store, readDerivation, drv);
+                maskedHash = maskedDerivation
+                                 ? std::optional{derivation::masked::hashDerivation(store, *maskedDerivation)}
+                                 : std::nullopt;
+            }
         }
-        return *hashModulo_;
+        return *maskedHash;
     };
 
     /* With the `builder-rpc-v0` experimental feature, outputs are
@@ -489,8 +380,8 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
        `exportReferencesGraph`) are recognized. */
     bool rpcOutputs = [&] {
         auto * parsed = get(drv.structuredAttrs);
-        if constexpr (requires { drv.inputs.drvs; })
-            return derivationOptionsFromStructuredAttrs(store, drv.inputs.drvs, drv.env, parsed, /*shouldWarn=*/false)
+        if constexpr (std::is_same_v<std::decay_t<decltype(drv.inputs)>, std::set<SingleDerivedPath>>)
+            return derivationOptionsFromStructuredAttrs(store, drv.inputs, drv.env, parsed, /*shouldWarn=*/false)
                        .requiredSystemFeatures.count(std::string{drvFeatureBuilderRpcV0})
                    != 0;
         else
@@ -500,7 +391,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     }();
 
     /* Throws on invalid output combinations. Must run before
-       `hashModulo`, which would panic instead. */
+       `fullyMaskDerivation`, which would panic instead. */
     auto drvType = type(drv);
 
     if (rpcOutputs && std::holds_alternative<Type::InputAddressed>(drvType.raw))
@@ -549,7 +440,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
             }
         };
         auto hash = [&]<typename Out>(const Out & outputVariant) {
-            auto & drvHash = hashModulo();
+            auto & drvHash = maskHash();
             if (drvHash) {
                 auto outPath = store.makeOutputPath(outputName, *drvHash, drvName);
 
@@ -618,7 +509,11 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
 }
 
 template<typename Inputs>
-void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath)
+void checkInvariants(
+    const Derivation<Inputs, Output> & drv,
+    const StoreDirConfig & store,
+    auto && readDerivation,
+    const StorePath & drvPath)
 {
     assert(drvPath.isDerivation());
     std::string drvName(drvPath.name());
@@ -630,39 +525,107 @@ void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, cons
     }
 
     try {
-        checkInvariants(drv, store);
+        if constexpr (std::is_same_v<Inputs, StorePathSet>)
+            checkInvariants(drv, store);
+        else
+            checkInvariants(drv, store, readDerivation);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation '%s'", store.printStorePath(drvPath));
         throw;
     }
 }
 
-template void checkInvariants(const Basic & drv, Store & store, const StorePath & drvPath);
-template void checkInvariants(const Full & drv, Store & store, const StorePath & drvPath);
+template void checkInvariants(
+    const Basic & drv, const StoreDirConfig & store, std::monostate && readDerivation, const StorePath & drvPath);
+template void checkInvariants(
+    const Full & drv, const StoreDirConfig & store, ReadDerivation && readDerivation, const StorePath & drvPath);
 
-void checkInvariants(const Basic & drv, Store & store)
+void checkInvariants(const Basic & drv, const StoreDirConfig & store)
 {
-    processDerivationOutputPaths<false>(store, drv, drv.name);
+    processDerivationOutputPaths<false>(store, std::monostate{}, drv, drv.name);
+}
+
+void checkInvariants(const Full & drv, const StoreDirConfig & store, ReadDerivation & readDerivation)
+{
+    processDerivationOutputPaths<false>(store, readDerivation, drv, drv.name);
 }
 
 void checkInvariants(const Full & drv, Store & store)
 {
-    processDerivationOutputPaths<false>(store, drv, drv.name);
+    auto readDerivation = readInvalid(store);
+    checkInvariants(drv, store, readDerivation);
+}
+
+ReadDerivation readInvalid(Store & store)
+{
+    return [&store](const StorePath & drvPath) { return store.readInvalidDerivation(drvPath); };
+}
+
+void fillInOutputPaths(Basic & drv, const StoreDirConfig & store)
+{
+    processDerivationOutputPaths<true>(store, std::monostate{}, drv, drv.name);
+}
+
+void fillInOutputPaths(Full & drv, const StoreDirConfig & store, ReadDerivation & readDerivation)
+{
+    processDerivationOutputPaths<true>(store, readDerivation, drv, drv.name);
 }
 
 void fillInOutputPaths(Full & drv, Store & store)
 {
-    processDerivationOutputPaths<true>(store, drv, drv.name);
+    auto readDerivation = readInvalid(store);
+    fillInOutputPaths(drv, store, readDerivation);
+}
+
+std::optional<FullInputAddressed>
+fillInOutputPaths(FullDeferred drv, const StoreDirConfig & store, ReadDerivation & readDerivation)
+{
+    /* Widen to the variant-typed form so there is just one
+       implementation of the actual work. Everything but the outputs is
+       moved through; the outputs are rebuilt, but they are small. */
+    Full full{
+        .inputs = std::move(drv.inputs),
+        .platform = std::move(drv.platform),
+        .builder = std::move(drv.builder),
+        .args = std::move(drv.args),
+        .env = std::move(drv.env),
+        .structuredAttrs = std::move(drv.structuredAttrs),
+        .name = std::move(drv.name),
+    };
+    for (auto & [outputName, output] : drv.outputs)
+        full.outputs.insert_or_assign(outputName, Output{output});
+
+    fillInOutputPaths(full, store, readDerivation);
+
+    /* Narrow back. If any output is still `Deferred`, there was no
+       input address to fill in, which this return type cannot say. */
+    FullInputAddressed res{
+        .inputs = std::move(full.inputs),
+        .platform = std::move(full.platform),
+        .builder = std::move(full.builder),
+        .args = std::move(full.args),
+        .env = std::move(full.env),
+        .structuredAttrs = std::move(full.structuredAttrs),
+        .name = std::move(full.name),
+    };
+    for (auto & [outputName, output] : full.outputs) {
+        auto * inputAddressed = std::get_if<Output::InputAddressed>(&output.raw);
+        if (!inputAddressed)
+            return std::nullopt;
+        res.outputs.insert_or_assign(outputName, *inputAddressed);
+    }
+    return res;
 }
 
 Full parseJsonAndValidate(Store & store, const nlohmann::json & json)
 {
     auto drv = static_cast<Full>(json);
 
-    fillInOutputPaths(drv, store);
+    auto readDerivation = derivation::readInvalid(store);
+    fillInOutputPaths(drv, store, readDerivation);
 
     try {
-        checkInvariants(drv, store);
+        checkInvariants(drv, store, readDerivation);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation from JSON with name '%s'", drv.name);
         throw;
@@ -679,7 +642,7 @@ const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 namespace derivation {
 
 template struct Derivation<StorePathSet>;
-template struct Derivation<FullInputs>;
+template struct Derivation<std::set<SingleDerivedPath>>;
 
 } // namespace derivation
 

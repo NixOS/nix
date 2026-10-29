@@ -42,11 +42,6 @@ struct CmdConfigShow : Command, MixJSON
         return "show the Nix configuration or the value of a specific setting";
     }
 
-    Category category() override
-    {
-        return catUtility;
-    }
-
     void run() override
     {
         if (name) {

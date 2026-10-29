@@ -17,7 +17,7 @@ struct Machine
 
     const StoreReference storeUri;
     /**
-     * @TODO this information should eventually just exist to update an
+     * @todo this information should eventually just exist to update an
      * underlying setting on `Store::Config`, just as the feature information
      * updates `Store::Config::systemType`. The only wrinkle is whether the
      * makes sense for separate local stores to have distinct systems, when they

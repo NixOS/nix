@@ -9,6 +9,8 @@
 #include "nix/util/util.hh"
 #include "nix/main/plugin.hh"
 
+#include <utility>
+
 namespace nix {
 
 MixCommonArgs::MixCommonArgs(const std::string & programName)
@@ -20,7 +22,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .description = "Increase the logging verbosity level.",
         .category = loggingCategory,
         .handler = {[]() {
-            verbosity = (Verbosity) std::min<std::underlying_type_t<Verbosity>>(verbosity + 1, lvlVomit);
+            verbosity = (verbosity >= lvlVomit ? lvlVomit : static_cast<Verbosity>(std::to_underlying(verbosity) + 1));
         }},
     });
 
@@ -28,7 +30,9 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .longName = "quiet",
         .description = "Decrease the logging verbosity level.",
         .category = loggingCategory,
-        .handler = {[]() { verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError; }},
+        .handler = {[]() {
+            verbosity = (verbosity <= lvlError ? lvlError : static_cast<Verbosity>(std::to_underlying(verbosity) - 1));
+        }},
     });
 
     addFlag({

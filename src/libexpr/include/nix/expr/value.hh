@@ -335,7 +335,7 @@ struct ValueBase
          * to represent a flattening of the recursive sum type that is a
          * context element.
          *
-         * @See NixStringContext for an more easily understood type,
+         * @see NixStringContext for an more easily understood type,
          * that of the "builder" for this data structure.
          */
         struct Context
@@ -1272,7 +1272,7 @@ public:
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
      *
-     * @param invalidIsThunk Instead of UB an an invalid (probably
+     * @tparam invalidIsThunk Instead of UB an an invalid (probably
      * 0, so uninitialized) internal type, return `nThunk`.
      */
     template<bool invalidIsThunk = false>

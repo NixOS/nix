@@ -15,6 +15,19 @@ export NIX_BUILD_SHELL=$SHELL
 env NIX_PATH=nixpkgs=shell.nix nix-shell structured-attrs-shell.nix \
     --run 'test "3" = "$(jq ".my.list|length" < $NIX_ATTRS_JSON_FILE)"'
 
+# https://github.com/NixOS/nix/issues/16603
+# shellcheck disable=SC2016
+output=$(env NIX_PATH=nixpkgs=shell.nix nix-shell --pure -I nixpkgs=shell.nix -E '
+  with import <nixpkgs> {};
+  stdenv.mkDerivation {
+    name = "test-percent";
+    __structuredAttrs = true;
+    testAttr = "printf %s";
+    buildCommand = "touch $out";
+  }
+' --run 'echo "$testAttr - SUCCESS"')
+[ "$output" = "printf %s - SUCCESS" ]
+
 # shellcheck disable=SC2016
 nix develop -f structured-attrs-shell.nix -c bash -c 'test "3" = "$(jq ".my.list|length" < $NIX_ATTRS_JSON_FILE)"'
 
@@ -23,8 +36,10 @@ TODO_NixOS # following line fails.
 # `nix develop` is a slightly special way of dealing with environment vars, it parses
 # these from a shell-file exported from a derivation. This is to test especially `outputs`
 # (which is an associative array in this case) being fine.
+# Unset the caller's `$out`: `nix develop` merges the caller's environment, so an
+# ambient `$out` (e.g. when the suite runs inside a Nix build) would satisfy this vacuously.
 # shellcheck disable=SC2016
-nix develop -f structured-attrs-shell.nix -c bash -c 'test -n "$out"'
+env -u out nix develop -f structured-attrs-shell.nix -c bash -c 'test "$out" = "$(pwd -P)/outputs/out"'
 
 nix print-dev-env -f structured-attrs-shell.nix | grepQuiet 'NIX_ATTRS_JSON_FILE='
 nix print-dev-env -f structured-attrs-shell.nix | grepQuiet 'NIX_ATTRS_SH_FILE='

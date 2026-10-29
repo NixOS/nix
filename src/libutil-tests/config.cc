@@ -333,4 +333,22 @@ TEST(Config, toKeyValue)
     ASSERT_EQ(config.toKeyValue(), "name-of-the-setting = default\n");
 }
 
+TEST(Config, toKeyValueOmitsDeprecatedSettings)
+{
+    struct DeprecatedSetting : Setting<std::string>
+    {
+        using Setting<std::string>::Setting;
+
+        bool excludedFromFullSerialisation() const override
+        {
+            return true;
+        }
+    };
+
+    Config config;
+    Setting<std::string> foo{&config, "default", "name-of-the-setting", "description"};
+    DeprecatedSetting bar{&config, "default", "deprecated-name-of-the-setting", "description"};
+    ASSERT_EQ(config.toKeyValue(), "name-of-the-setting = default\n");
+}
+
 } // namespace nix

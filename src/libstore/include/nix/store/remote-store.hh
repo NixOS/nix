@@ -128,7 +128,7 @@ public:
 
     ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override;
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
     Roots findRoots(bool censor) override;
 
@@ -199,7 +199,7 @@ protected:
 private:
 
     /**
-     * Same as the default implemenation of `RemoteStore::getFSAccessor`, but with a more preceise return type.
+     * Same as the default implementation of `RemoteStore::getFSAccessor`, but with a more preceise return type.
      */
     ref<RemoteFSAccessor> getRemoteFSAccessor(bool requireValidPath = true);
 

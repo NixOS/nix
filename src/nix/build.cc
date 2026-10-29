@@ -8,7 +8,7 @@
 
 namespace nix {
 
-/* This serialization code is diferent from the canonical (single)
+/* This serialization code is different from the canonical (single)
    derived path serialization because:
 
    - It looks up output paths where possible

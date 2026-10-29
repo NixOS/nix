@@ -96,7 +96,12 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
     for (const auto & opt : _settings)
         if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
             && experimentalFeatureSettings.isEnabled(opt.second.setting->experimentalFeature))
-            res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
+            res.emplace(
+                opt.first,
+                SettingInfo{
+                    opt.second.setting->to_string(),
+                    opt.second.setting->description,
+                    opt.second.setting->excludedFromFullSerialisation()});
 }
 
 /**
@@ -212,12 +217,15 @@ nlohmann::json Config::toJSON()
     return res;
 }
 
-std::string Config::toKeyValue()
+std::string Config::toKeyValue(bool overriddenOnly)
 {
     std::string res;
-    for (const auto & s : _settings)
-        if (!s.second.isAlias)
-            res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
+    for (const auto & [name, data] : _settings) {
+        if (data.isAlias || (overriddenOnly && !data.setting->overridden))
+            continue;
+        if (overriddenOnly || !data.setting->excludedFromFullSerialisation())
+            res += fmt("%s = %s\n", name, data.setting->to_string());
+    }
     return res;
 }
 

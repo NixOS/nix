@@ -28,6 +28,7 @@ mkMesonDerivation (finalAttrs: {
       ./meson.build
       ./doxygen.cfg.in
       ./README.md
+      ./logo.png
       # Source is not compiled, but still must be available for Doxygen
       # to gather comments.
       (cpp ../libexpr-c)

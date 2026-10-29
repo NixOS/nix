@@ -11,6 +11,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/experimental-features.hh"
+#include "nix/util/terminal.hh"
 
 namespace nix {
 
@@ -269,6 +270,47 @@ INSTANTIATE_TEST_SUITE_P(
                 },
             .description = "gitlab_ref_slashes_in_path_everywhere_with_pct_encoding",
             .expectedUrl = "gitlab:owner%252Fsubgroup/repoA/branchC",
+        },
+        InputFromURLTestCase{
+            // Can specify in the path
+            .url = "github:nixos/nix/0000000000000000000000000000000000000000",
+            .attrs =
+                {
+                    {"type", Attr("github")},
+                    {"owner", Attr("nixos")},
+                    {"repo", Attr("nix")},
+                    {"rev", Attr("0000000000000000000000000000000000000000")},
+                },
+            .description = "github_rev_in_url_path",
+            .expectedUrl = "github:nixos/nix/0000000000000000000000000000000000000000",
+        },
+        InputFromURLTestCase{
+            // Also in query parameter
+            .url = "github:nixos/nix?rev=0000000000000000000000000000000000000000",
+            .attrs =
+                {
+                    {"type", Attr("github")},
+                    {"owner", Attr("nixos")},
+                    {"repo", Attr("nix")},
+                    {"rev", Attr("0000000000000000000000000000000000000000")},
+                },
+            .description = "github_rev_in_url_query",
+            .expectedUrl = "github:nixos/nix/0000000000000000000000000000000000000000",
+        },
+        InputFromURLTestCase{
+            .url = "github:nixos/nix//master///something/",
+            .attrs =
+                {
+                    {"type", Attr("github")},
+                    {"owner", Attr("nixos")},
+                    {"repo", Attr("nix")},
+                    {"ref", Attr("master/something")},
+                },
+            .description = "github_slashes_in_url_path",
+            // XXX: Very strange that slashes get re-encoded in the path, even though they
+            // weren't initially. Also consecutive slashes get nuked. That seems wrong, but
+            // apparently has been the case since at least 2.18.
+            .expectedUrl = "github:nixos/nix/master%2Fsomething",
         }),
     [](const ::testing::TestParamInfo<InputFromURLTestCase> & info) { return info.param.description; });
 
@@ -280,6 +322,24 @@ TEST(to_string, doesntReencodeUrl)
     auto expected = "http://localhost:8181/test/%2B3d.tar.gz";
 
     ASSERT_EQ(unparsed, expected);
+}
+
+TEST(parseFlakeRef, urlInterpretationErrorsAreNotMasked)
+{
+    fetchers::Settings fetchSettings;
+
+    // Errors that occur while interpreting a syntactically valid URL
+    // (such as an unsupported query parameter) should be shown to the
+    // user, rather than causing the flake ref to be reinterpreted as a
+    // path, leading to a confusing "not an absolute path" error.
+    try {
+        parseFlakeRef("github:foo/bar?xyzzy=1");
+        FAIL() << "expected parseFlakeRef to throw";
+    } catch (BadURL & e) {
+        auto msg = filterANSIEscapes(e.msg());
+        EXPECT_NE(msg.find("xyzzy"), std::string::npos) << msg;
+        EXPECT_EQ(msg.find("not an absolute path"), std::string::npos) << msg;
+    }
 }
 
 TEST(parseFlakeRef, malformedGithubUrlDoesNotCrash)

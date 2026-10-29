@@ -7,5 +7,5 @@ if cxx.get_id() == 'clang' and ('address' in get_option('b_sanitize') or 'undefi
 endif
 
 if 'address' in get_option('b_sanitize')
-  deps_other += declare_dependency(sources : 'asan-options.cc')
+  deps_private_no_pkgconfig += declare_dependency(sources : 'asan-options.cc')
 endif

@@ -1,10 +1,11 @@
+#include <algorithm>
 #include <cerrno>
+#include <limits>
 #include <map>
 
 #include <strings.h> // for strcasecmp
 
 #include "nix/util/archive.hh"
-#include "nix/util/alignment.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/source-path.hh"
@@ -139,9 +140,9 @@ void dumpString(std::string_view s, Sink & sink)
 }
 
 template<typename... Args>
-static SerialisationError badArchive(std::string_view s, const Args &... args)
+static SerialisationError badArchive(std::string_view s, Args &&... args)
 {
-    return SerialisationError("bad archive: " + s, args...);
+    return SerialisationError("bad archive: " + s, std::forward<Args>(args)...);
 }
 
 static void parseContents(CreateRegularFileSink & sink, Source & source)
@@ -151,7 +152,7 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
     sink.preallocateContents(size);
 
     if (sink.skipContents) {
-        uint64_t left = alignUp(size, 8);
+        uint64_t left = size;
         /* Source::skip takes a size_t, which might be narrower on 32 bit systems, so
            be careful around truncations. */
         while (left) {
@@ -159,10 +160,9 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
             source.skip(toSkip);
             left -= toSkip;
         }
-        return;
+    } else {
+        source.drainInto(sink, size);
     }
-
-    source.drainInto(sink, size);
 
     readPadding(size, source);
 }
@@ -307,9 +307,9 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     parse(sink, source, CanonPath::root, 0);
 }
 
-void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
+void restorePath(const std::filesystem::path & path, Source & source, bool startFsync, RestoreSinkHooks * hooks)
 {
-    RestoreSink sink{startFsync};
+    RestoreSink sink{startFsync, hooks};
     sink.dstPath = path;
     parseDump(sink, source);
 }

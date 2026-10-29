@@ -12,8 +12,10 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
     std::shared_ptr<AutoRemoveJail> autoDelJail = std::make_shared<AutoRemoveJail>();
 
     ChrootFreeBSDDerivationBuilder(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, miscMethods, params}
+        std::shared_ptr<BuildingStore> store,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
+        : UnixDerivationBuilderImpl{store, miscMethods, params}
         , ChrootDerivationBuilder{store, miscMethods, params}
         , FreeBSDDerivationBuilder{store, miscMethods, params}
     {

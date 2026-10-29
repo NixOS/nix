@@ -499,7 +499,7 @@ public:
     std::optional<std::string> response;
 
     template<typename... Args>
-    FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args &... args);
+    FileTransferError(FileTransfer::Error error, std::optional<std::string> response, Args &&... args);
 };
 
 } // namespace nix

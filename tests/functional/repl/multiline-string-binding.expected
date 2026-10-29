@@ -1,9 +1,0 @@
-Nix <nix version>
-Type :? for help.
-
-nix-repl> x = ''
-        >   hello
-        > ''
-
-nix-repl> x
-"hello\n"

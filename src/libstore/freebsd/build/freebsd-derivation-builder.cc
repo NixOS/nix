@@ -1,4 +1,4 @@
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "freebsd-derivation-builder.hh"
 #include "chroot-derivation-builder.hh"
 #include "chroot-freebsd-derivation-builder.hh"
@@ -210,7 +210,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
             .uid = 0,
             .gid = 0,
             .description = "Nix build user",
-            .home = store.config->getLocalSettings().sandboxBuildDir,
+            .home = store->getLocalSettings().sandboxBuildDir,
             .shell = "/noshell",
         },
         {
@@ -218,7 +218,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
             .uid = buildUser->getUID(),
             .gid = sandboxGid(),
             .description = "Nix build user",
-            .home = store.config->getLocalSettings().sandboxBuildDir,
+            .home = store->getLocalSettings().sandboxBuildDir,
             .shell = "/noshell",
         },
         {
@@ -303,7 +303,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
         debug("setting up a nullfs mount from %1% to %2%", PathFmt(chrootPath.source), PathFmt(path));
 
         int flags = 0;
-        if (store.isInStore(target.native()))
+        if (store->isInStore(target.native()))
             /* While we are at it, enforce invariants about store paths. Anything located at the "logical" store
                location must be readonly (file permission canonicalisation enforces this on the host filesystem).
                Also the store must never contain setuid binaries for the same reason. This is just defense-in-depth. */
@@ -361,6 +361,8 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
 
 void ChrootFreeBSDDerivationBuilder::startChild()
 {
+    using namespace nix::unix;
+
     int jid;
 
     RunChildArgs args{
@@ -390,7 +392,7 @@ void ChrootFreeBSDDerivationBuilder::startChild()
         // Everything from here to the end of the block is setting up the network
         // code adapted from freebsd/sbin/ifconfig/af_inet.c, in_exec_nl
         Pid helper = startProcess([&]() {
-            unix::closeExtraFDs();
+            closeExtraFDs();
             enterChroot();
 
             struct snl_state ss = {};
@@ -466,9 +468,11 @@ void ChrootFreeBSDDerivationBuilder::startChild()
 
 void ChrootFreeBSDDerivationBuilder::enterChroot()
 {
+    using namespace nix::unix;
+
     /* Close all other file descriptors. This must happen before
        jail_attach for FreeBSD. */
-    unix::closeExtraFDs();
+    closeExtraFDs();
 
     if (jail_attach(autoDelJail->jid) < 0) {
         throw SysError("failed to attach to jail");
@@ -478,7 +482,7 @@ void ChrootFreeBSDDerivationBuilder::enterChroot()
 void ChrootFreeBSDDerivationBuilder::addDependencyImpl(const StorePath & path)
 {
     throw UnimplementedError(
-        "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store.printStorePath(path));
+        "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store->printStorePath(path));
 }
 
 } // namespace nix

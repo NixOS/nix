@@ -99,6 +99,8 @@ struct ArchiveCompressionSink : CompressionSink
 {
     Sink & nextSink;
     struct archive * archive;
+    /* Exception thrown by `nextSink`. Once set, no more data is written to `nextSink`. */
+    std::exception_ptr writeException;
 
     ArchiveCompressionSink(
         Sink & nextSink, CompressionAlgo method, bool parallel, int level = COMPRESSION_LEVEL_DEFAULT)
@@ -136,6 +138,11 @@ struct ArchiveCompressionSink : CompressionSink
         open();
     }
 
+    ArchiveCompressionSink(ArchiveCompressionSink &&) = delete;
+    ArchiveCompressionSink(const ArchiveCompressionSink &) = delete;
+    ArchiveCompressionSink & operator=(ArchiveCompressionSink &&) = delete;
+    ArchiveCompressionSink & operator=(const ArchiveCompressionSink &) = delete;
+
     ~ArchiveCompressionSink() override
     {
         if (archive)
@@ -152,8 +159,17 @@ struct ArchiveCompressionSink : CompressionSink
     {
         if (err == ARCHIVE_EOF)
             throw EndOfFile("reached end of archive");
-        else if (err != ARCHIVE_OK)
+        else if (err != ARCHIVE_OK) {
+            if (writeException) {
+                try {
+                    std::rethrow_exception(writeException);
+                } catch (const BaseError & e) {
+                    /* Throw a copy of the exception. */
+                    e.throwClone();
+                }
+            }
             throw Error(reason, archive_error_string(this->archive));
+        }
     }
 
     void writeUnbuffered(std::string_view data) override
@@ -173,11 +189,21 @@ private:
         archive_entry_free(ae);
     }
 
-    static ssize_t callback_write(struct archive * archive, void * _self, const void * buffer, size_t length)
+    /* Exceptions must not propagate through libarchive. Also, `archive_write_free()` in the destructor flushes
+       pending output through this callback, which must not throw. So we record the exception and rethrow it in
+       `check()`. */
+    static ssize_t callback_write(struct archive * archive, void * _self, const void * buffer, size_t length) noexcept
     {
         auto self = (ArchiveCompressionSink *) _self;
-        self->nextSink({(const char *) buffer, length});
-        return length;
+        if (self->writeException)
+            return ARCHIVE_FATAL;
+        try {
+            self->nextSink({(const char *) buffer, length});
+            return length;
+        } catch (...) {
+            self->writeException = std::current_exception();
+            return ARCHIVE_FATAL;
+        }
     }
 };
 
@@ -217,6 +243,11 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
             throw CompressionError("unable to initialize brotli decoder");
     }
 
+    BrotliDecompressionSink(BrotliDecompressionSink &&) = delete;
+    BrotliDecompressionSink(const BrotliDecompressionSink &) = delete;
+    BrotliDecompressionSink & operator=(BrotliDecompressionSink &&) = delete;
+    BrotliDecompressionSink & operator=(const BrotliDecompressionSink &) = delete;
+
     ~BrotliDecompressionSink()
     {
         BrotliDecoderDestroyInstance(state);
@@ -225,9 +256,18 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     void finish() override
     {
         flush();
+        /* Like the libarchive-based decompressors (which enable
+           `archive_read_support_format_empty`), treat completely empty
+           input as an empty stream rather than a truncated one. */
+        if (!BrotliDecoderIsUsed(state))
+            return;
         writeInternal({});
     }
 
+    /**
+     * @param data Chunk of data to feed to brotli. A default constructed std::string_view
+     *             serves as the EOF indicator.
+     */
     void writeInternal(std::string_view data) override
     {
         auto next_in = (const uint8_t *) data.data();
@@ -238,8 +278,12 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
         while (!finished && (!data.data() || avail_in)) {
             checkInterrupt();
 
-            if (!BrotliDecoderDecompressStream(state, &avail_in, &next_in, &avail_out, &next_out, nullptr))
+            auto result = BrotliDecoderDecompressStream(state, &avail_in, &next_in, &avail_out, &next_out, nullptr);
+            if (result == BROTLI_DECODER_RESULT_ERROR)
                 throw CompressionError("error while decompressing brotli file");
+            /* If we are in finish(), barf on incomplete inputs. */
+            if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT && !data.data())
+                throw CompressionError("truncated brotli file");
 
             if (avail_out < sizeof(outbuf) || avail_in == 0) {
                 nextSink({(char *) outbuf, sizeof(outbuf) - avail_out});

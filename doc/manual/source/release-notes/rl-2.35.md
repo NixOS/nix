@@ -61,7 +61,7 @@
 
   The `nix` binary now links [mimalloc](https://github.com/microsoft/mimalloc) by default, replacing glibc's malloc for all non-GC allocations.
   This yields a **5–12% wall-clock improvement** on evaluation workloads, ranging from `nix-instantiate hello` to `nix-env -qa` and full NixOS configurations.
-  The allocator can be disabled at build time with `-Dmimalloc=disabled`.
+  The allocator can be disabled at build time with `-Dnix:mimalloc=disabled`.
 
 - The `revCount` attribute of the Git fetchers is now lazily computed and passed-through as-is when explicitly specified [#15772](https://github.com/NixOS/nix/pull/15772) [#14596](https://github.com/NixOS/nix/pull/14596)
 

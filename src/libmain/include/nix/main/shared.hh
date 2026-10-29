@@ -75,9 +75,7 @@ public:
     ~RunPager();
 
 private:
-#ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
     Pid pid;
-#endif
     Descriptor std_out;
 };
 

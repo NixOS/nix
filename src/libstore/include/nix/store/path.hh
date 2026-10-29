@@ -11,6 +11,9 @@ namespace nix {
 
 struct Hash;
 
+MakeError(BadStorePath, Error);
+MakeError(BadStorePathName, BadStorePath);
+
 /**
  * Check whether a name is a valid store path name.
  *
@@ -37,7 +40,17 @@ public:
      */
     constexpr static size_t HashLen = 32; // i.e. 160 bits
 
-    constexpr static size_t MaxPathLen = 211;
+    /**
+     * @brief Maximum length of the name, i.e. everything after <hash part>-.
+     *
+     * It's chosen such that HashLen + MaxNameLen + 1 (dash) + len("/nix/store/") = 255
+     */
+    constexpr static size_t MaxNameLen = 211;
+
+    /**
+     * @brief Maximum length of the basename admitted by the constructor from a string.
+     */
+    constexpr static size_t MaxBasenameLen = HashLen + 1 + MaxNameLen;
 
     StorePath() = delete;
 
@@ -75,7 +88,7 @@ public:
         return std::string_view(baseName).substr(0, HashLen);
     }
 
-    static StorePath dummy;
+    static const StorePath dummy;
 
     static StorePath random(std::string_view name);
 };
@@ -84,8 +97,7 @@ typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
 
 /**
- * The file extension of \ref nix::Derivation derivations when serialized
- * into store objects.
+ * The file extension of @ref nix::derivation::Derivation when serialized into store objects.
  */
 constexpr std::string_view drvExtension = ".drv";
 

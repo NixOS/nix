@@ -100,6 +100,16 @@ GTEST_BRIEF=1 GTEST_FILTER='ErrorTraceTest.*' meson test nix-expr-tests -v
 
 for short but comprensive output.
 
+### Unit tests requiring root
+
+In `nix-util-tests`, suites beginning with `Root` require root and are excluded by default.
+To run them on macOS:
+
+```bash
+nix build .#nix-util-tests
+sudo ./result/bin/nix-util-tests --gtest_filter='Root*'
+```
+
 ### Debugging tests
 
 For debugging, it is useful to combine the third option above with Meson's [`--gdb`](https://mesonbuild.com/Unit-tests.html#other-test-options) flag:
@@ -305,13 +315,16 @@ You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-
 
 ## Fuzzing
 
-The project utilises [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) and LLVM coverage instrumentation to fuzz sensitive pieces of code.
+The project uses [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) and LLVM coverage instrumentation to fuzz sensitive pieces of code.
 The harnesses reside in corresponding `-tests` subprojects (e.g. `src/libutil-tests/fuzz`).
-The `fuzzers` option builds the harnesses, while `fuzzer-no-link` instruments the whole project.
-Meson rejects `fuzzers=true` unless `unit-tests=true` and `b_sanitize` includes `fuzzer-no-link`.
+The `fuzzers` option builds the harnesses independently of `unit-tests`; set `unit-tests=false` for a fuzzer-only build.
+The `fuzzing-engine` option accepts one compiler-driver argument for linking an external fuzzing engine.
+If `fuzzing-engine` is empty, Meson requires Clang and `fuzzer-no-link` in `b_sanitize`.
+The compiler driver then links the harnesses with libFuzzer and libstdc++.
 
 ```shell
 nix develop .#native-clangStdenv
+appendToVar mesonFlags "-Dunit-tests=false"
 appendToVar mesonFlags "-Dfuzzers=true"
 appendToVar mesonFlags "-Db_sanitize=address,undefined,fuzzer-no-link"
 # Clang sanitizer/shared-library workaround: https://github.com/mesonbuild/meson/issues/764
@@ -320,6 +333,19 @@ appendToVar mesonFlags "-Dlibexpr:gc=disabled" # Because Boehm doesn't play well
 configurePhase
 buildPhase
 ```
+
+To use an external fuzzing engine, set `fuzzing-engine`:
+
+```shell
+mesonFlagsArray+=(
+  "-Dunit-tests=false"
+  "-Dfuzzers=true"
+  "-Dfuzzing-engine=$LIB_FUZZING_ENGINE"
+)
+```
+
+Nix passes this value as one compiler-driver argument.
+The caller must also choose a compatible compiler and C++ runtime and provide any required instrumentation and sanitizer flags.
 
 If you want to collect coverage metrics you also need to specify the following compiler flags before running the `configurePhase`:
 
@@ -350,6 +376,29 @@ xdg-open cov-html/index.html
 ```
 
 If you have found a memory safety issue using fuzzing, consider reporting it [privately](https://github.com/NixOS/nix/security/) if you deem the issue to be security relevant.
+
+### Checks that defeat fuzzing
+
+Fuzzing is crucial for validating invariants, but a few invariants are ones a fuzzer can never satisfy.
+A check that a field equals a cryptographic hash of other fields is the usual case: passing it requires a hash preimage, so the code below the check becomes *unreachable* to the fuzzer rather than merely hard to reach.
+This is different from a check that is only awkward to satisfy --- sorted keys, balanced delimiters, no redundant escapes --- which a coverage-guided fuzzer will learn to get past on its own.
+Only the former should be gated.
+
+Such checks are compiled out under `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION`, e.g.:
+
+```c++
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (path != computedPath)
+        throw FormatError(...);
+#endif
+```
+
+The macro name is a convention from [OSS-Fuzz](https://google.github.io/oss-fuzz/) and libFuzzer.
+`nix-meson-build-support/common/meson.build` defines it for every subproject when `fuzzer-no-link` is in `b_sanitize`, which is exactly when a fuzzer-instrumented build is being made.
+Builds using an external `fuzzing-engine` are expected to pass it themselves, as OSS-Fuzz does.
+
+Anything gated this way is no longer exercised by the fuzzer, so it must be covered by a unit test instead.
+For an example of both halves, see the fixed-output derivation path check in `parseOutput` (`src/libstore/derivation/aterm.cc`) and its test `CAFixedPathMismatch`.
 
 ## Installer tests
 

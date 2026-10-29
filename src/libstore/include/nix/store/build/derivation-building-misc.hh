@@ -10,14 +10,15 @@ namespace nix {
 
 class Store;
 
+struct SingleDerivedPath;
+
 namespace derivation {
 template<typename Inputs, typename Out>
 struct Derivation;
-struct FullInputs;
 struct Output;
 } // namespace derivation
 
-using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
+using Derivation = derivation::Derivation<std::set<SingleDerivedPath>, derivation::Output>;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,

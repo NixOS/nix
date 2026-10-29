@@ -681,7 +681,7 @@ void ExprCall::warnIfCursedOr(const SymbolTable & symbols, const PosTable & posi
             << positions[pos].getSnippetUpTo(positions[*cursedOrEndPos]).value_or("could not read expression")
             << ")\n"
                "Give feedback at https://github.com/NixOS/nix/pull/11121";
-        warn(out.str());
+        warn("%s", out.str());
     }
 }
 

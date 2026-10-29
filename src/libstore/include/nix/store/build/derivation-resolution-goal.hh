@@ -53,25 +53,16 @@ private:
      */
     StorePath drvPath;
 
-    /**
-     * The derivation stored at drvPath.
-     */
-    ref<const Derivation> drv;
-
-    /**
-     * The remainder is state held during the build.
-     */
-
-    BuildMode buildMode;
-
     std::unique_ptr<Activity> act;
 
     std::string key() override;
 
-    /**
-     * The states.
-     */
-    Co resolveDerivation();
+    using InputsGoalMap = std::map<ref<const SingleDerivedPath>, GoalPtr, RefDeepComparator>;
+
+    Co<ExitCode> init(ref<const Derivation> drv, BuildMode buildMode);
+    Co<BuildResult> resolve(ref<const Derivation> drv, BuildMode buildMode);
+    Co<InputsGoalMap> realiseInputs(const Derivation & drv, BuildMode buildMode);
+    Co<decltype(resolvedDrv)> resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals);
 
     JobCategory jobCategory() const override
     {

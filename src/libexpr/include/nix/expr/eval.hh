@@ -364,6 +364,14 @@ public:
     EvalMemory & operator=(EvalMemory &&) = delete;
 
     inline void * allocBytes(size_t n);
+
+    /**
+     * Allocates @p count * sizeof(T) + N contiguous bytes.
+     * @throws bad_alloc if the computation would overflow.
+     */
+    template<typename T, std::size_t N = 0>
+    inline void * allocBytes(size_t count);
+
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
@@ -512,7 +520,7 @@ private:
         Value *,
         std::hash<SourcePath>,
         std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value *>>>>
+        gc_root_allocator<std::pair<const SourcePath, Value *>>>>
         fileEvalCache;
 
     /**
@@ -685,8 +693,8 @@ public:
      * type.
      */
     inline bool evalBool(Env & env, Expr * e);
-    inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx);
-    inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
+    inline bool evalBool(Env & env, Expr * e, std::string_view errorCtx);
+    inline void evalAttrs(Env & env, Expr * e, Value & v, std::string_view errorCtx);
 
     /**
      * If `v` is a thunk, enter it and overwrite `v` with the result
@@ -1137,7 +1145,7 @@ public:
      * Realise the given string with context, and return the string with outputs instead of downstream output
      * placeholders.
      * @param[in] str the string to realise
-     * @param[out] paths all referenced store paths will be added to this set
+     * @param[out] storePathsOutMaybe all referenced store paths will be added to this set if it's not nullptr
      * @return the realised string
      * @throw EvalError if the value is not a string, path or derivation (see `coerceToString`)
      */

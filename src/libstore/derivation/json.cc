@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
 
@@ -135,6 +136,12 @@ static void inputsToJson(json & res, const nix::derivation::FullInputs & inputs)
         inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
 }
 
+static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & inputs)
+{
+    using namespace nix::derivation;
+    inputsToJson(res, FullInputs::fromSet(inputs));
+}
+
 template<typename Inputs>
 void adl_serializer<nix::derivation::Derivation<Inputs>>::to_json(
     json & res, const nix::derivation::Derivation<Inputs> & d)
@@ -181,9 +188,10 @@ nix::derivation::FullInputs inputsFromJson<nix::derivation::FullInputs>(
     const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
+    using namespace derivation;
 
     auto inputsObj = getObject(inputsJson);
-    derivation::FullInputs inputs;
+    FullInputs inputs;
 
     try {
         for (auto & input : getArray(valueAt(inputsObj, "srcs")))
@@ -215,11 +223,20 @@ nix::derivation::FullInputs inputsFromJson<nix::derivation::FullInputs>(
     return inputs;
 }
 
+template<>
+std::set<nix::SingleDerivedPath> inputsFromJson<std::set<nix::SingleDerivedPath>>(
+    const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings)
+{
+    using namespace nix::derivation;
+    return inputsFromJson<FullInputs>(inputsJson, xpSettings).toSet();
+}
+
 template<typename Inputs>
 nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<Inputs>>::from_json(
     const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
+    using namespace derivation;
 
     auto & json = getObject(_json);
     {
@@ -234,7 +251,7 @@ nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<I
     return derivation::Derivation<Inputs>{
         .outputs =
             [&] {
-                derivation::Outputs<> outputs;
+                Outputs<> outputs;
                 try {
                     for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
                         outputs.insert_or_assign(

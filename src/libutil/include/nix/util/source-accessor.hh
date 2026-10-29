@@ -152,7 +152,7 @@ public:
     virtual DirEntries readDirectory(const CanonPath & path) = 0;
 
     /**
-     * Variation of readDirectory that receives a SourceAccessor possibly scoped to \ref dirPath.
+     * Variation of readDirectory that receives a SourceAccessor possibly scoped to @p dirPath.
      * Primary meant for recursive traversal functions that would benefit from *at-style syscalls
      * relative to a particular directory.
      *

@@ -64,10 +64,13 @@ const nlohmann::json::number_unsigned_t & getUnsigned(const nlohmann::json & val
     if (auto ptr = value.get<const nlohmann::json::number_unsigned_t *>()) {
         return *ptr;
     }
-    const char * typeName = value.type_name();
-    if (typeName == nlohmann::json(0).type_name()) {
-        typeName = value.is_number_float() ? "floating point number" : "signed integral number";
-    }
+
+    using namespace std::string_view_literals;
+    std::string_view typeName = value.type_name();
+    /* Caution: not pointer equality but string equality. */
+    if (typeName == nlohmann::json(0).type_name())
+        typeName = value.is_number_float() ? "floating point number"sv : "signed integral number"sv;
+
     throw Error(
         "Expected JSON value to be an unsigned integral number but it is of type '%s': %s", typeName, value.dump());
 }

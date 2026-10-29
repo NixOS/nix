@@ -92,7 +92,7 @@ References to other store objects are supported, but self-references are not.
 
 This is the only store-object content-addressing method that is not named identically with a corresponding file system object method.
 It is somewhat obscure, mainly used for "drv files"
-(derivations serialized as store objects in their ["ATerm" file format](@docroot@/protocols/derivation-aterm.md)).
+(derivations serialized as store objects in their ["ATerm" file format](@docroot@/protocols/derivation-aterm.md#use-for-encoding-to-store-object)).
 Prefer another method if possible.
 
 ### Nix Archive { #method-nix-archive }

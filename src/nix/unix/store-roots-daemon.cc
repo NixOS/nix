@@ -32,6 +32,8 @@ struct CmdRootsDaemon : StoreConfigCommand
 
     void run(ref<StoreConfig> storeConfig) override
     {
+        using namespace nix::unix;
+
         auto localStoreConfig = dynamic_cast<LocalStoreConfig *>(&*storeConfig);
         if (!localStoreConfig) {
             throw UsageError(
@@ -40,13 +42,13 @@ struct CmdRootsDaemon : StoreConfigCommand
 
         auto gcSocketPath = localStoreConfig->getRootsSocketPath();
 
-        unix::serveUnixSocket(
+        serveUnixSocket(
             {
                 .socketPath = gcSocketPath,
                 .socketMode = 0666,
                 .activationName = "nix-roots-daemon.socket",
             },
-            [&](AutoCloseFD remote, std::function<void()> closeListeners) {
+            [&](AutoCloseFD remote) {
                 std::thread([&, remote = std::move(remote)]() mutable {
                     auto roots = findRuntimeRootsUnchecked(*localStoreConfig);
 

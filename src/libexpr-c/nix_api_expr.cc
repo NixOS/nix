@@ -210,7 +210,7 @@ boost::concurrent_flat_map<
     unsigned int,
     std::hash<const void *>,
     std::equal_to<const void *>,
-    traceable_allocator<std::pair<const void * const, unsigned int>>>
+    gc_root_allocator<std::pair<const void * const, unsigned int>>>
     nix_refcounts{};
 
 nix_err nix_gc_incref(nix_c_context * context, const void * p)

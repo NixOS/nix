@@ -93,7 +93,7 @@ void execProgramInStore(
     if (system)
         linux::setPersonality({
             .system = *system,
-            .impersonateLinux26 = settings.getLocalSettings().impersonateLinux26,
+            .disableASLR = false,
         });
 #endif
 
@@ -249,7 +249,7 @@ void chrootHelper(int argc, char ** argv)
     if (system != "")
         linux::setPersonality({
             .system = system,
-            .impersonateLinux26 = settings.getLocalSettings().impersonateLinux26,
+            .disableASLR = false,
         });
 #  endif
 

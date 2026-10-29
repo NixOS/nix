@@ -6,6 +6,7 @@
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"
@@ -42,10 +43,6 @@ void StoreConfig::anchor() {}
 void InvalidPath::anchor() {}
 
 void Unsupported::anchor() {}
-
-void SubstituteGone::anchor() {}
-
-void SubstituterDisabled::anchor() {}
 
 void InvalidStoreReference::anchor() {}
 
@@ -1028,6 +1025,8 @@ std::map<StorePath, StorePath> copyPaths(
     CheckSigsFlag checkSigs,
     SubstituteFlag substitute)
 {
+    dstStore.addTempRoots(storePaths);
+
     auto valid = dstStore.queryValidPaths(storePaths, substitute);
 
     StorePathSet missing;
@@ -1081,7 +1080,7 @@ std::map<StorePath, StorePath> copyPaths(
         auto source = sinkToSource([&, narSize = info->narSize](Sink & sink) {
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
-            uint64_t total = 0;
+            uint64_t total = 0, latch = 0;
             const auto & srcCfg = srcStore.config;
             const auto & dstCfg = dstStore.config;
             auto storePathS = srcStore.printStorePath(missingPath);
@@ -1094,12 +1093,23 @@ std::map<StorePath, StorePath> copyPaths(
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {
+                /* Accumulate progress. narFromPath implementation will almost
+                   certainly either emit dumpPath or tee parseDump, which gives
+                   us data in small pieces like NAR framing. 128 KiB seems like
+                   a reasonable threshold. */
+                static constexpr size_t progressThreshold = 128 * 1024;
                 total += data.size();
-                act.progress(total, narSize);
+                latch += data.size();
+                /* Emit progress update once we cross the threshold. */
+                if (latch >= progressThreshold) {
+                    latch = 0;
+                    act.progress(total, narSize);
+                }
             });
             TeeSink tee{sink, progressSink};
 
             srcStore.narFromPath(missingPath, tee);
+            act.progress(total, narSize);
         });
         pathsToCopy.emplace_back(std::move(infoForDst), std::move(source));
     }

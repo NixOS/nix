@@ -43,15 +43,26 @@ if get_option('doc-gen')
 endif
 
 # Testing
-if get_option('fuzzers') and not get_option('unit-tests')
-  error('fuzzers=true requires unit-tests=true')
+unit_tests = get_option('unit-tests')
+fuzzers = get_option('fuzzers')
+
+if unit_tests
+  subproject('libutil-test-support')
 endif
 
-if get_option('unit-tests')
-  subproject('libutil-test-support')
+if unit_tests or fuzzers
   subproject('libutil-tests')
+endif
+
+if unit_tests
   subproject('libstore-test-support')
+endif
+
+if unit_tests or fuzzers
   subproject('libstore-tests')
+endif
+
+if unit_tests
   subproject('libfetchers-tests')
   subproject('libexpr-test-support')
   subproject('libexpr-tests')

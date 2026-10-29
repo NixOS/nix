@@ -6,15 +6,14 @@
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
 #include "nix/util/repair-flag.hh"
-#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derivation/output.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
+#include "nix/util/fun.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
-#include <ranges>
 #include <variant>
 
 namespace nix {
@@ -151,8 +150,58 @@ struct Type
 template<typename Inputs, typename Out = Output>
 struct Derivation;
 
+/**
+ * @brief Derivation that depends only on other store objects.
+ *
+ * This type is what's used in Store::buildDerivation or for resolved derivations
+ *
+ * @see derivation::tryResolve.
+ */
 using Basic = Derivation<StorePathSet>;
-using Full = Derivation<FullInputs>;
+
+/**
+ * @brief Derivation that depends on the outputs of other derivations in addition.
+ *
+ * This type is what's constructed by the evaluator and written to the store in
+ * ATerm format.
+ */
+using Full = Derivation<std::set<SingleDerivedPath>>;
+
+/**
+ * How to get a derivation's value from its store path.
+ *
+ * Several computations over derivations --- filling in output paths,
+ * checking invariants, computing masked hash --- need to recurse into input
+ * derivations, but that is *all* they need a store for; everything else
+ * they touch is `StoreDirConfig`, for printing paths. Taking just this
+ * much lets them be used (and tested) without a real store, and makes
+ * it evident from the signature that nothing else is queried.
+ */
+using ReadDerivation = fun<Full(const StorePath & drvPath)>;
+
+/**
+ * `Store::readInvalidDerivation` as a `ReadDerivation`, for callers
+ * that do have a whole store to hand.
+ */
+ReadDerivation readInvalid(Store & store);
+
+/**
+ * @brief `Full`, but statically known to have no output paths yet.
+ *
+ * The outputs are `Output::Deferred` rather than the `Output` variant,
+ * so "we have not computed the output paths" is carried in the type.
+ *
+ * @see fillInOutputPaths, which turns this into a `FullInputAddressed`.
+ */
+using FullDeferred = Derivation<std::set<SingleDerivedPath>, Output::Deferred>;
+
+/**
+ * @brief `Full`, but statically known to be input-addressed.
+ *
+ * The outputs are `Output::InputAddressed` rather than the `Output`
+ * variant, so "the output paths are computed" is carried in the type.
+ */
+using FullInputAddressed = Derivation<std::set<SingleDerivedPath>, Output::InputAddressed>;
 
 template<typename Inputs, typename Out>
 struct Derivation
@@ -249,46 +298,15 @@ template<typename Inputs>
 OutputsAndOptPaths outputsAndOptPaths(const Derivation<Inputs, Output> & drv, const StoreDirConfig & store);
 
 /**
- * Determine whether this derivation should be resolved before building.
+ * Does the derivation have a dependency on the output of a dynamic
+ * derivation?
  *
- * Resolution is needed when:
- * - Input-addressed derivations are deferred (depend on CA derivations)
- * - Content-addressed derivations have input drvs and are either:
- *   - Floating (non-fixed), which must always be resolved
- *   - Fixed, which can optionally be resolved when ca-derivations is enabled
- * - Impure derivations always need resolution
- * - Any input derivations have outputs from dynamic derivations
+ * In other words, does it depend on the output of a derivation that is
+ * itself an output of a derivation? This corresponds to a dependency
+ * that is an inductive derived path with more than one layer of
+ * `DerivedPath::Built`.
  */
-bool shouldResolve(const Full & drv);
-
-/**
- * Return the underlying basic derivation but with these changes:
- *
- * 1. Input drvs are emptied, but the outputs of them that were used
- *    are added directly to input sources.
- *
- * 2. Input placeholders are replaced with realized input store
- *    paths.
- */
-std::optional<Basic> tryResolve(const Full & drv, Store & store, Store * evalStore = nullptr);
-
-/**
- * Like the above, but instead of querying the Nix database for
- * realisations, uses a given mapping from input derivation paths +
- * output names to actual output store paths.
- */
-std::optional<Basic> tryResolve(
-    const Full & drv,
-    Store & store,
-    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
-        queryResolutionChain);
-
-/**
- * Convert a `Basic` derivation to a `Full` derivation.
- * The resulting derivation has empty input drvs since a `Basic`
- * derivation is already resolved.
- */
-Full unresolve(const Basic & drv);
+bool hasDynamicDrvDep(const std::set<SingleDerivedPath> & inputs);
 
 /**
  * Check that the derivation is valid and does not present any
@@ -304,8 +322,14 @@ Full unresolve(const Basic & drv);
  *
  * @param store The store to use for validation
  */
-void checkInvariants(const Basic & drv, Store & store);
+void checkInvariants(const Basic & drv, const StoreDirConfig & store);
 void checkInvariants(const Full & drv, Store & store);
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+void checkInvariants(const Full & drv, const StoreDirConfig & store, ReadDerivation & readDerivation);
 
 /**
  * This overload does everything the base `checkInvariants` does,
@@ -316,13 +340,27 @@ void checkInvariants(const Full & drv, Store & store);
  * @param drvPath The path to this derivation
  */
 template<typename Inputs>
-void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath);
+void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath)
+{
+    checkInvariants(drv, store, readInvalid(store), drvPath);
+}
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+template<typename Inputs>
+void checkInvariants(
+    const Derivation<Inputs, Output> & drv,
+    const StoreDirConfig & store,
+    auto && readDerivation,
+    const StorePath & drvPath);
 
 /**
  * Fill in output paths as needed.
  *
  * For input-addressed derivations (ready or deferred), it computes
- * the derivation hash modulo and based on the result:
+ * the derivation masked hash and based on the result:
  *
  * - If `Regular`: converts `Deferred` outputs to `InputAddressed`,
  *   and ensures all `InputAddressed` outputs (whether preexisting
@@ -338,7 +376,34 @@ void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, cons
  *
  * @param store The store to use for path computation
  */
+void fillInOutputPaths(Basic & drv, const StoreDirConfig & store);
 void fillInOutputPaths(Full & drv, Store & store);
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+void fillInOutputPaths(Full & drv, const StoreDirConfig & store, ReadDerivation & readDerivation);
+
+/**
+ * Functional, statically-typed variant of the above, for a derivation
+ * all of whose outputs are known to be `Deferred`.
+ *
+ * Rather than mutating in place --- which is only possible because
+ * `Output` is a variant able to hold either alternative --- this
+ * consumes its argument and returns a derivation whose outputs are
+ * statically `InputAddressed`, so the "outputs are filled in now" fact
+ * is carried in the type. Everything but the (small) outputs is moved
+ * through, so this is no more expensive than the mutating version.
+ *
+ * Returns `std::nullopt` if there is no input address to fill in yet,
+ * i.e. when the derivation (transitively) depends on a floating
+ * content-addressing derivation. That is the case `Deferred` exists
+ * for, and it is precisely the case this function cannot represent in
+ * its return type.
+ */
+std::optional<FullInputAddressed>
+fillInOutputPaths(FullDeferred drv, const StoreDirConfig & store, ReadDerivation & readDerivation);
 
 /**
  * Parse a derivation from JSON, and also perform various
@@ -374,21 +439,6 @@ using Derivation = derivation::Full;
  * This is a pure computation based on the derivation content and store directory.
  */
 StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv);
-
-/**
- * Does the derivation have a dependency on the output of a dynamic
- * derivation?
- *
- * In other words, does it on the output of derivation that is itself an
- * output of a derivation? This corresponds to a dependency that is an
- * inductive derived path with more than one layer of
- * `DerivedPath::Built`.
- */
-template<std::ranges::input_range Range>
-bool hasDynamicDrvDep(Range && drvsMap)
-{
-    return std::ranges::any_of(std::forward<Range>(drvsMap), [](auto & kv) { return !kv.second.childMap.empty(); });
-}
 
 /**
  * \todo Remove.

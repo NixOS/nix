@@ -14,6 +14,13 @@ if host_machine.system() == 'cygwin'
   )
 endif
 
+if host_machine.system() == 'windows'
+  # A unity build, or a single large file like libexpr's primops.cc, can exceed
+  # the COFF section limit:
+  #   Fatal error: can't write 16 bytes to section .text of ...: 'file too big'
+  add_project_arguments([ '-Wa,-mbig-obj' ], language : 'cpp')
+endif
+
 warning_flags = [
   '-Wdeprecated-copy',
   '-Werror=suggest-override',
@@ -92,6 +99,20 @@ is_using_libstdcxx = cxx.compiles(
 
 if is_using_libstdcxx
   add_project_arguments('-D_GLIBCXX_USE_TBB_PAR_BACKEND=0', language : 'cpp')
+endif
+
+# See "Checks that defeat fuzzing" in
+# doc/manual/source/development/testing.md for what this gates and when
+# to use it.
+#
+# Keyed off `b_sanitize` rather than the `fuzzers` option because this
+# file is included by every subproject, and only the `-tests` ones
+# declare `fuzzers`.
+if 'fuzzer-no-link' in get_option('b_sanitize').split(',')
+  add_project_arguments(
+    '-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1',
+    language : [ 'c', 'cpp' ],
+  )
 endif
 
 # Darwin ld doesn't like "X.Y.ZpreABCD+W"

@@ -1,0 +1,26 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a = {
+        >   b = 1;
+        > }
+
+nix-repl> a.b
+1
+
+nix-repl> a = rec {
+        >   b = 2;
+        >   c = {
+        >     d = b;
+        >   };
+        > };
+
+nix-repl> a.c.d
+2
+
+nix-repl> x = 1; y = {
+        >   z = 3;
+        > }
+
+nix-repl> y.z
+3

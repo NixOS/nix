@@ -185,17 +185,6 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/36",
     },
     {
-        .tag = Xp::DaemonTrustOverride,
-        .name = "daemon-trust-override",
-        .description = R"(
-            Allow forcing trusting or not trusting clients with
-            `nix-daemon`. This is useful for testing, but possibly also
-            useful for various experiments with `nix-daemon --stdio`
-            networking.
-        )",
-        .trackingUrl = "https://github.com/NixOS/nix/milestone/38",
-    },
-    {
         .tag = Xp::DynamicDerivations,
         .name = "dynamic-derivations",
         .description = R"(

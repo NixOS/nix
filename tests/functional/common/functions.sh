@@ -10,6 +10,23 @@ isTestOnNixOS() {
   [[ "${isTestOnNixOS:-}" == 1 ]]
 }
 
+isTrustedByAmbientStore() {
+  trusted=$(nix store info --json | jq '.trusted')
+
+  case $trusted in
+    "false")
+        return 1
+        ;;
+    "true")
+        return 0
+        ;;
+    *)
+        # Just a sanity check. Always a boolean
+        die "invalid .trusted value from 'nix store info'"
+        ;;
+  esac
+}
+
 die() {
   echo "unexpected fatal error: $*" >&2
   exit 1
@@ -73,7 +90,7 @@ startDaemon() {
     fi
     # Start the daemon, wait for the socket to appear.
     rm -f "$NIX_DAEMON_SOCKET_PATH"
-    PATH=$DAEMON_PATH nix --extra-experimental-features 'nix-command' daemon &
+    PATH=$DAEMON_PATH nix --log-format raw daemon 2>> "$TEST_ROOT/daemon-log" &
     _NIX_TEST_DAEMON_PID=$!
     export _NIX_TEST_DAEMON_PID
     for ((i = 0; i < 60; i++)); do
@@ -374,7 +391,7 @@ initGitRepo() {
     local extraArgs="${2-}"
 
     # shellcheck disable=SC2086 # word splitting of extraArgs is intended
-    git -C "$repo" init $extraArgs
+    git -C "$repo" init --initial-branch=master $extraArgs
     git -C "$repo" config user.email "foobar@example.com"
     git -C "$repo" config user.name "Foobar"
 }

@@ -5,7 +5,12 @@
 
   nodes = {
     host =
-      { config, pkgs, ... }:
+      {
+        config,
+        lib,
+        pkgs,
+        ...
+      }:
       {
         virtualisation.additionalPaths = [ pkgs.stdenvNoCC ];
         nix.extraOptions = ''
@@ -13,6 +18,7 @@
           extra-system-features = uid-range
         '';
         nix.settings.use-cgroups = true;
+        nix.settings.substituters = lib.mkForce [ ];
         nix.nixPath = [ "nixpkgs=${nixpkgs}" ];
       };
   };
@@ -30,12 +36,16 @@
 
       # Wait for cgroups to be created
       host.succeed(f"until [ -e {service}/nix-daemon ]; do sleep 1; done", timeout=30)
-      host.succeed(f"until [ -e {service}/nix-build-uid-* ]; do sleep 1; done", timeout=30)
+      host.succeed(f"until [ -e {service}/nix-build@* ]; do sleep 1; done", timeout=30)
 
       # Check that there aren't processes where there shouldn't be, and that there are where there should be
       host.succeed(f'[ -z "$(cat {service}/cgroup.procs)" ]')
       host.succeed(f'[ -n "$(cat {service}/nix-daemon/cgroup.procs)" ]')
-      host.succeed(f'[ -n "$(cat {service}/nix-build-uid-*/cgroup.procs)" ]')
+      host.succeed(f'[ -n "$(cat {service}/nix-build@*/cgroup.procs)" ]')
+
+      # Check controllers.
+      host.succeed(f'[ -n "$(cat {service}/cgroup.subtree_control)" ]')
+      host.succeed(f'[ -n "$(cat {service}/nix-build@*/memory.peak)" ]')
     '';
 
 }

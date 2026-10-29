@@ -71,7 +71,7 @@ let
       # pkgs.nix: The new Nix in this repo
       # We disallow it, to make sure we don't accidentally use it.
       system.forbiddenDependenciesRegexes = [
-        (lib.strings.escapeRegex "nix-${pkgs.nix.version}")
+        (lib.strings.escapeRegex "nix-${nixComponents.nix-cli.version}")
       ];
     };
 

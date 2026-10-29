@@ -25,7 +25,7 @@ can_wrap_assert_fail = cxx.links(
 )
 
 if can_wrap_assert_fail
-  deps_other += declare_dependency(
+  deps_private_no_pkgconfig += declare_dependency(
     sources : 'wrap-assert-fail.cc',
     link_args : wrap_assert_fail_args,
   )

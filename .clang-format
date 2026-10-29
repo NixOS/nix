@@ -34,3 +34,4 @@ BinPackArguments: false
 BreakBeforeTernaryOperators: true
 SeparateDefinitionBlocks: Always
 QualifierAlignment: Left
+OneLineFormatOffRegex: "// NOFORMAT$"

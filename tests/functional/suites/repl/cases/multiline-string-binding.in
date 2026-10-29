@@ -1,0 +1,12 @@
+# COM: Multi-line string in binding should trigger continuation (issue #15801)
+x = ''
+  hello
+''
+x
+x = "hello
+world"
+x
+x = ''${
+  "hello"
+}''
+x

@@ -3,6 +3,9 @@
 
 #include <boost/context/detail/exception.hpp>
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
+#include <limits>
 
 namespace nix {
 
@@ -22,6 +25,50 @@ TEST(readNum, negativeValuesSerialiseWellDefined)
     /* The result doesn't depend on the source type - only the destination matters. */
     EXPECT_EQ(readNum<uint64_t>(*makeNumSource(int32_t(-1))), std::numeric_limits<uint64_t>::max());
     EXPECT_EQ(readNum<uint64_t>(*makeNumSource(int16_t(-1))), std::numeric_limits<uint64_t>::max());
+}
+
+TEST(readString, roundTrip)
+{
+    for (auto & s : std::vector<std::string>{"", "x", "1234567", "12345678", "123456789", std::string(300'000, 'a')}) {
+        StringSink sink;
+        sink << s;
+        StringSource source(sink.s);
+        EXPECT_EQ(readString(source), s);
+    }
+}
+
+TEST(readString, bogusLengthDoesNotPreallocate)
+{
+    // 1 TiB length prefix followed by EOF: must fail on the read, not by
+    // allocating (and zeroing) the announced size up front.
+    StringSink sink;
+    sink << (uint64_t(1) << 40);
+    StringSource source(sink.s);
+    EXPECT_THROW(readString(source), EndOfFile);
+}
+
+TEST(readError, bogusLevelIsClamped)
+{
+    for (uint64_t level : {
+             uint64_t(8),
+             uint64_t(1234),
+             uint64_t(std::numeric_limits<unsigned>::max()),
+         }) {
+        StringSink sink;
+        sink << "Error" << level << "Error" << "oops" << uint64_t(0) << uint64_t(0);
+        StringSource source(sink.s);
+        auto e = readError(source);
+        EXPECT_THAT(std::string(e.what()), ::testing::HasSubstr("oops"));
+        EXPECT_EQ(e.info().level, Verbosity::lvlVomit);
+    }
+}
+
+TEST(readError, uint64LevelError)
+{
+    StringSink sink;
+    sink << "Error" << std::numeric_limits<uint64_t>::max() << "Error" << "oops" << uint64_t(0) << uint64_t(0);
+    StringSource source(sink.s);
+    EXPECT_THROW(readError(source), SerialisationError);
 }
 
 TEST(readPadding, works)

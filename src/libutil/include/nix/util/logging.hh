@@ -15,6 +15,8 @@
 
 namespace nix {
 
+/* TODO: Make these enum classes. */
+
 typedef enum {
     actUnknown = 0,
     actCopyPath = 100,
@@ -30,6 +32,17 @@ typedef enum {
     actPostBuildHook = 110,
     actBuildWaiting = 111,
     actFetchTree = 112,
+    /* A source path is being copied into the store, or (in dry-run mode) hashed
+       to compute its store path, via `fetchToStore()`. This backs eval-time path
+       coercion (`"${./file}"`, `src = ./.`), `builtins.path`, and similar. The
+       activity brackets the operation. Fields:
+         [0] = source path (string)
+         [1] = whether the path is only being hashed in a dry run rather than
+               actually copied (1 = hashing, 0 = copying) (int)
+       The resulting store path is only known once the operation completes and is
+       delivered via a resFetchToStore result. */
+    actFetchToStore = 113,
+    actLast = actFetchToStore
 } ActivityType;
 
 typedef enum {
@@ -42,6 +55,10 @@ typedef enum {
     resSetExpected = 106,
     resPostBuildLogLine = 107,
     resFetchStatus = 108,
+    /* The resulting store path of an actFetchToStore activity, emitted once the
+       operation completes. Fields: [0] = store path (string). */
+    resFetchToStore = 109,
+    resLast = resFetchToStore,
 } ResultType;
 
 typedef uint64_t ActivityId;
@@ -278,13 +295,13 @@ void applyJSONLogger();
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
  */
-std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::string_view source);
+std::optional<nlohmann::json> parseJSONMessage(std::string_view msg, std::string_view source);
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
  */
 bool handleJSONLogMessage(
-    nlohmann::json & json,
+    const nlohmann::json & json,
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
@@ -294,11 +311,21 @@ bool handleJSONLogMessage(
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
  */
 bool handleJSONLogMessage(
+    std::string_view msg,
+    const Activity & act,
+    std::map<ActivityId, Activity> & activities,
+    std::string_view source,
+    bool trusted);
+
+inline bool handleJSONLogMessage(
     const std::string & msg,
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
-    bool trusted);
+    bool trusted)
+{
+    return handleJSONLogMessage(std::string_view(msg), act, activities, source, trusted);
+}
 
 /**
  * suppress msgs > this

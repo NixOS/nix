@@ -209,9 +209,17 @@ void deleteGenerationsOlderThan(const std::filesystem::path & profile, time_t t,
 
     // Delete all previous generations (unless current).
     for (; i != gens.rend(); ++i) {
-        /* Creating date and generations should be monotonic, so lower
-           numbered derivations should also be older. */
-        assert(older(*i));
+        /* Creation times should increase with the generation number,
+           but they don't if the clock was wrong when a generation was
+           created, or if the profile was copied without preserving
+           timestamps. Never delete a generation that is newer than
+           the cutoff. */
+        if (!older(*i)) {
+            warn(
+                "not removing profile version %1% because it is newer than the cutoff, even though a later version is older",
+                i->number);
+            continue;
+        }
         if (i->number != curGen)
             deleteGeneration2(profile, i->number, dryRun);
     }

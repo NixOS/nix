@@ -1,4 +1,6 @@
 #include "nix/fetchers/fetchers.hh"
+
+#include "fetchers-config-private.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fmt.hh"
 #include "nix/util/os-string.hh"
@@ -22,7 +24,12 @@ static RunOptions hgOptions(OsStrings args)
     // Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
     env[OS_STR("HGPLAIN")] = OS_STR("");
 
-    return {.program = "hg", .lookupPath = true, .args = std::move(args), .environment = env};
+    return {{
+        .program = HG_PROGRAM,
+        .lookupPath = true,
+        .args = std::move(args),
+        .environment = env,
+    }};
 }
 
 // runProgram wrapper that uses hgOptions instead of stock RunOptions.
@@ -69,10 +76,22 @@ struct MercurialInputScheme : InputScheme
         return "hg";
     }
 
+    std::optional<ParsedURL> localRepoURL(const std::filesystem::path & path) const override
+    {
+        if (!pathExists(path / ".hg"))
+            return std::nullopt;
+        return ParsedURL{
+            .scheme = "hg+file",
+            .authority = ParsedURL::Authority{},
+            .path = pathToUrlPath(path),
+        };
+    }
+
     std::string schemeDescription() const override
     {
-        // TODO
-        return "";
+        return stripIndentation(R"(
+          Fetch a Mercurial tree and copy it to the Nix store.
+        )");
     }
 
     const std::map<std::string, AttributeInfo> & allowedAttrs() const override

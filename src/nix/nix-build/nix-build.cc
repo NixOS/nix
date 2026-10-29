@@ -1,3 +1,4 @@
+#include "cli-config-private.hh"
 #include <cstring>
 #include <iostream>
 #include <filesystem>
@@ -16,6 +17,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/path-with-outputs.hh"
@@ -492,39 +494,34 @@ static void main_nix_build(int argc, char ** argv)
 
             } catch (Error & e) {
                 logError(e.info());
-                notice("uses bash from your environment");
-                shell = "bash";
+                notice("falling back to '%s' as the interactive shell", FALLBACK_BASH);
+                shell = FALLBACK_BASH;
             }
         }
-
-        auto accumDerivedPath = [&](this auto & self,
-                                    ref<SingleDerivedPath> inputDrv,
-                                    const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
-            if (!inputNode.value.empty())
-                pathsToBuild.push_back(
-                    DerivedPath::Built{
-                        .drvPath = inputDrv,
-                        .outputs = OutputsSpec::Names{inputNode.value},
-                    });
-            for (const auto & [outputName, childNode] : inputNode.childMap)
-                self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
-        };
 
         // Build or fetch all dependencies of the derivation.
-        for (const auto & [inputDrv0, inputNode] : drv.inputs.drvs.map) {
-            // To get around lambda capturing restrictions in the
-            // standard.
-            const auto & inputDrv = inputDrv0;
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
-                    return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
-                })) {
-                accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);
-                pathsToCopy.insert(inputDrv);
-            }
-        }
-        for (const auto & src : drv.inputs.srcs) {
-            pathsToBuild.emplace_back(DerivedPath::Opaque{src});
-            pathsToCopy.insert(src);
+        for (const auto & input : drv.inputs) {
+            // Check exclusion for top-level drvs
+            bool excluded = false;
+            std::visit(
+                overloaded{
+                    [&](const SingleDerivedPath::Opaque & op) { pathsToCopy.insert(op.path); },
+                    [&](const SingleDerivedPath::Built & built) {
+                        /* For a dynamic derivation input, this is the
+                           root derivation the chain is ultimately built
+                           from. */
+                        auto & inputDrvPath = built.drvPath->getBaseStorePath();
+                        excluded =
+                            !std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
+                                return !std::regex_search(store->printStorePath(inputDrvPath), std::regex(exclude));
+                            });
+                        if (!excluded)
+                            pathsToCopy.insert(inputDrvPath);
+                    },
+                },
+                input.raw());
+            if (!excluded)
+                pathsToBuild.push_back(DerivedPath::fromSingle(input));
         }
 
         buildPaths(pathsToBuild);
@@ -592,27 +589,8 @@ static void main_nix_build(int argc, char ** argv)
         if (drv.structuredAttrs) {
             StorePathSet inputs;
 
-            fun<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure =
-                [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-                    // Only the depended-on outputs need realizing, so query partially rather than requiring every
-                    // output.
-                    auto outputs = deepQueryPartialDerivationOutputMap(*store, inputDrv, &*evalStore);
-                    for (auto & i : inputNode.value) {
-                        auto & o = outputs.at(i);
-                        if (!o)
-                            throw MissingRealisation(*store, inputDrv, i);
-                        store->computeFSClosure(*o, inputs);
-                    }
-                    for (const auto & [outputName, childNode] : inputNode.childMap) {
-                        auto & o = outputs.at(outputName);
-                        if (!o)
-                            throw MissingRealisation(*store, inputDrv, outputName);
-                        accumInputClosure(*o, childNode);
-                    }
-                };
-
-            for (const auto & [inputDrv, inputNode] : drv.inputs.drvs.map)
-                accumInputClosure(inputDrv, inputNode);
+            for (const auto & input : drv.inputs)
+                store->computeFSClosure(resolveDerivedPath(*store, input, evalStore.get()), inputs);
 
             auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);
 
@@ -649,12 +627,12 @@ static void main_nix_build(int argc, char ** argv)
                 // when nix-shell is run impure, we rehydrate it with the `p=$PATH` above
                 "unset PATH;"
                 "dontAddDisableDepTrack=1;\n"
-                + structuredAttrsRC +
-                "\n[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
-                "PATH=%4%:\"$PATH\"; "
-                "SHELL=%5%; "
-                "BASH=%5%; "
+                "\n[ -e $stdenv/setup ] && source $stdenv/setup; "
+                "%4%"
+                "PATH=%5%:\"$PATH\"; "
+                "SHELL=%6%; "
+                "BASH=%6%; "
                 "set +e; "
                 R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && )s" +
                 (isRootUser()
@@ -663,11 +641,12 @@ static void main_nix_build(int argc, char ** argv)
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
-                "unset TZ; %6%"
+                "unset TZ; %7%"
                 "shopt -s execfail;"
-                "%7%",
+                "%8%",
                 escapeShellArgAlways(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
+                structuredAttrsRC,
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
                 escapeShellArgAlways(std::filesystem::path(*shell).parent_path().string()),
                 escapeShellArgAlways(*shell),

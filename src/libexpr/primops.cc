@@ -1,5 +1,5 @@
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/masked.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
@@ -1031,17 +1031,30 @@ static void prim_addErrorContext(EvalState & state, CallSite callSite, Value * c
         state.forceValue(*args[1], noPos);
         v = *args[1];
     } catch (Error & e) {
-        NixStringContext context;
-        auto message = state
-                           .coerceToString(
-                               noPos,
-                               *args[0],
-                               context,
-                               "while evaluating the error message passed to builtins.addErrorContext",
-                               false,
-                               false)
-                           .toOwned();
-        e.addTrace(nullptr, HintFmt(message), TracePrint::Always);
+        /* Rethrow `e` itself, also if evaluating the message in `args[0]`
+           fails, to preserve the type of `e`. The type decides whether
+           `tryEval` catches the error; see the documentation of `tryEval`,
+           `throw` and `abort`. */
+        try {
+            NixStringContext context;
+            auto message = state
+                               .coerceToString(
+                                   noPos,
+                                   *args[0],
+                                   context,
+                                   "while evaluating the error message passed to builtins.addErrorContext",
+                                   false,
+                                   false)
+                               .toOwned();
+            e.addTrace(nullptr, HintFmt(message), TracePrint::Always);
+        } catch (Error & contextError) {
+            e.addTrace(
+                std::shared_ptr<const Pos>(contextError.info().pos),
+                HintFmt(
+                    "while evaluating the error message passed to builtins.addErrorContext, another error occurred: %s",
+                    contextError.info().msg),
+                TracePrint::Always);
+        }
         throw;
     }
 }
@@ -1060,6 +1073,8 @@ static RegisterPrimOp primop_addErrorContext(
             when the evaluation of *value* fails.
             The additional context is applied when evaluating *value* itself fails,
             not when attributes or elements of *value* are evaluated.
+
+            If evaluating *context* fails as well, the error from *value* propagates to the caller unchanged.
 
             For example, the module system from nixpkgs uses this to show
             the relevant information about the options that were evaluating
@@ -1358,6 +1373,8 @@ static void prim_warn(EvalState & state, CallSite callSite, Value * const * args
             .level = lvlWarn,
             .msg = HintFmt(std::string(msgStr)),
             .isFromExpr = true,
+            // Do not indent relative to the "evaluation warning: " prefix if the message starts with a newline.
+            .noIndent = msgStr.starts_with("\n"),
         };
         logWarning(info);
     }
@@ -1794,18 +1811,28 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     StorePathSet refs;
                     state.store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
-                        drv.inputs.srcs.insert(j);
+                        drv.inputs.insert(SingleDerivedPath::Opaque{j});
                         if (j.isDerivation()) {
-                            drv.inputs.drvs.map[j].value = state.store->readDerivation(j).outputNames();
+                            for (auto & outputName : state.store->readDerivation(j).outputNames()) {
+                                drv.inputs.insert(
+                                    SingleDerivedPath::Built{
+                                        .drvPath = makeConstantStorePathRef(j),
+                                        .output = outputName,
+                                    });
+                            }
                         }
                     }
                 },
                 [&](const NixStringContextElem::Built & b) {
-                    drv.inputs.drvs.ensureSlot(*b.drvPath).value.insert(b.output);
+                    drv.inputs.insert(
+                        SingleDerivedPath::Built{
+                            .drvPath = b.drvPath,
+                            .output = b.output,
+                        });
                 },
                 [&](const NixStringContextElem::Opaque & o) {
                     state.ensureLazyPathCopied(o.path);
-                    drv.inputs.srcs.insert(o.path);
+                    drv.inputs.insert(SingleDerivedPath::Opaque{o.path});
                 },
             },
             c.raw);
@@ -1914,8 +1941,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        case we don't actually write store derivations, so we can't
        read them later. */
     {
-        auto h = hashInputModulo(*state.store, drv);
-        derivation::hashes.insert_or_assign(drvPath, std::move(h));
+        auto h = derivation::masked::hashInput(*state.store, drv);
+        derivation::masked::hashes.insert_or_assign(drvPath, std::move(h));
     }
 
     auto result = state.buildBindings(1 + drv.outputs.size());
@@ -3288,9 +3315,11 @@ static RegisterPrimOp primop_hasAttr({
     .name = "__hasAttr",
     .args = {"s", "set"},
     .doc = R"(
-      `hasAttr` returns `true` if *set* has an attribute named *s*, and
-      `false` otherwise. This is a dynamic version of the `?` operator,
-      since *s* is an expression rather than an identifier.
+      `hasAttr` returns `true` if *set* has an attribute named *s*, and `false` if it does not.
+      This is a dynamic version of the `?` operator, since *s* is an expression rather than an identifier.
+
+      Unlike the `?` operator, however, *s* cannot refer to a nested attribute set.
+      Also unlike the `?` operator, if *s* is not a string or *set* is not an attribute set, evaluation is aborted.
 
       Has `O(log n)` time complexity, where `n` is number of attributes in the *set*.
     )",

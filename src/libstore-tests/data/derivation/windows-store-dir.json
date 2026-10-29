@@ -1,0 +1,23 @@
+{
+  "args": [
+    "arg"
+  ],
+  "builder": "builder.exe",
+  "env": {
+    "out": "C:\\ProgramData\\nix\\store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": [
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-bar"
+    ]
+  },
+  "name": "windows-store-dir",
+  "outputs": {
+    "out": {
+      "path": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo"
+    }
+  },
+  "system": "x86_64-windows",
+  "version": 4
+}

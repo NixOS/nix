@@ -5,8 +5,8 @@ this allows multiple builds to be performed in parallel.
 
 Remote builds also allow Nix to perform multi-platform builds in a
 semi-transparent way. For example, if you perform a build for a
-`x86_64-darwin` on an `i686-linux` machine, Nix can automatically
-forward the build to a `x86_64-darwin` machine, if one is available.
+`aarch64-darwin` on an `i686-linux` machine, Nix can automatically
+forward the build to a `aarch64-darwin` machine, if one is available.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ then you need to ensure that the `PATH` of non-interactive login shells
 contains Nix.
 
 The [list of remote build machines](@docroot@/command-ref/conf-file.md#conf-builders) can be specified on the command line or in the Nix configuration file.
-For example, the following command allows you to build a derivation for `x86_64-darwin` on a Linux machine:
+For example, the following command allows you to build a derivation for `aarch64-darwin` on a Linux machine:
 
 ```console
 uname
@@ -71,8 +71,8 @@ Linux
 
 ```console
 nix build --impure \
- --expr '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
- --builders 'ssh://mac x86_64-darwin'
+ --expr '(with import <nixpkgs> { system = "aarch64-darwin"; }; runCommand "foo" {} "uname > $out")' \
+ --builders 'ssh://mac aarch64-darwin'
 ```
 
 ```console
@@ -90,12 +90,12 @@ Darwin
 It is possible to specify multiple build machines separated by a semicolon or a newline, e.g.
 
 ```console
-  --builders 'ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd'
+  --builders 'ssh://mac aarch64-darwin ; ssh://beastie x86_64-freebsd'
 ```
 
 Remote build machines can also be configured in [`nix.conf`](@docroot@/command-ref/conf-file.md), e.g.
 
-    builders = ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd
+    builders = ssh://mac aarch64-darwin ; ssh://beastie x86_64-freebsd
 
 After making changes to `nix.conf`, restart the Nix daemon for changes to take effect.
 

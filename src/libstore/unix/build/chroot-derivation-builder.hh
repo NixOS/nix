@@ -1,18 +1,20 @@
 #pragma once
 
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "chroot.hh"
 
 namespace nix {
 
-struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
+struct ChrootDerivationBuilder : virtual UnixDerivationBuilderImpl
 {
 private:
     void anchor() override;
 public:
     ChrootDerivationBuilder(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
+        std::shared_ptr<BuildingStore> store,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
+        : UnixDerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
     {
     }
 
@@ -43,7 +45,7 @@ public:
 
     Strings getPreBuildHookArgs() override;
 
-    std::filesystem::path realPathInHost(const std::filesystem::path & p) override;
+    std::filesystem::path realPathInHost(const StorePath & p) override;
 
     void cleanupBuild(bool force) override;
 

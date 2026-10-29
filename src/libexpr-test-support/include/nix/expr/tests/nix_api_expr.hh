@@ -15,6 +15,9 @@ protected:
     void SetUp() override
     {
         nix_api_store_test::SetUp();
+        /* A skip in the base returns from the base only, leaving `store` null. */
+        if (IsSkipped())
+            return;
         nix_libexpr_init(ctx);
         state = nix_state_create(nullptr, nullptr, store);
         value = nix_alloc_value(nullptr, state);
@@ -22,8 +25,11 @@ protected:
 
     void TearDown() override
     {
-        nix_gc_decref(nullptr, value);
-        nix_state_free(state);
+        /* Also runs for skipped tests, where these are null. */
+        if (value)
+            nix_gc_decref(nullptr, value);
+        if (state)
+            nix_state_free(state);
     }
 
     EvalState * state = nullptr;

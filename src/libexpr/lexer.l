@@ -357,7 +357,7 @@ static_assert(std::is_same_v<yyscan_t, void *>);
 
 namespace nix {
 
-void setReplBindingsMode(yyscan_t scanner)
+void lexer::internal::setReplBindingsMode(yyscan_t scanner)
 {
     yy_push_state(REPL_BINDINGS_MODE, scanner);
 }

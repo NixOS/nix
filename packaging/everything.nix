@@ -130,7 +130,12 @@ stdenv.mkDerivation (finalAttrs: {
     nix-functional-tests
   ]
   ++
-    lib.optionals (stdenv.hostPlatform.isLinux && stdenv.buildPlatform.canExecute stdenv.hostPlatform)
+    lib.optionals
+      (
+        stdenv.hostPlatform.isLinux
+        && stdenv.buildPlatform.canExecute stdenv.hostPlatform
+        && nix-util-tests.tests ? run-without-new-syscalls
+      )
       [
         nix-util-tests.tests.run-without-new-syscalls
       ];
@@ -161,7 +166,7 @@ stdenv.mkDerivation (finalAttrs: {
       ln -sT ${nix-manual} $doc
       ln -sT ${nix-manual.man} $man
     ''
-    + lib.optionalString stdenv.isLinux ''
+    + lib.optionalString stdenv.hostPlatform.isLinux ''
       lndir ${nix-nswrapper} $out
     '';
 

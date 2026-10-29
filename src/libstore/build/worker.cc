@@ -159,7 +159,7 @@ void Worker::removeGoal(GoalPtr goal)
     } else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal)) {
         derivationBuildingGoals.erase(drvBuildingGoal->drvPath);
     } else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal)) {
-        substitutionGoals.erase(subGoal->storePath);
+        substitutionGoals.erase(subGoal->getStorePath());
     } else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal)) {
         drvOutputSubstitutionGoals.erase(subGoal->id);
     } else {
@@ -482,13 +482,13 @@ void Worker::waitForInput()
                 goal->handleEOF(k);
             });
 
-        if (goal->exitCode == Goal::ecBusy && 0 != settings.maxSilentTime && j->respectTimeouts
+        if (!goal->exitCode && 0 != settings.maxSilentTime && j->respectTimeouts
             && after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime)) {
             goal->timedOut(TimedOut(settings.maxSilentTime));
         }
 
         else if (
-            goal->exitCode == Goal::ecBusy && 0 != settings.buildTimeout && j->respectTimeouts
+            !goal->exitCode && 0 != settings.buildTimeout && j->respectTimeouts
             && after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout)) {
             goal->timedOut(TimedOut(settings.buildTimeout));
         }

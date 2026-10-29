@@ -1,20 +1,20 @@
-#include "derivation-builder-impl.hh"
-#include "nix/store/build/child.hh"
+#include "unix-derivation-builder-impl.hh"
+#include "child-impl.hh"
 
 namespace nix {
 
 namespace {
 
-struct ExternalDerivationBuilder : DerivationBuilderImpl
+struct ExternalDerivationBuilder : UnixDerivationBuilderImpl
 {
     ExternalBuilder externalBuilder;
 
     ExternalDerivationBuilder(
-        LocalStore & store,
+        std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         ExternalBuilder externalBuilder)
-        : DerivationBuilderImpl(store, miscMethods, std::move(params))
+        : UnixDerivationBuilderImpl(store, miscMethods, std::move(params))
         , externalBuilder(std::move(externalBuilder))
     {
         experimentalFeatureSettings.require(Xp::ExternalBuilders);
@@ -57,19 +57,19 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         json.emplace("topTmpDir", topTmpDir.native());
         json.emplace("tmpDir", tmpDir.native());
         json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
-        json.emplace("storeDir", store.storeDir);
-        json.emplace("realStoreDir", store.config->realStoreDir.get());
+        json.emplace("storeDir", store->storeDir);
+        json.emplace("realStoreDir", store->getRealStoreDir().native());
         json.emplace("system", drv.platform);
         {
             auto l = nlohmann::json::array();
             for (auto & i : inputPaths)
-                l.push_back(store.printStorePath(i));
+                l.push_back(store->printStorePath(i));
             json.emplace("inputPaths", std::move(l));
         }
         {
             auto l = nlohmann::json::object();
             for (auto & i : scratchOutputs)
-                l.emplace(i.first, store.printStorePath(i.second));
+                l.emplace(i.first, store->printStorePath(i.second));
             json.emplace("outputs", std::move(l));
         }
 
@@ -114,7 +114,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 } // namespace
 
 DerivationBuilderUnique makeExternalDerivationBuilder(
-    LocalStore & store,
+    std::shared_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler)

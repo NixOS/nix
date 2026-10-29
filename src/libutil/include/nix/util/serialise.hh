@@ -9,10 +9,6 @@
 #include "nix/util/util.hh"
 #include "nix/util/file-descriptor.hh"
 
-namespace boost::context {
-struct stack_context;
-}
-
 namespace nix {
 
 /**
@@ -78,6 +74,14 @@ public:
     void operator()(std::string_view data) override;
 
     void flush();
+
+    /**
+     * Check whether the buffer has unflushed data.
+     */
+    bool hasData() const noexcept
+    {
+        return bufPos;
+    }
 
 protected:
 
@@ -194,6 +198,12 @@ private:
 public:
     Descriptor fd;
     size_t written = 0;
+    /**
+     * A hint to the sink as to whether the destination is a regular file.
+     * Specifying a true for a non regular file doesn't affect correctness - only
+     * efficiency.
+     */
+    bool isRegularFile:1 = false;
 
     FdSink()
         : fd(INVALID_DESCRIPTOR)

@@ -1,0 +1,23 @@
+{
+  "args": [],
+  "builder": "/bin/parent",
+  "env": {},
+  "inputs": {
+    "drvs": {
+      "kp6i4n4bb3hlniwqjakhlf046qpdc0gl-intermediate.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      }
+    },
+    "srcs": []
+  },
+  "name": "parent",
+  "outputs": {
+    "out": {}
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

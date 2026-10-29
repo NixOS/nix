@@ -176,9 +176,9 @@ class SQLiteError : public CloneableError<SQLiteError, Error>
 
 public:
     template<typename... Args>
-    [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, const Args &... args)
+    [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, Args &&... args)
     {
-        throw_(db, HintFmt(fs, args...));
+        throw_(db, HintFmt(fs, std::forward<Args>(args)...));
     }
 
     SQLiteError(const char * path, const char * errMsg, int errNo, int extendedErrNo, int offset, HintFmt && hf);
@@ -193,8 +193,8 @@ protected:
         int extendedErrNo,
         int offset,
         const std::string & fs,
-        const Args &... args)
-        : SQLiteError(path, errMsg, errNo, extendedErrNo, offset, HintFmt(fs, args...))
+        Args &&... args)
+        : SQLiteError(path, errMsg, errNo, extendedErrNo, offset, HintFmt(fs, std::forward<Args>(args)...))
     {
     }
 

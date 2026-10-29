@@ -1,6 +1,7 @@
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "darwin-derivation-builder.hh"
 
+#include <map>
 #include <spawn.h>
 #include <sys/sysctl.h>
 #include <sandbox.h>
@@ -33,6 +34,21 @@ struct IpcsCommand
 
 namespace nix {
 
+/* Quote a string as an SBPL string literal. Escapes two characters: `\` which escapes
+   the next character and `"` which ends the literal when they are not escaped.
+   This keeps derivation-defined `__impureHostDeps` and other settings from injecting profile rules. */
+static std::string sbplQuote(std::string_view s)
+{
+    std::string res = "\"";
+    for (auto c : s) {
+        if (c == '"' || c == '\\')
+            res += '\\';
+        res += c;
+    }
+    res += '"';
+    return res;
+}
+
 void DarwinDerivationBuilder::prepareSandbox()
 {
     pathsInChroot = getPathsInSandbox();
@@ -40,7 +56,7 @@ void DarwinDerivationBuilder::prepareSandbox()
 
 void DarwinDerivationBuilder::setUser()
 {
-    DerivationBuilderImpl::setUser();
+    UnixDerivationBuilderImpl::setUser();
 
     /* This has to appear before import statements. */
     std::string sandboxProfile = "(version 1)\n";
@@ -63,7 +79,7 @@ void DarwinDerivationBuilder::setUser()
 
         /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
            path component this time, since it's typically /nix/store and we care about that. */
-        std::filesystem::path cur = store.storeDir;
+        std::filesystem::path cur = store->storeDir;
         while (cur != "/") {
             ancestry.insert(cur.native());
             cur = cur.parent_path();
@@ -71,13 +87,13 @@ void DarwinDerivationBuilder::setUser()
 
         /* Add all our input paths to the chroot */
         for (auto & i : inputPaths) {
-            auto p = store.printStorePath(i);
+            auto p = store->printStorePath(i);
             pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
         }
 
         /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be
          * configurable */
-        if (store.config->getLocalSettings().darwinLogSandboxViolations) {
+        if (store->getLocalSettings().darwinLogSandboxViolations) {
             sandboxProfile += "(deny default)\n";
         } else {
             sandboxProfile += "(deny default (with no-log))\n";
@@ -95,25 +111,24 @@ void DarwinDerivationBuilder::setUser()
         /* Add the output paths we'll use at build-time to the chroot */
         sandboxProfile += "(allow file-read* file-write* process-exec\n";
         for (auto & [_, path] : scratchOutputs)
-            sandboxProfile += fmt("\t(subpath \"%s\")\n", store.printStorePath(path));
+            sandboxProfile += fmt("\t(subpath %s)\n", sbplQuote(store->printStorePath(path)));
 
         sandboxProfile += ")\n";
 
         /* Our inputs (transitive dependencies and any impurities computed above)
-           without file-write* allowed, access() incorrectly returns EPERM */
-        sandboxProfile += "(allow file-read* file-write* process-exec\n";
+           without file-write* allowed, access() incorrectly returns EPERM.
 
-        // We create multiple allow lists, to avoid exceeding a limit in the darwin sandbox interpreter.
-        // See https://github.com/NixOS/nix/issues/4119
-        // We split our allow groups approximately at half the actual limit, 1 << 16
-        const size_t breakpoint = sandboxProfile.length() + (1 << 14);
+           The sandbox compiler merges all path filters of an operation into a single
+           pattern table that must stay below 64 KiB, regardless of how many (allow ...)
+           forms they are spread over (see https://github.com/NixOS/nix/issues/4119).
+           A group guarded by a distinct (prefix ...) filter gets its own table, so we
+           bucket store paths by the first character of their hash. The guard is a
+           superset of every filter in its group, so it does not change what is allowed. */
+
+        std::map<char, std::string> bucketedStorePathProfiles;
+        std::string otherSandboxPathsProfile;
+
         for (auto & i : pathsInChroot) {
-
-            if (sandboxProfile.length() >= breakpoint) {
-                debug("Sandbox break: %d %d", sandboxProfile.length(), breakpoint);
-                sandboxProfile += ")\n(allow file-read* file-write* process-exec\n";
-            }
-
             if (i.first != i.second.source)
                 throw Error(
                     "can't map %1% to %2%: mismatched impure paths not supported on Darwin",
@@ -127,17 +142,57 @@ void DarwinDerivationBuilder::setUser()
                     continue;
                 throw SysError("getting attributes of required path '%s", path);
             }
-            if (S_ISDIR(optSt->st_mode))
-                sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
-            else
-                sandboxProfile += fmt("\t(literal \"%s\")\n", path);
+
+            /* Store paths are bucketed by the store path hash'es first
+               character, creating 32 buckets. This allows us to fit around 10k
+               store paths into the sandbox. Everything else (impure deps or
+               manually specified sandbox-paths) is bundled into a separate
+               clause.
+
+               One step further would be to use two characters for the prefix, yielding
+               1024 buckets. However, we're already seeing the "profile too large" error
+               instead of the "data object length <> exceeds maximum (65535)" error at 12k
+               paths, so we aren't bottlenecked by the number of buckets. */
+
+            /* For future: One additional trick we can pull here is to reduce the path to a
+               (prefix "$storePrefix/<hash>-"), which is shorter than either a subpath, or
+               a literal value. It should be safe as hashes are unique. */
+            std::string profileRule = S_ISDIR(optSt->st_mode) ? fmt("\t\t(subpath %s)\n", sbplQuote(path))
+                                                              : fmt("\t\t(literal %s)\n", sbplQuote(path));
+
+            /* Legitimate derivation input paths are already lexically canonical. */
+            if (store->isInStore(path)) {
+                /* Anything that's inside the store must also be a valid StorePath (or a path under it).
+                   Any other path under the store directory is an implementation detail of Nix.
+                   (currently that's only .links/ directory). */
+                auto [sp, subdir] = store->toStorePath(path);
+                /* Bucket by the nix32 first char, which is uniformly distributed in the long run. */
+                bucketedStorePathProfiles[sp.hashPart().front()] += profileRule;
+            } else {
+                otherSandboxPathsProfile += profileRule;
+            }
         }
-        sandboxProfile += ")\n";
+
+        if (!otherSandboxPathsProfile.empty()) /* Avoid a repeat of CVE-2026-110451. */
+            sandboxProfile += fmt("(allow file-read* file-write* process-exec\n%s)\n", otherSandboxPathsProfile);
+
+        const auto storePrefix = store->storeDir + '/';
+        for (const auto & [bucket, filters] : bucketedStorePathProfiles) {
+            assert(!filters.empty()); /* Just to be safe. */
+            const auto prefix = storePrefix + bucket;
+            sandboxProfile +=
+                fmt("(allow file-read* file-write* process-exec\n"
+                    "\t(require-all (prefix %s)\n"
+                    "\t\t(require-any\n%s)))\n",
+                    sbplQuote(prefix),
+                    filters);
+        }
 
         /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
         sandboxProfile += "(allow file-read*\n";
+        assert(!ancestry.empty()); /* Just to be safe. */
         for (auto & i : ancestry) {
-            sandboxProfile += fmt("\t(literal \"%s\")\n", i);
+            sandboxProfile += fmt("\t(literal %s)\n", sbplQuote(i));
         }
         sandboxProfile += ")\n";
 
@@ -303,7 +358,7 @@ void DarwinDerivationBuilder::cleanupSysVIPCForUser(uid_t uid)
 
 void DarwinDerivationBuilder::killSandbox(bool getStats)
 {
-    DerivationBuilderImpl::killSandbox(getStats);
+    UnixDerivationBuilderImpl::killSandbox(getStats);
     if (buildUser) {
         auto uid = buildUser->getUID();
         cleanupSysVIPCForUser(uid);

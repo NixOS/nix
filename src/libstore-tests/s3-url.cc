@@ -54,7 +54,7 @@ INSTANTIATE_TEST_SUITE_P(
                 .bucket = "bucket",
                 .key = {"key"},
                 .profile = "prod",
-                .region = "us-west-2", //< using the first parameter (decodeQuery ignores dupicates)
+                .region = "us-west-2", //< using the first parameter (decodeQuery ignores duplicates)
                 .scheme = "https",
                 .endpoint = ParsedURL::Authority{.host = "custom.s3.com"},
             },

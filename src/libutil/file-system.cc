@@ -300,27 +300,33 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
 
-    std::array<char, 64 * 1024> buf;
-
-    try {
-        while (true) {
-            try {
-                auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), {buf.data(), n});
-            } catch (EndOfFile &) {
-                break;
-            }
-        }
-    } catch (Error & e) {
-        e.addTrace({}, "writing file %s", PathFmt(path));
-        throw;
-    }
-    if (sync == FsSync::Yes)
-        fd.fsync();
+    writeFile(fd.get(), source, sync, &path);
     // Explicitly close to make sure exceptions are propagated.
     fd.close();
     if (sync == FsSync::Yes)
         syncParent(path);
+}
+
+void writeFile(Descriptor fd, Source & source, FsSync sync, const std::filesystem::path * origPath)
+{
+    std::array<char, 64 * 1024> buf;
+
+    try {
+        while (true) {
+            size_t n;
+            try {
+                n = source.read(buf.data(), buf.size());
+            } catch (EndOfFile &) {
+                break;
+            }
+            writeFull(fd, {buf.data(), n});
+        }
+    } catch (Error & e) {
+        e.addTrace({}, "writing file %1%", origPath ? PathFmt(*origPath) : PathFmt(descriptorToPath(fd)));
+        throw;
+    }
+    if (sync == FsSync::Yes)
+        syncDescriptor(fd);
 }
 
 void syncParent(const std::filesystem::path & path)
@@ -376,19 +382,6 @@ void recursiveSync(const std::filesystem::path & path)
             throw NativeSysError("opening directory %1%", PathFmt(*dir));
         fd.fsync();
     }
-}
-
-void createDir(const std::filesystem::path & path, mode_t mode)
-{
-    if (mkdir(
-            path.string().c_str()
-#ifndef _WIN32
-                ,
-            mode
-#endif
-            )
-        == -1)
-        throw SysError("creating directory %s", PathFmt(path));
 }
 
 void createDirs(const std::filesystem::path & path)
@@ -526,9 +519,7 @@ createTempFile(const std::filesystem::path & root, const std::filesystem::path &
 
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
-#ifndef _WIN32
-    unix::closeOnExec(fd.get());
-#endif
+    closeOnExec(fd.get());
     return {std::move(fd), std::filesystem::path(std::move(tmpl))};
 }
 
@@ -623,28 +614,6 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
                 std::filesystem::perms::owner_write,
                 std::filesystem::perm_options::add | std::filesystem::perm_options::nofollow);
         std::filesystem::remove(from);
-    }
-}
-
-void moveFile(const std::filesystem::path & oldName, const std::filesystem::path & newName)
-{
-    try {
-        std::filesystem::rename(oldName, newName);
-    } catch (std::filesystem::filesystem_error & e) {
-        auto oldPath = oldName;
-        auto newPath = newName;
-        // For the move to be as atomic as possible, copy to a temporary
-        // directory
-        std::filesystem::path temp = createTempDir(os_string_to_string(PathView{newPath.parent_path()}), "rename-tmp");
-        Finally removeTemp = [&]() { std::filesystem::remove(temp); };
-        auto tempCopyTarget = temp / "copy-target";
-        if (e.code().value() == EXDEV) {
-            std::filesystem::remove(newPath);
-            warn("can’t rename %s as %s, copying instead", PathFmt(oldName), PathFmt(newName));
-            copyFile(oldPath, tempCopyTarget, true);
-            std::filesystem::rename(
-                os_string_to_string(PathView{tempCopyTarget}), os_string_to_string(PathView{newPath}));
-        }
     }
 }
 

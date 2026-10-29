@@ -33,7 +33,7 @@ outPathZero=$(nix build --print-out-paths --no-link --impure --file ./make-conte
 # Make it content-addressed as well.
 outPathZeroCA=$(nix store make-content-addressed --json "$outPathZero" | jq -r '.rewrites | map(.) | .[]')
 
-# The resulting paths should be different, since HashModuloSink hashes the positions of self-references.
+# The resulting paths should be different, since MaskedHashSink hashes the positions of self-references.
 # https://github.com/NixOS/nix/issues/15837
 [[ $outPathCA != "$outPathZeroCA" ]]
 

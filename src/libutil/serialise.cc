@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <limits>
 #include <memory>
+#include <utility>
 
 #include <boost/coroutine2/coroutine.hpp>
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
@@ -564,8 +565,8 @@ Sink & operator<<(Sink & sink, const StringSet & s)
 Sink & operator<<(Sink & sink, const Error & ex)
 {
     auto & info = ex.info();
-    sink << "Error" << info.level << "Error" // removed
-         << info.msg.str() << 0              // FIXME: info.errPos
+    sink << "Error" << std::to_underlying(info.level) << "Error" // removed
+         << info.msg.str() << 0                                  // FIXME: info.errPos
          << info.traces.size();
     for (auto & trace : info.traces) {
         sink << 0; // FIXME: trace.pos
@@ -600,8 +601,25 @@ std::string readString(Source & source, size_t max)
     auto len = readNum<size_t>(source);
     if (len > max)
         throw SerialisationError("string is too long");
-    std::string res(len, 0);
-    source(res.data(), len);
+    /* Grow with the data actually received rather than trusting `len` for
+       the allocation, so a bogus length prefix costs the peer as many bytes
+       as it costs us. */
+    std::string res;
+    while (res.size() < len) {
+        size_t filled = res.size();
+        size_t want = std::min(len, std::max<size_t>(2 * filled, 64 * 1024));
+        std::exception_ptr ex;
+        res.resize_and_overwrite(want, [&](char * buf, size_t) -> size_t {
+            try {
+                return filled + source.read(buf + filled, want - filled);
+            } catch (...) {
+                ex = std::current_exception();
+                return filled;
+            }
+        });
+        if (ex)
+            std::rethrow_exception(ex);
+    }
     readPadding(len, source);
     return res;
 }
@@ -630,7 +648,7 @@ Error readError(Source & source)
     auto type = readString(source);
     if (type != "Error")
         throw SerialisationError("unexpected error type '%s'", type);
-    auto level = (Verbosity) readInt(source);
+    auto level = verbosityFromIntClamped(readInt(source));
     [[maybe_unused]] auto name = readString(source); // removed
     auto msg = readString(source);
     ErrorInfo info{

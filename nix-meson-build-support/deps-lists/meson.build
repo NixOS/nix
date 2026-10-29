@@ -31,6 +31,9 @@ deps_public = []
 deps_private_subproject = []
 deps_public_subproject = []
 
-# These are dependencencies without pkg-config files. Ideally they are
-# just private, but they may also be public (e.g. boost).
-deps_other = []
+# These are dependencies without pkg-config files (Boost, or ad-hoc
+# libraries from `find_library`). The private ones only link this library;
+# the public ones are also propagated to consumers within this build, but
+# cannot be expressed in the generated pkg-config file.
+deps_private_no_pkgconfig = []
+deps_public_no_pkgconfig = []

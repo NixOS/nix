@@ -29,7 +29,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
         extra_nix_config:
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/install-nix-action
+      - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
         with:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
           extra_nix_config: experimental-features = nix-command flakes
@@ -95,7 +95,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -107,14 +107,22 @@ jobs:
       if: matrix.os == 'linux'
     - name: Run component tests
       run: |
-        nix build --file ci/gha/tests/wrapper.nix componentTests -L \
-          --arg withInstrumentation ${{ matrix.instrumented }} \
-          --argstr stdenv "${{ matrix.stdenv }}"
+        NIX_BUILD_FLAGS="--arg withInstrumentation $INSTRUMENTED --argstr stdenv $STDENV"
+        nix build --file ci/gha/tests/wrapper.nix componentTests -L $NIX_BUILD_FLAGS
+        echo "NIX_BUILD_FLAGS=$NIX_BUILD_FLAGS" >> "$GITHUB_ENV"
+      env:
+        # Sanitizers + coverage
+        INSTRUMENTED: ${{ matrix.instrumented }}
+        STDENV: ${{ matrix.stdenv }}
+    - name: Run root unit tests
+      # Root* unit tests are currently only defined for Darwin.
+      if: matrix.os == 'darwin'
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix nixComponentsInstrumented.nix-util-tests -L $NIX_BUILD_FLAGS --out-link result-root-tests
+        sudo -n ./result-root-tests/bin/nix-util-tests --gtest_filter='Root*'
     - name: Run VM tests
       run: |
-        nix build --file ci/gha/tests/wrapper.nix vmTests -L \
-          --arg withInstrumentation ${{ matrix.instrumented }} \
-          --argstr stdenv "${{ matrix.stdenv }}"
+        nix build --file ci/gha/tests/wrapper.nix vmTests -L $NIX_BUILD_FLAGS
       if: ${{ matrix.os == 'linux' }}
     - name: Run flake checks and prepare the installer tarball
       run: |
@@ -123,20 +131,17 @@ jobs:
       if: ${{ matrix.primary }}
     - name: Collect code coverage
       run: |
-        nix build --file ci/gha/tests/wrapper.nix codeCoverage.coverageReports -L \
-          --arg withInstrumentation ${{ matrix.instrumented }} \
-          --argstr stdenv "${{ matrix.stdenv }}" \
-          --out-link coverage-reports
+        nix build --file ci/gha/tests/wrapper.nix codeCoverage.coverageReports -L $NIX_BUILD_FLAGS --out-link coverage-reports
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
       if: ${{ matrix.instrumented }}
     - name: Upload coverage reports
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: coverage-reports
         path: coverage-reports/
       if: ${{ matrix.instrumented }}
     - name: Upload installer tarball
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: installer-${{matrix.os}}
         path: out/*
@@ -153,13 +158,13 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
-    - name: Run Windows unit tests
+    - name: Build and test Windows components
       run: |
-        nix build --file ci/gha/tests/windows.nix unitTests.nix-util-tests -L
+        nix build --file ci/gha/tests/windows.nix crossBuild unitTests.nix-util-tests -L
 
   installer_test:
     needs: [tests]
@@ -170,19 +175,19 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
-            rust-installer: false
+            nix-installer: false
           - scenario: on macos
             runs-on: macos-14
             os: darwin
-            rust-installer: false
+            nix-installer: false
           - scenario: on ubuntu (rust)
             runs-on: ubuntu-24.04
             os: linux
-            rust-installer: true
+            nix-installer: true
           - scenario: on macos (rust)
             runs-on: macos-14
             os: darwin
-            rust-installer: true
+            nix-installer: true
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
@@ -190,20 +195,20 @@ jobs:
       with:
         persist-credentials: false
     - name: Download installer tarball
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: installer-${{matrix.os}}
         path: out
     - name: Looking up the installer tarball URL
       id: installer-tarball-url
       run: echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-    - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
-      if: ${{ !matrix.rust-installer }}
+    - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      if: ${{ !matrix.nix-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
         install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
-    - name: Run rust installer
-      if: ${{ matrix.rust-installer }}
+    - name: Run nix-installer
+      if: ${{ matrix.nix-installer }}
       run: |
         chmod +x out/nix-installer
         ./out/nix-installer install --no-confirm
@@ -229,7 +234,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -260,7 +265,7 @@ jobs:
           path: flake-regressions/tests
           persist-credentials: false
       - name: Download installer tarball
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: installer-linux
           path: out
@@ -268,7 +273,7 @@ jobs:
         id: installer-tarball-url
         run: |
           echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-      - uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
         with:
           install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
           install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
@@ -289,7 +294,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}

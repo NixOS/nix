@@ -1,0 +1,654 @@
+#include <gtest/gtest.h>
+
+#include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/util/types.hh"
+
+#include "nix/store/tests/libstore.hh"
+#include "nix/util/tests/json-characterization.hh"
+
+namespace nix {
+
+class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>, public LibStoreTest
+{
+protected:
+    std::filesystem::path unitTestData = getUnitTestData() / "derivation" / "ia";
+
+public:
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+
+    /**
+     * We set these in tests rather than the regular globals so we don't have
+     * to worry about race conditions if the tests run concurrently.
+     */
+    ExperimentalFeatureSettings mockXpSettings;
+
+    /**
+     * Helper function to test getRequiredSystemFeatures for a given derivation file
+     */
+    void testRequiredSystemFeatures(const std::string & fileName, const StringSet & expectedFeatures)
+    {
+        this->readTest(fileName, [&](auto encoded) {
+            auto got = derivation::parse(
+                *this->store,
+                std::move(encoded),
+                "foo",
+                derivation::defaultSupportWindowsStoreDir,
+                this->mockXpSettings);
+            auto options = derivationOptionsFromStructuredAttrs(
+                *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedFeatures);
+        });
+    }
+
+    /**
+     * Helper function to test DerivationOptions parsing and comparison
+     */
+    void testDerivationOptions(
+        const std::string & fileName,
+        const DerivationOptions<SingleDerivedPath> & expected,
+        const StringSet & expectedSystemFeatures)
+    {
+        this->readTest(fileName, [&](auto encoded) {
+            auto got = derivation::parse(
+                *this->store,
+                std::move(encoded),
+                "foo",
+                derivation::defaultSupportWindowsStoreDir,
+                this->mockXpSettings);
+            auto options = derivationOptionsFromStructuredAttrs(
+                *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+
+            EXPECT_EQ(options, expected);
+            EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedSystemFeatures);
+        });
+    }
+};
+
+class CaDerivationAdvancedAttrsTest : public DerivationAdvancedAttrsTest
+{
+    void SetUp() override
+    {
+        unitTestData = getUnitTestData() / "derivation" / "ca";
+        mockXpSettings.set("experimental-features", "ca-derivations");
+    }
+};
+
+template<class Fixture>
+class DerivationAdvancedAttrsBothTest : public Fixture
+{};
+
+using BothFixtures = ::testing::Types<DerivationAdvancedAttrsTest, CaDerivationAdvancedAttrsTest>;
+
+TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
+
+#define TEST_ATERM_JSON(STEM, NAME)                                                                   \
+    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_json)                        \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+        this->readTest(NAME ".json", [&](const auto & encoded_) {                                     \
+            auto encoded = json::parse(encoded_);                                                     \
+            /* Use DRV file instead of C++ literal as source of truth. */                             \
+            auto aterm = readFile(this->goldenMaster(NAME ".drv"));                                   \
+            auto expected = derivation::parse(                                                        \
+                *this->store,                                                                         \
+                std::move(aterm),                                                                     \
+                NAME,                                                                                 \
+                derivation::defaultSupportWindowsStoreDir,                                            \
+                this->mockXpSettings);                                                                \
+            Derivation got = adl_serializer<Derivation>::from_json(encoded, this->mockXpSettings);    \
+            EXPECT_EQ(got, expected);                                                                 \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_to_json)                          \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+        this->writeTest(                                                                              \
+            NAME ".json",                                                                             \
+            [&]() -> json {                                                                           \
+                /* Use DRV file instead of C++ literal as source of truth. */                         \
+                auto aterm = readFile(this->goldenMaster(NAME ".drv"));                               \
+                return derivation::parse(                                                             \
+                    *this->store,                                                                     \
+                    std::move(aterm),                                                                 \
+                    NAME,                                                                             \
+                    derivation::defaultSupportWindowsStoreDir,                                        \
+                    this->mockXpSettings);                                                            \
+            },                                                                                        \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+    }                                                                                                 \
+                                                                                                      \
+    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_aterm)                       \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+        this->readTest(NAME ".drv", [&](auto encoded) {                                               \
+            /* Use JSON file instead of C++ literal as source of truth. */                            \
+            auto j = json::parse(readFile(this->goldenMaster(NAME ".json")));                         \
+            auto expected = adl_serializer<Derivation>::from_json(j, this->mockXpSettings);           \
+            auto got = derivation::parse(                                                             \
+                *this->store,                                                                         \
+                std::move(encoded),                                                                   \
+                NAME,                                                                                 \
+                derivation::defaultSupportWindowsStoreDir,                                            \
+                this->mockXpSettings);                                                                \
+            EXPECT_EQ(static_cast<json>(got), static_cast<json>(expected));                           \
+            EXPECT_EQ(got, expected);                                                                 \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    /* No corresponding write test, because we need to read the drv to write the json file */
+
+TEST_ATERM_JSON(advancedAttributes, "advanced-attributes-defaults");
+TEST_ATERM_JSON(advancedAttributes_defaults, "advanced-attributes");
+TEST_ATERM_JSON(advancedAttributes_structuredAttrs, "advanced-attributes-structured-attrs-defaults");
+TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults, "advanced-attributes-structured-attrs");
+
+#undef TEST_ATERM_JSON
+
+/**
+ * Since these are both repeated and sensitive opaque values, it makes
+ * sense to give them names in this file.
+ */
+static SingleDerivedPath
+    pathFoo = SingleDerivedPath::Opaque{StorePath{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"}},
+    pathFooDev = SingleDerivedPath::Opaque{StorePath{"z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"}},
+    pathBar = SingleDerivedPath::Opaque{StorePath{"r5cff30838majxk5mp3ip2diffi8vpaj-bar"}},
+    pathBarDev = SingleDerivedPath::Opaque{StorePath{"9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"}},
+    pathBarDrvIA = SingleDerivedPath::Opaque{StorePath{"vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"}},
+    pathBarDrvCA = SingleDerivedPath::Opaque{StorePath{"qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}},
+    placeholderFoo =
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(StorePath{"j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv"}),
+            .output = "out",
+        },
+    placeholderFooDev =
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(StorePath{"j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv"}),
+            .output = "dev",
+        },
+    placeholderBar =
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(StorePath{"qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}),
+            .output = "out",
+        },
+    placeholderBarDev = SingleDerivedPath::Built{
+        .drvPath = makeConstantStorePathRef(StorePath{"qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}),
+        .output = "dev",
+    };
+
+using ExportReferencesMap = decltype(DerivationOptions<SingleDerivedPath>::exportReferencesGraph);
+
+static const DerivationOptions<SingleDerivedPath> advancedAttributes_defaults = {
+    .outputChecks =
+        derivation::OutputChecks<SingleDerivedPath>{
+            .ignoreSelfRefs = true,
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph = {},
+    .additionalSandboxProfile = "",
+    .noChroot = false,
+    .impureHostDeps = {},
+    .impureEnvVars = {},
+    .allowLocalNetworking = false,
+    .requiredSystemFeatures = {},
+    .preferLocalBuild = false,
+    .allowSubstitutes = true,
+};
+
+TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
+{
+    this->readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
+
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+
+        EXPECT_TRUE(!got.structuredAttrs);
+
+        EXPECT_EQ(options, advancedAttributes_defaults);
+
+        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), true);
+        EXPECT_EQ(options.useUidRange(got), false);
+    });
+};
+
+TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_defaults)
+{
+    testRequiredSystemFeatures("advanced-attributes-defaults.drv", {});
+};
+
+TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_defaults)
+{
+    testRequiredSystemFeatures("advanced-attributes-defaults.drv", {"ca-derivations"});
+};
+
+TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
+{
+    DerivationOptions<SingleDerivedPath> expected = {
+        .outputChecks =
+            derivation::OutputChecks<SingleDerivedPath>{
+                .ignoreSelfRefs = true,
+            },
+        .unsafeDiscardReferences = {},
+        .passAsFile = {},
+        .additionalSandboxProfile = "sandcastle",
+        .noChroot = true,
+        .impureHostDeps = {"/usr/bin/ditto"},
+        .impureEnvVars = {"UNICORN"},
+        .allowLocalNetworking = true,
+        .requiredSystemFeatures = {"rainbow", "uid-range"},
+        .preferLocalBuild = true,
+        .allowSubstitutes = false,
+    };
+
+    this->readTest("advanced-attributes.drv", [&](auto encoded) {
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
+
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+
+        EXPECT_TRUE(!got.structuredAttrs);
+
+        // Reset fields that vary between test cases to enable whole-object comparison
+        options.outputChecks = derivation::OutputChecks<SingleDerivedPath>{.ignoreSelfRefs = true};
+        options.exportReferencesGraph = {};
+
+        EXPECT_EQ(options, expected);
+
+        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), false);
+        EXPECT_EQ(options.useUidRange(got), true);
+    });
+};
+
+DerivationOptions<SingleDerivedPath> advancedAttributes_ia = {
+    .outputChecks =
+        derivation::OutputChecks<SingleDerivedPath>{
+            .ignoreSelfRefs = true,
+            .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
+            .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
+            .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
+            .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph{
+        {"refs1", {pathFoo}},
+        {"refs2", {pathBarDrvIA}},
+    },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
+{
+    testDerivationOptions("advanced-attributes.drv", advancedAttributes_ia, {"rainbow", "uid-range"});
+};
+
+DerivationOptions<SingleDerivedPath> advancedAttributes_ca = {
+    .outputChecks =
+        derivation::OutputChecks<SingleDerivedPath>{
+            .ignoreSelfRefs = true,
+            .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
+            .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
+            .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
+            .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph{
+        {"refs1", {placeholderFoo}},
+        {"refs2", {pathBarDrvCA}},
+    },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
+{
+    testDerivationOptions("advanced-attributes.drv", advancedAttributes_ca, {"rainbow", "uid-range", "ca-derivations"});
+};
+
+DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults = {
+    .outputChecks = std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{},
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph = {},
+    .additionalSandboxProfile = "",
+    .noChroot = false,
+    .impureHostDeps = {},
+    .impureEnvVars = {},
+    .allowLocalNetworking = false,
+    .requiredSystemFeatures = {},
+    .preferLocalBuild = false,
+    .allowSubstitutes = true,
+};
+
+TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_defaults)
+{
+    this->readTest("advanced-attributes-structured-attrs-defaults.drv", [&](auto encoded) {
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
+
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+
+        EXPECT_TRUE(got.structuredAttrs);
+
+        EXPECT_EQ(options, advancedAttributes_structuredAttrs_defaults);
+
+        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), true);
+        EXPECT_EQ(options.useUidRange(got), false);
+    });
+};
+
+TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults)
+{
+    testRequiredSystemFeatures("advanced-attributes-structured-attrs-defaults.drv", {});
+};
+
+TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults)
+{
+    testRequiredSystemFeatures("advanced-attributes-structured-attrs-defaults.drv", {"ca-derivations"});
+};
+
+TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
+{
+    DerivationOptions<SingleDerivedPath> expected = {
+        .outputChecks =
+            std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
+                {"dev",
+                 derivation::OutputChecks<SingleDerivedPath>{
+                     .maxSize = 789,
+                     .maxClosureSize = 5909,
+                 }},
+            },
+        .unsafeDiscardReferences = {},
+        .passAsFile = {},
+        .exportReferencesGraph = {},
+        .additionalSandboxProfile = "sandcastle",
+        .noChroot = true,
+        .impureHostDeps = {"/usr/bin/ditto"},
+        .impureEnvVars = {"UNICORN"},
+        .allowLocalNetworking = true,
+        .requiredSystemFeatures = {"rainbow", "uid-range"},
+        .preferLocalBuild = true,
+        .allowSubstitutes = false,
+    };
+
+    this->readTest("advanced-attributes-structured-attrs.drv", [&](auto encoded) {
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
+
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+
+        EXPECT_TRUE(got.structuredAttrs);
+
+        // Reset fields that vary between test cases to enable whole-object comparison
+        {
+            // Delete all keys but "dev" in options.outputChecks
+            auto * outputChecksMapP =
+                std::get_if<std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>>(
+                    &options.outputChecks);
+            ASSERT_TRUE(outputChecksMapP);
+            auto & outputChecksMap = *outputChecksMapP;
+            auto devEntry = outputChecksMap.find("dev");
+            ASSERT_TRUE(devEntry != outputChecksMap.end());
+            auto devChecks = devEntry->second;
+            outputChecksMap.clear();
+            outputChecksMap.emplace("dev", std::move(devChecks));
+        }
+        options.exportReferencesGraph = {};
+
+        EXPECT_EQ(options, expected);
+
+        EXPECT_EQ(options.substitutesAllowed(settings.getWorkerSettings()), false);
+        EXPECT_EQ(options.useUidRange(got), true);
+    });
+};
+
+DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ia = {
+    .outputChecks =
+        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
+            {"out",
+             derivation::OutputChecks<SingleDerivedPath>{
+                 .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
+                 .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
+             }},
+            {"bin",
+             derivation::OutputChecks<SingleDerivedPath>{
+                 .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
+                 .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
+             }},
+            {"dev",
+             derivation::OutputChecks<SingleDerivedPath>{
+                 .maxSize = 789,
+                 .maxClosureSize = 5909,
+             }},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph =
+        {
+            {"refs1", {pathFoo}},
+            {"refs2", {pathBarDrvIA}},
+        },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
+{
+    testDerivationOptions(
+        "advanced-attributes-structured-attrs.drv", advancedAttributes_structuredAttrs_ia, {"rainbow", "uid-range"});
+};
+
+DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ca = {
+    .outputChecks =
+        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
+            {"out",
+             derivation::OutputChecks<SingleDerivedPath>{
+                 .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
+                 .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
+             }},
+            {"bin",
+             derivation::OutputChecks<SingleDerivedPath>{
+                 .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
+                 .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
+             }},
+            {"dev",
+             derivation::OutputChecks<SingleDerivedPath>{
+                 .maxSize = 789,
+                 .maxClosureSize = 5909,
+             }},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph =
+        {
+            {"refs1", {placeholderFoo}},
+            {"refs2", {pathBarDrvCA}},
+        },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
+{
+    testDerivationOptions(
+        "advanced-attributes-structured-attrs.drv",
+        advancedAttributes_structuredAttrs_ca,
+        {"rainbow", "uid-range", "ca-derivations"});
+};
+
+#define TEST_JSON_OPTIONS(FIXUTURE, INPUT, VAR, VAR2)                                                              \
+    TEST_F(FIXUTURE, DerivationOptions_##INPUT##_##VAR##_from_json)                                                \
+    {                                                                                                              \
+        nix::readJsonTest<DerivationOptions<INPUT>>(*this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
+    }                                                                                                              \
+    TEST_F(FIXUTURE, DerivationOptions_##INPUT##_##VAR##_to_json)                                                  \
+    {                                                                                                              \
+        nix::readJsonTest<DerivationOptions<INPUT>>(*this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
+    }
+
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, defaults, defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, all_set, ia)
+TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, SingleDerivedPath, all_set, ca)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_defaults, structuredAttrs_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_all_set, structuredAttrs_ia)
+TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_all_set, structuredAttrs_ca)
+
+/**
+ * `DerivationOptions<StorePath>` versions of the IA fixtures, used to
+ * exercise the `StorePath` JSON serializers. The IA test data files are
+ * reused as-is (see comment near the test invocations).
+ */
+static const StorePath spFoo{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
+    spFooDev{"z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"}, spBar{"r5cff30838majxk5mp3ip2diffi8vpaj-bar"},
+    spBarDev{"9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"}, spBarDrv{"vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
+    .outputChecks =
+        derivation::OutputChecks<StorePath>{
+            .ignoreSelfRefs = true,
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph = {},
+    .additionalSandboxProfile = "",
+    .noChroot = false,
+    .impureHostDeps = {},
+    .impureEnvVars = {},
+    .allowLocalNetworking = false,
+    .requiredSystemFeatures = {},
+    .preferLocalBuild = false,
+    .allowSubstitutes = true,
+};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
+    .outputChecks =
+        derivation::OutputChecks<StorePath>{
+            .ignoreSelfRefs = true,
+            .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
+            .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
+            .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
+            .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph{
+        {"refs1", {spFoo}},
+        {"refs2", {spBarDrv}},
+    },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
+    .outputChecks = std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{},
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph = {},
+    .additionalSandboxProfile = "",
+    .noChroot = false,
+    .impureHostDeps = {},
+    .impureEnvVars = {},
+    .allowLocalNetworking = false,
+    .requiredSystemFeatures = {},
+    .preferLocalBuild = false,
+    .allowSubstitutes = true,
+};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
+    .outputChecks =
+        std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{
+            {"out",
+             derivation::OutputChecks<StorePath>{
+                 .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
+                 .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
+             }},
+            {"bin",
+             derivation::OutputChecks<StorePath>{
+                 .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
+                 .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
+             }},
+            {"dev",
+             derivation::OutputChecks<StorePath>{
+                 .maxSize = 789,
+                 .maxClosureSize = 5909,
+             }},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph =
+        {
+            {"refs1", {spFoo}},
+            {"refs2", {spBarDrv}},
+        },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+/**
+ * Same JSON characterization tests, but for `DerivationOptions<StorePath>`.
+ *
+ * Since `DrvRef<StorePath>` and `DrvRef<SingleDerivedPath>` (when only
+ * the `Opaque` case is used) JSON-encode identically, the IA test data
+ * files can be reused as-is.
+ */
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, defaults, sp_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, all_set, sp_all_set)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, structuredAttrs_defaults, sp_structuredAttrs_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, structuredAttrs_all_set, sp_structuredAttrs_all_set)
+
+#undef TEST_JSON_OPTIONS
+
+} // namespace nix

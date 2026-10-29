@@ -1,0 +1,31 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :l doc-comments.nix
+Added 13 variables.
+compact, constant, curriedArgs, documentedFormals, floatedIn, lib, measurement, multiply, nonStrict, strict, strictPost, strictPre, unambiguous
+
+nix-repl> :doc curriedArgs
+Function `curriedArgs`\
+  … defined at /path/to/repl/suite/cases/doc-comments.nix:87:5
+
+
+A documented function.
+
+nix-repl> x = curriedArgs 1        
+
+nix-repl> "Note that users may not expect this to behave as it currently does"
+"Note that users may not expect this to behave as it currently does"
+
+nix-repl> :doc x
+Function `curriedArgs`\
+  … defined at /path/to/repl/suite/cases/doc-comments.nix:91:5
+
+
+The function returned by applying once
+
+nix-repl> "This won't produce docs; no support for arbitrary values"
+"This won't produce docs; no support for arbitrary values"
+
+nix-repl> :doc x 2
+error: value does not have documentation

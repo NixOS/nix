@@ -1,5 +1,6 @@
 #include "nix/store/outputs-query.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/util.hh"
 

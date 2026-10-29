@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
@@ -58,7 +59,7 @@ void Worker::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMo
             if (auto i2 = dynamic_cast<DerivationTrampolineGoal *>(i.get()))
                 failed.insert(i2->drvReq->to_string(store));
             else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
-                failed.insert(store.printStorePath(i2->storePath));
+                failed.insert(store.printStorePath(i2->getStorePath()));
         }
     }
 
@@ -90,10 +91,10 @@ std::vector<KeyedBuildResult> Worker::buildPathsWithResults(const std::vector<De
     results.reserve(state.size());
 
     for (auto & [req, goalPtr] : state) {
-        /* Goals that were never started or were cancelled have exitCode
-           ecBusy and a default buildResult with empty errorMsg. Skip them
+        /* Goals that were never started or were cancelled have no exit
+           code and a default buildResult with empty errorMsg. Skip them
            to avoid reporting spurious failures with empty messages. */
-        if (goalPtr->exitCode == Goal::ecBusy)
+        if (!goalPtr->exitCode)
             continue;
         results.emplace_back(
             KeyedBuildResult{

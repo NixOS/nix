@@ -224,6 +224,15 @@ public:
         return *this;
     }
 
+    /**
+     * Embed another hint as is. It carries its own coloring.
+     */
+    HintFmt & operator%(const HintFmt & value)
+    {
+        fmt % value.str();
+        return *this;
+    }
+
     HintFmt & operator=(const HintFmt & rhs) = default;
 
     std::string str() const

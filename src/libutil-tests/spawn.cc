@@ -6,10 +6,15 @@
 
 namespace nix {
 
+// TODO: Move into libutil-tests/processes.cc
+
 TEST(SpawnTest, spawnEcho)
 {
-    auto output =
-        runProgram(RunOptions{.program = "cmd.exe", .args = {OS_STR("/C"), OS_STR("echo"), OS_STR("hello world")}});
+    auto output = runProgram(
+        RunOptions{{
+            .program = "cmd.exe",
+            .args = {OS_STR("/C"), OS_STR("echo"), OS_STR("hello world")},
+        }});
     ASSERT_EQ(output.first, 0);
     ASSERT_EQ(output.second, "\"hello world\"\r\n");
 }

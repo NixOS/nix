@@ -64,10 +64,13 @@ private:
 
 public:
 
+    /**
+     * Note: `factory` cannot have a default argument because the
+     * default would be instantiated when Pool<R> is instantiated,
+     * requiring R to be default-constructible.
+     */
     Pool(
-        size_t max = std::numeric_limits<size_t>::max(),
-        const Factory & factory = []() { return make_ref<R>(); },
-        const Validator & validator = [](ref<R> r) { return true; })
+        size_t max, const Factory & factory, const Validator & validator = [](ref<R> r) { return true; })
         : factory(factory)
         , validator(validator)
     {

@@ -1,5 +1,14 @@
 error:
-       … in the right operand of the update (//) operator
+       … while selecting an attribute
+         at /pwd/lang/eval-fail-recursion.nix:4:1:
+            3| in
+            4| a.foo
+             | ^
+            5|
+
+       … entering the infinite recursion
+
+       … in the right operand of '//'
          at /pwd/lang/eval-fail-recursion.nix:2:14:
             1| let
             2|   a = { } // a;

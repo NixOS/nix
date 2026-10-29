@@ -956,8 +956,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             bool substitute = readInt(in);
             auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
             if (lock && writeAllowed)
-                for (auto & path : paths)
-                    store->addTempRoot(path);
+                store->addTempRoots(paths);
 
             if (substitute && writeAllowed) {
                 store->substitutePaths(paths);
@@ -1235,7 +1234,7 @@ static int main_nix_store(int argc, char ** argv)
         if (!op)
             throw UsageError("no operation specified");
 
-        if (op != opDump && op != opRestore) /* !!! hack */
+        if (op != opDump && op != opRestore && op != opVersion) /* !!! hack */
             store = openStore();
 
         op(std::move(opFlags), std::move(opArgs));

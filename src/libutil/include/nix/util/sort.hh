@@ -92,7 +92,7 @@ void mergeSortedRunsInPlace(Iter begin, Iter middle, Iter end, BufIter workingBe
  *
  * @param begin Start of the range to sort.
  * @param end End of the range to sort.
- * @comp Comparator the defines the ordering. Order of elements if the comp is not strict weak ordering
+ * @param comp Comparator the defines the ordering. Order of elements if the comp is not strict weak ordering
  * is not specified.
  * @throws Nothing.
  *
@@ -179,7 +179,7 @@ Iter weaklyIncreasingSuffix(Iter begin, Iter end, const Comparator & comp = {})
  * in infinite loops/out of bounds memory accesses or other undefined behavior.
  *
  * As a quick reminder, strict weak ordering relation operator< must satisfy
- * the following properties. Keep in mind that in C++ an equvalence relation
+ * the following properties. Keep in mind that in C++ an equivalence relation
  * is specified in terms of operator< like so: a ~ b iff !(a < b) && !(b < a).
  *
  * 1. a < a === false - relation is irreflexive
@@ -197,11 +197,9 @@ Iter weaklyIncreasingSuffix(Iter begin, Iter end, const Comparator & comp = {})
  *
  * @param begin Start of the range to be sorted.
  * @param end End of the range to be sorted.
- * @comp comp Comparator implementing an operator()(const ValueType& lhs, const ValueType& rhs).
+ * @param comp Comparator implementing an operator()(const ValueType& lhs, const ValueType& rhs).
  *
  * @throws std::bad_alloc if the temporary buffer can't be allocated.
- *
- * @return Nothing.
  *
  * Note on exception safety: this function provides weak exception safety
  * guarantees. To elaborate: if the comparator throws or move assignment

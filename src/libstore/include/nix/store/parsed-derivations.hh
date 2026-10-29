@@ -22,7 +22,20 @@ struct StructuredAttrs
 
     nlohmann::json::object_t structuredAttrs;
 
-    bool operator==(const StructuredAttrs &) const = default;
+    /**
+     * The encoding we parsed, kept verbatim because it was not the
+     * canonical one `unparse` would produce. Derivations in the wild
+     * predate us caring about this, and their encoding is part of their
+     * identity, so we must be able to reproduce it exactly.
+     */
+    std::optional<std::string> verbatim;
+
+    /**
+     * Compares encodings, not just values, since that is what must
+     * round-trip. Dumping is only needed when exactly one side has a
+     * verbatim encoding to compare against.
+     */
+    bool operator==(const StructuredAttrs & other) const;
 
     /**
      * Unconditionally parse from a JSON string. Used by `tryExtract`.

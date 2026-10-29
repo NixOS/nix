@@ -1,3 +1,0 @@
-# COM: nested attribute path
-a.b.c = 1;
-a.b

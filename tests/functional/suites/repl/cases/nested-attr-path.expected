@@ -1,0 +1,19 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a.b.c = 1;
+
+nix-repl> a.b
+{ c = 1; }
+
+nix-repl> a.z.a = 20
+
+nix-repl> a
+{
+  z = { ... };
+}
+
+nix-repl> :p a
+{
+  z = { a = 20; };
+}

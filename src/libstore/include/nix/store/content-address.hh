@@ -105,7 +105,7 @@ struct ContentAddressMethod
     static ContentAddressMethod parsePrefix(std::string_view & m);
 
     /**
-     * Render the prefix tag which indicates how the files wre ingested.
+     * Render the prefix tag which indicates how the files were ingested.
      *
      * The rough inverse of `parsePrefix()`.
      */

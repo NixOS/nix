@@ -1,5 +1,5 @@
 #include "linux-derivation-builder.hh"
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "chroot-derivation-builder.hh"
 #include "chroot-linux-derivation-builder.hh"
 
@@ -398,7 +398,9 @@ static const std::filesystem::path procPath = "/proc";
 
 void LinuxDerivationBuilder::enterChroot()
 {
-    auto & localSettings = store.config->getLocalSettings();
+    using namespace linux;
+
+    auto & localSettings = store->getLocalSettings();
 
     /* Set the NO_NEW_PRIVS before doing seccomp/landlock setup.
        landlock_restrict_self requires either NO_NEW_PRIVS or CAP_SYS_ADMIN.
@@ -421,9 +423,11 @@ void LinuxDerivationBuilder::enterChroot()
     }
 #endif
 
-    linux::setPersonality({
+    setPersonality({
         .system = drv.platform,
-        .impersonateLinux26 = localSettings.impersonateLinux26,
+        /* For improved determinism. This assumes that we don't care about security benefits it provides,
+           which might not be exactly true in case of FODs that download content the internet. */
+        .disableASLR = true,
     });
 }
 
@@ -441,29 +445,28 @@ gid_t ChrootLinuxDerivationBuilder::sandboxGid()
 std::unique_ptr<UserLock> ChrootLinuxDerivationBuilder::getBuildUser()
 {
     return acquireUserLock(
-        settings.nixStateDir, store.config->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        settings.nixStateDir, store->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
 }
 
 void ChrootLinuxDerivationBuilder::prepareUser()
 {
-    if ((buildUser && buildUser->getUIDCount() != 1) || store.config->getLocalSettings().useCgroups) {
+    using namespace linux;
+
+    if ((buildUser && buildUser->getUIDCount() != 1) || store->getLocalSettings().useCgroups) {
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         /* If we're running from the daemon, then this will return the
            root cgroup of the service. Otherwise, it will return the
            current cgroup. */
-        auto cgroupFS = linux::getCgroupFS();
+        auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
-        auto rootCgroupPath = *cgroupFS / linux::getRootCgroup().rel();
+        auto rootCgroupPath = *cgroupFS / getRootCgroup().rel();
         if (!pathExists(rootCgroupPath))
             throw Error("expected cgroup directory %s", PathFmt(rootCgroupPath));
 
-        static std::atomic<unsigned int> counter{0};
-
-        cgroup = rootCgroupPath
-                 / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
-                              : fmt("nix-build-pid-%d-%d", getpid(), counter++));
+        auto owner = buildUser ? std::to_string(buildUser->getUID()) : std::to_string(getpid());
+        cgroup = rootCgroupPath / fmt("nix-build@%s-%s", drvPath.hashPart(), owner);
 
         debug("using cgroup %s", PathFmt(*cgroup));
 
@@ -478,7 +481,7 @@ void ChrootLinuxDerivationBuilder::prepareUser()
 
             if (pathExists(cgroupFile)) {
                 auto prevCgroup = readFile(cgroupFile);
-                linux::destroyCgroup(prevCgroup);
+                destroyCgroup(prevCgroup);
             }
 
             writeFile(cgroupFile, cgroup->native());
@@ -486,7 +489,7 @@ void ChrootLinuxDerivationBuilder::prepareUser()
     }
 
     // Kill any processes left in the cgroup or build user.
-    DerivationBuilderImpl::prepareUser();
+    UnixDerivationBuilderImpl::prepareUser();
 }
 
 void ChrootLinuxDerivationBuilder::prepareSandbox()
@@ -566,7 +569,7 @@ void ChrootLinuxDerivationBuilder::startChild()
             if (setgroups(0, 0) == -1) {
                 if (errno != EPERM)
                     throw SysError("setgroups failed");
-                if (store.config->getLocalSettings().requireDropSupplementaryGroups)
+                if (store->getLocalSettings().requireDropSupplementaryGroups)
                     throw Error(
                         "setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
             }
@@ -650,7 +653,7 @@ void ChrootLinuxDerivationBuilder::startChild()
             "nobody:x:65534:65534:Nobody:/:/noshell\n",
             sandboxUid(),
             sandboxGid(),
-            store.config->getLocalSettings().sandboxBuildDir.get().native()));
+            store->getLocalSettings().sandboxBuildDir.get().native()));
 
     writeFile(
         chrootRootDir / "etc" / "group",
@@ -737,7 +740,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
 
        Marking chrootRootDir as MS_SHARED causes pivot_root()
        to fail with EINVAL. Don't know why. */
-    std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
+    std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store->storeDir).relative_path();
 
     if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
         throw SysError("unable to bind mount the Nix store at %1%", PathFmt(chrootStoreDir));
@@ -851,7 +854,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
                (chrootRootDir / "dev" / "shm").c_str(),
                "tmpfs",
                0,
-               fmt("size=%s", store.config->getLocalSettings().sandboxShmSize).c_str())
+               fmt("size=%s", store->getLocalSettings().sandboxShmSize).c_str())
                == -1)
         throw SysError("mounting /dev/shm");
 
@@ -933,18 +936,20 @@ void ChrootLinuxDerivationBuilder::setUser()
     });
 }
 
-SingleDrvOutputs ChrootLinuxDerivationBuilder::unprepareBuild()
+BuilderExit ChrootLinuxDerivationBuilder::unprepareBuild()
 {
     sandboxMountNamespace = -1;
     sandboxUserNamespace = -1;
 
-    return DerivationBuilderImpl::unprepareBuild();
+    return UnixDerivationBuilderImpl::unprepareBuild();
 }
 
 void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
 {
+    using namespace linux;
+
     if (cgroup) {
-        auto stats = linux::destroyCgroup(*cgroup);
+        auto stats = destroyCgroup(*cgroup);
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
             buildResult.cpuSystem = stats.cpuSystem;
@@ -952,7 +957,7 @@ void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
         return;
     }
 
-    DerivationBuilderImpl::killSandbox(getStats);
+    UnixDerivationBuilderImpl::killSandbox(getStats);
 }
 
 void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
@@ -982,7 +987,7 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
 
     int status = child.wait();
     if (!statusOk(status))
-        throw Error("could not add path '%s' to sandbox: %s", store.printStorePath(path), statusToString(status));
+        throw Error("could not add path '%s' to sandbox: %s", store->printStorePath(path), statusToString(status));
 }
 
 } // namespace nix

@@ -60,6 +60,12 @@ struct SingleDerivedPathBuilt
     const StorePath & getBaseStorePath() const;
 
     /**
+     * Whether this is the output of a dynamic derivation, i.e. the
+     * derivation path is itself `Built`.
+     */
+    bool isDynamicDrvOutput() const;
+
+    /**
      * Uses `^` as the separator
      */
     std::string to_string(const StoreDirConfig & store) const;
@@ -122,6 +128,13 @@ struct SingleDerivedPath : _SingleDerivedPathRaw
      * be used only with great care.
      */
     const StorePath & getBaseStorePath() const;
+
+    /**
+     * Whether this is the output of a dynamic derivation, i.e. a
+     * `Built` whose derivation path is itself `Built` — more than one
+     * layer of `DerivedPath::Built`.
+     */
+    bool isDynamicDrvOutput() const;
 
     /**
      * Uses `^` as the separator

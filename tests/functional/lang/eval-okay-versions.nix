@@ -39,8 +39,23 @@ let
     (versionTest "2.3pre1" "2.3" lt)
     (versionTest "2.3pre3" "2.3pre12" lt)
     (versionTest "2.3a" "2.3c" lt)
+    # Leading zeros are in the same component and numerically equal.
+    (versionTest "123.011" "0123.11" eq)
+    # Doesn't fit into 32-bit `int`, so compared as strings and the above
+    # quirk doesn't apply.
+    (versionTest "1-2147483648" "1-02147483648" gt)
+    # Number of leading zeros doesn't matter.
+    (versionTest "1-002147483646" "1.-0002147483647" lt)
+    # Number always wins against string.
+    (versionTest "1" "2147483648" gt)
+    (versionTest "1" "abc" gt)
+    # `pre` loses to everything.
+    (versionTest "...1.-pre" "1.....9" lt)
+    (versionTest "-1.-pre" "1abc" lt)
     (versionTest "2.3pre1" "2.3c" lt)
     (versionTest "2.3pre1" "2.3q" lt)
+    # ... other than `pre`
+    (versionTest "1-pre.3" "1pre2" gt)
   ];
 
 in

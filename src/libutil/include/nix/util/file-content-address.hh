@@ -59,13 +59,19 @@ std::string_view renderFileSerialisationMethod(FileSerialisationMethod method);
 void dumpPath(
     const SourcePath & path, Sink & sink, FileSerialisationMethod method, PathFilter & filter = defaultPathFilter);
 
+class RestoreSinkHooks;
+
 /**
  * Restore a serialisation of the given file system object.
  *
  * \todo use an arbitrary `FileSystemObjectSink`.
  */
 void restorePath(
-    const std::filesystem::path & path, Source & source, FileSerialisationMethod method, bool startFsync = false);
+    const std::filesystem::path & path,
+    Source & source,
+    FileSerialisationMethod method,
+    bool startFsync = false,
+    RestoreSinkHooks * hooks = nullptr);
 
 /**
  * Compute the hash of the given file system object according to the

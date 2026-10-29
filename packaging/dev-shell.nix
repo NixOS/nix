@@ -255,10 +255,6 @@ nixComponents.callPackage (
       # We use this shell with the local checkout, not unpackPhase.
       src = null;
 
-      # Workaround https://sourceware.org/pipermail/gdb-patches/2025-October/221398.html
-      # Remove when gdb fix is rolled out everywhere.
-      separateDebugInfo = false;
-
       mesonBuildType = "debugoptimized";
 
       env = {
@@ -291,44 +287,38 @@ nixComponents.callPackage (
       ++ map (transformFlag "nix") (ignoreCrossFile nixComponents.nix-cli.mesonFlags);
 
       nativeBuildInputs =
-        let
-          inputs =
-            dedupByString (v: "${v}") (
-              lib.filter (x: !isInternal x) (
-                lib.lists.concatMap (
-                  # Nix manual has a build-time dependency on nix, but we
-                  # don't want to do a native build just to enter the cross
-                  # dev shell.
-                  #
-                  # TODO: think of a more principled fix for this.
-                  c: lib.filter (f: f.pname or null != "nix") c.nativeBuildInputs
-                ) activeComponents
-              )
-            )
-            ++ lib.optional (
-              !buildCanExecuteHost
-              # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
-              && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
-              && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
-              && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages)
-            ) pkgs.buildPackages.mesonEmulatorHook
-            ++ [
-              pkgs.buildPackages.gnused
-              modular.pre-commit.settings.package
-              (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
-              pkgs.buildPackages.nixfmt
-              pkgs.buildPackages.shellcheck
-              pkgs.buildPackages.include-what-you-use
-            ]
-            ++ lib.optional stdenv.hostPlatform.isUnix pkgs.buildPackages.gdb
-            ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
-              lib.hiPrio pkgs.buildPackages.clang-tools
-            )
-            ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold;
-        in
-        # FIXME: separateDebugInfo = false doesn't actually prevent -Wa,--compress-debug-sections
-        # from making its way into NIX_CFLAGS_COMPILE.
-        lib.filter (p: !lib.hasInfix "separate-debug-info" p) inputs;
+        dedupByString (v: "${v}") (
+          lib.filter (x: !isInternal x) (
+            lib.lists.concatMap (
+              # Nix manual has a build-time dependency on nix, but we
+              # don't want to do a native build just to enter the cross
+              # dev shell.
+              #
+              # TODO: think of a more principled fix for this.
+              c: lib.filter (f: f.pname or null != "nix") c.nativeBuildInputs
+            ) activeComponents
+          )
+        )
+        ++ lib.optional (
+          !buildCanExecuteHost
+          # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
+          && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
+          && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
+          && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages)
+        ) pkgs.buildPackages.mesonEmulatorHook
+        ++ [
+          pkgs.buildPackages.gnused
+          modular.pre-commit.settings.package
+          (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
+          pkgs.buildPackages.nixfmt
+          pkgs.buildPackages.shellcheck
+          pkgs.buildPackages.include-what-you-use
+        ]
+        ++ lib.optional stdenv.hostPlatform.isUnix pkgs.buildPackages.gdb
+        ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
+          lib.hiPrio pkgs.buildPackages.clang-tools
+        )
+        ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold;
 
       propagatedNativeBuildInputs = dedupByString (v: "${v}") (
         lib.filter (x: !isInternal x) (

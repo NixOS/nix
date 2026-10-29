@@ -80,7 +80,7 @@ struct ParsedURL
      * IMPORTANT: An empty authority (i.e. one with an empty host string) and
      * a missing authority (std::nullopt) are drastically different cases. This
      * is especially important for "file:///path/to/file" URLs defined by RFC8089.
-     * The presence of the authority is indicated by `//` following the <scheme>:
+     * The presence of the authority is indicated by `//` following the `<scheme>:`
      * part of the URL.
      */
     std::optional<Authority> authority;
@@ -112,55 +112,13 @@ struct ParsedURL
      *
      * Examples:
      *
-     * - ```
-     *   https://foo.com/bar
-     *   ```
-     *   has path
-     *   ```
-     *   {"", "bar"}
-     *   ```
-     *
-     * - ```
-     *   https://foo.com/bar/
-     *   ```
-     *   has path
-     *   ```
-     *   {"", "bar", ""}
-     *   ```
-     *
-     * - ```
-     *   https://foo.com//bar///
-     *   ```
-     *   has path
-     *   ```
-     *   {"", "", "bar", "", "", ""}
-     *   ```
-     *
-     * - ```
-     *   https://foo.com
-     *   ```
-     *   has path
-     *   ```
-     *   {""}
-     *   ```
-     *
-     * - ```
-     *   https://foo.com/
-     *   ```
-     *   has path
-     *   ```
-     *   {"", ""}
-     *   ```
-     *
-     * - ```
-     *   tel:01234
-     *   ```
-     *   has path `{"01234"}` (and no authority)
-     *
-     * - ```
-     *   foo:/01234
-     *   ```
-     *   has path `{"", "01234"}` (and no authority)
+     * - `https://foo.com/bar` has path `{"", "bar"}`
+     * - `https://foo.com/bar/` has path `{"", "bar", ""}`
+     * - `https://foo.com//bar///` has path `{"", "", "bar", "", "", ""}`
+     * - `https://foo.com` has path `{""}`
+     * - `https://foo.com/` has path `{"", ""}`
+     * - `tel:01234` has path `{"01234"}` (and no authority)
+     * - `foo:/01234` has path `{"", "01234"}` (and no authority)
      *
      * Note that both trailing and leading slashes are, in general,
      * semantically significant.
@@ -335,13 +293,13 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme);
  *
  * @see https://git-scm.com/docs/git-clone#_git_urls
  *
- * ssh://[<user>@]<host>[:<port>]/<path-to-git-repo>
- * git://<host>[:<port>]/<path-to-git-repo>
- * http[s]://<host>[:<port>]/<path-to-git-repo>
- * ftp[s]://<host>[:<port>]/<path-to-git-repo>
+ * `ssh://[<user>@]<host>[:<port>]/<path-to-git-repo>`
+ * `git://<host>[:<port>]/<path-to-git-repo>`
+ * `http[s]://<host>[:<port>]/<path-to-git-repo>`
+ * `ftp[s]://<host>[:<port>]/<path-to-git-repo>`
  *
  * An alternative scp-like syntax may also be used with the ssh protocol:
- * [<user>@]<host>:/<path-to-git-repo>
+ * `[<user>@]<host>:/<path-to-git-repo>`
  * This syntax is only recognized if there are no slashes before the first colon.
  *
  * For local repositories, also supported by Git natively, the following syntaxes may be used:

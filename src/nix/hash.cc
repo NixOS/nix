@@ -79,7 +79,7 @@ struct CmdHashBase : Command
         for (const auto & path : paths) {
             auto makeSink = [&]() -> std::unique_ptr<AbstractHashSink> {
                 if (modulus)
-                    return std::make_unique<HashModuloSink>(hashAlgo, *modulus);
+                    return std::make_unique<MaskedHashSink>(hashAlgo, *modulus);
                 else
                     return std::make_unique<HashSink>(hashAlgo);
             };
@@ -111,7 +111,7 @@ struct CmdHashBase : Command
                 auto sourcePath = makeSourcePath();
                 fun<git::DumpHook> hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
-                    auto mode = dump(path, *hashSink, hook);
+                    auto mode = git::dump(path, *hashSink, hook);
                     auto hash = hashSink->finish().hash;
                     return {
                         .mode = mode,
@@ -144,7 +144,7 @@ struct CmdHashPath : CmdHashBase
 #if 0
         addFlag({
             .longName = "modulo",
-            .description = "Compute the hash modulo the specified string.",
+            .description = "Compute the masked hash the specified string.",
             .labels = {"modulus"},
             .handler = {&modulus},
         });

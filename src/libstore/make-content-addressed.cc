@@ -38,17 +38,17 @@ std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & ds
 
         sink.s = rewriteStrings(sink.s, rewrites);
 
-        HashModuloSink hashModuloSink(HashAlgorithm::SHA256, oldHashPart);
-        hashModuloSink(sink.s);
+        MaskedHashSink maskedHashSink(HashAlgorithm::SHA256, oldHashPart);
+        maskedHashSink(sink.s);
 
-        auto narModuloHash = hashModuloSink.finish().hash;
+        auto narMaskedHash = maskedHashSink.finish().hash;
 
         auto info = ValidPathInfo::makeFromCA(
             dstStore,
             path.name(),
             FixedOutputInfo{
                 .method = FileIngestionMethod::NixArchive,
-                .hash = narModuloHash,
+                .hash = narMaskedHash,
                 .references = std::move(refs),
             },
             Hash::dummy);

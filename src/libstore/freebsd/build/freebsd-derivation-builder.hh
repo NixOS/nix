@@ -1,12 +1,12 @@
 #pragma once
 
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 
 namespace nix {
 
-struct FreeBSDDerivationBuilder : virtual DerivationBuilderImpl
+struct FreeBSDDerivationBuilder : virtual UnixDerivationBuilderImpl
 {
-    using DerivationBuilderImpl::DerivationBuilderImpl;
+    using UnixDerivationBuilderImpl::UnixDerivationBuilderImpl;
 
     FreeBSDDerivationBuilder(FreeBSDDerivationBuilder &&) = delete;
     FreeBSDDerivationBuilder(const FreeBSDDerivationBuilder &) = delete;

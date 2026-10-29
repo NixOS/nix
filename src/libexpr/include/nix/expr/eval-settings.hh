@@ -39,6 +39,11 @@ public:
     void assign(const bool & v) override;
     void appendOrSet(bool newValue, bool append) override;
     void override(const bool & v) override;
+
+    bool excludedFromFullSerialisation() const override
+    {
+        return true;
+    }
 };
 
 struct EvalSettings : Config

@@ -10,7 +10,7 @@ namespace nix {
 
 void RefScanSink::anchor() {}
 
-void HashModuloSink::anchor() {}
+void MaskedHashSink::anchor() {}
 
 void RewritingSink::anchor() {}
 
@@ -101,19 +101,19 @@ void RewritingSink::flush()
     prev.clear();
 }
 
-HashModuloSink::HashModuloSink(HashAlgorithm ha, const std::string & modulus)
+MaskedHashSink::MaskedHashSink(HashAlgorithm ha, const std::string & modulus)
     : hashSink(ha)
     // Zero out self-references (the "modulus").
     , rewritingSink(modulus, std::string(modulus.size(), 0), hashSink)
 {
 }
 
-void HashModuloSink::operator()(std::string_view data)
+void MaskedHashSink::operator()(std::string_view data)
 {
     rewritingSink(data);
 }
 
-HashResult HashModuloSink::finish()
+HashResult MaskedHashSink::finish()
 {
     rewritingSink.flush();
 

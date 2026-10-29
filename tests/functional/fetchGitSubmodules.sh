@@ -36,7 +36,21 @@ git -C "$rootRepo" commit -m "Add submodule"
 
 rev=$(git -C "$rootRepo" rev-parse HEAD)
 
+# A clean workdir must yield the same tree as fetching its HEAD rev: the
+# submodule is an empty directory, whether or not it is checked out.
+r0=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; }).outPath")
+[[ -d $r0/sub ]]
+[[ -z "$(ls -A "$r0/sub")" ]]
+# Both paths share a fingerprint, so compare narHashes with separate caches.
+hashWorkdir=$(XDG_CACHE_HOME=$TEST_ROOT/cache-workdir nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; }).narHash")
+hashRev=$(XDG_CACHE_HOME=$TEST_ROOT/cache-rev nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; }).narHash")
+[[ $hashWorkdir == "$hashRev" ]]
+# The non-local (clone-to-cache) code path must agree as well.
+hashHttp=$(_NIX_FORCE_HTTP=1 XDG_CACHE_HOME=$TEST_ROOT/cache-http nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; }).narHash")
+[[ $hashWorkdir == "$hashHttp" ]]
+
 r1=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; }).outPath")
+[[ $r0 == "$r1" ]]
 r2=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; submodules = false; }).outPath")
 r3=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; submodules = true; }).outPath")
 
@@ -226,3 +240,28 @@ test_submodule_nested() {
 
 }
 test_submodule_nested
+
+
+# A gitlink without a .gitmodules entry is still a submodule (#15423): it must
+# render the same (empty directory) from the workdir and by rev.
+test_gitlink_without_gitmodules() {
+  local repo=$TEST_ROOT/nogitmodules
+  createGitRepo "$repo"
+  git -C "$repo" submodule add "$subRepo" sub
+  git -C "$repo" commit -m "Add submodule"
+  git -C "$repo" rm .gitmodules
+  git -C "$repo" commit -m "Remove .gitmodules"
+  local rev
+  rev=$(git -C "$repo" rev-parse HEAD)
+
+  for submodules in true false; do
+    local hashWorkdir hashRev outWorkdir
+    hashWorkdir=$(XDG_CACHE_HOME=$TEST_ROOT/ngm-workdir-$submodules nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; submodules = $submodules; }).narHash")
+    hashRev=$(XDG_CACHE_HOME=$TEST_ROOT/ngm-rev-$submodules nix eval --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; rev = \"$rev\"; submodules = $submodules; }).narHash")
+    [[ $hashWorkdir == "$hashRev" ]]
+    outWorkdir=$(XDG_CACHE_HOME=$TEST_ROOT/ngm-workdir-$submodules nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; submodules = $submodules; }).outPath")
+    [[ -d $outWorkdir/sub ]]
+    [[ -z "$(ls -A "$outWorkdir/sub")" ]]
+  done
+}
+test_gitlink_without_gitmodules

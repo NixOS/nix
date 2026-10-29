@@ -1,6 +1,7 @@
 #include "nix/cmd/network-proxy.hh"
 
 #include <algorithm>
+#include <iterator>
 
 #include "nix/util/environment-variables.hh"
 
@@ -12,9 +13,10 @@ static StringSet getAllVariables()
 {
     StringSet variables = lowercaseVariables;
     for (const auto & variable : lowercaseVariables) {
-        std::string upperVariable;
-        std::transform(
-            variable.begin(), variable.end(), upperVariable.begin(), [](unsigned char c) { return std::toupper(c); });
+        std::string upperVariable{variable};
+        std::transform(upperVariable.begin(), upperVariable.end(), upperVariable.begin(), [](unsigned char c) {
+            return std::toupper(c);
+        });
         variables.insert(std::move(upperVariable));
     }
     return variables;

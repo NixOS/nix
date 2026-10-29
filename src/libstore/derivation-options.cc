@@ -69,11 +69,8 @@ getStringSetAttr(const StringMap & env, const StructuredAttrs * parsed, const st
 }
 
 template<typename Inputs>
-using OutputChecks = DerivationOptions<Inputs>::OutputChecks;
-
-template<typename Inputs>
-using OutputChecksVariant =
-    std::variant<OutputChecks<Inputs>, std::map<std::string, OutputChecks<Inputs>, std::less<>>>;
+using OutputChecksVariant = std::
+    variant<derivation::OutputChecks<Inputs>, std::map<std::string, derivation::OutputChecks<Inputs>, std::less<>>>;
 
 DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
     const StoreDirConfig & store,
@@ -82,11 +79,11 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
     bool shouldWarn,
     const ExperimentalFeatureSettings & mockXpSettings)
 {
-    /* Use the SingleDerivedPath version with empty inputDrvs, then
+    /* Use the SingleDerivedPath version with empty inputs, then
        resolve. */
-    DerivedPathMap<StringSet> emptyInputDrvs{};
+    std::set<SingleDerivedPath> emptyInputs{};
     auto singleDerivedPathOptions =
-        derivationOptionsFromStructuredAttrs(store, emptyInputDrvs, env, parsed, shouldWarn, mockXpSettings);
+        derivationOptionsFromStructuredAttrs(store, emptyInputs, env, parsed, shouldWarn, mockXpSettings);
 
     /* "Resolve" all SingleDerivedPath inputs to StorePath. */
     auto resolved = tryResolve(
@@ -116,43 +113,24 @@ static void flatten(const nlohmann::json & value, StringSet & res)
 
 DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     const StoreDirConfig & store,
-    const DerivedPathMap<StringSet> & inputDrvs,
+    const std::set<SingleDerivedPath> & inputs,
     const StringMap & env,
     const StructuredAttrs * parsed,
     bool shouldWarn,
     const ExperimentalFeatureSettings & mockXpSettings)
 {
+    using namespace derivation;
+
     DerivationOptions<SingleDerivedPath> defaults = {};
 
     std::map<std::string, SingleDerivedPath::Built, std::less<>> placeholders;
     if (mockXpSettings.isEnabled(Xp::CaDerivations)) {
-        /* Initialize placeholder map from inputDrvs */
-        auto initPlaceholders = [&](this const auto & initPlaceholders,
-                                    ref<const SingleDerivedPath> basePath,
-                                    const DerivedPathMap<StringSet>::ChildNode & node) -> void {
-            for (const auto & outputName : node.value) {
-                auto built = SingleDerivedPath::Built{
-                    .drvPath = basePath,
-                    .output = outputName,
-                };
+        /* Initialize placeholder map from inputs */
+        for (const auto & input : inputs) {
+            if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw())) {
                 placeholders.insert_or_assign(
-                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(built, mockXpSettings).render(),
-                    std::move(built));
+                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(*built, mockXpSettings).render(), *built);
             }
-
-            for (const auto & [outputName, childNode] : node.childMap) {
-                initPlaceholders(
-                    make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{
-                        .drvPath = basePath,
-                        .output = outputName,
-                    }),
-                    childNode);
-            }
-        };
-
-        for (const auto & [drvPath, outputs] : inputDrvs.map) {
-            auto basePath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{drvPath});
-            initPlaceholders(basePath, outputs);
         }
     }
 
@@ -431,8 +409,8 @@ std::optional<Options<StorePath>> tryResolve(
     };
 
     // Helper function to try resolving OutputChecks using functional style
-    auto tryResolveOutputChecks = [&](const Options<SingleDerivedPath>::OutputChecks & checks)
-        -> std::optional<Options<StorePath>::OutputChecks> {
+    auto tryResolveOutputChecks =
+        [&](const OutputChecks<SingleDerivedPath> & checks) -> std::optional<OutputChecks<StorePath>> {
         std::optional<std::set<DrvRef<StorePath>>> resolvedAllowedReferences;
         if (checks.allowedReferences) {
             resolvedAllowedReferences = tryResolveRefSet(*checks.allowedReferences);
@@ -455,7 +433,7 @@ std::optional<Options<StorePath>> tryResolve(
         if (!resolvedDisallowedRequisites)
             return std::nullopt;
 
-        return Options<StorePath>::OutputChecks{
+        return OutputChecks<StorePath>{
             .ignoreSelfRefs = checks.ignoreSelfRefs,
             .maxSize = checks.maxSize,
             .maxClosureSize = checks.maxClosureSize,
@@ -487,31 +465,31 @@ std::optional<Options<StorePath>> tryResolve(
     // Resolve outputChecks using functional style with std::visit
     auto resolvedOutputChecks = std::visit(
         overloaded{
-            [&](const Options<SingleDerivedPath>::OutputChecks & checks)
+            [&](const OutputChecks<SingleDerivedPath> & checks)
                 -> std::optional<std::variant<
-                    Options<StorePath>::OutputChecks,
-                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>> {
+                    OutputChecks<StorePath>,
+                    std::map<std::string, OutputChecks<StorePath>, std::less<>>>> {
                 auto resolved = tryResolveOutputChecks(checks);
                 if (!resolved)
                     return std::nullopt;
-                return std::variant<
-                    Options<StorePath>::OutputChecks,
-                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>(*resolved);
+                return std::
+                    variant<OutputChecks<StorePath>, std::map<std::string, OutputChecks<StorePath>, std::less<>>>(
+                        *resolved);
             },
-            [&](const std::map<std::string, Options<SingleDerivedPath>::OutputChecks, std::less<>> & checksMap)
+            [&](const std::map<std::string, OutputChecks<SingleDerivedPath>, std::less<>> & checksMap)
                 -> std::optional<std::variant<
-                    Options<StorePath>::OutputChecks,
-                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>> {
-                std::map<std::string, Options<StorePath>::OutputChecks, std::less<>> resolvedMap;
+                    OutputChecks<StorePath>,
+                    std::map<std::string, OutputChecks<StorePath>, std::less<>>>> {
+                std::map<std::string, OutputChecks<StorePath>, std::less<>> resolvedMap;
                 for (const auto & [outputName, checks] : checksMap) {
                     auto resolved = tryResolveOutputChecks(checks);
                     if (!resolved)
                         return std::nullopt;
                     resolvedMap.emplace(outputName, *resolved);
                 }
-                return std::variant<
-                    Options<StorePath>::OutputChecks,
-                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>(resolvedMap);
+                return std::
+                    variant<OutputChecks<StorePath>, std::map<std::string, OutputChecks<StorePath>, std::less<>>>(
+                        resolvedMap);
             }},
         drvOptions.outputChecks);
 
@@ -553,6 +531,7 @@ template<typename Inputs>
 static nix::DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json & json_)
 {
     using namespace nix;
+    using namespace derivation;
 
     auto & json = getObject(json_);
 
@@ -592,6 +571,7 @@ template<typename Inputs>
 static void derivationOptionsToJson(nlohmann::json & json, const nix::DerivationOptions<Inputs> & o)
 {
     using namespace nix;
+    using namespace derivation;
 
     json["outputChecks"] = std::visit(
         overloaded{
@@ -624,7 +604,7 @@ static void derivationOptionsToJson(nlohmann::json & json, const nix::Derivation
 }
 
 template<typename Inputs>
-static nix::OutputChecks<Inputs> outputChecksFromJson(const nlohmann::json & json_)
+static nix::derivation::OutputChecks<Inputs> outputChecksFromJson(const nlohmann::json & json_)
 {
     using namespace nix;
 
@@ -642,7 +622,7 @@ static nix::OutputChecks<Inputs> outputChecksFromJson(const nlohmann::json & jso
 }
 
 template<typename Inputs>
-static void outputChecksToJson(nlohmann::json & json, const nix::OutputChecks<Inputs> & c)
+static void outputChecksToJson(nlohmann::json & json, const nix::derivation::OutputChecks<Inputs> & c)
 {
     json["ignoreSelfRefs"] = c.ignoreSelfRefs;
     json["maxSize"] = c.maxSize;
@@ -677,25 +657,26 @@ void adl_serializer<nix::DerivationOptions<nix::StorePath>>::to_json(
     derivationOptionsToJson<nix::StorePath>(json, o);
 }
 
-nix::OutputChecks<nix::SingleDerivedPath>
-adl_serializer<nix::OutputChecks<nix::SingleDerivedPath>>::from_json(const json & json_)
+nix::derivation::OutputChecks<nix::SingleDerivedPath>
+adl_serializer<nix::derivation::OutputChecks<nix::SingleDerivedPath>>::from_json(const json & json_)
 {
     return outputChecksFromJson<nix::SingleDerivedPath>(json_);
 }
 
-void adl_serializer<nix::OutputChecks<nix::SingleDerivedPath>>::to_json(
-    json & json, const nix::OutputChecks<nix::SingleDerivedPath> & c)
+void adl_serializer<nix::derivation::OutputChecks<nix::SingleDerivedPath>>::to_json(
+    json & json, const nix::derivation::OutputChecks<nix::SingleDerivedPath> & c)
 {
     outputChecksToJson<nix::SingleDerivedPath>(json, c);
 }
 
-nix::OutputChecks<nix::StorePath> adl_serializer<nix::OutputChecks<nix::StorePath>>::from_json(const json & json_)
+nix::derivation::OutputChecks<nix::StorePath>
+adl_serializer<nix::derivation::OutputChecks<nix::StorePath>>::from_json(const json & json_)
 {
     return outputChecksFromJson<nix::StorePath>(json_);
 }
 
-void adl_serializer<nix::OutputChecks<nix::StorePath>>::to_json(
-    json & json, const nix::OutputChecks<nix::StorePath> & c)
+void adl_serializer<nix::derivation::OutputChecks<nix::StorePath>>::to_json(
+    json & json, const nix::derivation::OutputChecks<nix::StorePath> & c)
 {
     outputChecksToJson<nix::StorePath>(json, c);
 }

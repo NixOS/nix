@@ -1,4 +1,5 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/error.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/common-protocol.hh"
@@ -8,6 +9,8 @@
 #include "nix/util/signature/local-keys.hh"
 
 #include <nlohmann/json.hpp>
+
+#include <utility>
 
 namespace nix {
 
@@ -26,7 +29,7 @@ void CommonProto::Serialise<std::string>::write(
 
 StorePath CommonProto::Serialise<StorePath>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
-    return store.parseStorePath(readString(conn.from));
+    return store.parseStorePathCanonical(readString(conn.from, store.maxCanonicalStorePathLen()));
 }
 
 void CommonProto::Serialise<StorePath>::write(
@@ -49,8 +52,8 @@ void CommonProto::Serialise<ContentAddress>::write(
 std::optional<StorePath>
 CommonProto::Serialise<std::optional<StorePath>>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
-    auto s = readString(conn.from);
-    return s == "" ? std::optional<StorePath>{} : store.parseStorePath(s);
+    auto s = readString(conn.from, store.maxCanonicalStorePathLen());
+    return s == "" ? std::optional<StorePath>{} : store.parseStorePathCanonical(s);
 }
 
 void CommonProto::Serialise<std::optional<StorePath>>::write(
@@ -134,6 +137,17 @@ void CommonProto::Serialise<BuildResultStatus>::write(
             return;
         }
     unreachable();
+}
+
+Verbosity CommonProto::Serialise<Verbosity>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
+{
+    return verbosityFromIntClamped(readInt(conn.from));
+}
+
+void CommonProto::Serialise<Verbosity>::write(
+    const StoreDirConfig & store, CommonProto::WriteConn conn, const Verbosity & verbosity)
+{
+    conn.to << std::to_underlying(verbosity);
 }
 
 } // namespace nix

@@ -1,4 +1,5 @@
 #include "nix/cmd/command.hh"
+#include "nix/fetchers/git-utils.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
@@ -921,7 +922,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             defaultTemplateAttrPathsPrefixes,
             lockFlags);
 
-        auto cursor = installable.getCursor(*evalState);
+        auto cursor = installable.getCursor(*evalState, AutoCall::No);
 
         auto templateDirAttr = cursor->getAttr("path")->forceValue();
         NixStringContext context;
@@ -993,7 +994,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             };
             for (auto & s : changedFiles)
                 args.emplace_back(s.native());
-            runProgram("git", true, args);
+            runProgram(gitProgram(), true, args);
         }
 
         if (auto welcomeText = cursor->maybeGetAttr("welcomeText")) {

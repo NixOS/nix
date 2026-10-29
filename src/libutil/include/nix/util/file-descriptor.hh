@@ -113,13 +113,15 @@ std::make_unsigned_t<off_t> getFileSize(Descriptor fd);
 size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer);
 
 /**
- * Read \ref nbytes starting at \ref offset from a seekable file into a sink.
+ * Read @p nbytes starting at @p offset from a seekable file into a sink.
  *
- * @throws SystemError if fd is not seekable or any operation fails
+ * @param tryCoW Used as a hint to use optimised file copying like copy_file_range.
+ *
+ * @throws SystemError if @p fd is not seekable or any operation fails
  * @throws Interrupted if the operation was interrupted
- * @throws EndOfFile if an EOF was reached before reading \ref nbytes
+ * @throws EndOfFile if an EOF was reached before reading @p nbytes
  */
-void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink);
+void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink, bool tryCoW = false);
 
 /**
  * Wrappers around read()/write() that read/write exactly the
@@ -308,6 +310,18 @@ public:
     void close();
 };
 
+/**
+ * Prevent the given descriptor from being passed on to child processes.
+ *
+ * On Unix this sets `FD_CLOEXEC`, so the descriptor is closed on `exec`.
+ * On Windows there is no `exec`; inheritance is a per-handle property, so
+ * this clears `HANDLE_FLAG_INHERIT` instead. A Windows handle is not
+ * inheritable unless it was created that way, so the Windows call is
+ * usually redundant — it exists so that callers do not have to know
+ * which platform they are on.
+ */
+void closeOnExec(Descriptor fd);
+
 #ifndef _WIN32 // Not needed on Windows, where we don't fork
 namespace unix {
 
@@ -318,9 +332,11 @@ namespace unix {
 void closeExtraFDs();
 
 /**
- * Set the close-on-exec flag for the given file descriptor.
+ * Close all file descriptors except stdio fds (ie 0, 1, 2) and
+ * @p keepExtra.
+ * Good practice in child processes.
  */
-void closeOnExec(Descriptor fd);
+void closeExtraFDs(std::span<const Descriptor> keepExtra);
 
 /**
  * A useful primitive for asynchronous poll() loops to notify about some work
@@ -344,6 +360,19 @@ struct SelfPipe
 };
 
 } // namespace unix
+#else
+namespace windows {
+
+/**
+ * Set whether `fd` is inherited by child processes spawned with
+ * `bInheritHandles`.
+ *
+ * This is the primitive underlying `closeOnExec` on Windows; prefer that
+ * when all you want is to stop a handle leaking into children.
+ */
+void setHandleInheritability(Descriptor fd, bool inherit);
+
+} // namespace windows
 #endif
 
 MakeError(EndOfFile, Error);

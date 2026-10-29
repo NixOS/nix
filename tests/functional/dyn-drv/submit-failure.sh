@@ -3,7 +3,7 @@
 source common.sh
 
 # builder-rpc-v0
-requireDaemonNewerThan "2.35pre20260507"
+requireDaemonNewerThan "2.36pre"
 
 TODO_NixOS
 

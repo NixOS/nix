@@ -17,11 +17,14 @@
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
+
 #include <variant>
+#include <utility>
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 #  include "nix/util/monitor-fd.hh"
@@ -169,7 +172,7 @@ struct TunnelLogger : public Logger
         }
 
         StringSink buf;
-        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
+        buf << STDERR_START_ACTIVITY << act << std::to_underlying(lvl) << type << s << fields << parent;
         enqueueMsg(buf.s);
     }
 
@@ -452,6 +455,10 @@ static void performOp(
             bool repairBool;
             conn.from >> repairBool;
             auto repair = RepairFlag{repairBool};
+            /* Repairing is not atomic, so disallowed for "untrusted"
+               clients. */
+            if (repair && !trusted)
+                throw Error("you are not privileged to repair paths");
 
             logger->startWork();
             auto pathInfo = [&]() {
@@ -533,6 +540,10 @@ static void performOp(
     case WorkerProto::Op::AddMultipleToStore: {
         bool repair, dontCheckSigs;
         conn.from >> repair >> dontCheckSigs;
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients. */
+        if (repair && !trusted)
+            throw Error("you are not privileged to repair store paths");
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
 
@@ -715,6 +726,15 @@ static void performOp(
         break;
     }
 
+    case WorkerProto::Op::AddTempRoots: {
+        auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+        logger->startWork();
+        store->addTempRoots(paths);
+        logger->stopWork();
+        conn.to << 1;
+        break;
+    }
+
     case WorkerProto::Op::AddPermRoot: {
         if (!trusted)
             throw Error(
@@ -820,11 +840,11 @@ static void performOp(
         clientSettings.keepFailed = readInt(conn.from);
         clientSettings.keepGoing = readInt(conn.from);
         clientSettings.tryFallback = readInt(conn.from);
-        clientSettings.verbosity = (Verbosity) readInt(conn.from);
+        clientSettings.verbosity = WorkerProto::Serialise<Verbosity>::read(*store, conn);
         clientSettings.maxBuildJobs = readInt(conn.from);
         clientSettings.maxSilentTime = readInt(conn.from);
         readInt(conn.from); // obsolete useBuildHook
-        clientSettings.verboseBuild = lvlError == (Verbosity) readInt(conn.from);
+        clientSettings.verboseBuild = (readInt(conn.from) == 0);
         readInt(conn.from); // obsolete logType
         readInt(conn.from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(conn.from);
@@ -963,6 +983,10 @@ static void performOp(
         info.sigs = WorkerProto::Serialise<std::set<Signature>>::read(*store, rconn);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
         conn.from >> repair >> dontCheckSigs;
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients. */
+        if (repair && !trusted)
+            throw Error("you are not privileged to repair store paths");
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
         if (!trusted)
@@ -1117,6 +1141,10 @@ void processConnection(
     std::shared_ptr<Builder> builder)
 {
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
+    // Construct before monitor so the interrupt flag is cleared only after
+    // the monitor thread has stopped and can no longer set it.
+    Finally clearInterruptFlag([] { setInterrupted(false); });
+
     auto monitor = (recursive == RecursiveFlag::NotRecursive) ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
     (void) monitor; // suppress warning
     ReceiveInterrupts receiveInterrupts;
@@ -1167,10 +1195,7 @@ void processConnection(
 
     unsigned int opCount = 0;
 
-    Finally finally([&]() {
-        setInterrupted(false);
-        printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
-    });
+    Finally logOpCount([&]() { printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount); });
 
     conn.postHandshake(
         *store,

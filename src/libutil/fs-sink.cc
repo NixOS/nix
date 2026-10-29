@@ -16,8 +16,6 @@ namespace nix {
 
 void FileSystemObjectSink::anchor() {}
 
-void ExtendedFileSystemObjectSink::anchor() {}
-
 void NullFileSystemObjectSink::anchor() {}
 
 void RegularFileSink::anchor() {}
@@ -25,6 +23,8 @@ void RegularFileSink::anchor() {}
 void RestoreSink::anchor() {}
 
 void CreateRegularFileSink::anchor() {}
+
+void RestoreSinkHooks::anchor() {}
 
 void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystemObjectSink & sink, const CanonPath & to)
 {
@@ -148,13 +148,18 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
     if (path.isRoot()) {
         createDirectory(path);
         callback(*this, path);
+#ifndef _WIN32 /* TODO: Have dirFd equivalent for the root directory. */
+        assert(dirFd);
+        if (hooks)
+            hooks->directoryDone(dirFd.get());
+#endif
         return;
     }
 
     createDirectory(path);
     assert(dirFd); // If that's not true the above call must have thrown an exception.
 
-    RestoreSink dirSink{startFsync};
+    RestoreSink dirSink{startFsync, hooks};
     dirSink.dstPath = append(dstPath, path);
     dirSink.dirFd = openFileEnsureBeneathNoSymlinks(
         dirFd.get(),
@@ -172,6 +177,8 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
         throw SysError("opening directory %s", PathFmt(dirSink.dstPath));
 
     callback(dirSink, CanonPath::root);
+    if (hooks)
+        hooks->directoryDone(dirSink.dirFd.get());
 }
 
 void RestoreSink::createDirectory(const CanonPath & path)
@@ -204,12 +211,15 @@ struct RestoreRegularFile : CreateRegularFileSink, FdSink
 {
     AutoCloseFD fd;
     bool startFsync = false;
+    bool executable = false;
 
     RestoreRegularFile(bool startFSync_, AutoCloseFD fd_)
         : FdSink(fd_.get())
         , fd(std::move(fd_))
         , startFsync(startFSync_)
+        , executable(false)
     {
+        isRegularFile = true; /* Hint for copying contents via CoW copy_file_range. */
     }
 
     void anchor() override;
@@ -267,6 +277,8 @@ void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegul
         throw NativeSysError("creating file %1%", PathFmt(append(dstPath, path)));
     func(crf);
     crf.flush();
+    if (hooks)
+        hooks->regularFileCreated(crf.fd.get(), crf.executable);
 }
 
 void RestoreRegularFile::isExecutable()
@@ -277,6 +289,7 @@ void RestoreRegularFile::isExecutable()
     auto st = nix::fstat(fd.get());
     if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
         throw SysError("fchmod");
+    executable = true;
 #endif
 }
 
@@ -307,6 +320,8 @@ void RestoreSink::createSymlink(const CanonPath & path, const std::string & targ
     auto [_parentFd, fd, name] = getParentFdAndName(dirFd.get(), dstPath, path);
     if (::symlinkat(requireCString(target), fd, name.rel_c_str()) == -1)
         throw SysError("creating symlink from %1% -> '%2%'", PathFmt(append(dstPath, path)), target);
+    if (hooks)
+        hooks->symlinkCreated(fd, name);
 #else
     nix::createSymlink(target, append(dstPath, path).string());
 #endif

@@ -74,6 +74,7 @@ public:
     {
         std::string value;
         std::string description;
+        bool excludedFromFullSerialisation = false;
     };
 
     /**
@@ -105,7 +106,7 @@ public:
      * Outputs all settings in a key-value pair format suitable to be used as
      * `nix.conf`
      */
-    virtual std::string toKeyValue() = 0;
+    virtual std::string toKeyValue(bool overriddenOnly = false) = 0;
 
     /**
      * Converts settings to `Args` to be used on the command line interface
@@ -176,7 +177,7 @@ public:
 
     nlohmann::json toJSON() override;
 
-    std::string toKeyValue() override;
+    std::string toKeyValue(bool overriddenOnly = false) override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 };
@@ -198,6 +199,11 @@ public:
     std::optional<ExperimentalFeature> experimentalFeature;
 
     bool isOverridden() const;
+
+    virtual bool excludedFromFullSerialisation() const
+    {
+        return false;
+    }
 
 protected:
 

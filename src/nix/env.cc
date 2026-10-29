@@ -3,6 +3,8 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include "nix/cmd/command.hh"
+
+#include "cli-config-private.hh"
 #include "nix/expr/eval.hh"
 #include "run.hh"
 #include "nix/util/strings.hh"
@@ -37,7 +39,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
     using InstallablesCommand::run;
 
-    std::vector<std::string> command = {getEnv("SHELL").value_or("bash")};
+    std::vector<std::string> command = {getEnv("SHELL").value_or(FALLBACK_BASH)};
 
     CmdShell()
     {

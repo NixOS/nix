@@ -11,7 +11,6 @@
 #include "nix/store/references.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/topo-sort.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
@@ -560,9 +559,13 @@ void LocalStore::openDB(State & state, bool create)
             SQLiteError::throw_(db, "querying journal mode");
         prevMode = std::string((const char *) sqlite3_column_text(stmt, 0));
     }
-    if (prevMode != mode
-        && sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        SQLiteError::throw_(db, "setting journal mode");
+    /* Switching a database to WAL mode needs an exclusive
+       lock, so retry like any other busy statement. */
+    if (prevMode != mode)
+        retrySQLite<void>([&]() {
+            if (sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
+                SQLiteError::throw_(db, "setting journal mode");
+        });
 
     if (mode == "wal") {
         /* persist the WAL files when the db connection is closed. This allows
@@ -771,10 +774,6 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
                 cacheDrvOutputMapping(state, id, i.first, *i.second.second);
         }
     }
-
-    if (pathInfoCache)
-        pathInfoCache->lock()->upsert(
-            info.path, PathInfoCacheValue{.value = std::make_shared<const ValidPathInfo>(info)});
 
     return id;
 }
@@ -1019,7 +1018,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        auto topoSortResult = topoSort(paths, [&](const StorePath & path) {
+        const auto topoSortResult = topoSort(paths, [&](const StorePath & path) {
             auto i = infos.find(path);
             return i == infos.end() ? StorePathSet() : i->second.references;
         });
@@ -1033,10 +1032,18 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
                         printStorePath(cycle.path),
                         printStorePath(cycle.parent));
                 },
-                [](auto &) { /* Success, continue */ }},
+                [](const std::vector<StorePath> &) { /* Success, continue */ }},
             topoSortResult);
 
         txn.commit();
+
+        /* Cache what's in the database, not `infos`: it lacks fields
+           like the registration time. */
+        if (pathInfoCache) {
+            auto cache(pathInfoCache->lock());
+            for (auto & [path, _] : infos)
+                cache->upsert(path, PathInfoCacheValue{.value = queryPathInfoInternal(*state, path)});
+        }
     });
 }
 
@@ -1094,16 +1101,26 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
             /* The path may have been created by another process in the meantime, so check again. */
             if (repair || !isValidPathUncached(info.path)) {
-
-                deletePath(realPath);
+                /* We'll restore to a temporary location accessible only to us first, confirm that
+                   the narHash/narSize/ca match after restoration and only then move the path into
+                   the expected location. */
+                auto [tempDir, tempDirFd] = createTempDirInStore();
+                AutoDelete delTempDir(tempDir);
+                std::filesystem::path tempPath = tempDir / "x";
 
                 /* While restoring the path from the NAR, compute the hash
                    of the NAR. */
                 HashSink hashSink(HashAlgorithm::SHA256);
 
                 TeeSource wrapperSource{source, hashSink};
+                auto canonicalisingRestoreHooks =
+                    makeCanonicalisingRestoreHooks(NIX_WHEN_SUPPORT_ACLS2(config->getLocalSettings().ignoredAcls));
 
-                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
+                restorePath(
+                    tempPath,
+                    wrapperSource,
+                    config->getLocalSettings().fsyncStorePaths,
+                    canonicalisingRestoreHooks.get());
 
                 auto hashResult = hashSink.finish();
 
@@ -1124,13 +1141,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 if (info.ca) {
                     auto & specified = *info.ca;
                     auto actualHash = ({
-                        SourcePath sourcePath = requireStoreObjectAccessor(info.path, /*requireValidPath=*/false);
+                        SourcePath sourcePath = {makeFSSourceAccessor(tempPath)};
                         Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
                         switch (fim) {
                         case FileIngestionMethod::Flat:
                         case FileIngestionMethod::NixArchive: {
-                            HashModuloSink caSink{
+                            MaskedHashSink caSink{
                                 specified.hash.algo,
                                 std::string{info.path.hashPart()},
                             };
@@ -1156,9 +1173,34 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                     }
                 }
 
-                autoGC();
+                /* Now that the content address / signed NAR contents is checked, we can move the path into place.
+                   TODO: We should use atomic exchange (RENAME_EXCHANGE and renamex_np with RENAME_SWAP) if possible. */
 
-                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
+                /* Delete the path for good measure even if not repairing. */
+                deletePath(realPath);
+
+                try {
+                    /* movePath and not renameFile because at this point the top-level directory is
+                       read-only. */
+                    movePath(tempPath, realPath);
+                } catch (const SystemError & e) {
+                    if (!e.is(std::errc::cross_device_link))
+                        throw;
+
+                    /* Apparently this can happen even on the same filesystem (and the paths that are renamed above
+                       are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
+                       Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
+                    warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
+                    RestoreSink copySink{/*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get()};
+                    copySink.dstPath = realPath;
+                    copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink, CanonPath::root);
+                }
+
+                /* Clean up the staging directory. */
+                delTempDir.deletePath();
+                tempDirFd.close();
+
+                autoGC();
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1219,38 +1261,35 @@ StorePath LocalStore::addToStoreFromDump(
        path. */
     bool inMemory = false;
 
-    struct Free
-    {
-        void operator()(void * v)
-        {
-            free(v);
-        }
-    };
-
-    std::unique_ptr<char, Free> dumpBuffer(nullptr);
-    std::string_view dump;
+    /* Because std::string has resize_and_overwrite. */
+    std::string dump;
 
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
        or the original source is empty */
     while (dump.size() < localSettings.narBufferSize) {
-        auto oldSize = dump.size();
+        const auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, localSettings.narBufferSize - oldSize);
-        if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
-            dumpBuffer.release();
-            dumpBuffer.reset((char *) tmp);
-        } else {
-            throw std::bad_alloc();
-        }
-        auto got = 0;
-        Finally cleanup([&]() { dump = {dumpBuffer.get(), dump.size() + got}; });
-        try {
-            got = source.read(dumpBuffer.get() + oldSize, want);
-        } catch (EndOfFile &) {
-            inMemory = true;
+        std::exception_ptr ex;
+        dump.resize_and_overwrite(
+            oldSize + want,
+            [&inMemory, &source, &ex, sz = oldSize](char * buf, std::size_t bufSize) -> std::string::size_type {
+                try {
+                    auto got = source.read(buf + sz, bufSize - sz);
+                    return sz + got;
+                } catch (EndOfFile &) {
+                    inMemory = true;
+                    return sz;
+                } catch (...) {
+                    ex = std::current_exception();
+                    return sz;
+                }
+            });
+        if (ex)
+            std::rethrow_exception(ex);
+        if (inMemory)
             break;
-        }
     }
 
     std::unique_ptr<AutoDelete> delTempDir;
@@ -1264,6 +1303,8 @@ StorePath LocalStore::addToStoreFromDump(
        wrong sort, and we need to rehash.
        References are also in store path, if scanning we will need to move */
     bool inMemoryAndDontNeedRestore = inMemory && methodsMatch && !filterReferences;
+    auto canonicalisingRestoreHooks =
+        makeCanonicalisingRestoreHooks(NIX_WHEN_SUPPORT_ACLS2(config->getLocalSettings().ignoredAcls));
 
     if (!inMemoryAndDontNeedRestore) {
         /* Drain what we pulled so far, and then keep on pulling */
@@ -1274,10 +1315,9 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath, bothSource, dumpMethod, localSettings.fsyncStorePaths);
+        restorePath(tempPath, bothSource, dumpMethod, localSettings.fsyncStorePaths, canonicalisingRestoreHooks.get());
 
-        dumpBuffer.reset();
-        dump = {};
+        std::string().swap(dump);
     }
 
     auto [dumpHash, size] = hashSink->finish();
@@ -1326,7 +1366,12 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, localSettings.fsyncStorePaths);
+                    restorePath(
+                        realPath,
+                        dumpSource,
+                        (FileSerialisationMethod) fim,
+                        localSettings.fsyncStorePaths,
+                        canonicalisingRestoreHooks.get());
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so
@@ -1335,7 +1380,23 @@ StorePath LocalStore::addToStoreFromDump(
                 }
             } else {
                 /* Move the temporary path we restored above. */
-                moveFile(tempPath, realPath);
+                try {
+                    /* movePath and not renameFile because at this point the top-level directory is
+                       read-only. */
+                    movePath(tempPath, realPath);
+                } catch (const SystemError & e) {
+                    if (!e.is(std::errc::cross_device_link))
+                        throw;
+
+                    /* Apparently this can happen even on the same filesystem (and the paths that are renamed above
+                       are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
+                       Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
+                    warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
+                    RestoreSink copySink{/*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get()};
+                    copySink.dstPath = realPath;
+                    copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink, CanonPath::root);
+                    delTempDir->deletePath();
+                }
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1346,9 +1407,6 @@ StorePath LocalStore::addToStoreFromDump(
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
             }
-
-            canonicalisePathMetaData(
-                realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
@@ -1628,12 +1686,17 @@ void LocalStore::addSignatures(const StorePath & storePath, const std::set<Signa
         SQLiteTxn txn(state->db);
 
         auto info = std::const_pointer_cast<ValidPathInfo>(queryPathInfoInternal(*state, storePath));
+        if (!info)
+            throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
 
         info->sigs.insert(sigs.begin(), sigs.end());
 
         updatePathInfo(*state, *info);
 
         txn.commit();
+
+        if (pathInfoCache)
+            pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
     });
 }
 

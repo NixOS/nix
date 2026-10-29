@@ -1,0 +1,21 @@
+set +x
+
+source "$_NIX_TEST_SOURCE_DIR"/common.sh
+
+set -x
+
+findPlugin() {
+    set +x
+
+    local name="$1"
+
+    for ext in so dylib; do
+        local plugin="@PLUGINS_BUILD_DIR@/${name}.$ext"
+        if [[ -f "$plugin" ]]; then
+            printf '%s\n' "$plugin"
+            return 0
+        fi
+    done
+
+    return 1
+}

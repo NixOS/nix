@@ -8,13 +8,15 @@ namespace nix {
 
 void MuxablePipePollState::poll(HANDLE ioport, std::optional<unsigned int> timeout)
 {
+    using namespace nix::windows;
+
     /* We are on at least Windows Vista / Server 2008 and can get many
        (countof(oentries)) statuses in one API call. */
     if (!GetQueuedCompletionStatusEx(
             ioport, oentries, sizeof(oentries) / sizeof(*oentries), &removed, timeout ? *timeout : INFINITE, false)) {
         auto lastError = GetLastError();
         if (lastError != WAIT_TIMEOUT)
-            throw windows::WinError(lastError, "GetQueuedCompletionStatusEx");
+            throw WinError(lastError, "GetQueuedCompletionStatusEx");
         assert(removed == 0);
     } else {
         assert(0 < removed && removed <= sizeof(oentries) / sizeof(*oentries));
@@ -26,6 +28,8 @@ void MuxablePipePollState::iterate(
     fun<void(Descriptor fd, std::string_view data)> handleRead,
     fun<void(Descriptor fd)> handleEOF)
 {
+    using namespace nix::windows;
+
     auto p = channels.begin();
     while (p != channels.end()) {
         decltype(p) nextp = p;
@@ -56,7 +60,7 @@ void MuxablePipePollState::iterate(
                             handleEOF((*p)->readSide.get());
                             nextp = channels.erase(p); // no need to maintain `channels` ?
                         } else if (lastError != ERROR_IO_PENDING)
-                            throw windows::WinError(lastError, "ReadFile(%s, ..)", (*p)->readSide.get());
+                            throw WinError(lastError, "ReadFile(%s, ..)", (*p)->readSide.get());
                     }
                 }
                 break;

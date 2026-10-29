@@ -1,0 +1,60 @@
+error:
+       … while evaluating the attribute 'x'
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:9:1:
+            8| in
+            9| n.x
+             | ^
+           10|
+
+       … from the definition of 'x'
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:6:5:
+            5|   n = {
+            6|     x = if (builtins.tryEval (builtins.addErrorContext "${throw "x"}" n.x)).success then 1 else 2;
+             |     ^
+            7|   };
+
+       … entering the infinite recursion
+
+       … while evaluating a branch condition
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:6:12:
+            5|   n = {
+            6|     x = if (builtins.tryEval (builtins.addErrorContext "${throw "x"}" n.x)).success then 1 else 2;
+             |            ^
+            7|   };
+
+       … while selecting an attribute
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:6:13:
+            5|   n = {
+            6|     x = if (builtins.tryEval (builtins.addErrorContext "${throw "x"}" n.x)).success then 1 else 2;
+             |             ^
+            7|   };
+
+       … while calling the 'tryEval' builtin
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:6:13:
+            5|   n = {
+            6|     x = if (builtins.tryEval (builtins.addErrorContext "${throw "x"}" n.x)).success then 1 else 2;
+             |             ^
+            7|   };
+
+       … while evaluating the error message passed to builtins.addErrorContext, another error occurred: x
+
+       … while evaluating the attribute 'x'
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:6:71:
+            5|   n = {
+            6|     x = if (builtins.tryEval (builtins.addErrorContext "${throw "x"}" n.x)).success then 1 else 2;
+             |                                                                       ^
+            7|   };
+
+       … from the definition of 'x'
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:6:5:
+            5|   n = {
+            6|     x = if (builtins.tryEval (builtins.addErrorContext "${throw "x"}" n.x)).success then 1 else 2;
+             |     ^
+            7|   };
+
+       error: infinite recursion encountered
+       at /pwd/lang/eval-fail-tryEval-addErrorContext-infinite-recursion.nix:6:5:
+            5|   n = {
+            6|     x = if (builtins.tryEval (builtins.addErrorContext "${throw "x"}" n.x)).success then 1 else 2;
+             |     ^
+            7|   };

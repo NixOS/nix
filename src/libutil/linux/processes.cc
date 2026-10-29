@@ -40,15 +40,17 @@ struct ExecChildParams
     const char * chdir;
     char * const * environment;
     char * const * args;
-    bool mergeStderrToStdout;
+    const FdRedirection * fdr;
+    size_t fdrSize;
     bool lookupPath;
-    Descriptor stdoutFd;
     Descriptor errorPipe;
     bool setGid;
     gid_t gid;
     bool setUid;
     uid_t uid;
     bool dieWithParent;
+    bool setSid;
+    bool restoreMounts;
 };
 
 /*
@@ -86,6 +88,8 @@ struct ExecChildParams
  */
 [[gnu::noinline, noreturn]] static void doExecChild(const ExecChildParams & params) noexcept
 {
+    using namespace nix::unix;
+
     Descriptor errorPipe = params.errorPipe;
 
     auto die = [&errorPipe] [[noreturn]] (int err, const char * msg) {
@@ -97,21 +101,13 @@ struct ExecChildParams
 
     auto dieWithErrno = [&die] [[noreturn]] (const char * msg) { die(errno, msg); };
 
-    /* TODO: Do something with stdin if we don't want to keep it? */
-
-    if (params.stdoutFd != INVALID_DESCRIPTOR && ::dup2(params.stdoutFd, STDOUT_FILENO) == -1)
-        dieWithErrno("dupping stdout");
-
-    if (params.mergeStderrToStdout && ::dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
-        dieWithErrno("cannot dup stdout into stderr");
-
     if (params.chdir && ::chdir(params.chdir) == -1)
         dieWithErrno("chdir failed");
 
     /* Restore saved process context. Much like nix::restoreProcessContext, but inlined
        and without any possibility of throwing exceptions. */
 
-    if (havePrivateMountNs) {
+    if (havePrivateMountNs && params.restoreMounts) {
         char savedCwd[PATH_MAX];
 
         /* On Linux, it seems like cwd can't ever be larger than PATH_MAX (as
@@ -142,13 +138,51 @@ struct ExecChildParams
        purposes we should dup (and mark as O_CLOEXEC) the error pipe descriptor.
        */
 
-    static constexpr int relocatedErrorPipeFD = STDERR_FILENO + 1;
+    /* First, specify the redirections the caller requested. We need to be careful
+       not to trample the error pipe while doing so. We do something similar to musl
+       and just move the pipe out of the way if we happen to collide. We'll mark it as
+       CLOEXEC at end unconditionally in case we did have to move it. */
+
+    int maxTo = STDERR_FILENO;
+    bool movedErrorPipe = false;
+
+    for (size_t i = 0; i < params.fdrSize; ++i) {
+        const auto & [from, to] = params.fdr[i];
+        /* Move the pipe into an unoccupied slot if needed. We are the thread
+           group leader in this process so racy dup() is perfectly fine. */
+        if (to == errorPipe) {
+            int newErrorPipe = ::dup(errorPipe);
+            if (newErrorPipe == -1)
+                dieWithErrno("moving the error pipe fd");
+            ::close(errorPipe);
+            errorPipe = newErrorPipe;
+            movedErrorPipe = true;
+        }
+
+        /* dup2 does nothing when from == to, but we still need to clear the CLOEXEC flag. */
+        if (from == to) {
+            if (int prev = ::fcntl(from, F_GETFD); prev == -1 || ::fcntl(from, F_SETFD, prev & ~FD_CLOEXEC) == -1)
+                dieWithErrno("clearing FD_CLOEXEC");
+        } else if (::dup2(from, to) == -1)
+            dieWithErrno("dup2");
+
+        /* Everything that's a redirection target needs to be kept. */
+        maxTo = maxTo < to ? to : maxTo;
+    }
+
+    /* Yes, this does mean that's it's not ideal to specify high-value
+       redirections. Please don't do that. */
+    int relocatedErrorPipeFD = maxTo + 1;
 
     /* dup3 fails if oldfd == newfd, so skip that case. */
     if (errorPipe != relocatedErrorPipeFD) {
         if (::dup3(errorPipe, relocatedErrorPipeFD, O_CLOEXEC) == -1)
             dieWithErrno("dupping error pipe");
         errorPipe = relocatedErrorPipeFD;
+    } else if (movedErrorPipe) {
+        /* Still need to mark it CLOEXEC in case it had to be moved. */
+        if (::fcntl(errorPipe, F_SETFD, FD_CLOEXEC) == -1)
+            dieWithErrno("making relocated error pipe O_CLOEXEC");
     }
 
 #if HAVE_CLOSEFROM
@@ -162,6 +196,23 @@ struct ExecChildParams
        like what glibc does in __closefrom_fallback is a lot of complex code. */
     ::syscall(SYS_close_range, relocatedErrorPipeFD + 1, ~0u, 0);
 #endif
+
+    /* Close everything in [3, maxTo) range that isn't supposed to be kept. maxTo + 1
+       is the error pipe that's CLOEXEC and shouldn't be closed and maxTo is already
+       known to be kept. And everything > maxTo + 1 is already closed above. */
+    for (int fd = STDERR_FILENO + 1; fd < maxTo; ++fd) {
+        bool kept = false;
+        /* Cheeky linear search. */
+        for (size_t j = 0; j < params.fdrSize; ++j) {
+            if (params.fdr[j].to == fd) {
+                kept = true;
+                break;
+            }
+        }
+
+        if (!kept)
+            ::close(fd);
+    }
 
     /* Important! Calling syscalls directly and not libc functions because of a
        discrepancy in POSIX specification (i.e. POSIX setgid/setuid has to apply
@@ -199,18 +250,21 @@ struct ExecChildParams
 #undef NIX_SYS_setgid
 #undef NIX_SYS_setgroups
 
-    if (unix::savedStackSize) {
+    if (savedStackSize) {
         struct ::rlimit limit;
         if (::getrlimit(RLIMIT_STACK, &limit) == 0) {
-            limit.rlim_cur = unix::savedStackSize;
+            limit.rlim_cur = savedStackSize;
             ::setrlimit(RLIMIT_STACK, &limit);
             /* TODO: Why do we ignore all errors here? */
         }
     }
 
-    /* Like unix::restoreSignals(), but safe to do in a vfork child. */
-    if (unix::savedSignalMaskIsSet && sigprocmask(SIG_SETMASK, &unix::savedSignalMask, nullptr) == -1)
+    /* Like restoreSignals(), but safe to do in a vfork child. */
+    if (savedSignalMaskIsSet && sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr) == -1)
         dieWithErrno("restoring signals");
+
+    if (params.setSid && ::setsid() == -1)
+        dieWithErrno("setsid");
 
     if (params.lookupPath)
         /* Nonstandard, but both musl and glibc have it and it doesn't
@@ -261,17 +315,8 @@ static Strings prepareEnvironmentStrings(const StringMap & environment)
 
 } // namespace
 
-/* TODO: Factor this out into a `launchProgram` that returns a pid. That would be
-   much more useful in more places. */
-void runProgram2(const RunOptions & options)
+Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fdr)
 {
-    checkInterrupt();
-
-    /* Create a pipe. */
-    Pipe out;
-    if (options.standardOut)
-        out.create();
-
     /* Pipe that the child reports errors through. */
     Pipe childErrorPipe;
     childErrorPipe.create();
@@ -290,9 +335,9 @@ void runProgram2(const RunOptions & options)
         .chdir = options.chdir ? options.chdir->c_str() : nullptr,
         .environment = options.environment ? env.data() : environ,
         .args = args.data(),
-        .mergeStderrToStdout = options.mergeStderrToStdout,
+        .fdr = fdr.data(),
+        .fdrSize = fdr.size(),
         .lookupPath = options.lookupPath,
-        .stdoutFd = options.standardOut ? out.writeSide.get() : INVALID_DESCRIPTOR,
         .errorPipe = childErrorPipe.writeSide.get(),
         .setGid = options.gid.has_value(),
         /* The default is not used, but a bit sketchy to leave zero initialised so "nobody". */
@@ -300,10 +345,10 @@ void runProgram2(const RunOptions & options)
         .setUid = options.uid.has_value(),
         /* The default is not used, but a bit sketchy to leave zero initialised so "nobody". */
         .uid = options.uid.value_or(65534),
-        .dieWithParent = true, /* TODO: Maybe we might want to expose this in RunOptions? */
+        .dieWithParent = options.dieWithParent,
+        .setSid = options.setSid,
+        .restoreMounts = options.restoreMounts,
     };
-
-    auto suspension = logger->suspendIf(options.isInteractive);
 
     const auto savedErrno = errno;
 
@@ -318,7 +363,6 @@ void runProgram2(const RunOptions & options)
     if (pid == -1)
         throw SysError(forkErrno, "unable to vfork");
 
-    out.writeSide.close();
     childErrorPipe.writeSide.close();
 
     StringSink childErrorSink;
@@ -347,13 +391,7 @@ void runProgram2(const RunOptions & options)
         throw std::move(execErr);
     }
 
-    if (options.standardOut)
-        drainFD(out.readSide.get(), *options.standardOut);
-
-    /* Wait for the child to finish. */
-    int status = pid.wait();
-    if (status)
-        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
+    return pid;
 }
 
 } // namespace nix

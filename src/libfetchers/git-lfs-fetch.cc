@@ -29,7 +29,7 @@ static void downloadToSink(
     std::string sha256Expected,
     size_t sizeExpected)
 {
-    FileTransferRequest request(parseURL(url));
+    FileTransferRequest request(VerbatimURL{url});
     Headers headers;
     if (authHeader.has_value())
         headers.push_back({"Authorization", *authHeader});
@@ -73,11 +73,12 @@ LfsApiInfo getLfsApi(ParsedURL url)
         args.push_back(string_to_os_string(url.renderPath(/*encode=*/false)));
         args.push_back(OS_STR("download"));
 
-        auto [status, output] = runProgram({.program = "ssh", .args = args});
+        auto [status, output] = runProgram({{.program = sshProgram(), .args = args}});
 
         if (output.empty())
             throw Error(
-                "git-lfs-authenticate: no output (cmd: 'ssh %s')",
+                "git-lfs-authenticate: no output (cmd: '%s %s')",
+                sshProgram().string(),
                 concatMapStringsSep(
                     " ", args, [](const OsString & s) { return escapeShellArgAlways(os_string_to_string(s)); }));
 

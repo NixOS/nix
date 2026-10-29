@@ -14,9 +14,6 @@ namespace nix {
 
 struct SourcePath;
 
-MakeError(BadStorePath, Error);
-MakeError(BadStorePathName, BadStorePath);
-
 /**
  * @todo This should just be inherited by `StoreConfig`. However, it
  * would be a huge amount of churn if `Store` didn't have these methods
@@ -36,18 +33,26 @@ struct StoreDirConfig
 
     StorePath parseStorePath(std::string_view path) const;
 
+    /**
+     * Parse a store path, requiring canonical form.
+     * Rejects paths with trailing or excess path separators
+     *
+     * @todo Try to use this as much as possible, and then rename so we
+     * have `parseStorePath` and `parseStorePathNonCanonical`.
+     */
+    StorePath parseStorePathCanonical(std::string_view path) const;
+
     std::optional<StorePath> maybeParseStorePath(std::string_view path) const;
 
     std::string printStorePath(const StorePath & path) const;
 
-    /**
-     * Deprecated
-     *
-     * \todo remove
-     */
-    StorePathSet parseStorePathSet(const StringSet & paths) const;
-
     StringSet printStorePathSet(const StorePathSet & path) const;
+
+    std::size_t maxCanonicalStorePathLen() const noexcept
+    {
+        /* storeDir itself must be canonical + "/" + StorePath basename. */
+        return storeDir.size() + 1 + StorePath::MaxBasenameLen;
+    }
 
     /**
      * Display a set of paths in human-readable form (i.e., between quotes

@@ -12,6 +12,10 @@
 #include <boost/lexical_cast.hpp>
 #include <stdint.h>
 
+#ifdef _WIN32
+#  include <winsock2.h>
+#endif
+
 #ifdef NDEBUG
 #  error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
 #endif
@@ -62,6 +66,18 @@ void initLibUtil()
            effect. */
         if (OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr) != 1)
             throw Error("could not initialise OpenSSL");
+
+#ifdef _WIN32
+        /* Winsock needs this once per process before any socket call; without
+           it every socket() fails with WSANOTINITIALISED. No matching
+           WSACleanup(), for the same reason the OpenSSL atexit() handler is
+           suppressed above. The error code comes from the return value because
+           WSAGetLastError() is not usable until Winsock is up, and must be a
+           DWORD to pick the explicit-code WinError constructor. */
+        WSADATA wsaData;
+        if (DWORD err = static_cast<DWORD>(WSAStartup(MAKEWORD(2, 2), &wsaData)); err != 0)
+            throw windows::WinError(err, "could not initialise Winsock");
+#endif
     });
 }
 
@@ -121,7 +137,7 @@ rewriteStrings(std::string s, const StringMap & rewrites, std::set<uint64_t> * m
     return s;
 }
 
-template<class N>
+template<std::integral N>
 std::optional<N> string2Int(const std::string_view s)
 {
     if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
@@ -134,12 +150,10 @@ std::optional<N> string2Int(const std::string_view s)
 }
 
 // Explicitly instantiated in one place for faster compilation
-template std::optional<unsigned char> string2Int<unsigned char>(const std::string_view s);
 template std::optional<unsigned short> string2Int<unsigned short>(const std::string_view s);
 template std::optional<unsigned int> string2Int<unsigned int>(const std::string_view s);
 template std::optional<unsigned long> string2Int<unsigned long>(const std::string_view s);
 template std::optional<unsigned long long> string2Int<unsigned long long>(const std::string_view s);
-template std::optional<signed char> string2Int<signed char>(const std::string_view s);
 template std::optional<signed short> string2Int<signed short>(const std::string_view s);
 template std::optional<signed int> string2Int<signed int>(const std::string_view s);
 template std::optional<signed long> string2Int<signed long>(const std::string_view s);

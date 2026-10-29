@@ -1,30 +1,21 @@
 #pragma once
 
 #include "nix/fetchers/filtering-source-accessor.hh"
-#include "nix/util/fs-sink.hh"
+#include "nix/fetchers/merkle-tar-adapter.hh"
 
 namespace nix {
+
+/**
+ * The git program used for all git invocations (build-time configurable
+ * via the `git-program` option; either a name resolved via PATH or an
+ * absolute path).
+ */
+const std::filesystem::path & gitProgram();
 
 namespace fetchers {
 struct PublicKey;
 struct Settings;
 } // namespace fetchers
-
-/**
- * A sink that writes into a Git repository. Note that nothing may be written
- * until `flush()` is called.
- */
-struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
-{
-private:
-    void anchor() override;
-
-public:
-    /**
-     * Flush builder and return a final Git hash.
-     */
-    virtual Hash flush() = 0;
-};
 
 struct GitAccessorOptions
 {
@@ -34,7 +25,7 @@ struct GitAccessorOptions
 
 struct GitRepo
 {
-    virtual ~GitRepo() {}
+    virtual ~GitRepo() = default;
 
     struct Options
     {
@@ -44,8 +35,6 @@ struct GitRepo
     };
 
     static ref<GitRepo> openRepo(const std::filesystem::path & path, Options options);
-
-    virtual uint64_t getRevCount(const Hash & rev) = 0;
 
     virtual uint64_t getLastModified(const Hash & rev) = 0;
 
@@ -114,9 +103,10 @@ struct GitRepo
     virtual ref<SourceAccessor> getAccessor(
         const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError) = 0;
 
-    virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
-
     virtual void flush() = 0;
+
+    virtual std::unique_ptr<merkle::DirectorySinkWithFinalize> makeDirectorySink() = 0;
+    virtual std::unique_ptr<merkle::RegularFileSinkWithFinalize> makeRegularFileSink() = 0;
 
     virtual void fetch(const std::string & url, const std::string & refspec, bool shallow) = 0;
 
@@ -138,6 +128,15 @@ struct GitRepo
      * Otherwise, return the passed ID unchanged.
      */
     virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
+};
+
+struct GitRepoPool : merkle::FileSinkBuilder
+{
+    virtual ~GitRepoPool() = default;
+
+    static ref<GitRepoPool> create(const std::filesystem::path & path, GitRepo::Options options);
+
+    virtual uint64_t getRevCount(const Hash & rev) = 0;
 };
 
 // A helper to ensure that we don't leak objects returned by libgit2.

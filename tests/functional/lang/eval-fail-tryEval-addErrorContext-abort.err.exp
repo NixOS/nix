@@ -1,0 +1,18 @@
+error:
+       … while calling the 'tryEval' builtin
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-abort.nix:4:1:
+            3| # catches.
+            4| builtins.tryEval (builtins.addErrorContext "${throw "x"}" (abort "real"))
+             | ^
+            5|
+
+       … while evaluating the error message passed to builtins.addErrorContext, another error occurred: x
+
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-abort.nix:4:60:
+            3| # catches.
+            4| builtins.tryEval (builtins.addErrorContext "${throw "x"}" (abort "real"))
+             |                                                            ^
+            5|
+
+       error: evaluation aborted with the following error message: 'real'

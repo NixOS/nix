@@ -81,7 +81,7 @@ void LocalStore::createTempRootsFile()
     }
 }
 
-void LocalStore::addTempRoot(const StorePath & path)
+void LocalStore::addTempRoots(const StorePathSet & paths)
 {
     if (config->readOnly) {
         debug(
@@ -130,12 +130,14 @@ restart:
         }
 
         try {
-            debug("sending GC root '%s'", printStorePath(path));
-            writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
-            char c;
-            readFull(fdRootsSocket->get(), &c, 1);
-            assert(c == '1');
-            debug("got ack for GC root '%s'", printStorePath(path));
+            for (auto & path : paths) {
+                debug("sending GC root '%s'", printStorePath(path));
+                writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
+                char c;
+                readFull(fdRootsSocket->get(), &c, 1);
+                assert(c == '1');
+                debug("got ack for GC root '%s'", printStorePath(path));
+            }
         } catch (SystemError & e) {
             /* The garbage collector may have exited, so we need to
                restart. */
@@ -152,10 +154,22 @@ restart:
         }
     }
 
-    /* Record the store path in the temporary roots file so it will be
+    /* Record the store paths in the temporary roots file so they will be
        seen by a future run of the garbage collector. */
-    auto s = printStorePath(path) + '\0';
-    writeFull(_fdTempRoots.lock()->get(), s);
+
+    std::string s;
+
+    for (auto & path : paths)
+        s += printStorePath(path) + '\0';
+
+    {
+        auto fdTempRoots(_fdTempRoots.lock());
+
+        /* This might not be atomic, but that's fine. Writes go in-order, and if
+           we partially write a store path, findTempRoots() will just ignore it,
+           and we'll send it the new temproots below if it's still running. */
+        writeFull(fdTempRoots->get(), s);
+    }
 }
 
 static std::string censored = "{censored}";
@@ -450,7 +464,17 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
                 debug("GC roots server accepted new client");
 
-                /* Process the connection in a separate thread. */
+                /* Process the connection in a separate thread. Hold
+                   the `connections` lock while starting the thread
+                   and registering it, so that the thread's cleanup
+                   handler (which removes it from `connections`)
+                   can't run before it has been inserted. Otherwise
+                   a client that disconnects immediately would leave
+                   a stale entry, and a later client that gets the
+                   same fd number would cause a duplicate key insert,
+                   destroying a joinable std::thread and thus calling
+                   std::terminate(). */
+                auto conn(connections.lock());
                 auto fdClient_ = fdClient.get();
                 std::thread clientThread([&, fdClient = std::move(fdClient)]() {
                     Finally cleanup([&]() {
@@ -493,14 +517,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             } else
                                 printError("received garbage instead of a root from client");
                             writeFull(fdClient.get(), "1", false);
-                        } catch (Error & e) {
+                        } catch (BaseError & e) {
                             debug("reading GC root from client: %s", e.msg());
                             break;
                         }
                     }
                 });
 
-                connections.lock()->insert({fdClient_, std::move(clientThread)});
+                auto [it, inserted] = conn->insert({fdClient_, std::move(clientThread)});
+                assert(inserted);
             }
         }
     });
@@ -541,6 +566,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        GCLimitReached if we've deleted enough garbage. */
     auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
         assert(!std::filesystem::path(baseName).is_absolute());
+
         /* Using `std::string` since this is the logical store dir. Hopefully that is the right choice. */
         std::string path = storeDir + "/" + std::string(baseName);
         auto realPath = config->realStoreDir.get() / std::string(baseName);
@@ -561,7 +587,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         results.paths.insert(path);
 
-        uint64_t bytesFreed;
+        uint64_t bytesFreed = 0;
         deleteStorePath(realPath, bytesFreed, isKnownPath);
 
         results.bytesFreed += bytesFreed;
@@ -817,7 +843,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
                         if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
                             maybeDeleteReferrersClosure(*storePath);
-                        else
+                        else if (shouldDelete)
                             deleteFromStore(name, false);
                     }
                 },
@@ -939,7 +965,7 @@ void LocalStore::autoGC(bool sync)
             return;
 
         /* Note: since gcRunning is false here, any previous GC thread has exited / is exiting so the join() should be
-         * almost instantenous. */
+         * almost instantaneous. */
         if (state->gcThread.joinable())
             state->gcThread.join();
 

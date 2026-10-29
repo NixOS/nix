@@ -33,7 +33,7 @@ struct CmdEdit : InstallableValueCommand
         auto state = getEvalState();
 
         const auto [file, line] = [&] {
-            auto [v, pos] = installable->toValue(*state);
+            auto [v, pos] = installable->toValue(*state, AutoCall::No);
 
             try {
                 return findPackageFilename(*state, *v, installable->what());
@@ -50,9 +50,12 @@ struct CmdEdit : InstallableValueCommand
 
         runProgram2(
             RunOptions{
-                .program = program,
-                .lookupPath = true,
-                .args = std::move(args),
+                .spawnOptions =
+                    {
+                        .program = program,
+                        .lookupPath = true,
+                        .args = std::move(args),
+                    },
                 .isInteractive = true,
             });
     }

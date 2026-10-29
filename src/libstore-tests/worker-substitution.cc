@@ -3,6 +3,8 @@
 
 #include "nix/store/build/worker.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/memory-source-accessor.hh"
@@ -79,8 +81,8 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
     Worker worker{*dummyStore, *dummyStore};
 
     // Override the substituters to use our dummy store substituter
-    ref<Store> substituerAsStore = substituter;
-    worker.getSubstituters = [substituerAsStore]() -> std::list<ref<Store>> { return {substituerAsStore}; };
+    ref<Store> substituterAsStore = substituter;
+    worker.getSubstituters = [substituterAsStore]() -> std::list<ref<Store>> { return {substituterAsStore}; };
 
     // Create a substitution goal for the path
     auto goal = worker.makePathSubstitutionGoal(pathInSubstituter);
@@ -329,7 +331,12 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
             },
         },
         // Add the dependency derivation as an input
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = make_ref<SingleDerivedPath>(SingleDerivedPath::Opaque{depDrvPath}),
+                .output = "out",
+            },
+        },
         .name = "root-drv",
     };
 

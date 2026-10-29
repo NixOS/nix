@@ -39,6 +39,8 @@ elif plugin_c_api_enabled and not host_machine.system().startswith('windows')
   ) + ',--no-whole-archive'
 endif
 
+libraries_public = get_variable('libraries_public', [])
+
 import('pkgconfig').generate(
   this_library,
   filebase : meson.project_name(),
@@ -47,6 +49,7 @@ import('pkgconfig').generate(
   extra_cflags : extra_cflags,
   requires : requires_public,
   requires_private : requires_private,
+  libraries : libraries_public,
   libraries_private : libraries_private,
   variables : extra_pkg_config_variables,
 )
@@ -70,7 +73,7 @@ meson.override_dependency(
     include_directories : include_dirs,
     link_with : this_library,
     compile_args : [ '-std=c++23' ],
-    dependencies : deps_public_subproject + deps_public,
+    dependencies : deps_public_subproject + deps_public + deps_public_no_pkgconfig,
     variables : extra_pkg_config_variables,
   ),
 )
@@ -82,7 +85,7 @@ if installed_whole_archive_link_arg != ''
       include_directories : include_dirs,
       link_whole : [ this_static_library ],
       compile_args : [ '-std=c++23' ],
-      dependencies : deps_public_subproject + deps_public,
+      dependencies : deps_public_subproject + deps_public + deps_public_no_pkgconfig,
       variables : extra_pkg_config_variables,
     ),
   )

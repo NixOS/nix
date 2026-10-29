@@ -19,7 +19,9 @@
 #include "nix/store/build-result.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/util.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/build.hh"
 #include "nix/cmd/legacy.hh"
@@ -83,7 +85,10 @@ static int main_build_remote(int argc, char ** argv)
         if (argc != 2)
             throw UsageError("called without required arguments");
 
-        verbosity = (Verbosity) std::stoll(argv[1]);
+        auto rawVerbosity = string2Int<unsigned>(argv[1]);
+        if (!rawVerbosity)
+            throw UsageError("invalid verbosity '%s'", argv[1]);
+        verbosity = verbosityFromIntClamped(*rawVerbosity);
 
         FdSource source(STDIN_FILENO);
 
@@ -271,7 +276,15 @@ static int main_build_remote(int argc, char ** argv)
 
         std::cerr << "# accept\n" << storeUri << "\n";
 
-        auto inputs = readStrings<StringSet>(source);
+        /* The other side of the build hook protocol is Nix itself, so
+           these are always printed in canonical form. */
+        auto inputs = [&] {
+            StorePathSet res;
+            for (auto & i : readStrings<StringSet>(source))
+                res.insert(store->parseStorePathCanonical(i));
+            return res;
+        }();
+
         auto wantedOutputs = readStrings<StringSet>(source);
 
         AutoCloseFD uploadLock;
@@ -305,7 +318,7 @@ static int main_build_remote(int argc, char ** argv)
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(*store, *sshStore, inputs, NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
@@ -328,18 +341,30 @@ static int main_build_remote(int argc, char ** argv)
         // This condition mirrors that: that code enforces the "rules" outlined there;
         // we do the best we can given those "rules".
         if (trustedOrLegacy || type(drv).isCA()) {
+            // Check if there are any derivation inputs
+            bool hasInputDrvs = std::ranges::any_of(drv.inputs, [](const auto & input) {
+                return std::holds_alternative<SingleDerivedPath::Built>(input.raw());
+            });
+
             BasicDerivation resolvedDrv{
                 .outputs = drv.outputs,
                 // Hijack the inputs paths of the derivation to include
                 // all the paths that come from the `inputDrvs` set. We
-                // don’t do that for the derivations whose `inputDrvs`
+                // don't do that for the derivations whose `inputDrvs`
                 // is empty because:
                 //
-                // 1. It’s not needed
+                // 1. It's not needed
                 //
                 // 2. Changing the `inputSrcs` set changes the
                 //    associated output ids, which break CA derivations
-                .inputs = drv.inputs.drvs.map.empty() ? drv.inputs.srcs : store->parseStorePathSet(inputs),
+                .inputs =
+                    hasInputDrvs ? inputs : [&] {
+                        StorePathSet srcs;
+                        for (auto & input : drv.inputs)
+                            if (auto * op = std::get_if<SingleDerivedPath::Opaque>(&input.raw()))
+                                srcs.insert(op->path);
+                        return srcs;
+                    }(),
                 .platform = drv.platform,
                 .builder = drv.builder,
                 .args = drv.args,

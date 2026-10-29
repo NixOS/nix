@@ -6,6 +6,8 @@
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/expr/tests/gc.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -13,6 +15,45 @@
 #include "expr-tests-config.hh"
 
 namespace nixC {
+
+#if NIX_USE_BOEHMGC
+TEST(nix_api_gc_test, last_decref_releases_root)
+{
+    ASSERT_EQ(NIX_OK, nix_libexpr_init(nullptr));
+
+    auto weak = static_cast<void **>(GC_MALLOC_ATOMIC(sizeof(void *)));
+    ASSERT_NE(nullptr, weak);
+    *weak = nullptr;
+    nix::Finally cleanup([&] {
+        GC_unregister_disappearing_link(weak);
+        GC_FREE(weak);
+    });
+
+    nix::runOnGCThread([&] {
+        auto object = GC_MALLOC(1024);
+        ASSERT_NE(nullptr, object);
+        ASSERT_EQ(NIX_OK, nix_gc_incref(nullptr, object));
+        ASSERT_EQ(NIX_OK, nix_gc_incref(nullptr, object));
+        *weak = object;
+        ASSERT_EQ(GC_SUCCESS, GC_GENERAL_REGISTER_DISAPPEARING_LINK(weak, object));
+        ASSERT_EQ(NIX_OK, nix_gc_decref(nullptr, object));
+    });
+    ASSERT_FALSE(HasFatalFailure());
+
+    nix_gc_now();
+
+    nix::runOnGCThread([&] {
+        ASSERT_NE(nullptr, *weak);
+        ASSERT_EQ(NIX_OK, nix_gc_decref(nullptr, *weak));
+    });
+    ASSERT_FALSE(HasFatalFailure());
+
+    for (int i = 0; i < 3; ++i)
+        nix_gc_now();
+
+    EXPECT_EQ(nullptr, *weak);
+}
+#endif
 
 TEST_F(nix_api_expr_test, nix_eval_state_lookup_path)
 {
@@ -58,7 +99,7 @@ TEST_F(nix_api_expr_test, nix_eval_state_builder_set_setting)
 {
     // Test whether setting eval settings via the C-api actually apply.
 
-    // Presence of builtins.currentSystem is used as an indicater whether pure-eval is used or not.
+    // Presence of builtins.currentSystem is used as an indicator whether pure-eval is used or not.
     auto hasCurrentSystem = [&](EvalState * es) {
         Value * v = nix_alloc_value(ctx, es);
         nix_expr_eval_from_string(ctx, es, "builtins ? currentSystem", ".", v);
@@ -297,6 +338,16 @@ primop_square(void * user_data, nix_c_context * context, EvalState * state, nix_
     assert(user_data == &SAMPLE_USER_DATA);
     auto i = nix_get_int(context, args[0]);
     nix_init_int(context, ret, i * i);
+}
+
+TEST_F(nix_api_expr_test, nix_alloc_primop_without_doc)
+{
+    PrimOp * primop = nix_alloc_primop(ctx, primop_square, 1, "undocumented", nullptr, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, primop);
+
+    nix_gc_decref(ctx, primop);
+    assert_ctx_ok();
 }
 
 TEST_F(nix_api_expr_test, nix_expr_primop)
