@@ -168,6 +168,69 @@ TEST_F(nix_api_store_test, nix_api_load_flake)
     nix_flake_settings_free(settings);
 }
 
+TEST_F(nix_api_store_test, nix_api_locked_flake_get_fingerprint)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir / "flake.nix", R"(
+        {
+            outputs = { ... }: { hello = "potato"; };
+        }
+    )");
+
+    nix_libstore_init(ctx);
+    assert_ctx_ok();
+    nix_libexpr_init(ctx);
+    assert_ctx_ok();
+
+    auto fetchSettings = nix_fetchers_settings_new(ctx);
+    auto settings = nix_flake_settings_new(ctx);
+    auto * builder = nix_eval_state_builder_new(ctx, store);
+    nix_flake_settings_add_to_eval_state_builder(ctx, settings, builder);
+    auto state = nix_eval_state_build(ctx, builder);
+    nix_eval_state_builder_free(builder);
+    assert_ctx_ok();
+
+    auto parseFlags = nix_flake_reference_parse_flags_new(ctx, settings);
+    nix_flake_reference_parse_flags_set_base_directory(
+        ctx, parseFlags, tmpDir.string().c_str(), tmpDir.string().size());
+    std::string fragment;
+    nix_flake_reference * flakeRef = nullptr;
+    nix_flake_reference_and_fragment_from_string(
+        ctx, fetchSettings, settings, parseFlags, ".", 1, &flakeRef, OBSERVE_STRING(fragment));
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, flakeRef);
+
+    auto lockFlags = nix_flake_lock_flags_new(ctx, settings);
+    auto locked = nix_flake_lock(ctx, fetchSettings, settings, state, lockFlags, flakeRef);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, locked);
+
+    std::string fp1;
+    auto r1 = nix_locked_flake_get_fingerprint(ctx, store, fetchSettings, locked, OBSERVE_STRING(fp1));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, r1);
+
+    std::string fp2;
+    auto r2 = nix_locked_flake_get_fingerprint(ctx, store, fetchSettings, locked, OBSERVE_STRING(fp2));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, r2);
+    ASSERT_EQ(fp1, fp2);
+
+    if (!fp1.empty()) {
+        ASSERT_EQ(64u, fp1.size());
+        ASSERT_EQ(fp1.find_first_not_of("0123456789abcdef"), std::string::npos);
+    }
+
+    nix_flake_lock_flags_free(lockFlags);
+    nix_flake_reference_free(flakeRef);
+    nix_flake_reference_parse_flags_free(parseFlags);
+    nix_locked_flake_free(locked);
+    nix_state_free(state);
+    nix_flake_settings_free(settings);
+}
+
 TEST_F(nix_api_store_test, nix_api_load_flake_with_flags)
 {
     nix_libstore_init(ctx);
