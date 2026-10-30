@@ -54,6 +54,18 @@ if ! NIX_REMOTE="" nix store optimize; then
     fail "nix store optimize alias is not present"
 fi
 
+# macOS refuses to hard-link `PkgInfo` and `_CodeSignature/*` below a *.app
+# directory; both building and optimising must leave them alone.
+# shellcheck disable=SC2016
+outPath5=$(echo 'with import '"${config_nix}"'; mkDerivation { name = "foo5"; builder = builtins.toFile "builder" "mkdir -p $out/foo.app/_CodeSignature; echo bundle > $out/foo.app/PkgInfo; echo bundle > $out/foo.app/_CodeSignature/CodeResources; echo bundle > $out/plain"; }' | nix-build - --no-out-link --auto-optimise-store)
+
+NIX_REMOTE="" nix-store --optimise
+
+nlink="$(stat --format=%h "$outPath5"/plain)"
+if [ "$nlink" -lt 2 ]; then
+    fail "file next to an app bundle was not linked"
+fi
+
 nix-store --gc
 
 if [ -n "$(ls "$NIX_STORE_DIR"/.links)" ]; then
