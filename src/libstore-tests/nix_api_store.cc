@@ -1,5 +1,7 @@
 #include <fstream>
+#include <unistd.h>
 
+#include <gmock/gmock.h>
 #include <nlohmann/json.hpp>
 
 #include "nix_api_util.h"
@@ -975,6 +977,68 @@ TEST_F(nix_api_store_test, nix_derivation_clone)
 
     nix_derivation_free(drv);
     nix_derivation_free(drv2);
+}
+
+TEST_F(nix_api_store_test, nix_store_add_temp_root)
+{
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, path);
+
+    auto ret = nix_store_add_temp_root(ctx, store, path);
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, ret);
+
+    auto tempRoots = nix::readFile(nixStateDir + "/temproots/" + std::to_string(getpid()));
+    ASSERT_NE(tempRoots.find(nixStoreDir + PATH_SUFFIX), std::string::npos);
+
+    nix_store_path_free(path);
+}
+
+TEST_F(nix_api_store_test, nix_store_add_perm_root)
+{
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, path);
+
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+    auto gcRoot = tmpDir / "gcroot";
+
+    std::string rootOut;
+    auto ret = nix_store_add_perm_root(ctx, store, path, gcRoot.string().c_str(), OBSERVE_STRING(rootOut));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, ret);
+    ASSERT_EQ(gcRoot.string(), rootOut);
+    ASSERT_EQ(nixStoreDir + PATH_SUFFIX, std::filesystem::read_symlink(gcRoot).string());
+
+    nix_store_path_free(path);
+}
+
+TEST_F(nix_api_util_context, nix_store_add_perm_root_fails_without_local_store)
+{
+    Store * store = nix_store_open(ctx, "dummy://", nullptr);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, store);
+
+    std::string storeDir;
+    nix_store_get_storedir(ctx, store, OBSERVE_STRING(storeDir));
+    assert_ctx_ok();
+
+    StorePath * path = nix_store_parse_path(ctx, store, (storeDir + PATH_SUFFIX).c_str());
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, path);
+
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    std::string rootOut;
+    auto ret = nix_store_add_perm_root(ctx, store, path, (tmpDir / "gcroot").string().c_str(), OBSERVE_STRING(rootOut));
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, ret);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("not a local filesystem store"));
+
+    nix_store_path_free(path);
+    nix_store_free(store);
 }
 
 } // namespace nixC

@@ -186,6 +186,36 @@ nix_err
 nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
 
 /**
+ * @brief Register a temporary GC root for a store path (lives until the store is closed).
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store
+ * @param[in] path the store path to protect
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_store_add_temp_root(nix_c_context * context, Store * store, const StorePath * path);
+
+/**
+ * @brief Register a permanent indirect GC root: a symlink at `gcRoot` pointing at `path`.
+ *
+ * Only supported by local filesystem stores; returns an error for remote/binary-cache stores.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store (must be a local store)
+ * @param[in] path the store path to protect
+ * @param[in] gcRoot filesystem location of the gc-root symlink to create
+ * @param[in] callback Called with the resulting root path
+ * @param[in] user_data optional, passed to the callback
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_store_add_perm_root(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    const char * gcRoot,
+    nix_get_string_callback callback,
+    void * user_data);
+
+/**
  * @brief Create a `nix_derivation` from a JSON representation of that derivation.
  *
  * @note Unlike `nix_derivation_to_json`, this needs a `Store`. This is because
