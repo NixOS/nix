@@ -77,7 +77,8 @@ StoreReference UDSRemoteStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
-                .authority = encodeUrlPath(pathToUrlPath(path)),
+                .authority = ParsedURL::Authority{},
+                .path = pathToUrlPath(path),
             },
         .params = getQueryParams(),
     };

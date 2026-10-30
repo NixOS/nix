@@ -99,7 +99,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
             [&](const StoreReference::Specified & g) {
                 for (const auto & [storeName, implem] : Implementations::registered())
                     if (implem.uriSchemes.count(g.scheme))
-                        return implem.parseConfig(g.scheme, g.authority, params);
+                        return implem.parseConfig(g, params);
 
                 throw Error("don't know how to open Nix store with scheme '%s'", g.scheme);
             },
