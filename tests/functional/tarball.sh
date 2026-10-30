@@ -124,3 +124,14 @@ wait "$pid2"
 [[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "Download.*to") -eq 2 ]]
 [[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "downloading.*tar.tar") -eq 1 ]]
 [[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "waiting for another Nix process to finish fetching input") -eq 1 ]]
+
+# Test that a URL whose query is not in normal form hits the tarball cache.
+rm -rf "$TEST_ROOT/tar_root"
+mkdir -p "$TEST_ROOT/tar_root"
+echo old > "$TEST_ROOT/tar_root/foo"
+tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
+url="file://$TEST_ROOT/tar.tar?b=1&a=2"
+[[ $(nix eval --impure --raw --expr "builtins.readFile ((fetchTree { type = \"tarball\"; url = \"$url\"; }) + \"/foo\")") = old ]]
+echo new > "$TEST_ROOT/tar_root/foo"
+tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
+[[ $(nix eval --impure --raw --expr "builtins.readFile ((fetchTree { type = \"tarball\"; url = \"$url\"; }) + \"/foo\")") = old ]]
