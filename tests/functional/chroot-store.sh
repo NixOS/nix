@@ -42,6 +42,11 @@ PATH2=$(nix path-info --store "$TEST_ROOT/x" "$CORRECT_PATH")
 PATH3=$(nix path-info --store "local?root=$TEST_ROOT/x" "$CORRECT_PATH")
 [ "$CORRECT_PATH" == "$PATH3" ]
 
+# Path values are printed with the logical store dir, not the physical one,
+# and without a trailing slash on the store dir itself.
+[[ $(nix-instantiate --eval --strict --pure-eval --store "$TEST_ROOT/x" -E "[ $NIX_STORE_DIR $CORRECT_PATH ]") \
+    == "[ $NIX_STORE_DIR $CORRECT_PATH ]" ]]
+
 # Test chroot store path with + symbols in it to exercise pct-encoding issues.
 cp -r "$TEST_ROOT/x" "$TEST_ROOT/x+chroot"
 
