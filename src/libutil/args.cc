@@ -1,5 +1,6 @@
 #include "nix/util/args.hh"
 #include "nix/util/args/root.hh"
+#include "nix/util/config-global.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/users.hh"
@@ -559,6 +560,15 @@ nlohmann::json Args::toJSON()
     if (s != "")
         res.emplace("doc", stripIndentation(s));
     return res;
+}
+
+void Args::completeSettings(AddCompletions & completions, size_t, std::string_view prefix)
+{
+    std::map<std::string, Config::SettingInfo> settings;
+    globalConfig.getSettings(settings);
+    for (auto & s : settings)
+        if (hasPrefix(s.first, prefix))
+            completions.add(s.first, fmt("Set the `%s` setting.", s.first));
 }
 
 static void _completePath(AddCompletions & completions, std::string_view prefix, bool onlyDirs)
