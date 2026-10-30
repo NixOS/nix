@@ -353,7 +353,9 @@ cat > "$flake3Dir/flake.nix" <<EOF
 }
 EOF
 
-nix flake update --flake "$flake3Dir"
+# The lock file diff omits flake2, which is refetched but unchanged.
+updated=$(nix flake update --flake "$flake3Dir" 2>&1 | grep -o "Updated input '[^']*'")
+[[ $updated = "Updated input 'flake2/flake1'" ]]
 # shellcheck disable=SC2076
 [[ $(jq -c .nodes.flake2.inputs.flake1 "$flake3Dir/flake.lock") =~ '["foo"]' ]]
 [[ $(jq .nodes.foo.locked.url "$flake3Dir/flake.lock") =~ flake7 ]]
