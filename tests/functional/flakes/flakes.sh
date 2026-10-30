@@ -520,3 +520,19 @@ EOF
 
 # Regression test for https://github.com/NixOS/nix/issues/13918
 [[ "$(nix eval --inputs-from "$subdirFlakeDir2" foo1#shouldBeOne)" = 1 ]]
+
+# --inputs-from with a Git input that is not locked yet.
+inputsFromDep=$TEST_ROOT/inputs-from-dep
+createGitRepo "$inputsFromDep"
+cat > "$inputsFromDep/flake.nix" <<EOF2
+{ outputs = _: { x = "hi"; }; }
+EOF2
+git -C "$inputsFromDep" add flake.nix
+git -C "$inputsFromDep" commit -m 'Add flake'
+inputsFromTop=$TEST_ROOT/inputs-from-top
+createGitRepo "$inputsFromTop"
+cat > "$inputsFromTop/flake.nix" <<EOF2
+{ inputs.dep.url = "git+file://$inputsFromDep"; outputs = _: { }; }
+EOF2
+git -C "$inputsFromTop" add flake.nix
+[[ "$(nix eval --raw --inputs-from "$inputsFromTop" dep#x)" = hi ]]
