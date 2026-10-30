@@ -51,11 +51,11 @@
       """)
       machine.succeed("""
         su --login mallory -c '
-          set -x
+          set -ex
           cd ~
           echo 5mgtDj0ohrWkT50TLR0f4tIIxY > four;
           (! nix store add-file four 2>&1) | grep -F "cannot open connection to remote store"
-          (! nix store add-file four 2>&1) | grep -F "Connection reset by peer"
+          (! nix store add-file four 2>&1) | grep -F "access denied by the Nix daemon"
           ! [[ -e ${pathFour} ]]
         ' 1>&2
       """)

@@ -419,9 +419,16 @@ static void daemonLoop(
                     trusted = *forceTrustClientOpt;
                 else {
                     peer = getPeerInfo(remote.get());
-                    auto [_trusted, _userName] = authPeer(peer);
-                    trusted = _trusted;
-                    userName = _userName;
+                    try {
+                        auto [_trusted, _userName] = authPeer(peer);
+                        trusted = _trusted;
+                        userName = _userName;
+                    } catch (const Error & e) {
+                        // Don't just hang up on the user.
+                        FdSink sink(remote.get());
+                        sink << WORKER_MAGIC_ACCESS_DENIED;
+                        throw;
+                    }
                 };
 
                 printInfo(
