@@ -5,7 +5,6 @@
 
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
-#include "nix/util/tests/gmock-matchers.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -171,7 +170,7 @@ TEST_F(nix_api_expr_test, nix_value_auto_call_function_non_attr_auto_args_is_err
     nix_value * result = nix_alloc_value(ctx, state);
     nix_value_auto_call_function(ctx, state, args, value, result);
     ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
-    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), ::nix::testing::HasSubstrIgnoreANSIMatcher("expected a set"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), ::testing::HasSubstr("expected a set"));
 
     nix_gc_decref(ctx, args);
     nix_gc_decref(ctx, result);
@@ -203,14 +202,17 @@ TEST_F(nix_api_expr_test, nix_value_auto_call_function_missing_arg_is_error)
     assert_ctx_ok();
 
     nix_value * result = nix_alloc_value(ctx, state);
-    // 'b' has neither a supplied value nor a default. The argument name in the
-    // message is colorized, so use the ANSI-stripping matcher to assert on it.
+    // 'b' has neither a supplied value nor a default. The message names it
+    // as plain text, without the colors the CLI would add on a terminal.
     nix_value_auto_call_function(ctx, state, args, value, result);
     ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
     ASSERT_THAT(
         nix_err_msg(nullptr, ctx, nullptr),
-        ::nix::testing::HasSubstrIgnoreANSIMatcher(
-            "cannot evaluate a function that has an argument without a value ('b')"));
+        ::testing::HasSubstr("cannot evaluate a function that has an argument without a value ('b')"));
+    std::string info;
+    nix_err_info_msg(nullptr, ctx, OBSERVE_STRING(info));
+    ASSERT_THAT(info, ::testing::HasSubstr("('b')"));
+    ASSERT_THAT(info, ::testing::Not(::testing::HasSubstr("\e")));
 
     nix_gc_decref(ctx, args);
     nix_gc_decref(ctx, result);
