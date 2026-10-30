@@ -72,4 +72,26 @@ TEST(LazyAttr, notCalledUntilForced)
     EXPECT_EQ(calls, 1);
 }
 
+TEST(LazyAttr, comparisonForces)
+{
+    auto lazy = [](uint64_t n) {
+        return LazyAttr(
+            make_ref<LazyAttrComputation>(LazyAttrComputation{.compute = [n]() -> ResolvedAttr { return n; }}));
+    };
+    EXPECT_EQ((Attrs{{"revCount", lazy(1)}}), (Attrs{{"revCount", uint64_t(1)}}));
+    EXPECT_EQ((Attrs{{"revCount", uint64_t(1)}}), (Attrs{{"revCount", lazy(1)}}));
+    EXPECT_EQ((Attrs{{"revCount", lazy(1)}}), (Attrs{{"revCount", lazy(1)}}));
+    EXPECT_NE((Attrs{{"revCount", lazy(1)}}), (Attrs{{"revCount", uint64_t(2)}}));
+    EXPECT_LT((Attrs{{"revCount", lazy(1)}}), (Attrs{{"revCount", uint64_t(2)}}));
+    EXPECT_LT((Attrs{{"revCount", uint64_t(1)}}), (Attrs{{"revCount", lazy(2)}}));
+}
+
+TEST(LazyAttr, comparisonPropagatesErrors)
+{
+    Attr failing = LazyAttr(make_ref<LazyAttrComputation>(LazyAttrComputation{.compute = []() -> ResolvedAttr {
+        throw Error("revCount is not available");
+    }}));
+    EXPECT_THROW((void) (failing == failing), Error);
+}
+
 } // namespace nix::fetchers
