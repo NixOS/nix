@@ -760,8 +760,9 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixProfileElementMatchers,
             assert(infop);
             auto & info = *infop;
 
+            /* Compare the URLs, which is what the manifest records. */
             if (info.flake.lockedRef.input.isLocked(getEvalState()->fetchSettings)
-                && element.source->lockedRef == info.flake.lockedRef)
+                && element.source->lockedRef.to_string() == info.flake.lockedRef.to_string())
                 continue;
 
             printInfo(
