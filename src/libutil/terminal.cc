@@ -2,6 +2,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
 
 #ifdef _WIN32
 #  include <io.h>
@@ -73,12 +74,80 @@ bool isTTY(Descriptor fd)
 #endif
 }
 
-bool isTTY()
+bool isOutputARealTerminal(StandardOutputStream fileno)
 {
-    static const bool tty = isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
-                            && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
+    return isTTY(fileno == StandardOutputStream::Stdout ? getStandardOutput() : getStandardError())
+           && getEnv("TERM").value_or("dumb") != "dumb";
+}
 
-    return tty;
+bool shouldANSI(StandardOutputStream fileno)
+{
+    // Implements the behaviour described by https://bixense.com/clicolors/
+    // As well as https://force-color.org/ for compatibility, since it fits in the same shape.
+    // NO_COLOR  CLICOLOR_FORCE  Colours?
+    // set       (any value)     No
+    // unset     set             Yes
+    // unset     unset           If attached to a terminal
+    //                           [we choose the "modern" approach of colour-by-default]
+    auto compute = [](StandardOutputStream fileno) -> bool {
+        bool mustNotColour = getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value();
+        bool shouldForce = getEnv("CLICOLOR_FORCE").has_value() || getEnv("FORCE_COLOR").has_value();
+        bool isTerminal = isOutputARealTerminal(fileno);
+        return !mustNotColour && (shouldForce || isTerminal);
+    };
+    static bool cached[2] = {compute(StandardOutputStream::Stdout), compute(StandardOutputStream::Stderr)};
+    return cached[int(fileno) - 1];
+}
+
+static std::string_view eatEscape(std::string_view::const_iterator & i, std::string_view::const_iterator end)
+{
+    auto start = i++;
+
+    if (i != end && *i == '[') {
+        i++;
+        // eat parameter bytes
+        while (i != end && *i >= 0x30 && *i <= 0x3f)
+            i++;
+        // eat intermediate bytes
+        while (i != end && *i >= 0x20 && *i <= 0x2f)
+            i++;
+        // eat final byte
+        if (i != end && *i >= 0x40 && *i <= 0x7e)
+            i++;
+    } else if (i != end && *i == ']') {
+        // OSC
+        i++;
+        // https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda defines
+        // two forms of a URI separator:
+        // 1. ESC '\' (standard)
+        // 2. BEL ('\a') (xterm-style, used by gcc)
+
+        // eat ESC or BEL
+        while (i != end && *i != '\e' && *i != '\a')
+            i++;
+        if (i != end) {
+            char v = *i++;
+            // eat backslash after ESC
+            if (i != end && v == '\e' && *i == '\\')
+                i++;
+        }
+    } else {
+        if (i != end && *i >= 0x40 && *i <= 0x5f)
+            i++;
+    }
+
+    return {start, i};
+}
+
+static unsigned int cursorForwardCount(std::string_view e)
+{
+    unsigned int n = 0;
+    for (char c : e.substr(2, e.size() - 3)) {
+        if (c < '0' || c > '9')
+            return 1;
+        n = std::min(n * 10 + (c - '0'), 1000u);
+    }
+    return std::max(n, 1u);
 }
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
@@ -90,46 +159,20 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
     while (i != s.end()) {
 
         if (*i == '\e') {
-            std::string e;
-            e += *i++;
-            char last = 0;
-
-            if (i != s.end() && *i == '[') {
-                e += *i++;
-                // eat parameter bytes
-                while (i != s.end() && *i >= 0x30 && *i <= 0x3f)
-                    e += *i++;
-                // eat intermediate bytes
-                while (i != s.end() && *i >= 0x20 && *i <= 0x2f)
-                    e += *i++;
-                // eat final byte
-                if (i != s.end() && *i >= 0x40 && *i <= 0x7e)
-                    e += last = *i++;
-            } else if (i != s.end() && *i == ']') {
-                // OSC
-                e += *i++;
-                // https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda defines
-                // two forms of a URI separator:
-                // 1. ESC '\' (standard)
-                // 2. BEL ('\a') (xterm-style, used by gcc)
-
-                // eat ESC or BEL
-                while (i != s.end() && *i != '\e' && *i != '\a')
-                    e += *i++;
-                if (i != s.end()) {
-                    char v = *i;
-                    e += *i++;
-                    // eat backslash after ESC
-                    if (i != s.end() && v == '\e' && *i == '\\')
-                        e += last = *i++;
-                }
-            } else {
-                if (i != s.end() && *i >= 0x40 && *i <= 0x5f)
-                    e += *i++;
-            }
+            auto e = eatEscape(i, s.end());
+            char last = e.size() > 2 && e[1] == '[' ? e.back() : 0;
 
             if (!filterAll && last == 'm')
                 t += e;
+            else if (last == 'C') {
+                // Cursor forward: some programs (e.g. Wine) move over a cell
+                // instead of printing a space, so keep the gap as spaces.
+                for (auto n = cursorForwardCount(e); n > 0; --n) {
+                    if (++w > (size_t) width)
+                        return t;
+                    t += ' ';
+                }
+            }
         }
 
         else if (*i == '\t') {
@@ -155,6 +198,23 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
             i += bytes;
         }
     }
+    return t;
+}
+
+std::string stripANSIEscapes(std::string_view s)
+{
+    std::string t;
+    auto i = s.begin();
+
+    while (i != s.end()) {
+        if (*i == '\e') {
+            auto e = eatEscape(i, s.end());
+            if (e.size() > 2 && e[1] == '[' && e.back() == 'C')
+                t.append(cursorForwardCount(e), ' ');
+        } else
+            t += *i++;
+    }
+
     return t;
 }
 

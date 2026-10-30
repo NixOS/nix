@@ -42,6 +42,18 @@ TEST(filterANSIEscapes, expandsTabs)
     ASSERT_EQ(filterANSIEscapes(s, true), "foo     bar     baz");
 }
 
+TEST(filterANSIEscapes, cursorForwardBecomesSpaces)
+{
+    // Wine draws a space as hide cursor, erase in line, cursor forward 1,
+    // show cursor.
+    ASSERT_EQ(filterANSIEscapes("x\e[?25l\e[K\e[1C\e[?25hy", true), "x y");
+    ASSERT_EQ(filterANSIEscapes("x\e[Cy", true), "x y");
+    ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true), "x   y");
+    ASSERT_EQ(filterANSIEscapes("x\e[3Cy", false), "x   y");
+    ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true, 3), "x  ");
+    ASSERT_EQ(stripANSIEscapes("x\e[3C\ty"), "x   \ty");
+}
+
 TEST(filterANSIEscapes, utf8)
 {
     ASSERT_EQ(filterANSIEscapes("foobar", true, 5), "fooba");
@@ -67,6 +79,19 @@ TEST(filterANSIEscapes, osc8_bell_as_sep)
     //   https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
     ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\aThis is a link\e]8;;\a"), "This is a link");
     ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\a\\This is a link\e]8;;\a"), "\\This is a link");
+}
+
+TEST(stripANSIEscapes, removesEscapes)
+{
+    ASSERT_EQ(stripANSIEscapes("\e[1;31mfoo\e[0m bar"), "foo bar");
+    ASSERT_EQ(stripANSIEscapes("\e]8;;http://example.com\e\\This is a link\e]8;;\e\\"), "This is a link");
+    ASSERT_EQ(stripANSIEscapes("\e]8;;http://example.com\aThis is a link\e]8;;\a"), "This is a link");
+}
+
+TEST(stripANSIEscapes, keepsOtherText)
+{
+    ASSERT_EQ(stripANSIEscapes("foo\tbar\r\n\a"), "foo\tbar\r\n\a");
+    ASSERT_EQ(stripANSIEscapes("f🔍b\e[32mar"), "f🔍bar");
 }
 
 } // namespace nix
