@@ -93,12 +93,15 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
             std::string e;
             e += *i++;
             char last = 0;
+            std::string params;
 
             if (i != s.end() && *i == '[') {
                 e += *i++;
                 // eat parameter bytes
-                while (i != s.end() && *i >= 0x30 && *i <= 0x3f)
+                while (i != s.end() && *i >= 0x30 && *i <= 0x3f) {
+                    params += *i;
                     e += *i++;
+                }
                 // eat intermediate bytes
                 while (i != s.end() && *i >= 0x20 && *i <= 0x2f)
                     e += *i++;
@@ -130,6 +133,23 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
             if (!filterAll && last == 'm')
                 t += e;
+            else if (last == 'C') {
+                // Cursor forward: some programs (e.g. Wine) move over a cell
+                // instead of printing a space, so keep the gap as spaces.
+                unsigned int n = 0;
+                for (char c : params) {
+                    if (c < '0' || c > '9') {
+                        n = 0;
+                        break;
+                    }
+                    n = std::min(n * 10 + (c - '0'), 1000u);
+                }
+                for (n = std::max(n, 1u); n > 0; --n) {
+                    if (++w > (size_t) width)
+                        return t;
+                    t += ' ';
+                }
+            }
         }
 
         else if (*i == '\t') {
