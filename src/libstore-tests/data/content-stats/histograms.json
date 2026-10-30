@@ -1,0 +1,59 @@
+{
+  "dedup": {
+    "dedupBytes": 0,
+    "dedupDiskBytes": 0,
+    "dedupedFileCount": 0,
+    "inodesSaved": 0,
+    "linksFileCount": 30,
+    "sizeHistogram": [
+      {
+        "bucket": 0,
+        "count": 3,
+        "high": 2,
+        "low": 0
+      },
+      {
+        "bucket": 10,
+        "count": 15,
+        "high": 2048,
+        "low": 1024
+      },
+      {
+        "bucket": 16,
+        "count": 12,
+        "high": 131072,
+        "low": 65536
+      }
+    ],
+    "uniqueBytes": 65536,
+    "uniqueDiskBytes": 73728
+  },
+  "narSizeHistogram": [
+    {
+      "bucket": 0,
+      "count": 1,
+      "high": 2,
+      "low": 0
+    },
+    {
+      "bucket": 8,
+      "count": 10,
+      "high": 512,
+      "low": 256
+    },
+    {
+      "bucket": 12,
+      "count": 20,
+      "high": 8192,
+      "low": 4096
+    },
+    {
+      "bucket": 63,
+      "count": 11,
+      "high": 18446744073709551615,
+      "low": 9223372036854775808
+    }
+  ],
+  "pathCount": 42,
+  "totalNarSize": 1048576
+}

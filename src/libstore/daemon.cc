@@ -941,6 +941,24 @@ static void performOp(
         conn.to << 1;
         break;
 
+    case WorkerProto::Op::QueryStoreStats: {
+        auto opts = WorkerProto::Serialise<ContentStatsOptions>::read(*store, rconn);
+        logger->startWork();
+        auto stats = store->queryStoreStats(opts);
+        logger->stopWork();
+        /* 0/1 prefix indicates whether a payload follows; matches
+           the 0/1 convention used elsewhere in this file. The
+           payload is the JSON object as a string, passed through
+           verbatim so that fields this daemon adds reach clients
+           that know about them. */
+        if (!stats) {
+            conn.to << 0;
+        } else {
+            conn.to << 1 << stats->dump();
+        }
+        break;
+    }
+
     case WorkerProto::Op::VerifyStore: {
         bool checkContents, repair;
         conn.from >> checkContents >> repair;

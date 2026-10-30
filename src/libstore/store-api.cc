@@ -1223,6 +1223,11 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
     }
 }
 
+std::optional<nlohmann::json> Store::queryStoreStats(ContentStatsOptions opts)
+{
+    return std::nullopt;
+}
+
 std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
 {
 

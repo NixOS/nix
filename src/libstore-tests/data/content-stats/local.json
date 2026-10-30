@@ -1,0 +1,24 @@
+{
+  "dedup": {
+    "dedupBytes": 8192,
+    "dedupDiskBytes": 12288,
+    "dedupedFileCount": 7,
+    "inodesSaved": 14,
+    "linksFileCount": 30,
+    "uniqueBytes": 65536,
+    "uniqueDiskBytes": 73728
+  },
+  "fullWalk": {
+    "dirInodes": 25,
+    "fileInodes": 100,
+    "symlinkInodes": 8,
+    "totalDiskBytes": 1073741824,
+    "totalInodes": 133
+  },
+  "pathCount": 42,
+  "predictedDedup": {
+    "bytesLinkable": 4096,
+    "filesLinkable": 17
+  },
+  "totalNarSize": 1048576
+}

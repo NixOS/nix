@@ -6,6 +6,7 @@
 #include "nix/store/derived-path.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
+#include "nix/store/content-stats.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
@@ -836,6 +837,23 @@ public:
      * with the same contents.
      */
     virtual void optimiseStore() {};
+
+    /**
+     * Return summary statistics for this store's contents as a JSON
+     * object, or `std::nullopt` if the store cannot supply them.
+     *
+     * The result is JSON rather than a fixed struct so that a store
+     * (in particular a newer remote daemon) can report fields this
+     * client does not know about; consumers must ignore unknown
+     * fields. `ContentStats` (in `nix/store/content-stats.hh`) is a
+     * typed view of the fields currently defined, documented in
+     * `nix store stats --help`.
+     *
+     * The default returns `std::nullopt`; concrete stores override
+     * (LocalStore directly; RemoteStore via the worker-protocol
+     * `query-store-stats` feature).
+     */
+    virtual std::optional<nlohmann::json> queryStoreStats(ContentStatsOptions opts);
 
     /**
      * Check the integrity of the Nix store.

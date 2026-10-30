@@ -157,6 +157,15 @@ struct WorkerProto
     static constexpr std::string_view featureAddTempRoots = "addTempRoots";
 
     /**
+     * Feature gating `WorkerProto::Op::QueryStoreStats`. When the
+     * daemon advertises this, the client can call
+     * `Store::queryStoreStats` and receive the daemon's statistics
+     * as a JSON object; without it the client must treat stats as
+     * unavailable.
+     */
+    static constexpr std::string_view featureQueryStoreStats = "query-store-stats";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
@@ -280,6 +289,7 @@ enum struct WorkerProto::Op : uint64_t {
     // QueryActiveBuilds = 48, // reserved for https://github.com/NixOS/nix/pull/15979
     AddTempRoots = 49,
     // QueryPathInfos = 50, // reserved for https://github.com/DeterminateSystems/nix-src/pull/539
+    QueryStoreStats = 51,
     SubmitOutput = 1000, // Only used within derivations with feature
     AddToStoreScanning = 1001,
 };
@@ -384,6 +394,9 @@ DECLARE_WORKER_SERIALISER(GCOptions::SpecificPaths);
 
 template<>
 DECLARE_WORKER_SERIALISER(GCOptions::GCPaths);
+
+template<>
+DECLARE_WORKER_SERIALISER(ContentStatsOptions);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);
