@@ -77,16 +77,90 @@ if canUseSandbox; then
 
     flakeDir=$TEST_ROOT/flake
     mkdir -p "$flakeDir"
+    nixBin=$(dirname "$(type -p nix)")
 
     cat > "$flakeDir"/flake.nix <<EOF
 {
   outputs = inputs: rec {
     packages.$system.default = import ./simple.nix;
+    packages.$system.readOnlyInput =
+      let config = import ./config.nix;
+      in config.mkDerivation {
+        name = "read-only-input";
+        builder = ./read-only-input.builder.sh;
+        input = builtins.path { path = ./input; name = "input"; };
+        inputFile = ./input/file;
+        PATH = config.path;
+      };
+    packages.$system.readOnlyRecursiveInput =
+      let config = import ./config.nix;
+      in config.mkDerivation {
+        name = "read-only-recursive-input";
+        builder = ./read-only-recursive-input.builder.sh;
+        requiredSystemFeatures = [ "recursive-nix" ];
+        nix = "$nixBin/nix";
+      };
   };
 }
 EOF
 
     cp simple.nix shell.nix simple.builder.sh "${config_nix}" "$flakeDir/"
+
+    # Regression test for #16645: the builder and store owner have the same UID.
+    mkdir "$flakeDir/input"
+    echo contents > "$flakeDir/input/file"
+    cat > "$flakeDir/read-only-input.builder.sh" <<'EOF'
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+for path in "$input" "$input/file" "$inputFile"; do
+    if chmod 0700 "$path"; then
+        echo "input store path is writable: $path" >&2
+        exit 1
+    fi
+done
+
+for path in "$input/file" "$inputFile"; do
+    if echo corrupted > "$path"; then
+        echo "input store file is writable: $path" >&2
+        exit 1
+    fi
+    [[ $(cat "$path") = contents ]]
+done
+
+if touch "$input/new"; then
+    echo "input store directory is writable" >&2
+    exit 1
+fi
+
+mkdir "$out"
+EOF
+    chmod +x "$flakeDir/read-only-input.builder.sh"
+
+    cat > "$flakeDir/read-only-recursive-input.builder.sh" <<'EOF'
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+echo contents > dynamic-file
+mkdir dynamic-dir
+echo contents > dynamic-dir/file
+ln -s /proc dynamic-link
+input=$("$nix" --extra-experimental-features nix-command store add-path dynamic-link)
+[[ -L "$input" ]]
+[[ $(readlink "$input") = /proc ]]
+
+for path in dynamic-file dynamic-dir; do
+    input=$("$nix" --extra-experimental-features nix-command store add-path "$path")
+    if chmod 0700 "$input"; then
+        echo "dynamically added store path is writable: $input" >&2
+        exit 1
+    fi
+done
+
+mkdir "$out"
+EOF
 
     TODO_NixOS
     requiresUnprivilegedUserNamespaces
@@ -97,4 +171,21 @@ EOF
 
     base=$(basename "$outPath")
     [[ $(cat "$TEST_ROOT"/x/nix/store/"$base"/hello) = 'Hello World!' ]]
+
+    nix build --no-link --sandbox-paths '/nix? /bin? /lib? /lib64? /usr?' --store "$TEST_ROOT/x" path:"$flakeDir"#readOnlyInput
+
+    nix build -L --no-link --extra-experimental-features recursive-nix \
+        --sandbox-paths '/nix? /bin? /lib? /lib64? /usr?' --extra-sandbox-paths "$(dirname "$nixBin")" \
+        --store "$TEST_ROOT/x" path:"$flakeDir"#readOnlyRecursiveInput
+
+    # Preserve nosuid/nodev when making inputs read-only in a user namespace.
+    unshare --user --map-root-user --mount bash -e -u -o pipefail -s -- "$TEST_ROOT/x" "$flakeDir" "$(dirname "$nixBin")" <<'EOF'
+mount --bind "$1" "$1"
+mount -o remount,bind,nosuid,nodev "$1"
+nix build --no-link --rebuild --option require-drop-supplementary-groups false \
+    --extra-experimental-features recursive-nix \
+    --sandbox-paths "/nix? /bin? /lib? /lib64? /usr?" \
+    --extra-sandbox-paths "$3" \
+    --store "$1" path:"$2"#readOnlyInput path:"$2"#readOnlyRecursiveInput
+EOF
 fi

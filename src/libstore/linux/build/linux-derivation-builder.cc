@@ -28,6 +28,7 @@
 #include <sched.h>
 #include <sys/param.h>
 #include <sys/mount.h>
+#include <sys/statvfs.h>
 #include <sys/syscall.h>
 #include <sys/prctl.h>
 #include <grp.h>
@@ -248,7 +249,8 @@ static void doBind(
     Descriptor chrootRootDirFd,
     const std::filesystem::path & target,
     const std::filesystem::path & chrootRootDirPath,
-    bool optional = false)
+    bool optional = false,
+    bool readOnly = false)
 {
     /* `target` denotes a relative path inside the chroot directory. All operations happen
         relative to chrootRootDirFd. Bail out if the path is not what we expect. */
@@ -295,6 +297,36 @@ static void doBind(
 
         if (::move_mount(treeFd.get(), "", destFd, "", MOVE_MOUNT_T_EMPTY_PATH | MOVE_MOUNT_F_EMPTY_PATH) == -1)
             throw SysError("bind mount from %1% to %2% failed", PathFmt(source), PathFmt(chrootRootDirPath / target));
+    };
+
+    auto makeReadOnly = [&](Descriptor mountFd) {
+        /* mountFd must have been opened after the bind mount. The destination
+           descriptor passed to bindMount still refers to the covered mount. */
+        auto selfProcMountPath = std::filesystem::path("/proc/self/fd") / std::to_string(mountFd);
+        struct statvfs st;
+        if (statvfs(selfProcMountPath.c_str(), &st) == -1)
+            throw SysError("getting mount info for %s", PathFmt(chrootRootDirPath / target));
+
+        /* Preserve existing per-mount flags, which may be locked in a user namespace. */
+        unsigned long flags = MS_BIND | MS_REMOUNT | MS_RDONLY;
+        if (st.f_flag & ST_NOSUID)
+            flags |= MS_NOSUID;
+        if (st.f_flag & ST_NODEV)
+            flags |= MS_NODEV;
+        if (st.f_flag & ST_NOEXEC)
+            flags |= MS_NOEXEC;
+        if (st.f_flag & ST_NOATIME)
+            flags |= MS_NOATIME;
+        if (st.f_flag & ST_NODIRATIME)
+            flags |= MS_NODIRATIME;
+        if (st.f_flag & ST_RELATIME)
+            flags |= MS_RELATIME;
+#ifdef ST_NOSYMFOLLOW
+        if (st.f_flag & ST_NOSYMFOLLOW)
+            flags |= MS_NOSYMFOLLOW;
+#endif
+        if (mount(0, selfProcMountPath.c_str(), 0, flags, 0) == -1)
+            throw SysError("remounting bind mount %s read-only", PathFmt(chrootRootDirPath / target));
     };
 
     /* TODO: Replace the sucky implementation of createDirs and use that instead. */
@@ -369,6 +401,11 @@ static void doBind(
             throw Error("sandbox path %s escapes the chroot", PathFmt(chrootRootDirPath / target));
         assert(maybeDirFdOwned.get() == dirFd); /* See the comment above. */
         bindMount(sourceFd.get(), dirFd);
+        if (readOnly) {
+            auto [maybeMountFdOwned, mountFd, isMountRoot] = createDirsAndOpen(target);
+            assert(!isMountRoot && maybeMountFdOwned.get() == mountFd);
+            makeReadOnly(mountFd);
+        }
     } else if (S_ISLNK(st.st_mode)) {
         /* Symlinks can't be bind-mounted, so copy the contents.
            The kernel implies AT_EMPTY_PATH for readlinkat
@@ -391,6 +428,12 @@ static void doBind(
         if (!destFd)
             throw SysError("creating regular file %s", PathFmt(chrootRootDirPath / target));
         bindMount(sourceFd.get(), destFd.get());
+        if (readOnly) {
+            AutoCloseFD mountFd = ::openat(parentFd, target.filename().c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
+            if (!mountFd)
+                throw SysError("opening bind mount %s", PathFmt(chrootRootDirPath / target));
+            makeReadOnly(mountFd.get());
+        }
     }
 }
 
@@ -830,7 +873,15 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         } else
 #endif
         {
-            doBind(i.second.source, chrootRootDirFd.get(), i.first.relative_path(), chrootRootDir, i.second.optional);
+            /* Inputs must not be mutable through their logical store paths,
+               even if the build user owns the physical paths in a chroot store. */
+            doBind(
+                i.second.source,
+                chrootRootDirFd.get(),
+                i.first.relative_path(),
+                chrootRootDir,
+                i.second.optional,
+                store->isInStore(i.first.native()));
         }
     }
 
@@ -980,7 +1031,21 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
         AutoCloseFD chrootRootDirFd = openDirectory(chrootRootDir, FinalSymlink::DontFollow);
         if (!chrootRootDirFd)
             throw SysError("opening directory %s", PathFmt(chrootRootDir));
-        doBind(source, chrootRootDirFd.get(), targetRelPath, chrootRootDir);
+
+        /* Remount flags do not propagate to the builder's mount namespace.
+           Make the input read-only outside the shared store subtree first,
+           so the bind mount propagated into the builder is already read-only. */
+        {
+            AutoDelete stagingDir(createTempDir("", "nix-input", 0700));
+            AutoCloseFD stagingDirFd = openDirectory(stagingDir.path(), FinalSymlink::DontFollow);
+            if (!stagingDirFd)
+                throw SysError("opening directory %s", PathFmt(stagingDir.path()));
+            auto stagingPath = stagingDir.path() / "input";
+            Finally unmountStaging([&]() { umount2(stagingPath.c_str(), MNT_DETACH | UMOUNT_NOFOLLOW); });
+
+            doBind(source, stagingDirFd.get(), "input", stagingDir.path(), false, true);
+            doBind(stagingPath, chrootRootDirFd.get(), targetRelPath, chrootRootDir);
+        }
 
         _exit(0);
     }));
