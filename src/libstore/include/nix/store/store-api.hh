@@ -810,7 +810,7 @@ public:
      * ```
      *
      */
-    void addTempRoot(const StorePath & path)
+    virtual void addTempRoot(const StorePath & path)
     {
         addTempRoots({path});
     }
@@ -818,6 +818,9 @@ public:
     /**
      * Add multiple store paths as temporary roots of the garbage collector.
      * The roots disappears as soon as we exit.
+     *
+     * @warning If you need to add just one path, prefer to use addTempRoot.
+     * addTempRoots is implemented on best-effort basis and might be a no-op.
      */
     virtual void addTempRoots(const StorePathSet & paths)
     {
