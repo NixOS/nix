@@ -316,6 +316,15 @@ public:
             Intermediate results are not cached.
         )"};
 
+    Setting<bool> allowUnsafeUnboundedFlakeAttributeEvaluation{
+        this,
+        false,
+        "allow-unsafe-unbounded-flake-attribute-evaluation",
+        "Whether to allow unbounded computation in `flake.nix`.",
+        {},
+        true,
+        Xp::Flakes};
+
     Setting<bool> ignoreExceptionsDuringTry{
         this,
         false,
