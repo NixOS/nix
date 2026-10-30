@@ -374,6 +374,8 @@ public:
 
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
+    /** Reuses allocValue()'s pool; IndexedCallDescriptor must fit in one Value-sized block. */
+    inline detail::ValueBase::IndexedCallDescriptor * allocIndexedCallDescriptor();
 
     Bindings * allocBindings(size_t capacity);
 
@@ -719,6 +721,9 @@ private:
      * This code is factored out so that it's not in the heavily inlined hot path.
      */
     void handleEvalExceptionForApp(Value & v, const Value & savedApp);
+
+    /** noinline: avoids duplicating this into forceValue's ~99 inlined call sites. */
+    [[gnu::noinline]] void forceIndexedCall(Value & v, const PosIdx pos);
 
     void handleEvalFailed(Value & v, PosIdx pos);
 
