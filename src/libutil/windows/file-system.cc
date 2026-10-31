@@ -48,7 +48,10 @@ AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink fi
         FILE_SHARE_READ | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
+        /* `FILE_FLAG_BACKUP_SEMANTICS` so that directories can be opened
+           too, like `open(O_RDONLY)` on Unix. */
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS
+            | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
         /*hTemplateFile=*/nullptr)};
 }
 
