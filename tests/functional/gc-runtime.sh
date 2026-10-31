@@ -5,8 +5,12 @@ source common.sh
 case $system in
     *linux*)
         ;;
+    *darwin*)
+        # Older daemons lack libproc scanning, and tests disable their lsof fallback.
+        requireDaemonNewerThan "2.36pre"
+        ;;
     *)
-        skipTest "Not running Linux";
+        skipTest "Not running Linux or Darwin";
 esac
 
 set -m # enable job control, needed for kill
@@ -16,8 +20,8 @@ environPath=$(nix-build --no-link ./gc-runtime.nix -A environ)
 openPath=$(nix-build --no-link ./gc-runtime.nix -A open)
 
 echo "backgrounding program..."
-export environPath
-"$programPath"/program "$openPath"/open &
+env -i "environPath=$environPath" \
+    "$programPath"/program "$openPath"/open "" &
 sleep 2 # hack - wait for the program to get started
 child=$!
 echo PID=$child
