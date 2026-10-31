@@ -417,10 +417,10 @@ AutoCloseFD LocalStore::openGCLock()
     return openLockFile(fnGCLock, /*create=*/true);
 }
 
-void LocalStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
+DeletePathResult LocalStore::deleteStorePath(const std::filesystem::path & path, bool isKnownPath)
 {
     try {
-        deletePath(path, bytesFreed);
+        return deletePath(path);
     } catch (SystemError & e) {
         if (config->ignoreGcDeleteFailure) {
             logWarning(
@@ -437,6 +437,7 @@ void LocalStore::deleteStorePath(const std::filesystem::path & path, uint64_t & 
             throw;
         }
     }
+    return {};
 }
 
 LocalStore::~LocalStore()

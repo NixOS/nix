@@ -292,15 +292,9 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
         std::rethrow_exception(ex);
 }
 
-void deletePath(const std::filesystem::path & path)
+DeletePathResult deletePath(const std::filesystem::path & path)
 {
-    uint64_t dummy;
-    deletePath(path, dummy);
-}
-
-void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
-{
-    bytesFreed = 0;
+    DeletePathResult result;
 #ifdef __FreeBSD__
     std::set<std::filesystem::path> mountedPaths;
     struct statfs * mntbuf;
@@ -313,7 +307,8 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
         mountedPaths.emplace(mntbuf[i].f_mntonname);
     }
 #endif
-    _deletePath(path, bytesFreed MOUNTEDPATHS_ARG);
+    _deletePath(path, result.bytesFreed MOUNTEDPATHS_ARG);
+    return result;
 }
 
 void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
