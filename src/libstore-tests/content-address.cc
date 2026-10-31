@@ -47,11 +47,6 @@ class ContentAddressTest : public virtual CharacterizationTest
     std::filesystem::path unitTestData = getUnitTestData() / "content-address";
 
 public:
-
-    /**
-     * We set these in tests rather than the regular globals so we don't have
-     * to worry about race conditions if the tests run concurrently.
-     */
     ExperimentalFeatureSettings mockXpSettings;
 
     std::filesystem::path goldenMaster(std::string_view testStem) const override

@@ -18,10 +18,6 @@ public:
         return unitTestData / testStem;
     }
 
-    /**
-     * We set these in tests rather than the regular globals so we don't have
-     * to worry about race conditions if the tests run concurrently.
-     */
     ExperimentalFeatureSettings mockXpSettings;
 };
 

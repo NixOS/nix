@@ -6,10 +6,6 @@ namespace nix {
 
 TEST(DownstreamPlaceholder, unknownCaOutput)
 {
-    /**
-     * We set these in tests rather than the regular globals so we don't have
-     * to worry about race conditions if the tests run concurrently.
-     */
     ExperimentalFeatureSettings mockXpSettings;
     mockXpSettings.set("experimental-features", "ca-derivations");
 
@@ -22,9 +18,6 @@ TEST(DownstreamPlaceholder, unknownCaOutput)
 
 TEST(DownstreamPlaceholder, unknownDerivation)
 {
-    /**
-     * Same reason as above
-     */
     ExperimentalFeatureSettings mockXpSettings;
     mockXpSettings.set("experimental-features", "dynamic-derivations ca-derivations");
 
