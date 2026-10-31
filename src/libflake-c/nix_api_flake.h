@@ -237,6 +237,29 @@ void nix_flake_reference_free(nix_flake_reference * store);
 nix_value * nix_locked_flake_get_output_attrs(
     nix_c_context * context, nix_flake_settings * settings, EvalState * evalState, nix_locked_flake * lockedFlake);
 
+/**
+ * @brief Get the fingerprint of a locked flake.
+ *
+ * The fingerprint is the cache key Nix uses for the evaluation cache. It is
+ * present only for flakes whose source is fully locked (immutable); for a
+ * mutable source the callback receives the empty string.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store to resolve the fingerprint against
+ * @param[in] fetchSettings fetcher settings
+ * @param[in] lockedFlake the locked flake to fingerprint
+ * @param[in] callback Called with the Base16 fingerprint string (possibly empty)
+ * @param[in] user_data optional, passed to the callback
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_locked_flake_get_fingerprint(
+    nix_c_context * context,
+    Store * store,
+    nix_fetchers_settings * fetchSettings,
+    nix_locked_flake * lockedFlake,
+    nix_get_string_callback callback,
+    void * user_data);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
