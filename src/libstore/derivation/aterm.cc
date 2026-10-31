@@ -110,7 +110,7 @@ static void expect(StringViewStream & str, std::string_view s)
 static void expect(StringViewStream & str, char c)
 {
     if (str.remaining.empty() || str.remaining[0] != c)
-        throw FormatError("expected string '%1%'", c);
+        throw FormatError("expected '%1%' character", c);
     str.remaining.remove_prefix(1);
 }
 
@@ -470,7 +470,7 @@ Full parse(
                 return fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name);
             });
         } else {
-            throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
+            throw FormatError("unknown derivation ATerm format version '%s'", *versionS);
         }
         expect(str, ',');
         break;

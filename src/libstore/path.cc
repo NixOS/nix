@@ -50,12 +50,12 @@ StorePath::StorePath(std::string_view _baseName)
     : baseName(_baseName)
 {
     if (baseName.size() < HashLen + 1)
-        throw BadStorePath("'%s' is too short to be a valid store path", baseName);
-    if (baseName[HashLen] != '-')
-        throw BadStorePath("'%s' can't name a store path because the hash part is not followed by a '-'", baseName);
+        throw BadStorePath("'%s' is too short to be a valid store path basename", baseName);
     for (auto c : hashPart())
         if (c == 'e' || c == 'o' || c == 'u' || c == 't' || !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')))
-            throw BadStorePath("store path '%s' contains illegal base-32 character '%s'", baseName, c);
+            throw BadStorePath("store path basename '%s' contains illegal base-32 character '%s'", baseName, c);
+    if (baseName[HashLen] != '-')
+        throw BadStorePath("'%s' can't name a store path because the hash part is not followed by a '-'", baseName);
     checkPathName(baseName, name());
 }
 

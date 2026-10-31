@@ -6,33 +6,98 @@
 #include "nix/store/derivation/full-inputs.hh"
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 namespace nix {
 
-using nlohmann::json;
+namespace {
 
-TEST_F(DerivationTest, BadATerm_version)
+struct MalformedATermTestCase
 {
-    ASSERT_THROW(
-        derivation::parse(
-            *store,
-            readFile(goldenMaster("bad-version.drv")),
-            "whatever",
-            derivation::defaultSupportWindowsStoreDir,
-            mockXpSettings),
-        FormatError);
+    std::string aterm;
+    std::string msg;
+    std::string description;
+};
+
+static std::ostream & operator<<(std::ostream & os, const MalformedATermTestCase & testCase)
+{
+    return os << testCase.aterm;
 }
 
-TEST_F(DerivationTest, UnterminatedString)
+} // namespace
+
+class MalformedATermTest : public LibStoreTest, public ::testing::WithParamInterface<MalformedATermTestCase>
+{};
+
+INSTANTIATE_TEST_SUITE_P(
+    MalformedATerm,
+    MalformedATermTest,
+    ::testing::Values(
+        MalformedATermTestCase{"", "expected 'D' character", "truncated_1"},
+        MalformedATermTestCase{"D", "does not start with", "truncated_2"},
+        MalformedATermTestCase{"Derive(", "expected '[' character", "truncated_3"},
+        MalformedATermTestCase{"Derive([", "expected '(' character", "truncated_4"},
+        MalformedATermTestCase{"Derive([(\"out\",\"", "unterminated", "truncated_5"},
+        MalformedATermTestCase{"Derive([(\"out\",\"\xff", "unterminated", "truncated_6"},
+        MalformedATermTestCase{
+            R"(DrvWithVersion("invalid-version",)",
+            "unknown derivation ATerm format version 'invalid-version'",
+            "bad_version",
+        },
+        MalformedATermTestCase{
+            R"(Derive([("out\n")",
+            "unexpected escape sequence in unquoted string",
+            /* Escapes are not allowed in the output name parsing. */
+            "escapes_rejected_in_output_name",
+        },
+        /* FIXME: Sigh... output names are not checked. As the test below demonstrates, embedded NULs and DELs
+           are not rejected and are written straight to the output map. This will be rejected by makeStorePath
+           when trying to create a StorePath, but it's thin ice. */
+        MalformedATermTestCase{
+            [] {
+                using namespace std::string_literals;
+                return "Derive([(\"blahblah\x7F\x00\",\"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo\",\"\",\"\")]"s;
+            }(),
+            /**/
+            "expected ',' character",
+            "bad_character_in_output_name",
+        },
+        MalformedATermTestCase{
+            R"(Derive([("out","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo)",
+            "unterminated string in derivation",
+            "unterminated_string",
+        },
+        MalformedATermTestCase{
+            R"(Derive([("out","/nix/store/\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo")",
+            "unexpected escape sequence in unquoted string",
+            "escapes_rejected_in_store_path_string",
+        },
+        MalformedATermTestCase{
+            R"(Derive([("out","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo","sha256\0"))",
+            "unknown escape '\\0'",
+            "invalid_escapes_in_hash_algo",
+        },
+        MalformedATermTestCase{
+            R"(Derive([("bar","/gnu/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo","","")",
+            "path '/gnu/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo' is not in the Nix store",
+            "bad_store_path_different_store",
+        },
+        MalformedATermTestCase{
+            R"(Derive([("bar","/nix/store/foo/../aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo","","")",
+            "store path basename 'foo/../aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo' contains illegal base-32 character 'o'",
+            "bad_store_path_non_canonical",
+        }),
+    [](const ::testing::TestParamInfo<MalformedATermTestCase> & info) { return info.param.description; });
+
+TEST_P(MalformedATermTest, throwsFormatError)
 {
-    ASSERT_THROW(
-        derivation::parse(
-            *store,
-            "Derive([(\"out\",\"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo",
-            "bar",
-            derivation::defaultSupportWindowsStoreDir,
-            mockXpSettings),
-        FormatError);
+    ExperimentalFeatureSettings mockXpSettings;
+    auto [drv, msg, _] = GetParam();
+    ASSERT_THAT(
+        [&]() { derivation::parse(*store, std::string(drv), "foo", /*supportWindowsStoreDir=*/false, mockXpSettings); },
+        /* The exception isn't always FormatError, but we also throw BadStorePath too. */
+        ::testing::ThrowsMessage<Error>(::nix::testing::HasSubstrIgnoreANSIMatcher(msg)))
+        << drv;
 }
 
 /**
@@ -53,17 +118,6 @@ TEST_F(DerivationTest, NonUtf8Bytes)
         "a\xff"
         "b\x80");
     ASSERT_EQ(derivation::unparse(drv, *store, derivation::defaultSupportWindowsStoreDir), aterm);
-}
-
-TEST_F(DerivationTest, TruncatedATerm)
-{
-    for (std::string_view aterm : {"", "D", "Derive(", "Derive([", "Derive([(\"out\",\"", "Derive([(\"out\",\"\xff"}) {
-        ASSERT_THROW(
-            derivation::parse(
-                *store, std::string{aterm}, "u6", derivation::defaultSupportWindowsStoreDir, mockXpSettings),
-            Error)
-            << aterm;
-    }
 }
 
 /**

@@ -29,12 +29,15 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 
 StorePath StoreDirConfig::parseStorePathCanonical(std::string_view path) const
 {
+    /* Just for reporting the full string in case of an error. */
+    const std::string_view original = path;
+
     if (!path.starts_with(storeDir))
-        throw BadStorePath("path '%s' is not in the Nix store", path);
+        throw BadStorePath("path '%s' is not in the Nix store", original);
     path.remove_prefix(storeDir.length());
 
     if (!path.starts_with('/'))
-        throw BadStorePath("path '%s' is not in the Nix store", path);
+        throw BadStorePath("path '%s' is not in the Nix store", original);
 
     return StorePath(path.substr(1));
 }
