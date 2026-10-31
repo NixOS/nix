@@ -12,6 +12,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <nlohmann/json.hpp>
+
 #include "expr-tests-config.hh"
 
 namespace nixC {
@@ -769,6 +771,88 @@ TEST_F(nix_api_expr_test, nix_expr_thunk_re_evaluation_after_deployment)
     nix_get_string(ctx, thunk, OBSERVE_STRING(result));
     assert_ctx_ok();
     ASSERT_STREQ("vm-12345", result.c_str());
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_get_stats_json)
+{
+    auto value = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "let f = x: x + x; in f 21", ".", value);
+    assert_ctx_ok();
+    nix_value_force(ctx, state, value);
+    assert_ctx_ok();
+
+    std::string statsJson;
+    auto r = nix_eval_state_get_stats_json(ctx, state, OBSERVE_STRING(statsJson));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, r);
+
+    auto j = nlohmann::json::parse(statsJson);
+    ASSERT_TRUE(j.contains("cpuTime"));
+    ASSERT_TRUE(j.contains("nrThunks"));
+    ASSERT_TRUE(j.contains("envs"));
+    ASSERT_TRUE(j["envs"].contains("bytes"));
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_get_stat_int)
+{
+    ASSERT_EQ(NIX_OK, nix_eval_stats_enable(ctx));
+    assert_ctx_ok();
+
+    auto read = [&](nix_eval_stat stat) {
+        uint64_t n = 0;
+        EXPECT_EQ(NIX_OK, nix_eval_state_get_stat_int(ctx, state, stat, &n));
+        return n;
+    };
+    auto functionCalls = read(NIX_EVAL_STAT_NR_FUNCTION_CALLS);
+    auto thunks = read(NIX_EVAL_STAT_NR_THUNKS);
+    auto primopCalls = read(NIX_EVAL_STAT_NR_PRIMOP_CALLS);
+    auto lookups = read(NIX_EVAL_STAT_NR_LOOKUPS);
+    assert_ctx_ok();
+
+    auto value = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "let f = x: x + x; in f 21", ".", value);
+    assert_ctx_ok();
+    nix_value_force(ctx, state, value);
+    assert_ctx_ok();
+
+    ASSERT_GT(read(NIX_EVAL_STAT_NR_FUNCTION_CALLS), functionCalls);
+    ASSERT_GE(read(NIX_EVAL_STAT_NR_THUNKS), thunks);
+    ASSERT_GE(read(NIX_EVAL_STAT_NR_PRIMOP_CALLS), primopCalls);
+    ASSERT_GE(read(NIX_EVAL_STAT_NR_LOOKUPS), lookups);
+    assert_ctx_ok();
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_get_stat_int_per_state)
+{
+    ASSERT_EQ(NIX_OK, nix_eval_stats_enable(ctx));
+    EvalState * other = nix_state_create(ctx, nullptr, store);
+    assert_ctx_ok();
+
+    auto thunks = [&](EvalState * s) {
+        uint64_t n = 0;
+        EXPECT_EQ(NIX_OK, nix_eval_state_get_stat_int(ctx, s, NIX_EVAL_STAT_NR_THUNKS, &n));
+        return n;
+    };
+    auto before = thunks(state);
+
+    auto value = nix_alloc_value(ctx, other);
+    nix_expr_eval_from_string(ctx, other, "let x = 1 + 1; in x + x", ".", value);
+    assert_ctx_ok();
+    nix_value_force(ctx, other, value);
+    assert_ctx_ok();
+
+    ASSERT_GT(thunks(other), 0u);
+    ASSERT_EQ(thunks(state), before);
+
+    nix_gc_decref(nullptr, value);
+    nix_state_free(other);
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_get_stat_int_unknown)
+{
+    uint64_t n = 42;
+    ASSERT_EQ(NIX_ERR_KEY, nix_eval_state_get_stat_int(ctx, state, static_cast<nix_eval_stat>(1000), &n));
+    ASSERT_EQ(42u, n);
 }
 
 } // namespace nixC
