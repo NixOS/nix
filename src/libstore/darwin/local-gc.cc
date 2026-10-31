@@ -18,17 +18,8 @@
 
 namespace nix {
 
-static void findRootsHeldByProcess(pid_t pid, UncheckedRoots & unchecked, const boost::regex & storePathRegex)
+static std::vector<::proc_fdinfo> listAllOpenFDsForProcess(pid_t pid)
 {
-    // Process cwd/root directory.
-    ::proc_vnodepathinfo vnodeInfo;
-    if (proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &vnodeInfo, sizeof(vnodeInfo)) <= 0)
-        throw SysError("getting pid %1% working directory", pid);
-
-    unchecked[std::string(vnodeInfo.pvi_cdir.vip_path)].emplace(fmt("{libproc/%d/cwd}", pid));
-    unchecked[std::string(vnodeInfo.pvi_rdir.vip_path)].emplace(fmt("{libproc/%d/rootdir}", pid));
-
-    // File descriptors.
     std::vector<::proc_fdinfo> fds;
     std::size_t fdBufSize = 1;
     while (fdBufSize > fds.size() * sizeof(::proc_fdinfo)) {
@@ -50,8 +41,20 @@ static void findRootsHeldByProcess(pid_t pid, UncheckedRoots & unchecked, const 
         fdBufSize = size;
     }
     fds.resize(fdBufSize / sizeof(::proc_fdinfo));
+    return fds;
+}
 
-    for (auto fd : fds) {
+static void findRootsHeldByProcess(pid_t pid, UncheckedRoots & unchecked, const boost::regex & storePathRegex)
+{
+    // Process cwd/root directory.
+    ::proc_vnodepathinfo vnodeInfo;
+    if (proc_pidinfo(pid, PROC_PIDVNODEPATHINFO, 0, &vnodeInfo, sizeof(vnodeInfo)) <= 0)
+        throw SysError("getting pid %1% working directory", pid);
+
+    unchecked[std::string(vnodeInfo.pvi_cdir.vip_path)].emplace(fmt("{libproc/%d/cwd}", pid));
+    unchecked[std::string(vnodeInfo.pvi_rdir.vip_path)].emplace(fmt("{libproc/%d/rootdir}", pid));
+
+    for (auto fd : listAllOpenFDsForProcess(pid)) {
         // By definition, only a vnode is on the filesystem.
         if (fd.proc_fdtype != PROX_FDTYPE_VNODE)
             continue;
