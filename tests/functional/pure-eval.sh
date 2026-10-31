@@ -15,6 +15,15 @@ echo "$missingImpureErrorMsg" | grepQuiet -- --impure || \
 [[ $(nix eval --expr 'builtins.pathExists ./pure-eval.sh') == false ]] || \
     fail "Calling 'pathExists' on a non-authorised path should return false"
 
+# A forbidden access while evaluating the argument is an error, not a missing path.
+for arg in \
+    '(builtins.readFile ./pure-eval.sh)' \
+    '(builtins.seq (builtins.readFile ./pure-eval.sh) 1)' \
+    '{ outPath = builtins.readFile ./pure-eval.sh; }' \
+    '{ __toString = _: builtins.readFile ./pure-eval.sh; }'; do
+    expectStderr 1 nix eval --expr "builtins.pathExists $arg" | grepQuiet "is forbidden in pure evaluation mode"
+done
+
 (! nix eval --expr builtins.currentTime)
 (! nix eval --expr builtins.currentSystem)
 

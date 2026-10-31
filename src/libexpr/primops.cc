@@ -2075,16 +2075,17 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
+    auto & arg = *args[0];
+
+    /* SourcePath doesn't know about trailing slash. */
+    state.forceValue(arg, noPos);
+    auto mustBeDir = arg.type() == nString && (arg.string_view().ends_with("/") || arg.string_view().ends_with("/."));
+
+    auto path = state.realisePath(noPos, arg, std::nullopt);
+
     try {
-        auto & arg = *args[0];
-
-        /* SourcePath doesn't know about trailing slash. */
-        state.forceValue(arg, noPos);
-        auto mustBeDir =
-            arg.type() == nString && (arg.string_view().ends_with("/") || arg.string_view().ends_with("/."));
-
         auto symlinkResolution = mustBeDir ? SymlinkResolution::Full : SymlinkResolution::Ancestors;
-        auto path = state.realisePath(noPos, arg, symlinkResolution);
+        path = path.resolveSymlinks(symlinkResolution);
 
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
