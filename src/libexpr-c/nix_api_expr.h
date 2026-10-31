@@ -16,6 +16,7 @@
 #include "nix_api_store.h"
 #include "nix_api_util.h"
 #include <stddef.h>
+#include <stdint.h>
 
 #ifndef __has_c_attribute
 #  define __has_c_attribute(x) 0
@@ -291,6 +292,61 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, 
  * @param[in] state The state to free.
  */
 void nix_state_free(EvalState * state);
+
+/**
+ * @brief Get the evaluation statistics of a state as a JSON string.
+ *
+ * The JSON has the same format as the output of `NIX_SHOW_STATS`. The fields
+ * `cpuTime`, `time`, `nrExprs` and `gc` cover the whole process.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The evaluator state to read statistics from
+ * @param[in] callback Called with the JSON string
+ * @param[in] user_data Optional, passed to the callback
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_eval_state_get_stats_json(
+    nix_c_context * context, EvalState * state, nix_get_string_callback callback, void * user_data);
+
+/**
+ * @brief Turn on the evaluation counters.
+ *
+ * Counting is off by default, unless `NIX_SHOW_STATS` is set. This turns it
+ * on for all evaluator states. Call it before evaluating.
+ *
+ * @param[out] context Optional, stores error information
+ * @return NIX_OK if there were no errors.
+ */
+nix_err nix_eval_stats_enable(nix_c_context * context);
+
+/**
+ * @brief Select the statistic that nix_eval_state_get_stat_int() can read.
+ *
+ * `NR` counters belong to the state. `GC` values cover the whole process and
+ * are 0 without Boehm GC. Later versions can add entries. Existing entries
+ * keep their numbers.
+ */
+typedef enum {
+    NIX_EVAL_STAT_NR_THUNKS = 0,
+    NIX_EVAL_STAT_NR_FUNCTION_CALLS = 1,
+    NIX_EVAL_STAT_NR_PRIMOP_CALLS = 2,
+    NIX_EVAL_STAT_NR_LOOKUPS = 3,
+    NIX_EVAL_STAT_NR_OP_UPDATES = 4,
+    NIX_EVAL_STAT_GC_HEAP_SIZE = 5,
+    NIX_EVAL_STAT_GC_TOTAL_BYTES = 6,
+} nix_eval_stat;
+
+/**
+ * @brief Read one evaluation counter of a state.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The evaluator state to read the counter from
+ * @param[in] stat The counter to read
+ * @param[out] out The current value of the counter
+ * @return NIX_OK if there were no errors, NIX_ERR_KEY if this version of Nix
+ * does not know the counter.
+ */
+nix_err nix_eval_state_get_stat_int(nix_c_context * context, EvalState * state, nix_eval_stat stat, uint64_t * out);
 
 /** @addtogroup GC
  * @ingroup libexpr
