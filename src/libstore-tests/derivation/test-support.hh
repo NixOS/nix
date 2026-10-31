@@ -10,18 +10,14 @@ namespace nix {
 
 class DerivationTest : public virtual CharacterizationTest, public LibStoreTest
 {
+protected:
     std::filesystem::path unitTestData = getUnitTestData() / "derivation";
 
-public:
     std::filesystem::path goldenMaster(std::string_view testStem) const override
     {
         return unitTestData / testStem;
     }
 
-    /**
-     * We set these in tests rather than the regular globals so we don't have
-     * to worry about race conditions if the tests run concurrently.
-     */
     ExperimentalFeatureSettings mockXpSettings;
 };
 

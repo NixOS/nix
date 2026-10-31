@@ -22,10 +22,6 @@ public:
 
 struct BLAKE3HashTest : virtual HashTest
 {
-    /**
-     * We set these in tests rather than the regular globals so we don't have
-     * to worry about race conditions if the tests run concurrently.
-     */
     ExperimentalFeatureSettings mockXpSettings;
 
     void SetUp() override

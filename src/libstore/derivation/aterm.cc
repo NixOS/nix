@@ -38,15 +38,16 @@ struct StringViewStream
 
     int peek() const
     {
-        return remaining.empty() ? EOF : remaining[0];
+        if (remaining.empty())
+            return EOF;
+        return static_cast<unsigned char>(remaining[0]);
     }
 
     int get()
     {
-        if (remaining.empty())
-            return EOF;
-        char c = remaining[0];
-        remaining.remove_prefix(1);
+        auto c = peek();
+        if (c != EOF)
+            remaining.remove_prefix(1);
         return c;
     }
 };
@@ -109,7 +110,7 @@ static void expect(StringViewStream & str, std::string_view s)
 static void expect(StringViewStream & str, char c)
 {
     if (str.remaining.empty() || str.remaining[0] != c)
-        throw FormatError("expected string '%1%'", c);
+        throw FormatError("expected '%1%' character", c);
     str.remaining.remove_prefix(1);
 }
 
@@ -469,7 +470,7 @@ Full parse(
                 return fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name);
             });
         } else {
-            throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
+            throw FormatError("unknown derivation ATerm format version '%s'", *versionS);
         }
         expect(str, ',');
         break;

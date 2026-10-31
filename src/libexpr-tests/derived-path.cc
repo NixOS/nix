@@ -32,10 +32,6 @@ RC_GTEST_FIXTURE_PROP(DerivedPathExpressionTest, prop_opaque_path_round_trip, (c
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest, prop_derived_path_built_placeholder_round_trip, (const SingleDerivedPath::Built & b))
 {
-    /**
-     * We set these in tests rather than the regular globals so we don't have
-     * to worry about race conditions if the tests run concurrently.
-     */
     ExperimentalFeatureSettings mockXpSettings;
     mockXpSettings.set("experimental-features", "ca-derivations dynamic-derivations");
 
