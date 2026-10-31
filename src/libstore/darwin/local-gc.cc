@@ -201,17 +201,19 @@ void findPlatformRuntimeRoots(const StoreDirConfig & config, UncheckedRoots & un
 
         try {
             findRootsHeldByProcess(pid, unchecked, storePathRegex);
-        } catch (SysError & e) {
-            // Processes can exit or become inaccessible at any point while
-            // they are inspected. Protected processes also reject some of
-            // these calls.
+        } catch (const SystemError & e) {
+            using enum std::errc;
             if (e.is(
-                    std::errc::no_such_file_or_directory,
-                    std::errc::no_such_process,
-                    std::errc::invalid_argument,
-                    std::errc::permission_denied,
-                    std::errc::operation_not_permitted,
-                    std::errc::io_error))
+                    /* Process no longer exists (proc_info) */
+                    no_such_file_or_directory,
+                    no_such_process,
+                    /* Process no longer exists (sysctl) */
+                    invalid_argument,
+                    /* We don't have permission to read this field (proc_info) */
+                    permission_denied,
+                    operation_not_permitted,
+                    /* Kernel failed to read from target process memory during KERN_PROCARGS2 (sysctl) */
+                    io_error))
                 continue;
             throw;
         }
