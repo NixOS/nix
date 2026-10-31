@@ -1,7 +1,8 @@
 #include "unix-derivation-builder-impl.hh"
 #include "darwin-derivation-builder.hh"
+#include "nix/util/base-nix-32.hh"
 
-#include <map>
+#include <array>
 #include <spawn.h>
 #include <sys/sysctl.h>
 #include <sandbox.h>
@@ -125,7 +126,7 @@ void DarwinDerivationBuilder::setUser()
            bucket store paths by the first character of their hash. The guard is a
            superset of every filter in its group, so it does not change what is allowed. */
 
-        std::map<char, std::string> bucketedStorePathProfiles;
+        std::array<std::string, BaseNix32::characters.size() / 2> bucketedStorePathProfiles;
         std::string otherSandboxPathsProfile;
 
         for (auto & i : pathsInChroot) {
@@ -143,8 +144,8 @@ void DarwinDerivationBuilder::setUser()
                 throw SysError("getting attributes of required path '%s", path);
             }
 
-            /* Store paths are bucketed by the store path hash'es first
-               character, creating 32 buckets. This allows us to fit around 10k
+            /* Store paths are bucketed by pairs of adjacent first hash
+               characters, creating 16 buckets. This allows us to fit around 10k
                store paths into the sandbox. Everything else (impure deps or
                manually specified sandbox-paths) is bundled into a separate
                clause.
@@ -166,8 +167,9 @@ void DarwinDerivationBuilder::setUser()
                    Any other path under the store directory is an implementation detail of Nix.
                    (currently that's only .links/ directory). */
                 auto [sp, subdir] = store->toStorePath(path);
-                /* Bucket by the nix32 first char, which is uniformly distributed in the long run. */
-                bucketedStorePathProfiles[sp.hashPart().front()] += profileRule;
+                /* StorePath validates the hash, so the first character is always nix32. */
+                auto bucket = BaseNix32::lookupReverse(sp.hashPart().front()).value() / 2;
+                bucketedStorePathProfiles[bucket] += profileRule;
             } else {
                 otherSandboxPathsProfile += profileRule;
             }
@@ -177,14 +179,22 @@ void DarwinDerivationBuilder::setUser()
             sandboxProfile += fmt("(allow file-read* file-write* process-exec\n%s)\n", otherSandboxPathsProfile);
 
         const auto storePrefix = store->storeDir + '/';
-        for (const auto & [bucket, filters] : bucketedStorePathProfiles) {
-            assert(!filters.empty()); /* Just to be safe. */
-            const auto prefix = storePrefix + bucket;
+        /* Pair adjacent hash prefixes: two distinct alternatives in each guard
+           compile substantially faster than singleton guards. Keep both prefixes
+           even if only one has inputs; the full path filters still restrict access. */
+        for (size_t bucket = 0; bucket < bucketedStorePathProfiles.size(); ++bucket) {
+            const auto & filters = bucketedStorePathProfiles[bucket];
+            if (filters.empty())
+                continue;
+
+            const auto firstPrefix = storePrefix + BaseNix32::characters[2 * bucket];
+            const auto secondPrefix = storePrefix + BaseNix32::characters[2 * bucket + 1];
             sandboxProfile +=
                 fmt("(allow file-read* file-write* process-exec\n"
-                    "\t(require-all (prefix %s)\n"
+                    "\t(require-all (require-any (prefix %s) (prefix %s))\n"
                     "\t\t(require-any\n%s)))\n",
-                    sbplQuote(prefix),
+                    sbplQuote(firstPrefix),
+                    sbplQuote(secondPrefix),
                     filters);
         }
 
