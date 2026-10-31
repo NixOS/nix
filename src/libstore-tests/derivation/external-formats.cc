@@ -100,24 +100,65 @@ TEST_P(MalformedATermTest, throwsFormatError)
         << drv;
 }
 
-/**
- * Strings are bytes: `builtins.readFile` can put 0xFF into any field,
- * and 0xFF read through a signed `char` is `EOF`.
- */
-TEST_F(DerivationTest, NonUtf8Bytes)
+class RoundtripATermTest : public DerivationTest, public ::testing::WithParamInterface<std::string_view>
+{};
+
+TEST_F(RoundtripATermTest, everythingGoes)
 {
-    const std::string aterm =
-        "Derive([(\"out\",\"/nix/store/7mjal1rkzwzrgppbvidx6gf2bls2hvb5-u6\",\"\",\"\")],[],[],\"a\xff"
-        "b\x80\",\"/bin/sh\",[],[(\"builder\",\"/bin/sh\"),(\"name\",\"u6\"),"
-        "(\"out\",\"/nix/store/7mjal1rkzwzrgppbvidx6gf2bls2hvb5-u6\"),(\"system\",\"a\xff"
-        "b\x80\")])";
-    auto drv =
-        derivation::parse(*store, std::string{aterm}, "u6", derivation::defaultSupportWindowsStoreDir, mockXpSettings);
-    ASSERT_EQ(
-        drv.platform,
-        "a\xff"
-        "b\x80");
-    ASSERT_EQ(derivation::unparse(drv, *store, derivation::defaultSupportWindowsStoreDir), aterm);
+    /* Basically, test and characterise (in a binary file) how we encode and decode all chars
+       when stored in a derivation. Some notable behavior:
+       - Everything that can be escaped must be escaped.
+       - Some fields are not validated at parse time.
+       Derivation serialisers doesn't escape certain fields, so the deserialiser can't parse it
+       back. This applies to output names and the platform.
+       TLDR; it's all broken, fix ASAP. */
+
+    /* Just a test string with all byte values. */
+    std::string all(256, '\0');
+    for (int i = 255; i >= 0; --i)
+        all[i] = static_cast<unsigned char>(i);
+
+    /* FIXME: Hack because the serialiser doesn't check the unencoded value at
+       all and pastes it verbatim, but the decoder correctly rejects them. */
+    std::string escaped;
+    for (char c : all) {
+        if (c == '\\' || c == '\n' || c == '\t' || c == '\r' || c == '"')
+            /* Funnily enough, NULs aren't rejected. */
+            escaped += '\0';
+        else
+            escaped += c;
+    }
+
+    std::string outputName = "+_-._?=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890";
+    StorePath outputPath("j5v9jrrqr8yn981qi5x5dvcx075j29gm-foo-" + outputName);
+
+    Derivation drv = {
+        /* Store path length limitations. */
+        .outputs = {{outputName, DerivationOutput::InputAddressed{outputPath}}},
+        /* Hopefully store path parsing is sufficiently tested. */
+        .inputs = {},
+        /* Platform is freeform text. */
+        .platform = escaped,
+        /* As is the builder and the arguments. We should probably disallow embedded NULs
+           at parse time, although derivation builders also check at exec-time. */
+        .builder = all,
+        /* Same goes for arguments and env variables. NULs also rejected at exec-time. */
+        .args = {all, all},
+        /* Yes, this does mean that an env variable name can contain `=`. We don't currently
+           reject that at parse time or exec-time, so this truncates the env variable name. */
+        .env = {{all, all}, {outputName, store->printStorePath(outputPath)}},
+        /* Never actually finds up in the serialisation. */
+        .name = "foo",
+    };
+
+    /* The input-addressed path won't change. */
+    ASSERT_NO_THROW(checkInvariants(drv, *store));
+
+    writeTest(
+        "aterm-encoding.drv", [&]() { return derivation::unparse(drv, *store, /*supportWindowsStoreDir=*/false); });
+    readTest("aterm-encoding.drv", [&](std::string aterm) {
+        ASSERT_EQ(derivation::parse(*store, std::move(aterm), drv.name), drv);
+    });
 }
 
 /**
