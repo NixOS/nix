@@ -396,6 +396,12 @@ public:
     {
         return errorCode == e;
     }
+
+    template<std::same_as<std::errc>... Rest>
+    bool is(std::errc e, Rest... rest) const
+    {
+        return is(e) || (is(rest) || ...);
+    }
 };
 
 /**
