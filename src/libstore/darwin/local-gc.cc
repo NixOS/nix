@@ -162,26 +162,34 @@ static void findRootsHeldByProcess(pid_t pid, UncheckedRoots & unchecked, const 
     }
 }
 
-void findPlatformRuntimeRoots(const StoreDirConfig & config, UncheckedRoots & unchecked)
+static std::vector<pid_t> listAllProcesses()
 {
-    auto storePathRegex = makeStorePathRegex(config);
-
-    std::vector<int> pids;
+    std::vector<pid_t> pids;
     std::size_t pidBufSize = 1;
 
-    while (pidBufSize > pids.size() * sizeof(int)) {
+    while (pidBufSize > pids.size() * sizeof(pid_t)) {
         // Reserve some extra size so we don't fail too much.
-        pids.resize((pidBufSize + pidBufSize / 8) / sizeof(int));
-        auto size = proc_listpids(PROC_ALL_PIDS, 0, pids.data(), pids.size() * sizeof(int));
+        pids.resize((pidBufSize + pidBufSize / 8) / sizeof(pid_t));
+        auto size = proc_listpids(
+            PROC_ALL_PIDS,
+            /*typeinfo=*/0, /* Completely ignored. */
+            pids.data(),
+            pids.size() * sizeof(pid_t));
 
         if (size <= 0)
             throw SysError("listing PIDs");
         pidBufSize = size;
     }
 
-    pids.resize(pidBufSize / sizeof(int));
+    pids.resize(pidBufSize / sizeof(pid_t));
+    return pids;
+}
 
-    for (auto pid : pids) {
+void findPlatformRuntimeRoots(const StoreDirConfig & config, UncheckedRoots & unchecked)
+{
+    auto storePathRegex = makeStorePathRegex(config);
+
+    for (pid_t pid : listAllProcesses()) {
         checkInterrupt();
 
         // It doesn't make sense to ask about the kernel.
