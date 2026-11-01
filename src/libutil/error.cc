@@ -174,7 +174,7 @@ static void printTrace(std::ostream & output, const std::string_view & indent, s
         count++;
 }
 
-void printSkippedTracesMaybe(
+static void printSkippedTracesMaybe(
     std::ostream & output,
     const std::string_view & indent,
     size_t & count,
