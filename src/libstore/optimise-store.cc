@@ -203,6 +203,18 @@ void LocalStore::optimisePath_(
                 return;
             }
 
+#ifdef __APPLE__
+            else if (e.code() == std::errc::operation_not_permitted) {
+                /* macOS refuses to hard-link some files anywhere below a
+                   *.app directory, such as `_CodeSignature/*` and `PkgInfo`,
+                   even for root. The regex above only covers bundles with a
+                   `Contents` directory, not iOS-style ones that keep these
+                   files at the bundle root. */
+                debug("%s is not allowed to be linked in macOS", PathFmt(path));
+                return;
+            }
+#endif
+
             else
                 throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), PathFmt(path));
         }
