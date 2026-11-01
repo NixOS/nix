@@ -396,10 +396,20 @@ enum struct ATermVersion {
     DynamicDerivations,
 };
 
+/**
+ * Maximum nesting depth of dynamic-derivation `inputDrvs` entries.
+ * Without a cap, a malicious `.drv` file could overflow the stack
+ * of the parsing process.
+ */
+static constexpr size_t maxDerivedPathMapDepth = 256;
+
 static DerivedPathMap<StringSet>::ChildNode
-parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, ATermVersion version)
+parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, ATermVersion version, size_t depth = 0)
 {
     using namespace std::literals::string_view_literals;
+
+    if (depth >= maxDerivedPathMapDepth)
+        throw FormatError("inputDrvs entry in derivation is nested more than %d levels deep", maxDerivedPathMapDepth);
 
     DerivedPathMap<StringSet>::ChildNode node;
 
@@ -424,7 +434,7 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, AT
                 str,
                 node.childMap,
                 [&] { return parseString(str).toOwned(); },
-                [&](const auto &) { return parseDerivedPathMapNode(store, str, version); },
+                [&](const auto &) { return parseDerivedPathMapNode(store, str, version, depth + 1); },
                 [](const auto & outputName) { return fmt("output name '%s'", outputName); });
             expect(str, ')');
             break;
