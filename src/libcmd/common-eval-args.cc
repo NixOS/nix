@@ -13,6 +13,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/cmd/compatibility-settings.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/store/globals.hh"
 
 namespace nix {
@@ -177,9 +178,20 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
     const auto & fetchSettings = state.fetchSettings;
 
     if (EvalSettings::isPseudoUrl(s)) {
-        auto accessor = fetchers::downloadTarball(*state.store, fetchSettings, EvalSettings::resolvePseudoUrl(s));
-        auto storePath = fetchToStore(fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
-        return state.storePath(storePath);
+        std::list<std::string> downloadErrors;
+        for (const auto & url : EvalSettings::resolvePseudoUrl(s)) {
+            try {
+                auto accessor = fetchers::downloadTarball(*state.store, fetchSettings, url);
+                auto storePath = fetchToStore(fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
+                return state.storePath(storePath);
+            } catch (FileTransferError & e) {
+                downloadErrors.push_back(e.message());
+                debug("failed to download pseudo-url: '%s': %s", url, e.message());
+            }
+        }
+
+        throw Error(
+            "failed to download file argument '%s': %s", s, Uncolored(concatStringsSep("\n\t", downloadErrors)));
     }
 
     else if (hasPrefix(s, "flake:")) {
