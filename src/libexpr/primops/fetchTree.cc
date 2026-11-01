@@ -11,6 +11,7 @@
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/util/url.hh"
+#include "nix/util/util.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/input-cache.hh"
@@ -167,8 +168,8 @@ void emitTreeAttrs(
 
     if (auto lastModified = input.getLastModified()) {
         attrs.alloc("lastModified", callPos).mkInt(*lastModified);
-        attrs.alloc("lastModifiedDate", callPos)
-            .mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")), state.mem);
+        auto tm = utcTime(*lastModified);
+        attrs.alloc("lastModifiedDate", callPos).mkString(fmt("%s", std::put_time(&tm, "%Y%m%d%H%M%S")), state.mem);
     }
 
     v.mkAttrs(attrs);
