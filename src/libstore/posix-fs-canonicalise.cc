@@ -247,14 +247,14 @@ public:
         canonicaliseTimestampAndPermissions(fd, executable ? 0555 : 0444);
     }
 
-    void symlinkCreated(Descriptor parentFd, const CanonPath & name) override
+    void symlinkCreated(Descriptor parentFd, const OsFilename & name) override
     {
 #ifndef _WIN32 /* Handling of symlinks on windows needs a ton more work. */
 #  if NIX_SUPPORT_ACL
-        AutoCloseFD fd = ::openat(parentFd, name.rel_c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
+        AutoCloseFD fd = ::openat(parentFd, name.c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
         if (!fd)
             throw SysError(
-                [&]() { return HintFmt("failed to open %1%", PathFmt(descriptorToPath(parentFd) / name.rel())); });
+                [&]() { return HintFmt("failed to open %1%", PathFmt(descriptorToPath(parentFd) / name.path())); });
         /* Would be nice to use the *at family of syscalls with AT_EMPTY_PATH added in (6.13)
            https://github.com/torvalds/linux/commit/6140be90ec70c39fa844741ca3cc807dd0866394,
            but there are no glibc wrappers and apparently no manpages for them too? */
@@ -269,11 +269,11 @@ public:
             {.tv_sec = mtimeStore, .tv_nsec = 0},
         };
 
-        if (::utimensat(parentFd, name.rel_c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
+        if (::utimensat(parentFd, name.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
             throw SysError([&]() {
                 return HintFmt(
                     "changing modification time of %s (using `utimensat`)",
-                    PathFmt(descriptorToPath(parentFd) / name.rel()));
+                    PathFmt(descriptorToPath(parentFd) / name.path()));
             });
 #endif
     }

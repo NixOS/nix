@@ -107,6 +107,45 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
     EXPECT_THAT(accessor, testing::HasSymlink(CanonPath("a/b/l"), "g"));
 }
 
+/* At the moment, the dir-fd cache resolves a miss by walking up to the deepest cached
+   ancestor and re-anchoring the rest of the path onto it. Nothing else
+   exercises that: the tests above only ever read a single branch, so the
+   lookup either hits exactly or starts from the root.
+
+   Only uses the `SourceAccessor` interface, so this runs on Windows too, where
+   it degenerates to a plain nested-read check (that accessor has no cache). */
+TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
+{
+    /* Siblings deliberately share a length, so that a component comparison
+       which only looked at sizes would confuse them. */
+    createDirs(tmpDir / "aaa" / "bbb" / "ccc");
+    createDirs(tmpDir / "aaa" / "bbb" / "ddd");
+    createDirs(tmpDir / "aaa" / "zzz");
+    writeFile(tmpDir / "aaa" / "bbb" / "ccc" / "f", "in-ccc");
+    writeFile(tmpDir / "aaa" / "bbb" / "ddd" / "f", "in-ddd");
+    writeFile(tmpDir / "aaa" / "zzz" / "f", "in-zzz");
+
+    auto accessor = makeFSSourceAccessor(tmpDir);
+
+    /* Populate the cache all the way down one branch. */
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ccc/f"), "in-ccc"));
+
+    /* Sibling of the deepest cached directory: misses, re-anchors on `aaa/bbb`. */
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ddd/f"), "in-ddd"));
+
+    /* Shallower sibling: re-anchors on `aaa` instead. */
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/zzz/f"), "in-zzz"));
+
+    /* Re-read everything, now served from the cache rather than walked. */
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ccc/f"), "in-ccc"));
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ddd/f"), "in-ddd"));
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/zzz/f"), "in-zzz"));
+
+    /* A genuine miss under a cached ancestor must stay a miss. */
+    EXPECT_FALSE(accessor->pathExists(CanonPath("aaa/bbb/eee/f")));
+    EXPECT_FALSE(accessor->pathExists(CanonPath("aaa/bbb/ccc/nope")));
+}
+
 /* ----------------------------------------------------------------------------
  * RestoreSink non-directory at root (no dirFd)
  * --------------------------------------------------------------------------*/
