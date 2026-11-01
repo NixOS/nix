@@ -827,7 +827,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
                 auto & [name, element] = e;
                 if (i)
                     logger->cout("");
-                logger->cout(
+                logger->coutStyled(
                     "Name:               " ANSI_BOLD "%s" ANSI_NORMAL "%s",
                     name,
                     element.active ? "" : " " ANSI_RED "(inactive)" ANSI_NORMAL);
@@ -911,7 +911,7 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
                 logger->cout("");
             first = false;
 
-            logger->cout(
+            logger->coutStyled(
                 "Version %s%d" ANSI_NORMAL " (%s)%s:",
                 gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
                 gen.number,

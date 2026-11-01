@@ -155,12 +155,12 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                         } else {
                             if (results > 1)
                                 logger->cout("");
-                            logger->cout(
+                            logger->coutStyled(
                                 "* %s%s",
                                 wrap("\e[0;1m", hiliteMatches(attrPathStr, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
                                 optionalBracket(" (", name.version, ")"));
                             if (description != "")
-                                logger->cout(
+                                logger->coutStyled(
                                     "  %s", hiliteMatches(description, descriptionMatches, ANSI_GREEN, ANSI_NORMAL));
                         }
                     }
