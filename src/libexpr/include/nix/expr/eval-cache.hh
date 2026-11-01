@@ -50,6 +50,14 @@ public:
     EvalCache(std::optional<std::reference_wrapper<const Hash>> useCache, EvalState & state, RootLoader rootLoader);
 
     ref<AttrCursor> getRoot();
+
+    /**
+     * Fold the WAL into the main `.sqlite` file with a PASSIVE checkpoint, so
+     * a reader of the database file alone (without its `-wal` sidecar) sees
+     * the writes so far. Does not block on concurrent connections. No-op
+     * without a cache.
+     */
+    void checkpoint();
 };
 
 enum AttrType {
