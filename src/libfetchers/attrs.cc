@@ -16,6 +16,16 @@ ResolvedAttr forceAttr(const Attr & attr)
         attr);
 }
 
+bool Attr::operator==(const Attr & other) const
+{
+    return forceAttr(*this) == forceAttr(other);
+}
+
+bool Attr::operator<(const Attr & other) const
+{
+    return forceAttr(*this) < forceAttr(other);
+}
+
 Attrs jsonToAttrs(const nlohmann::json & json)
 {
     Attrs attrs;
