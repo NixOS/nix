@@ -6,6 +6,7 @@
 #include "nix/util/ref.hh"
 #include "nix/util/sync.hh"
 
+#include <functional>
 #include <map>
 #include <limits>
 
@@ -163,6 +164,13 @@ struct Settings : public Config
     const ref<SrcToStore> srcToStore = createSrcToStore();
 
     ref<GitRepoPool> getTarballWriterPool() const;
+
+    /**
+     * Fetches an input that is not in the store instead of the built-in
+     * fetchers. Takes and returns a JSON request and response; on return
+     * the response's `storePath` is valid. Throws `Error` on failure.
+     */
+    std::function<std::string(const std::string & requestJson)> fetchHook;
 
 private:
     void anchor() override;

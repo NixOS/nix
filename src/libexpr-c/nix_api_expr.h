@@ -245,6 +245,40 @@ nix_err nix_eval_state_builder_set_setting(
     nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value);
 
 /**
+ * @brief Callback that fetches an input missing from the store
+ * @ingroup libexpr_init
+ *
+ * @param[in] user_data The pointer passed to nix_eval_state_builder_set_fetch_hook().
+ * @param[out] context Stores the error message when the fetch fails.
+ * @param[in] request_json `{"builtin": "fetchTree" | "fetchTarball" | "fetchurl", "args": {...}, "storePath"?: "..."}`.
+ * @param[in] callback Called with the response `{"storePath": "...", "attrs"?: {...}}`.
+ * @param[in] callback_user_data Passed to the callback unchanged.
+ * @return NIX_OK once the response's store path is valid in the store, an error code otherwise.
+ */
+typedef nix_err (*nix_fetch_hook)(
+    void * user_data,
+    nix_c_context * context,
+    const char * request_json,
+    nix_get_string_callback callback,
+    void * callback_user_data);
+
+/**
+ * @brief Let the embedder fetch inputs that are not in the store
+ * @ingroup libexpr_init
+ *
+ * The hook replaces the built-in fetchers for every input except `path`, and the download of
+ * `fetchurl` and `fetchTarball`. user_data must stay valid as long as the state built from this builder.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] builder The builder to modify.
+ * @param[in] hook The callback that fetches the input.
+ * @param[in] user_data Passed to the hook unchanged.
+ * @return NIX_OK if successful, an error code otherwise.
+ */
+nix_err nix_eval_state_builder_set_fetch_hook(
+    nix_c_context * context, nix_eval_state_builder * builder, nix_fetch_hook hook, void * user_data);
+
+/**
  * @brief Create a new Nix language evaluator state
  * @ingroup libexpr_init
  *
