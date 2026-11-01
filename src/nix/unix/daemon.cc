@@ -325,19 +325,10 @@ static void daemonLoop(
     }
 #endif
 
-    /* Check for anything that might be a crash. Too many crashes aren't
-       supposed to happen and we should limit the amount if someone is
-       intentionally triggering those as an ASLR bypass attempt (each forked
-       daemon worker has the same address space layout as we do). TODO: Ideally
-       we'd re-exec the daemon worker so that it gets a fresh address space
-       for each connection. Alternatively, we could make the daemon socket use
-       Accept=yes systemd.socket(5). */
+    /* Daemon workers are not supposed to crash, so this many crashes means
+       something is badly wrong: stop serving. It is not an ASLR defence;
+       each worker re-execs and gets its own address space layout. */
     unsigned crashCount = 0;
-
-    /* For now we are just limiting the number of crashes experienced by this
-       daemon instance. systemd (e.g.) would restart us, which would get us
-       a fresh address space layout - which is exactly what we want in case
-       someone is intentionally crashing the daemon to brute-force ASLR. */
     static constexpr unsigned crashLimit = 64;
 
     /* We only want overrides from the cli, the nix.conf state will get picked up
@@ -365,6 +356,14 @@ static void daemonLoop(
        It doesn't actually roundtrip. Note that a relative path shorthand will be resolved by StoreReference::parse
        called during option parsing (quite janky). */
     workerEnv[OS_STR("NIX_CONFIG")] = workerConfig;
+
+#ifdef __linux__
+    /* Workers start in the `nix-daemon` sub-cgroup created above, so their
+       own cgroup is the wrong parent for build cgroups: it has processes,
+       so it cannot delegate the controllers we enabled. */
+    if (settings.getLocalSettings().useCgroups)
+        workerEnv["_NIX_DAEMON_ROOT_CGROUP"] = linux::getRootCgroup().abs();
+#endif
 
     /* lvlInfo is the default used by nix-daemon (or anything using RegisterLegacyCommand for that matter). */
     std::vector<OsString> workerVerbosityFlags = [&]() -> std::vector<OsString> {
@@ -570,6 +569,13 @@ static void runDaemon(
     std::visit(
         overloaded{
             [&](StdIO) {
+#ifdef __linux__
+                if (auto rootCgroup = getEnv("_NIX_DAEMON_ROOT_CGROUP")) {
+                    linux::setRootCgroup(CanonPath(*rootCgroup));
+                    unsetenv("_NIX_DAEMON_ROOT_CGROUP");
+                }
+#endif
+
                 auto store = storeConfig->openStore();
                 store->init();
 
