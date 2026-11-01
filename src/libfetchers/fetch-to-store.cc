@@ -55,8 +55,17 @@ std::pair<StorePath, Hash> fetchToStore2(
 
     if (!filter) {
         auto dstPathCached = getConcurrent(settings.srcToStore->cache, srcToStoreKey);
-        if (dstPathCached && (mode == FetchMode::DryRun || std::get<2>(*dstPathCached) == FetchMode::Copy))
-            return std::make_pair(std::get<0>(*dstPathCached), std::get<1>(*dstPathCached));
+        if (dstPathCached) {
+            auto & [storePath, hash, cachedMode] = *dstPathCached;
+            if (mode == FetchMode::DryRun)
+                return {storePath, hash};
+            /* A long-lived evaluator outlives the copy: the store path may have been garbage collected since. */
+            if (cachedMode == FetchMode::Copy) {
+                store.addTempRoot(storePath);
+                if (store.isValidPath(storePath))
+                    return {storePath, hash};
+            }
+        }
     }
 
     std::optional<fetchers::Cache::Key> cacheKey;
