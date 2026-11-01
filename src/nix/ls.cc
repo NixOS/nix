@@ -132,7 +132,7 @@ struct CmdLsNar : Command, MixLs
 
     CmdLsNar()
     {
-        expectArgs({.label = "nar", .handler = {&narPath}, .completer = completePath});
+        expectArg("nar", &narPath);
         expectArg("path", &path);
     }
 

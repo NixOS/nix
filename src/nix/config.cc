@@ -34,6 +34,7 @@ struct CmdConfigShow : Command, MixJSON
             .label = {"name"},
             .optional = true,
             .handler = {&name},
+            .completer = completeSettings,
         });
     }
 
