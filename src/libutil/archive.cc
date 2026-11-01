@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <limits>
+#include <fcntl.h>
 #include <map>
 
 #include <strings.h> // for strcasecmp
