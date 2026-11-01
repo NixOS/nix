@@ -626,7 +626,7 @@ string_t AttrCursor::getStringWithContext()
         fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
-                bool valid = true;
+                StorePathSet paths;
                 for (auto & c : s->second) {
                     const StorePath & path = std::visit(
                         overloaded{
@@ -638,12 +638,9 @@ string_t AttrCursor::getStringWithContext()
                         },
                         c.raw);
                     root->state.store->addTempRoot(path);
-                    if (!root->state.store->isValidPath(path)) {
-                        valid = false;
-                        break;
-                    }
+                    paths.insert(path);
                 }
-                if (valid) {
+                if (paths.empty() || root->state.store->queryValidPaths(paths).size() == paths.size()) {
                     debug("using cached string attribute '%s'", getAttrPathStr());
                     return *s;
                 }
