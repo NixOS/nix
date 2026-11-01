@@ -15,6 +15,7 @@
 #include <optional>
 #include <ranges>
 #include <concepts>
+#include <ctime>
 
 namespace nix {
 
@@ -185,6 +186,21 @@ char getSizeUnitSuffix(SizeUnit unit);
  * padding with spaces on the left.
  */
 std::string renderSize(int64_t value, bool align = false);
+
+/**
+ * Convert `t` to calendar time in UTC, like `std::gmtime`.
+ *
+ * Unlike `std::gmtime`, this is thread-safe: the result is not stored
+ * in a buffer shared with other threads.
+ *
+ * @throws Error if `t` cannot be represented.
+ */
+std::tm utcTime(time_t t);
+
+/**
+ * Like `utcTime`, but in the local time zone, like `std::localtime`.
+ */
+std::tm localTime(time_t t);
 
 /**
  * Parse a string into a float.

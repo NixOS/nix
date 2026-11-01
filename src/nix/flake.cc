@@ -21,6 +21,7 @@
 #include "nix/expr/eval-cache.hh"
 #include "nix/cmd/markdown.hh"
 #include "nix/util/users.hh"
+#include "nix/util/util.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/build.hh"
@@ -263,10 +264,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(ANSI_BOLD "Revision:" ANSI_NORMAL "      %s", *dirtyRev);
             if (auto revCount = flake.lockedRef.input.getRevCount())
                 logger->cout(ANSI_BOLD "Revisions:" ANSI_NORMAL "     %s", *revCount);
-            if (auto lastModified = flake.lockedRef.input.getLastModified())
-                logger->cout(
-                    ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
-                    std::put_time(std::localtime(&*lastModified), "%F %T"));
+            if (auto lastModified = flake.lockedRef.input.getLastModified()) {
+                auto tm = localTime(*lastModified);
+                logger->cout(ANSI_BOLD "Last modified:" ANSI_NORMAL " %s", std::put_time(&tm, "%F %T"));
+            }
             if (auto fingerprint = lockedFlake.getFingerprint(*store, fetchSettings))
                 logger->cout(
                     ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s", fingerprint->to_string(HashFormat::Base16, false));
@@ -280,8 +281,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 for (const auto & [last, input] : markLast(node.inputs)) {
                     if (auto lockedNode = std::get_if<0>(&input.second)) {
                         std::string lastModifiedStr = "";
-                        if (auto lastModified = (*lockedNode)->lockedRef.input.getLastModified())
-                            lastModifiedStr = fmt(" (%s)", std::put_time(std::gmtime(&*lastModified), "%F %T"));
+                        if (auto lastModified = (*lockedNode)->lockedRef.input.getLastModified()) {
+                            auto tm = utcTime(*lastModified);
+                            lastModifiedStr = fmt(" (%s)", std::put_time(&tm, "%F %T"));
+                        }
                         logger->cout(
                             "%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s%s",
                             prefix + (last ? treeLast : treeConn),
