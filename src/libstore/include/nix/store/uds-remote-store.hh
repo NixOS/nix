@@ -49,6 +49,19 @@ public:
      */
     std::filesystem::path path;
 
+    Setting<bool> localFS{
+        this,
+        true,
+        "local-fs",
+        R"(
+          Whether the client reads store objects from its own file system.
+          Set it to `false` when the daemon serves a store this machine
+          cannot see, such as one in a virtual machine or a container.
+          Then the client reads store objects over the socket, as `ssh-ng://` does.
+          Build logs and garbage collector roots still use this machine's file system.
+        )",
+    };
+
     static StringSet uriSchemes()
     {
         return {"unix"};
@@ -73,16 +86,22 @@ public:
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
     {
+        if (!config->localFS)
+            return RemoteStore::getFSAccessor(requireValidPath);
         return LocalFSStore::getFSAccessor(requireValidPath);
     }
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override
     {
+        if (!config->localFS)
+            return RemoteStore::getFSAccessor(path, requireValidPath);
         return LocalFSStore::getFSAccessor(path, requireValidPath);
     }
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
+        if (!config->localFS)
+            return RemoteStore::narFromPath(path, sink);
         Store::narFromPath(path, sink);
     }
 

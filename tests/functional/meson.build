@@ -185,6 +185,7 @@ suites = [
       'test-infra.sh',
       'timeout.sh',
       'toString-path.sh',
+      'uds-local-fs.sh',
       'user-envs-migration.sh',
       'user-envs.sh',
       'why-depends.sh',
