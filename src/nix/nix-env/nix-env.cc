@@ -21,6 +21,7 @@
 #include "nix/expr/eval-settings.hh" // for defexpr
 #include "nix/util/table.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/util.hh"
 #include "man-pages.hh"
 
 #include <cerrno>
@@ -1336,16 +1337,7 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
     RunPager pager;
 
     for (auto & i : gens) {
-#ifdef _WIN32 // TODO portable wrapper in libutil
-        tm * tp = localtime(&i.creationTime);
-        if (!tp)
-            throw Error("cannot convert time");
-        auto & t = *tp;
-#else
-        tm t;
-        if (!localtime_r(&i.creationTime, &t))
-            throw Error("cannot convert time");
-#endif
+        auto t = localTime(i.creationTime);
         logger->cout(
             "%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||",
             i.number,

@@ -230,6 +230,30 @@ std::string renderSize(int64_t value, bool align)
     return fmt("%s %ciB", renderSizeWithoutUnit(value, unit, align), getSizeUnitSuffix(unit));
 }
 
+std::tm utcTime(time_t t)
+{
+    std::tm tm;
+#ifdef _WIN32
+    if (gmtime_s(&tm, &t) != 0)
+#else
+    if (!gmtime_r(&t, &tm))
+#endif
+        throw Error("cannot convert time %d to UTC", t);
+    return tm;
+}
+
+std::tm localTime(time_t t)
+{
+    std::tm tm;
+#ifdef _WIN32
+    if (localtime_s(&tm, &t) != 0)
+#else
+    if (!localtime_r(&t, &tm))
+#endif
+        throw Error("cannot convert time %d to local time", t);
+    return tm;
+}
+
 bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
