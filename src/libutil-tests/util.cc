@@ -86,6 +86,40 @@ TEST(getLine, all)
 }
 
 /* ----------------------------------------------------------------------------
+ * utcTime, localTime
+ * --------------------------------------------------------------------------*/
+
+TEST(utcTime, convertsToUtc)
+{
+    auto tm = utcTime(1700000000);
+    EXPECT_EQ(tm.tm_year + 1900, 2023);
+    EXPECT_EQ(tm.tm_mon + 1, 11);
+    EXPECT_EQ(tm.tm_mday, 14);
+    EXPECT_EQ(tm.tm_hour, 22);
+    EXPECT_EQ(tm.tm_min, 13);
+    EXPECT_EQ(tm.tm_sec, 20);
+}
+
+TEST(utcTime, leavesSharedBufferAlone)
+{
+    // std::gmtime returns a buffer that every caller in the process shares.
+    // If utcTime wrote it, another thread's gmtime result would change.
+    time_t epoch = 0;
+    std::tm * shared = std::gmtime(&epoch);
+    ASSERT_NE(shared, nullptr);
+
+    utcTime(1700000000);
+
+    EXPECT_EQ(shared->tm_year, 70);
+}
+
+TEST(localTime, roundTripsThroughMktime)
+{
+    auto tm = localTime(1700000000);
+    EXPECT_EQ(std::mktime(&tm), 1700000000);
+}
+
+/* ----------------------------------------------------------------------------
  * toLower
  * --------------------------------------------------------------------------*/
 

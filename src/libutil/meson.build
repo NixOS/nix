@@ -41,6 +41,16 @@ check_funcs = [
     'Avoids forking when connecting AF_UNIX sockets with paths longer than sun_path.',
     '#include <sys/socket.h>',
   ],
+  [
+    'gmtime_r',
+    'Thread-safe gmtime. Without it, utcTime uses the Windows gmtime_s.',
+    '#include <time.h>',
+  ],
+  [
+    'localtime_r',
+    'Thread-safe localtime. Without it, localTime uses the Windows localtime_s.',
+    '#include <time.h>',
+  ],
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec[0].underscorify().to_upper()
