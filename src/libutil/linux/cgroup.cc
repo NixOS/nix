@@ -168,10 +168,19 @@ CanonPath getCurrentCgroup()
     return CanonPath{ourCgroup};
 }
 
+static std::optional<CanonPath> rootCgroupOverride;
+
 CanonPath getRootCgroup()
 {
+    if (rootCgroupOverride)
+        return *rootCgroupOverride;
     static auto rootCgroup = getCurrentCgroup();
     return rootCgroup;
+}
+
+void setRootCgroup(CanonPath cgroup)
+{
+    rootCgroupOverride = std::move(cgroup);
 }
 
 } // namespace nix::linux
