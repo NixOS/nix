@@ -130,7 +130,25 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     buildReqs.reserve(drvs.size());
     for (auto & d : drvs)
         buildReqs.emplace_back(DerivedPath{d});
-    buildStore->getBuilder(store)->buildPaths(buildReqs, bmNormal);
+
+    /* A thunk that threw is forced again on its next use and would ask the
+       store to build the same failing derivation again. Within this evaluation
+       the failure is replayed instead, so a broken import-from-derivation costs
+       its build attempt once per process rather than once per importer. */
+    for (auto & d : drvs)
+        if (auto failed = getConcurrent(*failedRealisations, d.drvPath->getBaseStorePath()))
+            std::rethrow_exception(*failed);
+
+    try {
+        if (settings.realiseHook)
+            settings.realiseHook(drvs);
+        else
+            buildStore->getBuilder(store)->buildPaths(buildReqs, bmNormal);
+    } catch (Error &) {
+        if (drvs.size() == 1 && !settings.realiseHook)
+            failedRealisations->insert_or_assign(drvs.front().drvPath->getBaseStorePath(), std::current_exception());
+        throw;
+    }
 
     StorePathSet outputsToCopyAndAllow;
 
