@@ -3366,13 +3366,22 @@ EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAcces
     };
 
     if (EvalSettings::isPseudoUrl(value)) {
-        try {
-            auto accessor = fetchers::downloadTarball(*store, fetchSettings, EvalSettings::resolvePseudoUrl(value));
-            auto storePath = fetchToStore(fetchSettings, *store, SourcePath(accessor), FetchMode::Copy);
-            return finish(this->storePath(storePath));
-        } catch (Error & e) {
-            logWarning({.msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)});
+        for (const auto & url : EvalSettings::resolvePseudoUrl(value)) {
+            try {
+                auto accessor = fetchers::downloadTarball(*store, fetchSettings, url);
+                auto storePath = fetchToStore(fetchSettings, *store, SourcePath(accessor), FetchMode::Copy);
+                return finish(this->storePath(storePath));
+            } catch (Error & e) {
+                debug(
+                    "failed to download '%s' to satisfy NIX_PATH lookup for '%s', continuing on the next "
+                    "candidate: %s",
+                    url,
+                    value,
+                    e.message());
+            }
         }
+
+        logWarning({.msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)});
     }
 
     if (auto colPos = value.find(':'); colPos != value.npos) {
