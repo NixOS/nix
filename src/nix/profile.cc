@@ -20,6 +20,7 @@
 #include <iomanip>
 
 #include "nix/util/strings.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 
@@ -911,11 +912,12 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
                 logger->cout("");
             first = false;
 
+            auto created = utcTime(gen.creationTime);
             logger->cout(
                 "Version %s%d" ANSI_NORMAL " (%s)%s:",
                 gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
                 gen.number,
-                std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),
+                std::put_time(&created, "%Y-%m-%d"),
                 prevGen ? fmt(" <- %d", prevGen->first.number) : "");
 
             ProfileManifest::printDiff(prevGen ? prevGen->second : ProfileManifest(), manifest, "  ");

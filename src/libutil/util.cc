@@ -3,6 +3,8 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/signals.hh"
 
+#include "util-config-private.hh"
+
 #include <array>
 #include <cctype>
 #include <mutex>
@@ -228,6 +230,30 @@ std::string renderSize(int64_t value, bool align)
 {
     SizeUnit unit = getSizeUnit(value);
     return fmt("%s %ciB", renderSizeWithoutUnit(value, unit, align), getSizeUnitSuffix(unit));
+}
+
+std::tm utcTime(time_t t)
+{
+    std::tm tm;
+#if HAVE_GMTIME_R
+    if (!gmtime_r(&t, &tm))
+#else
+    if (gmtime_s(&tm, &t) != 0)
+#endif
+        throw Error("cannot convert time %d to UTC", t);
+    return tm;
+}
+
+std::tm localTime(time_t t)
+{
+    std::tm tm;
+#if HAVE_LOCALTIME_R
+    if (!localtime_r(&t, &tm))
+#else
+    if (localtime_s(&tm, &t) != 0)
+#endif
+        throw Error("cannot convert time %d to local time", t);
+    return tm;
 }
 
 bool hasPrefix(std::string_view s, std::string_view prefix)

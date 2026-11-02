@@ -356,8 +356,10 @@ static std::string describe(const FlakeRef & flakeRef)
 {
     auto s = fmt("'%s'", flakeRef.to_string());
 
-    if (auto lastModified = flakeRef.input.getLastModified())
-        s += fmt(" (%s)", std::put_time(std::gmtime(&*lastModified), "%Y-%m-%d"));
+    if (auto lastModified = flakeRef.input.getLastModified()) {
+        auto tm = utcTime(*lastModified);
+        s += fmt(" (%s)", std::put_time(&tm, "%Y-%m-%d"));
+    }
 
     return s;
 }
