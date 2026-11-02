@@ -69,4 +69,46 @@ TEST(filterANSIEscapes, osc8_bell_as_sep)
     ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\a\\This is a link\e]8;;\a"), "\\This is a link");
 }
 
+/* ----------------------------------------------------------------------------
+ * stripANSIEscapes
+ * --------------------------------------------------------------------------*/
+
+TEST(stripANSIEscapes, emptyString)
+{
+    ASSERT_EQ(stripANSIEscapes(""), "");
+}
+
+TEST(stripANSIEscapes, doesntChangePrintableChars)
+{
+    auto s = "09 2q304ruyhr slk2-19024 kjsadh sar f";
+    ASSERT_EQ(stripANSIEscapes(s), s);
+}
+
+TEST(stripANSIEscapes, stripsColorCodes)
+{
+    ASSERT_EQ(stripANSIEscapes("\e[31;1m4.3 MiB\e[0m"), "4.3 MiB");
+    ASSERT_EQ(stripANSIEscapes("\e[30m A \e[31m B \e[32m C \e[0m"), " A  B  C ");
+}
+
+TEST(stripANSIEscapes, preservesTabsAndCarriageReturns)
+{
+    // Unlike filterANSIEscapes, tabs are NOT expanded and \r is NOT dropped;
+    // this matters for tab-delimited output such as shell completions.
+    ASSERT_EQ(stripANSIEscapes("foo\tbar\tbaz"), "foo\tbar\tbaz");
+    ASSERT_EQ(stripANSIEscapes("\e[1m--rebuild\e[0m\trebuild the given path"), "--rebuild\trebuild the given path");
+    ASSERT_EQ(stripANSIEscapes("a\r\nb"), "a\r\nb");
+}
+
+TEST(stripANSIEscapes, preservesUTF8)
+{
+    ASSERT_EQ(stripANSIEscapes("fóóbär"), "fóóbär");
+    ASSERT_EQ(stripANSIEscapes("\e[32mhello: 2.10 → 2.12.1\e[0m"), "hello: 2.10 → 2.12.1");
+}
+
+TEST(stripANSIEscapes, osc8Hyperlink)
+{
+    ASSERT_EQ(stripANSIEscapes("\e]8;;http://example.com\e\\This is a link\e]8;;\e\\"), "This is a link");
+    ASSERT_EQ(stripANSIEscapes("\e]8;;http://example.com\aThis is a link\e]8;;\a"), "This is a link");
+}
+
 } // namespace nix
