@@ -7,6 +7,8 @@
 #include "nix/util/pool.hh"
 #include "nix/util/lru-cache.hh"
 
+#include <utility>
+
 namespace nix {
 
 /**
@@ -36,7 +38,7 @@ public:
      * Skipping the wire call is an optional but worthwhile optimization that
      * reduces communication overhead. LRU eviction would cost a round-trip.
      */
-    LRUCache<StorePath, bool> tempRootsPinned{65536};
+    LRUCache<StorePath, std::monostate> tempRootsPinned{65536};
 };
 
 /**

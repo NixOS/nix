@@ -359,7 +359,10 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
             conn.withFramedSink([&](Sink & sink) { dump.drainInto(sink); });
         }
 
-        return make_ref<ValidPathInfo>(WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
+        auto res = make_ref<ValidPathInfo>(WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
+        /* The remote has already temprooted the path for us. */
+        conn->tempRootsPinned.upsert(res->path, {});
+        return res;
     } else {
         if (repair)
             throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
@@ -458,6 +461,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
         copyNAR(source, conn->to);
         conn.processStderr(0, nullptr);
     }
+
+    /* If the calls above succeeded, the remote has registered the path as a temproot for us. */
+    conn->tempRootsPinned.upsert(info.path, {});
 }
 
 void RemoteStore::addMultipleToStore(
@@ -476,6 +482,7 @@ void RemoteStore::addMultipleToStore(
         bytesExpected += pathInfo.narSize;
     }
     act.setExpected(actCopyPath, bytesExpected);
+    std::vector<StorePath> processedPaths;
 
     auto source = sinkToSource([&](Sink & sink) {
         size_t nrTotal = pathsToCopy.size();
@@ -494,12 +501,16 @@ void RemoteStore::addMultipleToStore(
                 },
                 pathInfo);
             pathSource->drainInto(sink);
+            processedPaths.push_back(pathInfo.path);
             pathsToCopy.pop_back();
         }
     });
 
     conn->to << WorkerProto::Op::AddMultipleToStore << repair << !checkSigs;
     conn.withFramedSink([&](Sink & sink) { source->drainInto(sink); });
+    /* The remote has pinned the paths for us if the call above succeeded. */
+    for (const auto & path : processedPaths)
+        conn->tempRootsPinned.upsert(path, {});
 }
 
 void RemoteStore::registerDrvOutputUnchecked(const Realisation & info)
@@ -769,9 +780,19 @@ void RemoteStore::addTempRoots(const StorePathSet & paths)
         readInt(conn->from);
 
         for (auto & path : newPaths)
-            conn->tempRootsPinned.upsert(path, true);
+            conn->tempRootsPinned.upsert(path, {});
     }
     /* Note: there is no fallback for old daemons to prevent performance regressions. */
+}
+
+void RemoteStore::addTempRoot(const StorePath & path)
+{
+    /* Unlike the best-effort-implemented addTempRoots, addTempRoot is always supported. */
+    auto conn(getConnection());
+    if (conn->tempRootsPinned.get(path))
+        return;
+    conn->addTempRoot(*this, &conn.daemonException, path);
+    conn->tempRootsPinned.upsert(path, {});
 }
 
 Roots RemoteStore::findRoots(bool censor)
