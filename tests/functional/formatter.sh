@@ -10,8 +10,14 @@ cd "$TEST_HOME"
 
 nix formatter --help | grep "build or run the formatter"
 nix fmt --help | grep "reformat your code"
-nix fmt run --help | grep "reformat your code"
-nix fmt build --help | grep "build"
+nix formatter run --help | grep "reformat your code"
+nix formatter build --help | grep "build"
+
+for flag in --file -f --expr; do
+    expect 1 nix formatter build "$flag" unused 2>&1 | grep -F -- "unrecognised flag '$flag'"
+    expect 1 nix formatter run "$flag" unused 2>&1 | grep -F -- "unrecognised flag '$flag'"
+    expect 1 nix fmt "$flag" unused 2>&1 | grep -F -- "unrecognised flag '$flag'"
+done
 
 # shellcheck disable=SC2154
 cat << EOF > flake.nix
@@ -57,9 +63,25 @@ EOF
 [[ "$(nix fmt)" = "PRJ_ROOT=$TEST_HOME Formatting(0):" ]]
 [[ "$(nix formatter run)" = "PRJ_ROOT=$TEST_HOME Formatting(0):" ]]
 
+for flag in --arg --argstr; do
+    expect 1 nix formatter build "$flag" unused true 2>&1 | grep -F "incompatible with flakes"
+    expect 1 nix formatter run "$flag" unused true 2>&1 | grep -F "incompatible with flakes"
+    expect 1 nix fmt "$flag" unused true 2>&1 | grep -F "incompatible with flakes"
+done
+
 # Argument forwarding check
 nix fmt ./file ./folder | grep "PRJ_ROOT=$TEST_HOME Formatting(2): ./file ./folder"
 nix formatter run ./file ./folder | grep "PRJ_ROOT=$TEST_HOME Formatting(2): ./file ./folder"
+nix fmt -- --file -f --expr | grep "PRJ_ROOT=$TEST_HOME Formatting(3): --file -f --expr"
+nix formatter run -- --file -f --expr | grep "PRJ_ROOT=$TEST_HOME Formatting(3): --file -f --expr"
+
+mkdir subdir
+(
+    cd subdir
+    [[ "$(nix fmt)" = "PRJ_ROOT=$TEST_HOME Formatting(0):" ]]
+    [[ "$(nix formatter run)" = "PRJ_ROOT=$TEST_HOME Formatting(0):" ]]
+    nix formatter build --no-link | grep ".\+/bin/formatter"
+)
 
 # test subflake
 cd subflake
