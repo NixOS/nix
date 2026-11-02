@@ -13,6 +13,7 @@
 #include <span>
 #include <algorithm>
 #include <atomic>
+#include <vector>
 
 #include "util-unix-config-private.hh"
 #include "../file-descriptor-private.hh"
@@ -166,14 +167,19 @@ void unix::closeExtraFDs(std::span<const Descriptor> keepExtra)
 #if defined(__linux__) || defined(__APPLE__)
     try {
 #  ifdef __linux__
-        /* XXX: Is it ok to close while readdir()-ing? Seems like it's not. */
+        /* Don't close while iterating: the listing includes the FD of the directory itself, and
+           closing that would make the next read fail. By the time we do the closing below, that
+           FD is already closed by the iterator, so closing it again is a harmless no-op. */
+        std::vector<int> openFds;
         for (const auto & s : DirectoryIterator{"/proc/self/fd/"}) {
             auto fd = string2Int<int>(s.path().filename().native());
             if (!fd)
                 continue;
             if (*fd > maxKept)
-                ::close(*fd); /* ignore result */
+                openFds.push_back(*fd);
         }
+        for (auto fd : openFds)
+            ::close(fd); /* ignore result */
 #  elifdef __APPLE__
         const auto pid = ::getpid();
         errno = 0;
