@@ -265,10 +265,16 @@ public:
         auto i = path.begin();
         auto j = x.path.begin();
         for (; i != path.end() && j != x.path.end(); ++i, ++j) {
-            auto c_i = *i;
+            /* Unsigned, so that `/` (mapped to 0) sorts before every
+               other byte, including non-ASCII ones. Otherwise we
+               violate the spec written above.
+
+               Null bytes are already disallowed so we don't need to worry
+               about '\0' and '/' comparisons. */
+            unsigned char c_i = *i;
             if (c_i == '/')
                 c_i = 0;
-            auto c_j = *j;
+            unsigned char c_j = *j;
             if (c_j == '/')
                 c_j = 0;
             if (auto cmp = c_i <=> c_j; cmp != 0)

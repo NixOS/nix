@@ -216,6 +216,17 @@ TYPED_TEST(CanonicalPath, orderingIsComponentwise)
     ASSERT_FALSE(TestFixture::parse("foo") < TestFixture::parse("foo"));
     ASSERT_TRUE(TestFixture::parse("foo") < TestFixture::parse("foo/bar"));
     ASSERT_TRUE(TestFixture::identity() < TestFixture::parse("foo"));
+    /* Bytes must compare as unsigned: a directory's descendants come
+       right after it, before a sibling whose name extends the directory's
+       with a non-ASCII byte (here UTF-8 `ü`). */
+    auto dir = TestFixture::parse("foo");
+    auto child = TestFixture::parse("foo/bar");
+    auto grandchild = TestFixture::parse("foo/bar/baz");
+    auto sibling = TestFixture::parse("foo\xc3\xbc");
+    ASSERT_TRUE(dir < child);
+    ASSERT_TRUE(child < grandchild);
+    ASSERT_TRUE(grandchild < sibling);
+    ASSERT_TRUE(dir < sibling);
 }
 
 /* --------------------------------------------------------------------------
@@ -286,8 +297,8 @@ TEST(CanonicalPathHomomorphism, ordering)
 {
     /* Order must be preserved, or the dir-fd cache's `std::map` would
        disagree with the portable namespace it mirrors. */
-    for (auto a : {"", "foo", "foo/bar", "foo!", "bar"}) {
-        for (auto b : {"", "foo", "foo/bar", "foo!", "bar"}) {
+    for (auto a : {"", "foo", "foo/bar", "foo!", "foo\xc3\xbc", "bar"}) {
+        for (auto b : {"", "foo", "foo/bar", "foo!", "foo\xc3\xbc", "bar"}) {
             ASSERT_EQ(osParse(a) < osParse(b), portableParse(a) < portableParse(b)) << "a: " << a << ", b: " << b;
         }
     }
