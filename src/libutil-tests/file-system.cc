@@ -309,6 +309,32 @@ TEST(DirectoryIterator, nonexistent)
     ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
 }
 
+#ifdef __linux__
+TEST(DirectoryIterator, readError)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir / "somefile", "");
+
+    DirectoryIterator it(tmpDir);
+
+    /* Make the next read of the directory fail by closing the FD of the iterator's directory stream. */
+    auto target = std::filesystem::canonical(tmpDir);
+    bool closed = false;
+    for (auto & fd : DirectoryIterator("/proc/self/fd")) {
+        std::error_code ec;
+        if (std::filesystem::read_symlink(fd.path(), ec) == target) {
+            ::close(std::stoi(fd.path().filename().string()));
+            closed = true;
+        }
+    }
+    ASSERT_TRUE(closed);
+
+    ASSERT_THROW((void) std::distance(it, DirectoryIterator{}), SystemError);
+}
+#endif
+
 /* ----------------------------------------------------------------------------
  * createAnonymousTempFile
  * --------------------------------------------------------------------------*/
