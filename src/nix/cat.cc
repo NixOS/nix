@@ -59,7 +59,7 @@ struct CmdCatNar : StoreCommand, MixCat
 
     CmdCatNar()
     {
-        expectArgs({.label = "nar", .handler = {&narPath}, .completer = completePath});
+        expectArg("nar", &narPath);
         expectArg("path", &path);
     }
 

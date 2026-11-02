@@ -343,6 +343,12 @@ struct Common : InstallableCommand, MixProfile
             .handler = {[&](std::string installable, std::filesystem::path outputsDir) {
                 redirects.push_back({installable, outputsDir});
             }},
+            .completer =
+                [](AddCompletions & completions, size_t index, std::string_view prefix) {
+                    if (index == 1) {
+                        completeDir(completions, index, prefix);
+                    }
+                },
         });
     }
 

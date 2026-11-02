@@ -322,7 +322,7 @@ public:
      */
     void expectArg(const std::string & label, std::filesystem::path * dest, bool optional = false)
     {
-        expectArgs({.label = label, .optional = optional, .handler = {dest}});
+        expectArgs({.label = label, .optional = optional, .handler = {dest}, .completer = completePath});
     }
 
     /**
@@ -332,6 +332,8 @@ public:
     {
         expectArgs({.label = label, .handler = {dest}});
     }
+
+    static CompleterFun completeSettings;
 
     static CompleterFun completePath;
 
