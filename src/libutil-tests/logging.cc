@@ -23,7 +23,6 @@ namespace nix {
     TEST(logEI, capturesBasicProperties) {
 
         MakeError(TestError, Error);
-        ErrorInfo::programName = std::optional("error-unit-test");
 
         try {
             throw TestError("an error for testing purposes");
@@ -56,7 +55,6 @@ namespace nix {
     TEST(logEI, appendingHintsToPreviousError) {
 
         MakeError(TestError, Error);
-        ErrorInfo::programName = std::optional("error-unit-test");
 
         try {
             auto e = Error("initial error");
@@ -77,7 +75,6 @@ namespace nix {
     TEST(logEI, picksUpSystemErrorExitCode) {
 
         MakeError(TestError, Error);
-        ErrorInfo::programName = std::optional("error-unit-test");
 
         try {
             auto x = readFile(-1);
