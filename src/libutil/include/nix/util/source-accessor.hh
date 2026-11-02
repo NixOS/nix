@@ -1,8 +1,11 @@
 #pragma once
 
 #include <filesystem>
+#include <variant>
 
 #include "nix/util/canon-path.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-canon-path.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/ref.hh"
@@ -266,7 +269,11 @@ class SymlinkNotAllowed final : public CloneableError<SymlinkNotAllowed, Error>
     void anchor() override;
 
 public:
-    CanonPath path;
+    /**
+     * Either a portable path, or an OS-native canonical *relative* path
+     * (relative to whichever directory handle the operation started from).
+     */
+    std::variant<CanonPath, OsCanonPath> path;
 
     SymlinkNotAllowed(CanonPath path)
         : CloneableError("relative path '%s' points to a symlink, which is not allowed", path.rel())
@@ -276,6 +283,19 @@ public:
 
     template<typename... Args>
     SymlinkNotAllowed(CanonPath path, const std::string & fs, Args &&... args)
+        : CloneableError(fs, std::forward<Args>(args)...)
+        , path(std::move(path))
+    {
+    }
+
+    SymlinkNotAllowed(OsCanonPath path)
+        : CloneableError("relative path %s points to a symlink, which is not allowed", PathFmt(path.path()))
+        , path(std::move(path))
+    {
+    }
+
+    template<typename... Args>
+    SymlinkNotAllowed(OsCanonPath path, const std::string & fs, Args &&... args)
         : CloneableError(fs, std::forward<Args>(args)...)
         , path(std::move(path))
     {
