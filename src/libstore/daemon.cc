@@ -25,6 +25,7 @@
 
 #include <variant>
 #include <utility>
+#include <thread>
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 #  include "nix/util/monitor-fd.hh"
@@ -62,42 +63,124 @@ struct TunnelLogger : public Logger
 {
     FdSink & to;
 
+    struct Message
+    {
+        std::string data;
+        // Optional acknowledgement for protocol requests, protected by state_'s mutex.
+        std::shared_ptr<bool> flushed;
+    };
+
     struct State
     {
         bool canSendStderr = false;
-        std::vector<std::string> pendingMsgs;
+        std::vector<Message> pendingMsgs;
+        std::vector<Message> outgoingMsgs;
+        bool sending = false;
+        bool finished = false;
+        std::exception_ptr exception;
     };
 
     Sync<State> state_;
 
     WorkerProto::Version clientVersion;
+    std::condition_variable wakeup;
+    std::jthread sender;
 
     TunnelLogger(FdSink & to, WorkerProto::Version clientVersion)
         : to(to)
         , clientVersion(clientVersion)
+        , sender([this](std::stop_token stop) { sendMessages(stop); })
     {
+    }
+
+    ~TunnelLogger() override
+    {
+        stop();
+    }
+
+    void sendMessages(std::stop_token stop) noexcept
+    {
+        try {
+            ReceiveInterrupts receiveInterrupts;
+            while (!stop.stop_requested()) {
+                std::vector<Message> msgs;
+                {
+                    auto state(state_.lock());
+                    state.wait(wakeup, [&] { return stop.stop_requested() || !state->outgoingMsgs.empty(); });
+                    if (stop.stop_requested())
+                        break;
+                    msgs.swap(state->outgoingMsgs);
+                    state->sending = true;
+                }
+                for (auto & msg : msgs) {
+                    if (stop.stop_requested())
+                        throw Interrupted("stopping tunnel logger");
+                    to(msg.data);
+                    if (msg.flushed) {
+                        to.flush();
+                        {
+                            auto state(state_.lock());
+                            *msg.flushed = true;
+                        }
+                        wakeup.notify_all();
+                    }
+                }
+                to.flush();
+                state_.lock()->sending = false;
+                wakeup.notify_all();
+            }
+        } catch (...) {
+            auto state(state_.lock());
+            // Discard residual output after failure only while the sender owns the sink.
+            if (state->sending)
+                to.bufPos = 0;
+            state->exception = std::current_exception();
+        }
+        state_.lock()->finished = true;
+        wakeup.notify_all();
+    }
+
+    void stop() override
+    {
+        if (!sender.joinable())
+            return;
+        {
+            auto state(state_.lock());
+            sender.request_stop();
+        }
+        wakeup.notify_all();
+        sender.join();
+        {
+            auto state(state_.lock());
+            std::vector<Message>{}.swap(state->pendingMsgs);
+            std::vector<Message>{}.swap(state->outgoingMsgs);
+        }
     }
 
     void enqueueMsg(const std::string & s) noexcept
     {
         auto state(state_.lock());
+        if (state->finished || state->exception)
+            return;
+        (state->canSendStderr ? state->outgoingMsgs : state->pendingMsgs).push_back({s, {}});
+        wakeup.notify_all();
+    }
 
-        if (state->canSendStderr) {
-            assert(state->pendingMsgs.empty());
-            try {
-                to(s);
-                to.flush();
-            } catch (...) {
-                /* Write failed; that means that the other side is
-                   gone, so stop sending it messages. Note that we
-                   don't propagate the error, since logging must not
-                   throw. The client's death will be detected
-                   elsewhere (e.g. by `MonitorFdHup` or by the next
-                   protocol read/write). */
-                state->canSendStderr = false;
-            }
-        } else
-            state->pendingMsgs.push_back(s);
+    void sendRequestAndWait(const std::string & s)
+    {
+        auto flushed = std::make_shared<bool>(false);
+        auto state(state_.lock());
+        if (state->exception)
+            std::rethrow_exception(state->exception);
+        if (state->finished || !state->canSendStderr)
+            throw Error("tunnel logger is not accepting requests");
+        state->outgoingMsgs.push_back({s, flushed});
+        wakeup.notify_all();
+        state.wait(wakeup, [&] { return *flushed || state->exception || state->finished; });
+        if (state->exception)
+            std::rethrow_exception(state->exception);
+        if (!*flushed)
+            throw Error("tunnel logger stopped before flushing a request");
     }
 
     void log(Verbosity lvl, std::string_view s) noexcept override
@@ -127,24 +210,31 @@ struct TunnelLogger : public Logger
        want to send out stderr to the client. */
     void startWork()
     {
-        auto state(state_.lock());
-        state->canSendStderr = true;
-
-        for (auto & msg : state->pendingMsgs)
-            to(msg);
-
-        state->pendingMsgs.clear();
-
         to.flush();
+        auto state(state_.lock());
+        if (state->exception)
+            std::rethrow_exception(state->exception);
+        if (state->finished)
+            throw Error("tunnel logger has stopped");
+        state->canSendStderr = true;
+        assert(state->outgoingMsgs.empty());
+        state->outgoingMsgs.swap(state->pendingMsgs);
+        wakeup.notify_all();
     }
 
     /* stopWork() means that we're done; stop sending stderr to the
        client. */
     void stopWork(const Error * ex = nullptr)
     {
-        auto state(state_.lock());
-
-        state->canSendStderr = false;
+        {
+            auto state(state_.lock());
+            state->canSendStderr = false;
+            state.wait(wakeup, [&] { return state->finished || (state->outgoingMsgs.empty() && !state->sending); });
+            if (state->exception)
+                std::rethrow_exception(state->exception);
+            if (state->finished)
+                throw Error("tunnel logger has stopped");
+        }
 
         if (!ex)
             to << STDERR_LAST;
@@ -198,18 +288,19 @@ struct TunnelLogger : public Logger
 struct TunnelSource : BufferedSource
 {
     Source & from;
-    BufferedSink & to;
+    TunnelLogger & logger;
 
-    TunnelSource(Source & from, BufferedSink & to)
+    TunnelSource(Source & from, TunnelLogger & logger)
         : from(from)
-        , to(to)
+        , logger(logger)
     {
     }
 
     size_t readUnbuffered(char * data, size_t len) override
     {
-        to << STDERR_READ << len;
-        to.flush();
+        StringSink buf;
+        buf << STDERR_READ << len;
+        logger.sendRequestAndWait(buf.s);
         size_t n = readString(data, len, from);
         if (n == 0)
             throw EndOfFile("unexpected end-of-file");
@@ -1005,7 +1096,7 @@ static void performOp(
             std::unique_ptr<Source> source;
             StringSink saved;
             if (conn.protoVersion >= WorkerProto::Version{.number = {1, 21}})
-                source = std::make_unique<TunnelSource>(conn.from, conn.to);
+                source = std::make_unique<TunnelSource>(conn.from, *logger);
             else {
                 TeeSource tee{conn.from, saved};
                 NullFileSystemObjectSink ether;
@@ -1186,6 +1277,7 @@ void processConnection(
     conn.from = std::move(from);
 
     auto tunnelLogger = new TunnelLogger(conn.to, conn.protoVersion);
+    Finally stopLogger([&] { tunnelLogger->stop(); });
     auto prevLogger = logger;
     // FIXME
     if (recursive == RecursiveFlag::NotRecursive) {
