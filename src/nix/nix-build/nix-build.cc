@@ -449,7 +449,7 @@ static void main_nix_build(int argc, char ** argv)
 
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         if (settings.printMissing)
-            printMissing(ref<Store>(store), paths);
+            printMissing(ref<Store>(store), paths, lvlInfo, &*evalStore);
 
         if (!dryRun)
             store->getBuilder(evalStore)->buildPaths(paths, buildMode);

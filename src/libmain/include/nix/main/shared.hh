@@ -36,7 +36,8 @@ void printGCWarning();
 class Store;
 struct MissingPaths;
 
-void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl = lvlInfo);
+void printMissing(
+    ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl = lvlInfo, Store * evalStore = nullptr);
 
 void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl = lvlInfo);
 

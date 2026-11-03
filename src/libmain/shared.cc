@@ -54,9 +54,9 @@ void printGCWarning()
         "the result might be removed by the garbage collector");
 }
 
-void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl, Store * evalStore)
 {
-    printMissing(store, store->queryMissing(paths), lvl);
+    printMissing(store, store->queryMissing(paths, evalStore), lvl);
 }
 
 void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)
