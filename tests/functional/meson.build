@@ -154,6 +154,7 @@ suites = [
       'path-info.sh',
       'placeholders.sh',
       'post-hook.sh',
+      'pre-build-hook.sh',
       'pure-eval.sh',
       'read-only-store.sh',
       'readfile-context.sh',

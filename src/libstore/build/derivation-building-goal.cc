@@ -1003,15 +1003,22 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
                             );
         }
 
-        if (!builder->startBuild()) {
-            if (!actLock)
-                actLock = std::make_unique<Activity>(
-                    *logger,
-                    lvlWarn,
-                    actBuildWaiting,
-                    fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
-            co_await waitForAWhile();
-            continue;
+        try {
+            if (!builder->startBuild()) {
+                if (!actLock)
+                    actLock = std::make_unique<Activity>(
+                        *logger,
+                        lvlWarn,
+                        actBuildWaiting,
+                        fmt("waiting for a free build user ID for '%s'",
+                            Magenta(worker.store.printStorePath(drvPath))));
+                co_await waitForAWhile();
+                continue;
+            }
+        } catch (BuildError & e) {
+            builder.reset();
+            outputLocks.unlock();
+            co_return std::move(e);
         }
 
         break;
