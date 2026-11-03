@@ -35,34 +35,12 @@
 
 namespace nix {
 
-DirectoryIterator::DirectoryIterator(const std::filesystem::path & p)
+DirectoryIterator::DirectoryIterator(const std::filesystem::path & path)
 {
-    try {
-        // **Attempt to create the underlying directory_iterator**
-        it_ = std::filesystem::directory_iterator(p);
-    } catch (const std::filesystem::filesystem_error & e) {
-        // **Catch filesystem_error and throw SystemError**
-        // Adapt the error message as needed for SystemError
-        throw SystemError(e.code(), "cannot read directory %s", PathFmt(p));
-    }
-}
-
-DirectoryIterator & DirectoryIterator::operator++()
-{
-    // **Attempt to increment the underlying iterator**
-    std::error_code ec;
-    it_.increment(ec);
-    if (ec) {
-        // Try to get path info if possible, might fail if iterator is bad
-        try {
-            if (it_ != std::filesystem::directory_iterator{}) {
-                throw SysError("cannot read directory past %s: %s", PathFmt(it_->path()), ec.message());
-            }
-        } catch (...) {
-            throw SysError("cannot read directory");
-        }
-    }
-    return *this;
+    auto fd = openDirectory(path, FinalSymlink::Follow);
+    if (!fd)
+        throw NativeSysError("cannot read directory %s", PathFmt(path));
+    *this = DirectoryIterator{std::move(fd)};
 }
 
 std::filesystem::path
@@ -371,15 +349,28 @@ void recursiveSync(const std::filesystem::path & path)
         auto currentDir = dirsToEnumerate.back();
         dirsToEnumerate.pop_back();
         for (auto & entry : DirectoryIterator(currentDir)) {
-            auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
-                dirsToEnumerate.emplace_back(entry.path());
-            } else if (std::filesystem::is_regular_file(st)) {
-                AutoCloseFD fd = openFileReadonly(entry.path(), FinalSymlink::DontFollow);
+            auto entryPath = currentDir / entry.name.path();
+            auto type = entry.type != std::filesystem::file_type::none
+                            ? entry.type
+                            : std::filesystem::symlink_status(entryPath).type();
+// Allow selecting a subset of enum values
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+            switch (type) {
+            case std::filesystem::file_type::directory:
+                dirsToEnumerate.emplace_back(std::move(entryPath));
+                break;
+            case std::filesystem::file_type::regular: {
+                AutoCloseFD fd = openFileReadonly(entryPath, FinalSymlink::DontFollow);
                 if (!fd)
-                    throw NativeSysError("opening file %1%", PathFmt(entry.path()));
+                    throw NativeSysError("opening file %1%", PathFmt(entryPath));
                 fd.fsync();
+                break;
             }
+            default:
+                break;
+            }
+#pragma GCC diagnostic pop
         }
         dirsToFsync.emplace_back(std::move(currentDir));
     }
@@ -617,7 +608,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);
         for (auto & entry : DirectoryIterator(from)) {
-            copyFile(entry, to / entry.path().filename(), andDelete);
+            copyFile(from / entry.name.path(), to / entry.name.path(), andDelete);
         }
     } else {
         throw Error("file %s has an unsupported type", PathFmt(from));

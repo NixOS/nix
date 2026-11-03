@@ -96,9 +96,12 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
        this cgroup. */
     for (auto & entry : DirectoryIterator{cgroup}) {
         checkInterrupt();
-        if (entry.symlink_status().type() != std::filesystem::file_type::directory)
+        auto entryPath = cgroup / entry.name.path();
+        auto type = entry.type != std::filesystem::file_type::none ? entry.type
+                                                                   : std::filesystem::symlink_status(entryPath).type();
+        if (type != std::filesystem::file_type::directory)
             continue;
-        destroyCgroup(cgroup / entry.path().filename(), false);
+        destroyCgroup(entryPath, false);
     }
 
     int round = 1;

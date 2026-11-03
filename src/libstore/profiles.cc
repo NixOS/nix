@@ -37,8 +37,8 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
 
     for (auto & i : DirectoryIterator{profileDir}) {
         checkInterrupt();
-        if (auto n = parseName(profileName, i.path().filename().string())) {
-            auto path = i.path().string();
+        if (auto n = parseName(profileName, i.name.path().string())) {
+            auto path = (profileDir / i.name.path()).string();
             gens.push_back({.number = *n, .path = path, .creationTime = lstat(path).st_mtime});
         }
     }

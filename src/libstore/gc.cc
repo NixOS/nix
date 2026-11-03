@@ -180,13 +180,13 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
        files. */
     for (auto & i : DirectoryIterator{tempRootsDir}) {
         checkInterrupt();
-        auto name = i.path().filename().string();
+        auto name = i.name.path().string();
         if (name[0] == '.') {
             // Ignore hidden files. Some package managers (notably portage) create
             // those to keep the directory alive.
             continue;
         }
-        auto path = i.path();
+        auto path = tempRootsDir / i.name.path();
 
         debug("reading temporary root file %1%", PathFmt(path));
         AutoCloseFD fd(toDescriptor(open(
@@ -243,17 +243,21 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
 
     try {
 
-        if (type == std::filesystem::file_type::unknown)
+        if (type == std::filesystem::file_type::none || type == std::filesystem::file_type::unknown)
             type = std::filesystem::symlink_status(path).type();
 
-        if (type == std::filesystem::file_type::directory) {
+// Allow selecting a subset of enum values
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+        switch (type) {
+        case std::filesystem::file_type::directory:
             for (auto & i : DirectoryIterator{path}) {
                 checkInterrupt();
-                findRoots(i.path(), i.symlink_status().type(), roots);
+                findRoots(path / i.name.path(), i.type, roots);
             }
-        }
+            break;
 
-        else if (type == std::filesystem::file_type::symlink) {
+        case std::filesystem::file_type::symlink: {
             auto target = readLink(path);
             if (isInStore(target.string()))
                 foundRoot(path, target);
@@ -275,13 +279,20 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                         foundRoot(target, target2);
                 }
             }
+            break;
         }
 
-        else if (type == std::filesystem::file_type::regular) {
+        case std::filesystem::file_type::regular: {
             auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path.string())));
             if (storePath && isValidPath(*storePath))
                 roots[std::move(*storePath)].emplace(path.string());
+            break;
         }
+
+        default:
+            break;
+        }
+#pragma GCC diagnostic pop
 
     }
 
