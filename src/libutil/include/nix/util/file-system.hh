@@ -12,6 +12,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/os-filename.hh"
 #include "nix/util/deleter.hh"
 
 #include <filesystem>
@@ -25,6 +26,8 @@
 #endif
 
 #include <functional>
+#include <iterator>
+#include <memory>
 #include <optional>
 
 /**
@@ -574,75 +577,123 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
 void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst);
 
 /**
+ * An entry read by @ref DirectoryIterator.
+ */
+struct DirectoryEntry
+{
+    /**
+     * The entry's name. It refers to the iterator's own buffer, so it is
+     * only valid until the iterator is advanced; copy it into an
+     * `OsFilename` to keep it.
+     */
+    OsFilenameView name;
+
+    /**
+     * The entry's own type (symlinks are not followed), as reported by
+     * the directory read itself. `std::filesystem::file_type::none` if
+     * it was not reported, in which case callers that need it have to
+     * `lstat` the entry themselves.
+     */
+    std::filesystem::file_type type;
+};
+
+/**
  * @brief A directory iterator that can be used to iterate over the
- * contents of a directory. It is similar to std::filesystem::directory_iterator
- * but throws NixError on failure instead of std::filesystem::filesystem_error.
+ * contents of a directory, other than `.` and `..`. It is similar to
+ * std::filesystem::directory_iterator but throws SystemError on failure
+ * instead of std::filesystem::filesystem_error.
+ *
+ * Unlike `std::filesystem::directory_iterator`, it can only be moved,
+ * not copied, since copies could only ever share one position, and the
+ * entries it hands out are overwritten as it advances. It is its own
+ * range: `begin()` moves it, so it can be used directly in a
+ * range-based for loop. Also unlike `std::filesystem::directory_iterator`,
+ * entries are just names relative to the directory rather than full
+ * paths.
  */
 class DirectoryIterator
 {
 public:
     // --- Iterator Traits ---
-    using iterator_category = std::input_iterator_tag;
-    using value_type = std::filesystem::directory_entry;
+    using iterator_concept = std::input_iterator_tag;
+    using value_type = DirectoryEntry;
     using difference_type = std::ptrdiff_t;
-    using pointer = const std::filesystem::directory_entry *;
-    using reference = const std::filesystem::directory_entry &;
+    using pointer = const DirectoryEntry *;
+    using reference = const DirectoryEntry &;
 
     // Default constructor (represents end iterator)
-    DirectoryIterator() noexcept = default;
+    DirectoryIterator() noexcept;
+
+    /**
+     * Read the directory @p dirFd refers to, taking ownership of it.
+     *
+     * The handle's read position is consumed, so it must not be shared.
+     * On Unix it must not be an `O_PATH` descriptor; on Windows it needs
+     * `FILE_LIST_DIRECTORY` access.
+     */
+    explicit DirectoryIterator(AutoCloseFD dirFd);
 
     // Constructor taking a path
-    explicit DirectoryIterator(const std::filesystem::path & p);
+    explicit DirectoryIterator(const std::filesystem::path & path);
+
+    DirectoryIterator(DirectoryIterator &&) noexcept;
+    DirectoryIterator & operator=(DirectoryIterator &&) noexcept;
+    ~DirectoryIterator();
 
     reference operator*() const
     {
-        // Accessing the value itself doesn't typically throw filesystem_error
-        // after successful construction/increment, but underlying operations might.
-        // If directory_entry methods called via -> could throw, add try-catch there.
-        return *it_;
+        return *entry;
     }
 
     pointer operator->() const
     {
-        return &(*it_);
+        return &*entry;
     }
 
     DirectoryIterator & operator++();
 
     // Postfix increment operator
-    DirectoryIterator operator++(int)
+    void operator++(int)
     {
-        DirectoryIterator temp = *this;
-        ++(*this); // Uses the prefix increment's try-catch logic
-        return temp;
+        ++*this;
     }
 
-    // Equality comparison
-    friend bool operator==(const DirectoryIterator & a, const DirectoryIterator & b) noexcept
+    /**
+     * Whether this is the end iterator.
+     */
+    bool operator==(std::default_sentinel_t) const noexcept
     {
-        return a.it_ == b.it_;
-    }
-
-    // Inequality comparison
-    friend bool operator!=(const DirectoryIterator & a, const DirectoryIterator & b) noexcept
-    {
-        return !(a == b);
+        return !state;
     }
 
     // Allow direct use in range-based for loops if iterating over an instance
-    DirectoryIterator begin() const
+    DirectoryIterator begin()
     {
-        return *this;
+        return std::move(*this);
     }
 
-    DirectoryIterator end() const
+    std::default_sentinel_t end() const noexcept
     {
-        return DirectoryIterator{};
+        return std::default_sentinel;
     }
-
 
 private:
-    std::filesystem::directory_iterator it_;
+    /**
+     * The entry `operator*` hands out, overwritten as the iterator
+     * advances.
+     */
+    std::optional<DirectoryEntry> entry;
+
+    /**
+     * Each platform's implementation defines this. Its destructor and
+     * the iterator's moves are defined there too, where it is complete.
+     */
+    struct PlatformState;
+
+    /**
+     * Null exactly for the end iterator.
+     */
+    std::unique_ptr<PlatformState> state;
 };
 
 } // namespace nix

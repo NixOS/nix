@@ -260,11 +260,12 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         try {
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
-            for (auto & entry : DirectoryIterator{dir == "" ? "/" : dir}) {
+            std::filesystem::path dirPath = dir == "" ? "/" : dir;
+            for (const auto & entry : DirectoryIterator{dirPath}) {
                 checkInterrupt();
-                auto name = entry.path().filename().string();
+                auto name = os_string_to_string(entry.name.native());
                 if (name[0] != '.' && hasPrefix(name, prefix2))
-                    completions.insert(prev + entry.path().string());
+                    completions.insert(prev + (dirPath / entry.name.mkPath()).string());
             }
         } catch (Error &) {
         }

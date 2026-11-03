@@ -9,6 +9,7 @@
 #include <windows.h>
 
 #include <boost/format.hpp>
+#include <array>
 #include <chrono>
 
 // Verify that our S_IFLNK polyfill doesn't conflict with Windows file type constants
@@ -18,6 +19,90 @@ static_assert(S_IFLNK != S_IFREG, "S_IFLNK must not equal S_IFREG");
 static_assert(S_IFLNK != S_IFCHR, "S_IFLNK must not equal S_IFCHR");
 
 namespace nix {
+
+struct DirectoryIterator::PlatformState
+{
+    AutoCloseFD handle;
+
+    alignas(LONGLONG) std::array<std::byte, 64 * 1024> buf;
+
+    /**
+     * Offset of the next record in `buf`, or `std::nullopt` once the
+     * records in `buf` are used up and the next batch must be read.
+     */
+    std::optional<size_t> next;
+
+    bool restart = true;
+};
+
+DirectoryIterator::DirectoryIterator() noexcept = default;
+DirectoryIterator::DirectoryIterator(DirectoryIterator &&) noexcept = default;
+DirectoryIterator & DirectoryIterator::operator=(DirectoryIterator &&) noexcept = default;
+DirectoryIterator::~DirectoryIterator() = default;
+
+DirectoryIterator::DirectoryIterator(AutoCloseFD dirFd)
+{
+    using namespace nix::windows;
+
+    /* `openDirectory()` can open non-directories too (thanks to
+       `FILE_FLAG_BACKUP_SEMANTICS`), so report those up front, as
+       `ENOTDIR` would on Unix. */
+    BY_HANDLE_FILE_INFORMATION info;
+    if (!GetFileInformationByHandle(dirFd.get(), &info))
+        throw WinError("getting file information for %s", PathFmt(descriptorToPath(dirFd.get())));
+    if (!(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+        throw WinError(DWORD{ERROR_DIRECTORY}, "cannot read directory %s", PathFmt(descriptorToPath(dirFd.get())));
+
+    auto s = std::make_unique<PlatformState>();
+    s->handle = std::move(dirFd);
+    state = std::move(s);
+    ++*this;
+}
+
+DirectoryIterator & DirectoryIterator::operator++()
+{
+    using namespace nix::windows;
+    using T = std::filesystem::file_type;
+
+    auto & s = *state;
+    while (true) {
+        if (!s.next) {
+            if (!GetFileInformationByHandleEx(
+                    s.handle.get(),
+                    s.restart ? FileIdBothDirectoryRestartInfo : FileIdBothDirectoryInfo,
+                    s.buf.data(),
+                    s.buf.size())) {
+                if (GetLastError() == ERROR_NO_MORE_FILES) {
+                    state.reset();
+                    entry.reset();
+                    return *this;
+                }
+                throw WinError("reading directory %s", PathFmt(descriptorToPath(s.handle.get())));
+            }
+            s.restart = false;
+            s.next = 0;
+        }
+
+        auto & info = *reinterpret_cast<const FILE_ID_BOTH_DIR_INFO *>(s.buf.data() + *s.next);
+        if (info.NextEntryOffset)
+            *s.next += info.NextEntryOffset;
+        else
+            s.next.reset();
+
+        std::wstring_view name{info.FileName, info.FileNameLength / sizeof(wchar_t)};
+        if (name == L"." || name == L"..")
+            continue;
+        entry = DirectoryEntry{
+            .name = OsFilenameView::fromNativeUnchecked(name),
+            /* Every reparse point is reported as a symlink, consistent
+               with `fstat`. */
+            .type = info.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT ? T::symlink
+                    : info.FileAttributes & FILE_ATTRIBUTE_DIRECTORY   ? T::directory
+                                                                       : T::regular,
+        };
+        return *this;
+    }
+}
 
 void setWriteTime(
     const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
