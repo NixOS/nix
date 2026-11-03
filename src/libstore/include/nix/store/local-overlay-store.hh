@@ -35,9 +35,16 @@ public:
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
+    /* The default is a placeholder, but it must still be an absolute
+       path on the host. */
     const Setting<AbsolutePath> upperLayer{
         (StoreConfig *) this,
-        "/upper-layer-must-be-set",
+#ifdef _WIN32
+        "C:\\"
+#else
+        "/"
+#endif
+        "upper-layer-must-be-set",
         "upper-layer",
         R"(
           Directory containing the OverlayFS upper layer for this store's store dir.

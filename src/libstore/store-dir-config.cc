@@ -15,13 +15,17 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
     // notion of a canonical path at all. For example, it makes to
     // support remote stores whose store dir is a non-native path (e.g.
     // Windows <-> Unix ssh-ing).
-    auto p =
 #ifdef _WIN32
-        std::filesystem::path(path)
+    /* `canonPath` requires an absolute path, which `/nix/store` is not
+       on Windows, so just normalise lexically. */
+    auto p = std::filesystem::path(path).lexically_normal();
+    /* `lexically_normal` keeps a trailing separator (as an empty final
+       component), but `canonPath` drops it. */
+    if (!p.has_filename())
+        p = p.parent_path();
 #else
-        canonPath(std::string(path))
+    auto p = canonPath(path);
 #endif
-        ;
     if (p.parent_path() != storeDir)
         throw BadStorePath("path %s is not in the Nix store", PathFmt(p));
     return StorePath(p.filename().string());
