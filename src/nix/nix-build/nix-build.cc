@@ -493,8 +493,22 @@ static void main_nix_build(int argc, char ** argv)
                 shellDrv = bashDrv;
 
             } catch (Error & e) {
-                logError(e.info());
-                notice("falling back to '%s' as the interactive shell", FALLBACK_BASH);
+                /* Installs without channels (the default of nix-installer)
+                   have no <nixpkgs>, so its absence is not worth an error. */
+                bool haveNixpkgs = true;
+                try {
+                    state->findFile("nixpkgs");
+                } catch (ThrownError &) {
+                    haveNixpkgs = false;
+                }
+                if (haveNixpkgs) {
+                    logError(e.info());
+                    notice("falling back to '%s' as the interactive shell", FALLBACK_BASH);
+                } else {
+                    notice(
+                        "using '%s' as the interactive shell, since <nixpkgs> is not in the search path",
+                        FALLBACK_BASH);
+                }
                 shell = FALLBACK_BASH;
             }
         }
