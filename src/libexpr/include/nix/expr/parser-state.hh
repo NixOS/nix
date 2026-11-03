@@ -152,7 +152,7 @@ struct LexerState
 
 struct ParserState
 {
-    const LexerState & lexerState;
+    LexerState & lexerState;
     Exprs & exprs;
     SymbolTable & symbols;
     PosTable & positions;
