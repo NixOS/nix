@@ -11,6 +11,8 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
+#include "nix/util/os-string.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 
 #include "store-config-private.hh"
@@ -575,22 +577,38 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
-    auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
-        assert(!std::filesystem::path(baseName).is_absolute());
-
+    auto deleteFromStore = [&](const OsFilename & name, bool isKnownPath) {
         /* Using `std::string` since this is the logical store dir. Hopefully that is the right choice. */
-        std::string path = storeDir + "/" + std::string(baseName);
-        auto realPath = config->realStoreDir.get() / std::string(baseName);
+        std::string path = storeDir + "/" + name.path().string();
+        auto realPath = config->realStoreDir.get() / name.path();
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
-           exclusive lock before deleting them. */
-        if (baseName.find("tmp-", 0) == 0) {
-            /* TODO Reconsider whether Follow is the right choice, here */
-            auto tmpDirFd = openDirectory(realPath, FinalSymlink::Follow);
-            if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
-                debug("skipping locked tempdir %s", PathFmt(realPath));
+           exclusive lock before deleting them.
+
+           We hold that lock until the deletion is done. Otherwise the
+           process that created the directory could lock it in between, and
+           think it got a directory it could use (see
+           `createTempDirInStore()`).
+
+           That process opens the directory without following symlinks, so
+           we do the same. Anything that isn't a directory then can't be in
+           use, and is just deleted. */
+        AutoCloseFD tmpDirLock;
+        if (name.path().native().starts_with(OS_STR("tmp-"))) {
+            auto tmpDirFd = openDirectoryAt(getRealStoreDirFd(), name);
+            if (tmpDirFd) {
+                if (!lockFile(tmpDirFd.value().get(), ltWrite, false)) {
+                    debug("skipping locked tempdir %s", PathFmt(realPath));
+                    return;
+                }
+                tmpDirLock = std::move(tmpDirFd.value());
+            } else if (tmpDirFd.error() == std::errc::no_such_file_or_directory) {
                 return;
+            } else if (
+                tmpDirFd.error() != std::errc::not_a_directory
+                && tmpDirFd.error() != std::errc::too_many_symbolic_link_levels) {
+                throw SystemError(tmpDirFd.error(), "opening %s", PathFmt(realPath));
             }
         }
 
@@ -781,7 +799,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 });
                 try {
                     invalidatePathChecked(path);
-                    deleteFromStore(path.to_string(), true);
+                    deleteFromStore(OsFilename::fromPathAsserting(path.to_string()), true);
                     referrersCache.erase(path);
                 } catch (PathInUse & e) {
                     // If we end up here, it's likely a new occurrence
@@ -837,25 +855,20 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                         printInfo("determining live/dead paths...");
                     }
 
-                    AutoCloseDir dir(opendir(config->realStoreDir.get().string().c_str()));
-                    if (!dir)
-                        throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
-
                     /* Read the store and delete all paths that are invalid or
                     unreachable. We don't use readDirectory() here so that
                     GCing can start faster. */
                     auto linksName = linksDir.filename();
-                    struct dirent * dirent;
-                    while (errno = 0, dirent = readdir(dir.get())) {
+                    for (auto & entry : DirectoryIterator{reopenDirectory(getRealStoreDirFd())}) {
                         checkInterrupt();
-                        std::string name = dirent->d_name;
-                        if (name == "." || name == ".." || name == linksName)
+                        std::string name = entry.name.path().string();
+                        if (name == linksName)
                             continue;
 
                         if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
                             maybeDeleteReferrersClosure(*storePath);
                         else if (shouldDelete)
-                            deleteFromStore(name, false);
+                            deleteFromStore(entry.name, false);
                     }
                 },
             },
@@ -943,8 +956,8 @@ void LocalStore::autoGC(bool sync)
             return std::stoll(readFile(*fakeFreeSpaceFile));
 
         struct statvfs st;
-        if (statvfs(config->realStoreDir.get().c_str(), &st))
-            throw SysError("getting filesystem info about '%s'", PathFmt(config->realStoreDir.get()));
+        if (fstatvfs(getRealStoreDirFd(), &st))
+            throw SysError("getting filesystem info about %s", PathFmt(config->realStoreDir.get()));
 
         return (uint64_t) st.f_bavail * st.f_frsize;
     };

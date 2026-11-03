@@ -135,6 +135,17 @@ Result<AutoCloseFD, std::error_code> createDirectoryAt(
 );
 
 /**
+ * Open a fresh handle to the directory @p dirFd refers to.
+ *
+ * Unlike `dupDescriptor`, the new handle has its own read position, so
+ * it can be given to a `DirectoryIterator` without disturbing anyone
+ * else using @p dirFd.
+ *
+ * @throws SystemError on failure.
+ */
+AutoCloseFD reopenDirectory(Descriptor dirFd);
+
+/**
  * Get status of an open file/directory handle.
  *
  * @param fd File descriptor/handle

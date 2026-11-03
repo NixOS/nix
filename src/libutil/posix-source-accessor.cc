@@ -594,17 +594,7 @@ AutoCloseFD PosixDirectorySourceAccessor::openSubdirectory(const CanonPath & pat
 
     if (path.isRoot()) {
         /* Get a fresh file descriptor for thread-safety. */
-#ifdef _WIN32
-        dirFdOwning = AutoCloseFD{ReOpenFile(
-            dirFd.get(),
-            FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            FILE_FLAG_BACKUP_SEMANTICS)};
-#else
-        dirFdOwning = ::openat(dirFd.get(), ".", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-#endif
-        if (!dirFdOwning)
-            throw NativeSysError("opening directory '%s'", showPath(path));
+        dirFdOwning = reopenDirectory(dirFd.get());
     } else {
         /* TODO: We can do better when we have openat2. */
         auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
