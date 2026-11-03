@@ -861,7 +861,7 @@ install_from_extracted_nix() {
                   cp -RPp ./store/* "$NIX_ROOT/store/"
         else
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-                  cp -RP --preserve=ownership,timestamps ./store/* "$NIX_ROOT/store/"
+                  cp -RP --preserve=timestamps ./store/* "$NIX_ROOT/store/"
         fi
 
         _sudo "to chown the $NIX_ROOT/store contents" \
