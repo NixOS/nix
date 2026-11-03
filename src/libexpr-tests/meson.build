@@ -58,6 +58,7 @@ sources = files(
   'nix_api_external.cc',
   'nix_api_value.cc',
   'nix_api_value_internal.cc',
+  'parser.cc',
   'primops.cc',
   'search-path.cc',
   'trivial.cc',
