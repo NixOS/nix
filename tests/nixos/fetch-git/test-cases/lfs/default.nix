@@ -2,6 +2,7 @@
   # mostly copied from https://github.com/NixOS/nix/blob/358c26fd13a902d9a4032a00e6683571be07a384/tests/nixos/fetch-git/test-cases/fetchTree-shallow/default.nix#L1
   # ty @DavHau
   description = "fetchGit smudges LFS pointers if lfs=true";
+  repo.private = true;
   script = ''
     from tempfile import TemporaryDirectory
 
