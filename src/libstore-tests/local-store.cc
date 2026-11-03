@@ -112,7 +112,7 @@ protected:
         } else if (S_ISDIR(st.st_mode)) {
             ASSERT_EQ(modeTypeMaskedOut, 0555);
             for (const auto & p : DirectoryIterator{path})
-                assertCanonicalPermissions(p.path());
+                assertCanonicalPermissions(path / p.name.mkPath());
         } else {
             FAIL() << fmt("unknown file type at %1%", PathFmt(path));
         }

@@ -130,12 +130,12 @@ std::tuple<StorePath, Hash> prefetchFile(
             unpackTarfile(tmpFile, unpacked);
 
             auto entries = DirectoryIterator{unpacked};
-            if (entries == DirectoryIterator{})
+            if (entries == std::default_sentinel)
                 throw Error("archive '%s' is empty", url.to_string());
             /* If the archive unpacks to a single file/directory, then use
                that as the top-level. */
-            tmpFile = entries->path();
-            auto fileCount = std::distance(entries, DirectoryIterator{});
+            tmpFile = unpacked / entries->name.mkPath();
+            auto fileCount = std::ranges::distance(std::move(entries), std::default_sentinel);
             if (fileCount != 1) {
                 /* otherwise, use the directory itself */
                 tmpFile = unpacked;

@@ -1501,19 +1501,19 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking link hashes...");
 
-        for (auto & link : DirectoryIterator{linksDir}) {
+        for (const auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
-            auto name = link.path().filename();
+            auto name = link.name.mkPath();
+            auto linkPath = linksDir / name;
             printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
             std::string hash =
-                hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
+                hashPath(makeFSSourceAccessor(linkPath), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError(
-                    "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
+                printError("link %s was modified! expected hash %s, got '%s'", PathFmt(linkPath), name.string(), hash);
                 if (repair) {
-                    unlinkIfExists(link.path());
-                    printInfo("removed link %s", PathFmt(link.path()));
+                    unlinkIfExists(linkPath);
+                    printInfo("removed link %s", PathFmt(linkPath));
                 } else {
                     errors = true;
                 }
@@ -1596,10 +1596,10 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : DirectoryIterator{config->realStoreDir.get()}) {
+    for (const auto & i : DirectoryIterator{config->realStoreDir.get()}) {
         checkInterrupt();
         try {
-            storePathsInStoreDir.insert({i.path().filename().string()});
+            storePathsInStoreDir.insert({os_string_to_string(i.name.native())});
         } catch (BadStorePath &) {
         }
     }
