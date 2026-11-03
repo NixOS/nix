@@ -203,6 +203,8 @@ protected:
         return Strings({store->printStorePath(drvPath)});
     }
 
+    std::string runPreBuildHook();
+
     /**
      * Open the slave side of the pseudoterminal and use it as stderr.
      */
