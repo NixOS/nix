@@ -14,28 +14,9 @@ namespace nix::eval_cache {
 struct AttrDb;
 class AttrCursor;
 
-struct CachedEvalError : CloneableError<CachedEvalError, EvalError>
-{
-private:
-    void anchor() override;
-public:
-    const ref<AttrCursor> cursor;
-    const Symbol attr;
-
-    CachedEvalError(ref<AttrCursor> cursor, Symbol attr);
-
-    /**
-     * Evaluate this attribute, which should result in a regular
-     * `EvalError` exception being thrown.
-     */
-    [[noreturn]]
-    void force();
-};
-
 class EvalCache : public std::enable_shared_from_this<EvalCache>
 {
     friend class AttrCursor;
-    friend struct CachedEvalError;
 
     std::shared_ptr<AttrDb> db;
     EvalState & state;
@@ -58,6 +39,7 @@ enum AttrType {
     String = 2,
     Missing = 3,
     Misc = 4,
+    /* Written by older versions of Nix, read as an absent row. */
     Failed = 5,
     Bool = 6,
     ListOfStrings = 7,
@@ -73,9 +55,6 @@ struct missing_t
 struct misc_t
 {};
 
-struct failed_t
-{};
-
 struct int_t
 {
     NixInt x;
@@ -85,22 +64,13 @@ typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
 
-typedef std::variant<
-    std::vector<Symbol>,
-    string_t,
-    placeholder_t,
-    missing_t,
-    misc_t,
-    failed_t,
-    bool,
-    int_t,
-    std::vector<std::string>>
-    AttrValue;
+typedef std::
+    variant<std::vector<Symbol>, string_t, placeholder_t, missing_t, misc_t, bool, int_t, std::vector<std::string>>
+        AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {
     friend class EvalCache;
-    friend struct CachedEvalError;
 
     ref<EvalCache> root;
     using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
@@ -114,9 +84,7 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 
     /**
      * If `cachedValue` is unset, try to initialize it from the
-     * database. It is not an error if it does not exist. Throw a
-     * `CachedEvalError` exception if it does exist but has type
-     * `AttrType::Failed`.
+     * database. It is not an error if it does not exist.
      */
     void fetchCachedValue();
 
