@@ -507,6 +507,12 @@ public:
 private:
 
     /**
+     * Derivations whose realisation threw during this evaluation, with the
+     * exception, replayed by `realiseContext()` instead of building again.
+     */
+    const ref<boost::concurrent_flat_map<StorePath, std::exception_ptr>> failedRealisations;
+
+    /**
      * A cache that maps paths to "resolved" paths for importing Nix
      * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
