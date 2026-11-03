@@ -1,3 +1,4 @@
+#include "nix/util/error.hh"
 #include "nix/util/users.hh"
 #include "nix/expr/attr-path.hh"
 #include "nix/cmd/common-eval-args.hh"
@@ -807,9 +808,11 @@ static void uninstallDerivations(Globals & globals, Strings & selectors, const s
         auto lockToken = optimisticLockProfile(profile);
 
         PackageInfos workingElems = queryInstalled(*globals.state, profile);
+        PackageInfos removedElems;
+        std::vector<std::string> unmatchedSelectors;
 
         for (auto & selector : selectors) {
-            PackageInfos::iterator split = workingElems.begin();
+            PackageInfos::iterator split;
             if (isPath(selector)) {
                 StorePath selectorStorePath = globals.state->store->followLinksToStorePath(selector);
                 split = std::partition(
@@ -823,13 +826,24 @@ static void uninstallDerivations(Globals & globals, Strings & selectors, const s
                     return !selectorName.matches(elemName);
                 });
             }
-            if (split == workingElems.end())
-                warn("selector '%s' matched no installed derivations", selector);
-            for (auto removedElem = split; removedElem != workingElems.end(); removedElem++) {
-                printInfo("uninstalling '%s'", removedElem->queryName());
-            }
+
+            if (split == workingElems.end() && selector != "*")
+                unmatchedSelectors.push_back(selector);
+
+            removedElems.insert(removedElems.end(), split, workingElems.end());
             workingElems.erase(split, workingElems.end());
         }
+
+        if (!unmatchedSelectors.empty()) {
+            if (unmatchedSelectors.size() == 1)
+                throw Error("selector '%s' matched no installed derivations", unmatchedSelectors.front());
+            else
+                throw Error(
+                    "selectors '%s' matched no installed derivations", concatStringsSep("', '", unmatchedSelectors));
+        }
+
+        for (auto & removedElem : removedElems)
+            printInfo("uninstalling '%s'", removedElem.queryName());
 
         if (globals.dryRun)
             return;
