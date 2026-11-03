@@ -41,6 +41,9 @@ nix eval --store dummy:// --write-to "$TEST_ROOT"/eval-out --expr '{ x = "foo" +
 rm -rf "$TEST_ROOT"/eval-out
 (! nix eval --store dummy:// --write-to "$TEST_ROOT"/eval-out --expr '{ "." = "bla"; }')
 
+# The store dir itself is printed without a trailing slash.
+[[ $(nix-instantiate --eval --pure-eval --store dummy:// -E "${NIX_STORE_DIR:-/nix/store}") == "${NIX_STORE_DIR:-/nix/store}" ]]
+
 # shellcheck disable=SC2088
 (! nix eval --expr '~/foo')
 
