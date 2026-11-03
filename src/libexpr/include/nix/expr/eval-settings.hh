@@ -486,6 +486,16 @@ public:
           The default value is chosen to balance performance and memory usage. On 32 bit systems
           where memory is scarce, the default is a large value to reduce the amount of allocations.
     )"};
+
+    Setting<bool> functionPointerEquality{
+        this,
+        true,
+        "function-pointer-equality",
+        R"(
+          Whether functions compare as equal based on value-pointer equality.
+          If set to false, all functions (even nested under aggregate data
+          structures) compare inequal
+        )"};
 };
 
 /**
