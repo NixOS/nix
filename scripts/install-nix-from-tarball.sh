@@ -180,7 +180,7 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
         if [ "$OS" = "Darwin" ] || [ "$OS" = "FreeBSD" ]; then
             cp -RPp "$self/store/$i" "$i_tmp"
         else
-            cp -RP --preserve=ownership,timestamps "$self/store/$i" "$i_tmp"
+            cp -RP --preserve=timestamps "$self/store/$i" "$i_tmp"
         fi
         chmod -R a-w "$i_tmp"
         chmod +w "$i_tmp"
