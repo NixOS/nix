@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<items>
+  <item attrPath="" name="xml-maintainers" outputName="out" pname="xml-maintainers" system="SYSTEM" version="">
+    <output name="out" />
+    <meta name="license">
+      <list>
+        <attrs>
+          <attr name="fullName">
+            <string value="MIT License" />
+          </attr>
+          <attr name="spdxId">
+            <string value="MIT" />
+          </attr>
+        </attrs>
+        <attrs>
+          <attr name="fullName">
+            <string value="GNU General Public License v2.0 only" />
+          </attr>
+          <attr name="shortName">
+            <string value="gpl2Only" />
+          </attr>
+          <attr name="spdxId">
+            <string value="GPL-2.0-only" />
+          </attr>
+          <attr name="url">
+            <string value="https://spdx.org/licenses/GPL-2.0-only.html" />
+          </attr>
+        </attrs>
+      </list>
+    </meta>
+    <meta name="maintainers">
+      <list>
+        <attrs>
+          <attr name="email">
+            <string value="alice@example.org" />
+          </attr>
+          <attr name="name">
+            <string value="Alice" />
+          </attr>
+        </attrs>
+        <attrs>
+          <attr name="email">
+            <string value="bob@example.org" />
+          </attr>
+          <attr name="name">
+            <string value="Bob" />
+          </attr>
+        </attrs>
+      </list>
+    </meta>
+  </item>
+</items>
