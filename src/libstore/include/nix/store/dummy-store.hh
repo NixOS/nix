@@ -66,6 +66,7 @@ public:
             .variant =
                 StoreReference::Specified{
                     .scheme = *uriSchemes().begin(),
+                    .authority = ParsedURL::Authority{},
                 },
             .params = getQueryParams(),
         };

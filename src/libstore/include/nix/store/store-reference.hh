@@ -7,6 +7,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/util/json-non-null.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 
@@ -55,18 +56,7 @@ struct StoreReference
         inline auto operator<=>(const Auto & rhs) const = default;
     };
 
-    /**
-     * General case, a regular `scheme://authority` URL.
-     * @todo Consider making this pluggable instead of passing through the encoded authority + path.
-     */
-    struct Specified
-    {
-        std::string scheme;
-        std::string authority = "";
-
-        bool operator==(const Specified & rhs) const = default;
-        auto operator<=>(const Specified & rhs) const = default;
-    };
+    using Specified = ParsedURL;
 
     /**
      * Special case for `daemon` to avoid normalization.
@@ -74,7 +64,7 @@ struct StoreReference
     struct Daemon : Specified
     {
         Daemon()
-            : Specified({.scheme = "unix"})
+            : Specified({.scheme = "unix", .authority = ParsedURL::Authority{}})
         {
         }
     };
@@ -85,7 +75,7 @@ struct StoreReference
     struct Local : Specified
     {
         Local()
-            : Specified({.scheme = "local"})
+            : Specified({.scheme = "local", .authority = ParsedURL::Authority{}})
         {
         }
     };

@@ -34,7 +34,7 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(ParsedURL _cacheUri, cons
     , BinaryCacheStoreConfig(params)
     , cacheUri(std::move(_cacheUri))
 {
-    if (!uriSchemes().contains("file") && (!cacheUri.authority || cacheUri.authority->host.empty()))
+    if (cacheUri.scheme != "file" && (!cacheUri.authority || cacheUri.authority->host.empty()))
         throw UsageError("`%s` Store requires a non-empty authority in Store URL", cacheUri.scheme);
     while (!cacheUri.path.empty() && cacheUri.path.back() == "")
         cacheUri.path.pop_back();
@@ -42,12 +42,10 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(ParsedURL _cacheUri, cons
 
 StoreReference HttpBinaryCacheStoreConfig::getReference() const
 {
+    auto uri = cacheUri;
+    uri.query.clear();
     return {
-        .variant =
-            StoreReference::Specified{
-                .scheme = cacheUri.scheme,
-                .authority = cacheUri.renderAuthorityAndPath(),
-            },
+        .variant = std::move(uri),
         .params = getQueryParams(),
     };
 }

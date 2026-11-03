@@ -901,7 +901,8 @@ makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std:
                 }},
             ref.variant);
         const auto & scheme = specified.scheme;
-        return (scheme == "local" || scheme == "unix") && specified.authority.empty();
+        return (scheme == "local" || scheme == "unix")
+               && (!specified.authority || specified.authority->to_string().empty()) && specified.renderPath().empty();
     };
 
     if (isShorthand(src))
