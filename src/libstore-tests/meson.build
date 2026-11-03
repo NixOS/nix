@@ -80,11 +80,14 @@ sources = files(
 include_dirs = [ include_directories('.') ]
 
 if build_unit_tests
+  rapidcheck = dependency('rapidcheck')
   unit_dependencies = fuzz_dependencies + [
     dependency('nix-store-c'),
     dependency('nix-store-test-support'),
     dependency('sqlite3', 'sqlite', version : '>=3.6.19'),
-    dependency('rapidcheck'),
+    rapidcheck,
+    # See ../libutil-test-support/meson.build
+    cxx.find_library('rapidcheck', dirs : [ rapidcheck.get_variable('libdir') ]),
     dependency('gtest', main : true),
     dependency('gmock'),
   ]
@@ -104,8 +107,7 @@ if build_unit_tests
     config_priv_h,
     dependencies : unit_dependencies,
     include_directories : include_dirs,
-    # TODO: -lrapidcheck, see ../libutil-support/build.meson
-    link_args : linker_export_flags + [ '-lrapidcheck' ],
+    link_args : linker_export_flags,
     # get main from gtest
     install : true,
     cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
