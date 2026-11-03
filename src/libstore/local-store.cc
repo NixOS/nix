@@ -13,6 +13,7 @@
 #include "nix/util/topo-sort.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/store/keys.hh"
@@ -145,6 +146,11 @@ LocalStore::LocalStore(ref<const Config> config)
     } else {
         makeStoreWritable();
     }
+    /* Only now, since `makeStoreWritable()` may have moved us into a new
+       mount namespace with the store remounted read-write; a handle
+       opened before that would still refer to the old mount. Not
+       virtual, since we are still constructing. */
+    LocalFSStore::init();
     createDirs(linksDir);
     auto profilesDir = config->stateDir.get() / "profiles";
     createDirs(profilesDir);
@@ -177,11 +183,13 @@ LocalStore::LocalStore(ref<const Config> config)
                 "warning: the group '%1%' specified in 'build-users-group' does not exist",
                 localSettings.buildUsersGroup);
         else if (!config->readOnly) {
-            auto st = stat(config->realStoreDir.get());
+            auto st = fstat(getRealStoreDirFd());
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                chown(config->realStoreDir.get(), 0, gr->gr_gid);
-                chmod(config->realStoreDir.get(), perm);
+                if (::fchown(getRealStoreDirFd(), 0, gr->gr_gid) == -1)
+                    throw SysError("changing owner of %s", PathFmt(config->realStoreDir.get()));
+                if (::fchmod(getRealStoreDirFd(), perm) == -1)
+                    throw SysError("changing permissions of %s", PathFmt(config->realStoreDir.get()));
             }
         }
     }
@@ -1596,7 +1604,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (const auto & i : DirectoryIterator{config->realStoreDir.get()}) {
+    for (const auto & i : DirectoryIterator{reopenDirectory(getRealStoreDirFd())}) {
         checkInterrupt();
         try {
             storePathsInStoreDir.insert({i.name.path().string()});

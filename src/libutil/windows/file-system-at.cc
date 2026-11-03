@@ -270,6 +270,20 @@ bool isReparsePoint(HANDLE handle)
 
 } // namespace windows
 
+AutoCloseFD reopenDirectory(Descriptor dirFd)
+{
+    using namespace nix::windows;
+
+    AutoCloseFD fd{ReOpenFile(
+        dirFd,
+        FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        FILE_FLAG_BACKUP_SEMANTICS)};
+    if (!fd)
+        throw WinError("reopening directory %s", PathFmt(descriptorToPath(dirFd)));
+    return fd;
+}
+
 OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
     using namespace nix::windows;

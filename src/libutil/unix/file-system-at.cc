@@ -286,6 +286,14 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode, std::move(dirFdCallback));
 }
 
+AutoCloseFD reopenDirectory(Descriptor dirFd)
+{
+    AutoCloseFD fd = ::openat(dirFd, ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (!fd)
+        throw SysError([&] { return HintFmt("reopening directory %s", PathFmt(descriptorToPath(dirFd))); });
+    return fd;
+}
+
 OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
     /* No emptiness assertion, unlike the other operations here: since Linux
