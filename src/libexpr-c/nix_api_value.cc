@@ -722,4 +722,59 @@ const StorePath * nix_realised_string_get_store_path(nix_realised_string * s, si
     return &s->storePaths[i];
 }
 
+bool nix_value_is_functor(nix_c_context * context, EvalState * state, nix_value * value)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto & v = check_value_in(value);
+        return state->state.isFunctor(v);
+    }
+    NIXC_CATCH_ERRS_RES(false)
+}
+
+nix_doc *
+nix_get_value_doc(nix_c_context * context, EvalState * state, nix_value * value)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto & v = check_value_in(value);
+        assert(v.type() == nix::nFunction || state->state.isFunctor(v));
+        auto doc = state->state.getDoc(v);
+        if (doc)
+            return new nix_doc{.doc = *doc};
+        return nullptr;
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_pos * nix_get_doc_pos(nix_doc * doc)
+{
+    return new nix_pos{.pos = doc->doc.pos};
+}
+
+const char * nix_get_doc_name(nix_doc * doc)
+{
+    auto name = doc->doc.name;
+    if (name)
+        return strdup(name->c_str());
+    return nullptr;
+}
+
+size_t nix_get_doc_args_size(nix_doc * doc)
+{
+    return doc->doc.args.size();
+}
+
+const char * nix_get_doc_arg_by_idx(nix_doc * doc, size_t index)
+{
+    return strdup(doc->doc.args[index].c_str());
+}
+
+const char * nix_get_doc_content(nix_doc * doc)
+{
+    return doc->doc.content;
+}
+
 } // extern "C"
