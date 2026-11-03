@@ -26,6 +26,36 @@ For a description of how *args* is mapped to a set of store paths, see
 store paths with the same symbolic name, only the one with the highest
 version is installed.
 
+# Examples
+
+```console
+$ nix-env --upgrade --attr nixpkgs.gcc
+upgrading `gcc-3.3.1' to `gcc-3.4'
+```
+
+When there are no updates available, nothing will happen:
+
+```console
+$ nix-env --upgrade --attr nixpkgs.pan
+```
+
+Using `-A` is preferred when possible, as it is faster and unambiguous but
+it is also possible to upgrade to a specific version by matching the derivation name:
+
+```console
+$ nix-env --upgrade gcc-3.3.2 --always
+upgrading `gcc-3.4' to `gcc-3.3.2'
+```
+
+To try to upgrade everything
+(matching packages based on the part of the derivation name without version):
+
+```console
+$ nix-env --upgrade
+upgrading `hello-2.1.2' to `hello-2.1.3'
+upgrading `mozilla-1.2' to `mozilla-1.4'
+```
+
 # Flags
 
 - `--lt`
@@ -78,36 +108,6 @@ version is installed.
 {{#include ./env-common.md}}
 
 {{#include ../env-common.md}}
-
-# Examples
-
-```console
-$ nix-env --upgrade --attr nixpkgs.gcc
-upgrading `gcc-3.3.1' to `gcc-3.4'
-```
-
-When there are no updates available, nothing will happen:
-
-```console
-$ nix-env --upgrade --attr nixpkgs.pan
-```
-
-Using `-A` is preferred when possible, as it is faster and unambiguous but
-it is also possible to upgrade to a specific version by matching the derivation name:
-
-```console
-$ nix-env --upgrade gcc-3.3.2 --always
-upgrading `gcc-3.4' to `gcc-3.3.2'
-```
-
-To try to upgrade everything
-(matching packages based on the part of the derivation name without version):
-
-```console
-$ nix-env --upgrade
-upgrading `hello-2.1.2' to `hello-2.1.3'
-upgrading `mozilla-1.2' to `mozilla-1.4'
-```
 
 # Versions
 

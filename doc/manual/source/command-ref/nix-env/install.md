@@ -124,38 +124,6 @@ The arguments *args* map to store paths in a number of possible ways:
 
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
-# Options
-
-- `--prebuilt-only` / `-b`
-
-  Use only derivations for which a substitute is registered, i.e.,
-  there is a pre-built binary available that can be downloaded in lieu
-  of building the derivation. Thus, no packages will be built from
-  source.
-
-- `--preserve-installed` / `-P`
-
-  Do not remove derivations with a name matching one of the
-  derivations being installed. Usually, trying to have two versions of
-  the same package installed in the same generation of a profile will
-  lead to an error in building the generation, due to file name
-  clashes between the two versions. However, this is not the case for
-  all packages.
-
-- `--remove-all` / `-r`
-
-  Remove all previously installed packages first. This is equivalent
-  to running `nix-env --uninstall '.*'` first, except that everything happens
-  in a single transaction.
-
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ./env-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 To install a package using a specific attribute path from the active Nix expression:
@@ -242,3 +210,35 @@ channel:
 ```console
 $ nix-env --file https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz --install --attr firefox
 ```
+
+# Options
+
+- `--prebuilt-only` / `-b`
+
+  Use only derivations for which a substitute is registered, i.e.,
+  there is a pre-built binary available that can be downloaded in lieu
+  of building the derivation. Thus, no packages will be built from
+  source.
+
+- `--preserve-installed` / `-P`
+
+  Do not remove derivations with a name matching one of the
+  derivations being installed. Usually, trying to have two versions of
+  the same package installed in the same generation of a profile will
+  lead to an error in building the generation, due to file name
+  clashes between the two versions. However, this is not the case for
+  all packages.
+
+- `--remove-all` / `-r`
+
+  Remove all previously installed packages first. This is equivalent
+  to running `nix-env --uninstall '.*'` first, except that everything happens
+  in a single transaction.
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ./env-common.md}}
+
+{{#include ../env-common.md}}

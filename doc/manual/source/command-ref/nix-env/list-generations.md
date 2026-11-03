@@ -13,14 +13,6 @@ for the active profile. These may be switched to using the
 `--switch-generation` operation. It also prints the creation date of the
 generation, and indicates the current generation.
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ./env-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 ```console
@@ -31,3 +23,11 @@ $ nix-env --list-generations
   98   2004-02-06 16:24:33   (current)
 ```
 
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ./env-common.md}}
+
+{{#include ../env-common.md}}
