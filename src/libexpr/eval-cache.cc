@@ -389,6 +389,18 @@ ref<AttrCursor> EvalCache::getRoot()
     return make_ref<AttrCursor>(ref(shared_from_this()), std::nullopt);
 }
 
+void EvalCache::checkpoint()
+{
+    if (!db || db->failed)
+        return;
+    auto state(db->_state->lock());
+    try {
+        state->db.exec("pragma wal_checkpoint(passive);");
+    } catch (...) {
+        ignoreExceptionExceptInterrupt();
+    }
+}
+
 AttrCursor::AttrCursor(
     ref<EvalCache> root, Parent parent, Value * value, std::optional<std::pair<AttrId, AttrValue>> && cachedValue)
     : root(root)
