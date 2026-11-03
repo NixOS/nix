@@ -1,7 +1,9 @@
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/base-n.hh"
+#include "nix/util/util.hh"
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -59,6 +61,30 @@ TEST(local_keys, rfc8032TestVector)
     auto pk = sk.toPublicKey();
     ASSERT_EQ(pk.key, pubKeyBytes);
     ASSERT_TRUE(pk.verifyDetached(message, sig));
+}
+
+/**
+ * Signatures are stored as a space-separated list, so a key name
+ * containing whitespace would not parse back.
+ */
+TEST(local_keys, rejectsInvalidKeyNames)
+{
+    auto sig = "c2lnbmF0dXJl";
+    for (std::string name : {"evil name", "evil\tname", "evil\nname", "evil\x01name", "evil\xc3\xa9name"}) {
+        ASSERT_THROW(Signature::parse(name + ":" + sig), FormatError) << name;
+        ASSERT_THROW(nlohmann::json({{"keyName", name}, {"sig", sig}}).get<Signature>(), FormatError) << name;
+        ASSERT_THROW(SecretKey::generate(name), FormatError) << name;
+    }
+    ASSERT_THROW(SecretKey::generate(""), FormatError);
+    ASSERT_THROW(SecretKey::generate("evil:name"), FormatError);
+}
+
+TEST(local_keys, acceptsValidKeyNames)
+{
+    for (std::string name : {"cache.nixos.org-1", "user@host/key_2+x"}) {
+        ASSERT_EQ(Signature::parse(name + ":c2lnbmF0dXJl").keyName, name);
+        ASSERT_EQ(SecretKey::generate(name).name, name);
+    }
 }
 
 } // namespace nix
