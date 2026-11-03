@@ -1324,8 +1324,9 @@ class ParsedURLPathSegmentsTest : public ::testing::TestWithParam<ParsedURLPathS
 TEST_P(ParsedURLPathSegmentsTest, segmentsAreCorrect)
 {
     const auto & testCase = GetParam();
-    auto segments = parseURL(testCase.url).pathSegments(/*skipEmpty=*/testCase.skipEmpty)
-                    | std::ranges::to<decltype(testCase.segments)>();
+    /* Named, because `pathSegments()` borrows the URL and so rejects rvalues. */
+    auto url = parseURL(testCase.url);
+    auto segments = url.pathSegments(/*skipEmpty=*/testCase.skipEmpty) | std::ranges::to<decltype(testCase.segments)>();
     EXPECT_EQ(segments, testCase.segments);
     EXPECT_EQ(encodeUrlPath(segments), testCase.path);
 }
