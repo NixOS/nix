@@ -3229,7 +3229,7 @@ SourcePath resolveExprPath(SourcePath path, bool addDefaultNix)
 
     /* If `path' refers to a directory, append `/default.nix'. */
     if (addDefaultNix && path.resolveSymlinks().lstat().type == SourceAccessor::tDirectory)
-        return path / "default.nix";
+        return path / "default.nix"_filename;
 
     return path;
 }

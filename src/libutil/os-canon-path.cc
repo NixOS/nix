@@ -24,9 +24,9 @@ OsCanonPath::OsCanonPath(const CanonPath & canonPath)
 {
     for (const auto & component : canonPath) {
 #ifdef _WIN32
-        assert(component.find('\\') == component.npos && "CanonPath component cannot contain backslash");
+        assert(component.str().find('\\') == component.str().npos && "CanonPath component cannot contain backslash");
 #endif
-        p /= component;
+        p /= component.str();
     }
     // No need to further validate — CanonPath guarantees no empty/dot/dotdot components,
     // and operator/ produces preferred separators.
@@ -125,7 +125,8 @@ CanonPath OsCanonPath::toPortable() const
 {
     CanonPath res = CanonPath::root;
     for (const auto & component : *this)
-        res.push(component.path().string());
+        /* An `OsFilename` is also a valid portable file name. */
+        res.push(FilenameView::fromStringAsserting(component.path().string()));
     return res;
 }
 

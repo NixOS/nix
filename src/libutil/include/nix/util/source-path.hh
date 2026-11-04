@@ -97,11 +97,13 @@ struct SourcePath
     SourcePath operator/(const CanonPath & x) const;
 
     /**
-     * Append a single component `c` to this path. `c` must not
-     * contain a slash. A slash is implicitly added between this path
-     * and `c`.
+     * Append a single component `c` to this path. A slash is implicitly
+     * added between this path and `c`.
      */
-    SourcePath operator/(std::string_view c) const;
+    SourcePath operator/(FilenameView c) const
+    {
+        return {accessor, path / c};
+    }
 
     bool operator==(const SourcePath & x) const noexcept;
     std::strong_ordering operator<=>(const SourcePath & x) const noexcept;

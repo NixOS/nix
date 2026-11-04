@@ -28,13 +28,14 @@ TEST(fchmodatTryNoFollow, works)
 
     {
         RestoreSink::Directory root{openDirectory(tmpDir, FinalSymlink::Follow)};
-        root.createChild("file", [](FileSystemObjectSink & s) {
+        root.createChild("file"_filename, [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) {});
         });
-        root.createChild(
-            "dir", [](FileSystemObjectSink & s) { s.createDirectory([](FileSystemObjectSink::OnDirectory &) {}); });
-        root.createChild("filelink", [](FileSystemObjectSink & s) { s.createSymlink("file"); });
-        root.createChild("dirlink", [](FileSystemObjectSink & s) { s.createSymlink("dir"); });
+        root.createChild("dir"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+        });
+        root.createChild("filelink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("file"); });
+        root.createChild("dirlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("dir"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
@@ -113,10 +114,10 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
 
     {
         RestoreSink::Directory root{openDirectory(tmpDir, FinalSymlink::Follow)};
-        root.createChild("file", [](FileSystemObjectSink & s) {
+        root.createChild("file"_filename, [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) {});
         });
-        root.createChild("link", [](FileSystemObjectSink & s) { s.createSymlink("file"); });
+        root.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("file"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));

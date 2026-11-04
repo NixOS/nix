@@ -160,24 +160,24 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
     {
         MemorySink memorySink{[&](File file) -> File & { return accessor->root.emplace(std::move(file)); }};
         memorySink.createDirectory([](FileSystemObjectSink::OnDirectory & root) {
-            root.createChild("regular", [](FileSystemObjectSink & s) {
+            root.createChild("regular"_filename, [](FileSystemObjectSink & s) {
                 s.createRegularFile(false, [](auto & crf) { crf("test"); });
             });
-            root.createChild("executable", [](FileSystemObjectSink & s) {
+            root.createChild("executable"_filename, [](FileSystemObjectSink & s) {
                 s.createRegularFile(true, [](auto & crf) { crf("test"); });
             });
-            root.createChild("dir", [](FileSystemObjectSink & s) {
+            root.createChild("dir"_filename, [](FileSystemObjectSink & s) {
                 s.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-                    dir.createChild("regular", [](FileSystemObjectSink & s) {
+                    dir.createChild("regular"_filename, [](FileSystemObjectSink & s) {
                         s.createRegularFile(false, [](auto & crf) { crf("test 2"); });
                     });
-                    dir.createChild("executable", [](FileSystemObjectSink & s) {
+                    dir.createChild("executable"_filename, [](FileSystemObjectSink & s) {
                         s.createRegularFile(true, [](auto & crf) { crf("test 2"); });
                     });
-                    dir.createChild("symlink", [](FileSystemObjectSink & s) { s.createSymlink(".."); });
+                    dir.createChild("symlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink(".."); });
                 });
             });
-            root.createChild("symlink", [](FileSystemObjectSink & s) { s.createSymlink("some target"); });
+            root.createChild("symlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("some target"); });
         });
     }
     auto source = sinkToSource([&accessor](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });

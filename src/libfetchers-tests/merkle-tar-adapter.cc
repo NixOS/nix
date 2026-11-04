@@ -80,7 +80,7 @@ TEST_F(MerkleTarAdapterTest, single_file_at_root)
 
     // Wrap in a directory to verify content via accessor
     auto dirSink = pool->makeDirectorySink();
-    dirSink->insertChild("file", result);
+    dirSink->insertChild("file"_filename, result);
     auto dirHash = std::move(*dirSink).finalize();
 
     pool->flush();
@@ -114,7 +114,7 @@ TEST_F(MerkleTarAdapterTest, single_symlink)
 
     // Wrap in a directory to verify content via accessor
     auto dirSink = pool->makeDirectorySink();
-    dirSink->insertChild("link", result);
+    dirSink->insertChild("link"_filename, result);
     auto dirHash = std::move(*dirSink).finalize();
 
     pool->flush();
@@ -808,7 +808,7 @@ TEST_F(MerkleTarAdapterTest, last_wins_at_root)
 
     // Wrap to verify
     auto dirSink = pool->makeDirectorySink();
-    dirSink->insertChild("link", result);
+    dirSink->insertChild("link"_filename, result);
     auto dirHash = std::move(*dirSink).finalize();
 
     pool->flush();

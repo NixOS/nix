@@ -119,7 +119,7 @@ MATCHER_P2(HasDirectory, path, dirents, "")
     auto actual = arg->readDirectory(path);
     std::set<std::string> actualKeys, expectedKeys(dirents.begin(), dirents.end());
     for (auto & [k, _] : actual)
-        actualKeys.insert(k);
+        actualKeys.insert(k.str());
     if (actualKeys != expectedKeys) {
         *result_listener << arg->showPath(path) << " has entries " << ::testing::PrintToString(actualKeys);
         return false;

@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/source-path.hh"
+#include "nix/util/filename.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/variant-wrapper.hh"
 #include "nix/util/json-impls.hh"
@@ -31,9 +32,7 @@ struct Regular
 template<typename Child>
 struct DirectoryT
 {
-    using Name = std::string;
-
-    std::map<Name, Child, std::less<>> entries;
+    std::map<Filename, Child, std::less<>> entries;
 
     inline bool operator==(const DirectoryT &) const noexcept;
     inline std::strong_ordering operator<=>(const DirectoryT &) const noexcept;
@@ -177,7 +176,7 @@ public:
         {
         }
 
-        void createChild(std::string_view name, ChildCreatedCallback callback) override;
+        void createChild(FilenameView name, ChildCreatedCallback callback) override;
     };
 
     void createDirectory(DirectoryCreatedCallback callback) override;

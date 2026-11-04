@@ -39,20 +39,20 @@ TEST_F(FSSourceAccessorTest, works)
 #endif
     {
         RestoreSink::Directory root{openDirectory(tmpDir, FinalSymlink::Follow)};
-        root.createChild("subdir", [](FileSystemObjectSink & s) {
+        root.createChild("subdir"_filename, [](FileSystemObjectSink & s) {
             s.createDirectory([](FileSystemObjectSink::OnDirectory & subdir) {
-                subdir.createChild("file2", [](FileSystemObjectSink & s) {
+                subdir.createChild("file2"_filename, [](FileSystemObjectSink & s) {
                     s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content2"); });
                 });
             });
         });
-        root.createChild("file1", [](FileSystemObjectSink & s) {
+        root.createChild("file1"_filename, [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content1"); });
         });
-        root.createChild("rootlink", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
-        root.createChild("a", [](FileSystemObjectSink & s) {
+        root.createChild("rootlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+        root.createChild("a"_filename, [](FileSystemObjectSink & s) {
             s.createDirectory([](FileSystemObjectSink::OnDirectory & a) {
-                a.createChild("dirlink", [](FileSystemObjectSink & s) { s.createSymlink("../subdir"); });
+                a.createChild("dirlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("../subdir"); });
             });
         });
     }

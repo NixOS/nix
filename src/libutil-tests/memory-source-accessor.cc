@@ -32,25 +32,25 @@ ref<MemorySourceAccessor> exampleComplex()
     files->root = File::Directory{
         .entries{
             {
-                "foo",
+                "foo"_filename,
                 File::Regular{
                     .contents = "hello\n\0\n\tworld!"s,
                 },
             },
             {
-                "bar",
+                "bar"_filename,
                 File::Directory{
                     .entries =
                         {
                             {
-                                "baz",
+                                "baz"_filename,
                                 File::Regular{
                                     .executable = true,
                                     .contents = "good day,\n\0\n\tworld!"s,
                                 },
                             },
                             {
-                                "quux",
+                                "quux"_filename,
                                 File::Symlink{
                                     .target = "/over/there",
                                 },
@@ -98,7 +98,7 @@ TEST_F(MemorySourceAccessorTestErrors, readFileNotFound)
 TEST_F(MemorySourceAccessorTestErrors, readFileNotARegularFile)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("subdir", [](FileSystemObjectSink & child) {
+        dir.createChild("subdir"_filename, [](FileSystemObjectSink & child) {
             child.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
         });
     });
@@ -122,7 +122,7 @@ TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotFound)
 TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotADirectory)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("file", [](FileSystemObjectSink & child) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & child) {
             child.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
         });
     });
@@ -146,7 +146,7 @@ TEST_F(MemorySourceAccessorTestErrors, readLinkNotFound)
 TEST_F(MemorySourceAccessorTestErrors, readLinkNotASymlink)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("file", [](FileSystemObjectSink & child) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & child) {
             child.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
         });
     });
@@ -160,7 +160,7 @@ TEST_F(MemorySourceAccessorTestErrors, readLinkNotASymlink)
 TEST_F(MemorySourceAccessorTestErrors, addFileParentNotDirectory)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("file", [](FileSystemObjectSink & child) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & child) {
             child.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
         });
     });
@@ -175,7 +175,7 @@ TEST_F(MemorySourceAccessorTestErrors, addFileParentNotDirectory)
 TEST_F(MemorySourceAccessorTestErrors, addFileNotARegularFile)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("subdir", [](FileSystemObjectSink & child) {
+        dir.createChild("subdir"_filename, [](FileSystemObjectSink & child) {
             child.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
         });
     });
@@ -186,26 +186,16 @@ TEST_F(MemorySourceAccessorTestErrors, addFileNotARegularFile)
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/subdir"), HasSubstrIgnoreANSIMatcher("is not a regular file"))));
 }
 
-TEST_F(MemorySourceAccessorTestErrors, createChildInvalidName)
-{
-    for (std::string_view name : {"", ".", "..", "a/b"}) {
-        sink.createDirectory([&](FileSystemObjectSink::OnDirectory & dir) {
-            EXPECT_THROW(
-                dir.createChild(name, [](FileSystemObjectSink & child) { child.createSymlink("target"); }),
-                BadCanonPath)
-                << name;
-        });
-    }
-}
-
 TEST_F(MemorySourceAccessorTestErrors, createChildAlreadyExists)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("file", [](FileSystemObjectSink & child) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & child) {
             child.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("first"); });
         });
         EXPECT_THAT(
-            [&] { dir.createChild("file", [](FileSystemObjectSink & child) { child.createSymlink("second"); }); },
+            [&] {
+                dir.createChild("file"_filename, [](FileSystemObjectSink & child) { child.createSymlink("second"); });
+            },
             ThrowsMessage<Error>(HasSubstrIgnoreANSIMatcher("file 'file' already exists")));
     });
 
@@ -215,7 +205,7 @@ TEST_F(MemorySourceAccessorTestErrors, createChildAlreadyExists)
 TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughRegularFile)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("file", [](FileSystemObjectSink & s) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
         });
     });
@@ -225,7 +215,7 @@ TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughRegularFile)
 TEST_F(MemorySourceAccessorTestErrors, maybeLstatThroughRegularFile)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("file", [](FileSystemObjectSink & s) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
         });
     });
@@ -235,7 +225,7 @@ TEST_F(MemorySourceAccessorTestErrors, maybeLstatThroughRegularFile)
 TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughSymlink)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("link", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+        dir.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("target"); });
     });
     EXPECT_THAT(
         [&] { accessor->pathExists(CanonPath("link/child")); },
@@ -246,7 +236,7 @@ TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughSymlink)
 TEST_F(MemorySourceAccessorTestErrors, addFileThroughSymlink)
 {
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("link", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+        dir.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("target"); });
     });
     EXPECT_THAT(
         [&] { accessor->addFile(CanonPath("link/child"), "contents"); },

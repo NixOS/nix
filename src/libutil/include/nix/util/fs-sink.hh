@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/filename.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
@@ -95,11 +96,11 @@ public:
          * which we have chosen, allowing us to subsequently choose what we
          * want to put there.
          *
-         * @param fileName must not contain any `/` or null bytes. It should
-         * also not contain any `\` when Windows host filesystems aim to be
-         * supported.
+         * @param fileName Sinks that write to the host file system may
+         * additionally reject names that aren't valid there (e.g. ones
+         * containing `\` on Windows).
          */
-        virtual void createChild(std::string_view fileName, ChildCreatedCallback callback) = 0;
+        virtual void createChild(FilenameView fileName, ChildCreatedCallback callback) = 0;
     };
 
     virtual ~FileSystemObjectSink() = default;
@@ -207,7 +208,7 @@ public:
         {
         }
 
-        void createChild(std::string_view name, ChildCreatedCallback callback) override;
+        void createChild(FilenameView name, ChildCreatedCallback callback) override;
     };
 
     RestoreSink(Descriptor parentDir, OsFilename name, bool startFsync = false, RestoreSinkHooks * hooks = nullptr)

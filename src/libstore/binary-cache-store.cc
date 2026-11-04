@@ -241,16 +241,17 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
             for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
                 auto dir = buildIdDir / s1;
 
-                if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory || !std::regex_match(s1, regex1))
+                if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory || !std::regex_match(s1.str(), regex1))
                     continue;
 
                 for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
                     auto debugPath = dir / s2;
 
-                    if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular || !std::regex_match(s2, regex2))
+                    if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular
+                        || !std::regex_match(s2.str(), regex2))
                         continue;
 
-                    auto buildId = s1 + s2;
+                    auto buildId = s1.str() + s2.str();
 
                     std::string key = "debuginfo/" + buildId;
                     std::string target = "../" + narInfo->url;

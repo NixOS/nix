@@ -374,7 +374,7 @@ static CanonPath portablePathOf(const SymlinkNotAllowed & e)
  */
 static OsFilename osBaseNameOf(const CanonPath & path)
 {
-    return OsFilename::fromPathAsserting(path.baseName().value());
+    return OsFilename::fromPathAsserting(path.baseName().value().str());
 }
 
 std::function<void(AutoCloseFD, OsCanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
@@ -615,7 +615,9 @@ try {
             type = std::nullopt;
             break;
         }
-        entries.emplace(name, type);
+        /* `readdir` never gives empty names, or ones containing `/` or
+           NUL, and `.` and `..` are skipped above. */
+        entries.emplace(Filename::fromStringAsserting(std::string{name}), type);
     }
 
     if (errno)
@@ -833,7 +835,9 @@ SourceAccessor::DirEntries WindowsSourceAccessor::readDirectory(const CanonPath 
                     throw SystemError(e.code(), "getting status of '%s'", PathFmt(entry.path()));
             }
         }();
-        res.emplace(entry.path().filename().string(), type);
+        /* `DirectoryIterator` never gives empty names, `.` or `..`, and
+           Windows file names cannot contain `/`. */
+        res.emplace(Filename::fromStringAsserting(entry.path().filename().string()), type);
     }
     return res;
 }

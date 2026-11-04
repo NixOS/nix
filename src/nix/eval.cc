@@ -115,11 +115,10 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                             std::string_view name = state->symbols[attr.name];
                             try {
                                 /* Each name must be a single path component. */
-                                if (name.empty() || name == "." || name == ".." || name.find('/') != name.npos)
-                                    throw Error("invalid file name '%s'", name);
-                                dirSink.createChild(name, [&](FileSystemObjectSink & childSink) {
-                                    recurse(childSink, *attr.value, attr.pos, depth + 1);
-                                });
+                                dirSink.createChild(
+                                    FilenameView::fromStringThrowing(name), [&](FileSystemObjectSink & childSink) {
+                                        recurse(childSink, *attr.value, attr.pos, depth + 1);
+                                    });
                             } catch (Error & e) {
                                 e.addTrace(
                                     state->positions[attr.pos], HintFmt("while evaluating the attribute '%s'", name));

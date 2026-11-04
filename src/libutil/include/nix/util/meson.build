@@ -48,6 +48,7 @@ headers = [ config_pub_h ] + files(
   'file-path.hh',
   'file-system-at.hh',
   'file-system.hh',
+  'filename.hh',
   'finally.hh',
   'fmt.hh',
   'fs-sink.hh',
