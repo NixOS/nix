@@ -6,13 +6,26 @@ int fuzzParseDumpCommon(std::string_view s, bool acceptInvalid)
 {
     struct DrainingFileSystemObjectSink : NullFileSystemObjectSink
     {
-        void createRegularFile(const CanonPath &, fun<void(CreateRegularFileSink &)> func) override
+        /* So that files within directories are drained too. */
+        void createDirectory(DirectoryCreatedCallback func) override
         {
-            struct : CreateRegularFileSink
+            struct : OnDirectory
+            {
+                void createChild(std::string_view, ChildCreatedCallback callback) override
+                {
+                    DrainingFileSystemObjectSink childSink;
+                    callback(childSink);
+                }
+            } dir;
+
+            func(dir);
+        }
+
+        void createRegularFile(bool, RegularFileCreatedCallback func) override
+        {
+            struct : OnRegularFile
             {
                 void operator()(std::string_view) override {}
-
-                void isExecutable() override {}
             } sink;
 
             func(sink);
