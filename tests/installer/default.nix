@@ -79,12 +79,16 @@ let
       '';
     };
 
-    install-force-daemon-different-umask = {
+    install-force-daemon-corner-cases = {
       install = ''
         # To get some coverage on whether we preserve permissions when copying the bootstrap store.
         sudo bash -c 'echo "Defaults umask=0023" >> /etc/sudoers'
         mkdir scripted-installer
         tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --daemon --no-channel-add
+        # Test the idempotency.
+        sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc || true
+        sudo mv /etc/bashrc.backup-before-nix /etc/bashrc || true
         ./scripted-installer/install --daemon --no-channel-add
       '';
 
