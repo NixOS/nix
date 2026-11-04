@@ -111,32 +111,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             throw Error("got unknown message type %x from Nix daemon", msg);
     }
 
-    if (!ex) {
-        return ex;
-    } else {
-        try {
-            std::rethrow_exception(ex);
-        } catch (const Error & e) {
-            // Nix versions before #4628 did not have an adequate
-            // behavior for reporting that the derivation format was
-            // upgraded. To avoid having to add compatibility logic in
-            // many places, we expect to catch almost all occurrences of
-            // the old incomprehensible error here, so that we can
-            // explain to users what's going on when their daemon is
-            // older than #4628 (2023).
-            if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations)
-                && protoVersion.number < WorkerProto::Version::Number{1, 36}) {
-                auto m = e.msg();
-                if (m.find("parsing derivation") != std::string::npos && m.find("expected string") != std::string::npos
-                    && m.find("Derive([") != std::string::npos)
-                    return std::make_exception_ptr(Error(
-                        "%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw derivation is in the form '%s'",
-                        std::move(m),
-                        "Drv WithVersion(..)"));
-            }
-            return std::current_exception();
-        }
-    }
+    return ex;
 }
 
 void WorkerProto::BasicClientConnection::processStderr(
