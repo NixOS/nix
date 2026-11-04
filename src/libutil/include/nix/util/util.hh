@@ -196,6 +196,7 @@ std::optional<N> string2Float(const std::string_view s);
  * Convert a little-endian integer to host order.
  */
 template<typename T>
+    requires std::is_unsigned_v<T> && (sizeof(T) > 1)
 T readLittleEndian(unsigned char * p)
 {
     T x = 0;
@@ -206,19 +207,8 @@ T readLittleEndian(unsigned char * p)
        something). Use a memcpy + byteswap here as needed. */
     std::memcpy(&x, p, sizeof(T));
     /* Don't need to do anything if we are not on a big endian machine. */
-    if constexpr (std::endian::native != std::endian::little) {
-        if constexpr (std::is_same_v<T, uint64_t>) {
-            x = __builtin_bswap64(x);
-        } else if constexpr (std::is_same_v<T, uint32_t>) {
-            x = __builtin_bswap32(x);
-        } else if constexpr (std::is_same_v<T, uint16_t>) {
-            x = __builtin_bswap16(x);
-        } else {
-            /* Signed types don't make their way here. Though it would be fine
-               since C++20 mandates 2's complement representation. */
-            static_assert(false);
-        }
-    }
+    if constexpr (std::endian::native != std::endian::little)
+        x = std::byteswap(x);
     return x;
 }
 
