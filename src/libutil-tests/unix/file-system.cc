@@ -16,9 +16,9 @@ void testDeletePathWithRestrictivePermissions()
         auto child = directory / "child";
         RestoreSink::forPath(directory, /*startFsync=*/false)
             .createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-                dir.createChild("child", [](FileSystemObjectSink & s) {
+                dir.createChild("child"_filename, [](FileSystemObjectSink & s) {
                     s.createDirectory([](FileSystemObjectSink::OnDirectory & childDir) {
-                        childDir.createChild("file", [](FileSystemObjectSink & s) {
+                        childDir.createChild("file"_filename, [](FileSystemObjectSink & s) {
                             s.createRegularFile(
                                 false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("contents"); });
                         });

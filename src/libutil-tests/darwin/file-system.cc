@@ -31,7 +31,7 @@ TEST_F(RootDeletePath, modeChangesDenied)
     AutoDelete cleanup(tmpDir);
     auto directory = tmpDir / "directory";
     RestoreSink::forPath(directory, /*startFsync=*/false).createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-        dir.createChild("file", [](FileSystemObjectSink & s) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("contents"); });
         });
     });

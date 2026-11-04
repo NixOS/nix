@@ -114,7 +114,7 @@ public:
             auto paths = store->queryAllValidPaths();
             for (const auto & path : paths)
                 /* Don't know the type, so nullopt to query lazily. */
-                entries.emplace(path.to_string(), std::nullopt);
+                entries.emplace(path.filename(), std::nullopt);
             return entries;
         }
 

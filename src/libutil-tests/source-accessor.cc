@@ -43,20 +43,20 @@ TEST_F(FSSourceAccessorTest, works)
 #endif
     {
         RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-        root.createChild("subdir", [](FileSystemObjectSink & s) {
+        root.createChild("subdir"_filename, [](FileSystemObjectSink & s) {
             s.createDirectory([](FileSystemObjectSink::OnDirectory & subdir) {
-                subdir.createChild("file2", [](FileSystemObjectSink & s) {
+                subdir.createChild("file2"_filename, [](FileSystemObjectSink & s) {
                     s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content2"); });
                 });
             });
         });
-        root.createChild("file1", [](FileSystemObjectSink & s) {
+        root.createChild("file1"_filename, [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content1"); });
         });
-        root.createChild("rootlink", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
-        root.createChild("a", [](FileSystemObjectSink & s) {
+        root.createChild("rootlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+        root.createChild("a"_filename, [](FileSystemObjectSink & s) {
             s.createDirectory([](FileSystemObjectSink::OnDirectory & a) {
-                a.createChild("dirlink", [](FileSystemObjectSink & s) { s.createSymlink("../subdir"); });
+                a.createChild("dirlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("../subdir"); });
             });
         });
     }
@@ -104,9 +104,9 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
     auto accessor = makeFSSourceAccessor(tmpDir);
 
     RestoreSink::forPath(tmpDir / "a", /*startFsync=*/false).createDirectory([](FileSystemObjectSink::OnDirectory & a) {
-        a.createChild("b", [](FileSystemObjectSink & s) {
+        a.createChild("b"_filename, [](FileSystemObjectSink & s) {
             s.createDirectory([](FileSystemObjectSink::OnDirectory & b) {
-                b.createChild("f", [](FileSystemObjectSink & s) {
+                b.createChild("f"_filename, [](FileSystemObjectSink & s) {
                     s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("old"); });
                 });
             });
@@ -118,10 +118,10 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
     deletePath(tmpDir / "a" / "b");
     RestoreSink::forPath(tmpDir / "a" / "b", /*startFsync=*/false)
         .createDirectory([](FileSystemObjectSink::OnDirectory & b) {
-            b.createChild("g", [](FileSystemObjectSink & s) {
+            b.createChild("g"_filename, [](FileSystemObjectSink & s) {
                 s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("new"); });
             });
-            b.createChild("l", [](FileSystemObjectSink & s) { s.createSymlink("g"); });
+            b.createChild("l"_filename, [](FileSystemObjectSink & s) { s.createSymlink("g"); });
         });
 
     accessor->invalidateCache();
@@ -146,7 +146,7 @@ TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
     auto dirWithF = [](std::string_view contents) {
         return [contents](FileSystemObjectSink & s) {
             s.createDirectory([&](FileSystemObjectSink::OnDirectory & dir) {
-                dir.createChild("f", [&](FileSystemObjectSink & s) {
+                dir.createChild("f"_filename, [&](FileSystemObjectSink & s) {
                     s.createRegularFile(false, [&](FileSystemObjectSink::OnRegularFile & crf) { crf(contents); });
                 });
             });
@@ -156,13 +156,13 @@ TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
        which only looked at sizes would confuse them. */
     RestoreSink::forPath(tmpDir / "aaa", /*startFsync=*/false)
         .createDirectory([&](FileSystemObjectSink::OnDirectory & aaa) {
-            aaa.createChild("bbb", [&](FileSystemObjectSink & s) {
+            aaa.createChild("bbb"_filename, [&](FileSystemObjectSink & s) {
                 s.createDirectory([&](FileSystemObjectSink::OnDirectory & bbb) {
-                    bbb.createChild("ccc", dirWithF("in-ccc"));
-                    bbb.createChild("ddd", dirWithF("in-ddd"));
+                    bbb.createChild("ccc"_filename, dirWithF("in-ccc"));
+                    bbb.createChild("ddd"_filename, dirWithF("in-ddd"));
                 });
             });
-            aaa.createChild("zzz", dirWithF("in-zzz"));
+            aaa.createChild("zzz"_filename, dirWithF("in-zzz"));
         });
 
     auto accessor = makeFSSourceAccessor(tmpDir);
@@ -200,11 +200,11 @@ TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
 
     RestoreSink::forPath(tmpDir / "root", /*startFsync=*/false)
         .createDirectory([](FileSystemObjectSink::OnDirectory & root) {
-            root.createChild("mid", [](FileSystemObjectSink & s) {
+            root.createChild("mid"_filename, [](FileSystemObjectSink & s) {
                 s.createDirectory([](FileSystemObjectSink::OnDirectory & mid) {
-                    mid.createChild("sub", [](FileSystemObjectSink & s) {
+                    mid.createChild("sub"_filename, [](FileSystemObjectSink & s) {
                         s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
-                            sub.createChild("f", [](FileSystemObjectSink & s) {
+                            sub.createChild("f"_filename, [](FileSystemObjectSink & s) {
                                 s.createRegularFile(
                                     false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content"); });
                             });
@@ -273,7 +273,7 @@ TEST_F(FSSourceAccessorTest, RestoreSinkTrailingSeparator)
     {
         auto sink = RestoreSink::forPath(tmpDir / "dir" / "", /*startFsync=*/false);
         sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
-            dir.createChild("file", [](FileSystemObjectSink & s) {
+            dir.createChild("file"_filename, [](FileSystemObjectSink & s) {
                 s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content"); });
             });
         });

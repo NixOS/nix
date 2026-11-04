@@ -2517,7 +2517,7 @@ static void prim_readDir(EvalState & state, CallSite callSite, Value * const * a
 
     for (auto & [name, type] : entries) {
         if (!type) {
-            auto & attr = attrs.alloc(name);
+            auto & attr = attrs.alloc(name.str());
             // Some filesystems or operating systems may not be able to return
             // detailed node info quickly in this case we produce a thunk to
             // query the file type lazily.
@@ -2531,7 +2531,7 @@ static void prim_readDir(EvalState & state, CallSite callSite, Value * const * a
             // Here we just stringize the directory entry type.
             // N.B. const_cast here is ok, because these values will never be modified, since
             // only thunks are mutable - other types do not change once constructed.
-            attrs.insert(state.symbols.create(name), const_cast<Value *>(&fileTypeToString(state, *type)));
+            attrs.insert(state.symbols.create(name.str()), const_cast<Value *>(&fileTypeToString(state, *type)));
         }
     }
 

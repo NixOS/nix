@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/error.hh"
+#include "nix/util/filename.hh"
 #include <string>
 #include <optional>
 #include <cassert>
@@ -137,23 +138,23 @@ public:
          */
         class PointerProxy
         {
-            std::string_view segment;
+            FilenameView segment;
 
         public:
-            PointerProxy(std::string_view segment_)
+            PointerProxy(FilenameView segment_)
                 : segment(segment_)
             {
             }
 
-            const std::string_view * operator->() const
+            const FilenameView * operator->() const
             {
                 return &segment;
             }
         };
 
     public:
-        using value_type = std::string_view;
-        using reference_type = const std::string_view;
+        using value_type = FilenameView;
+        using reference_type = const FilenameView;
         using pointer_type = PointerProxy;
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::forward_iterator_tag;
@@ -184,7 +185,8 @@ public:
 
         reference_type operator*() const
         {
-            return remaining.substr(0, slash);
+            /* A component is always a valid file name. */
+            return FilenameView{remaining.substr(0, slash)};
         }
 
         pointer_type operator->() const
@@ -237,11 +239,12 @@ public:
         return ((std::string_view) path).substr(0, path.rfind('/'));
     }
 
-    std::optional<std::string_view> baseName() const
+    std::optional<FilenameView> baseName() const
     {
         if (isRoot())
             return std::nullopt;
-        return ((std::string_view) path).substr(path.rfind('/') + 1);
+        /* A component is always a valid file name. */
+        return FilenameView{((std::string_view) path).substr(path.rfind('/') + 1)};
     }
 
     bool operator==(const CanonPath & x) const
@@ -302,11 +305,16 @@ public:
     CanonPath operator/(const CanonPath & x) const;
 
     /**
-     * Add a path component to this one. It must not contain any slashes.
+     * Add a path component to this one.
      */
-    void push(std::string_view c);
+    void push(FilenameView c);
 
-    CanonPath operator/(std::string_view c) const;
+    CanonPath operator/(FilenameView c) const
+    {
+        auto res = *this;
+        res.push(c);
+        return res;
+    }
 
     /**
      * Check whether access to this path is allowed, which is the case

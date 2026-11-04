@@ -186,6 +186,7 @@ sources = [ config_priv_h ] + files(
   'file-content-address.cc',
   'file-descriptor.cc',
   'file-system.cc',
+  'filename.cc',
   'fs-sink.cc',
   'git.cc',
   'hash.cc',

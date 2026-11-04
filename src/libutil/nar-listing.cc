@@ -54,9 +54,9 @@ NarListing parseNarListing(Source & source)
                 {
                 }
 
-                void createChild(std::string_view name, ChildCreatedCallback callback) override
+                void createChild(FilenameView name, ChildCreatedCallback callback) override
                 {
-                    auto [it, inserted] = dir.entries.emplace(std::string{name}, NarListing{});
+                    auto [it, inserted] = dir.entries.emplace(name, NarListing{});
                     auto oldDst = indexer.currentDst;
                     indexer.currentDst = &it->second;
 

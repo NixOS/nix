@@ -11,7 +11,7 @@ int fuzzParseDumpCommon(std::string_view s, bool acceptInvalid)
         {
             struct : OnDirectory
             {
-                void createChild(std::string_view, ChildCreatedCallback callback) override
+                void createChild(FilenameView, ChildCreatedCallback callback) override
                 {
                     DrainingFileSystemObjectSink childSink;
                     callback(childSink);
