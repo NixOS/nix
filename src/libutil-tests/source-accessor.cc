@@ -42,17 +42,23 @@ TEST_F(FSSourceAccessorTest, works)
     GTEST_SKIP() << "Broken on Windows";
 #endif
     {
-        RestoreSink sink(false);
-        sink.dstPath = tmpDir;
-#ifndef _WIN32
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-#endif
-        sink.createDirectory(CanonPath("subdir"));
-        sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });
-        sink.createRegularFile(CanonPath("subdir/file2"), [](CreateRegularFileSink & crf) { crf("content2"); });
-        sink.createSymlink(CanonPath("rootlink"), "target");
-        sink.createDirectory(CanonPath("a"));
-        sink.createSymlink(CanonPath("a/dirlink"), "../subdir");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("subdir", [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & subdir) {
+                subdir.createChild("file2", [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content2"); });
+                });
+            });
+        });
+        root.createChild("file1", [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content1"); });
+        });
+        root.createChild("rootlink", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+        root.createChild("a", [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & a) {
+                a.createChild("dirlink", [](FileSystemObjectSink & s) { s.createSymlink("../subdir"); });
+            });
+        });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(tmpDir / "file1"), testing::HasContents(CanonPath::root, "content1"));
@@ -97,15 +103,26 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
 #endif
     auto accessor = makeFSSourceAccessor(tmpDir);
 
-    createDirs(tmpDir / "a" / "b");
-    writeFile(tmpDir / "a" / "b" / "f", "old");
+    RestoreSink::forPath(tmpDir / "a", /*startFsync=*/false).createDirectory([](FileSystemObjectSink::OnDirectory & a) {
+        a.createChild("b", [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & b) {
+                b.createChild("f", [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("old"); });
+                });
+            });
+        });
+    });
 
     EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/f")));
 
     deletePath(tmpDir / "a" / "b");
-    createDirs(tmpDir / "a" / "b");
-    writeFile(tmpDir / "a" / "b" / "g", "new");
-    createSymlink("g", tmpDir / "a" / "b" / "l");
+    RestoreSink::forPath(tmpDir / "a" / "b", /*startFsync=*/false)
+        .createDirectory([](FileSystemObjectSink::OnDirectory & b) {
+            b.createChild("g", [](FileSystemObjectSink & s) {
+                s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("new"); });
+            });
+            b.createChild("l", [](FileSystemObjectSink & s) { s.createSymlink("g"); });
+        });
 
     accessor->invalidateCache();
 
@@ -125,14 +142,28 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
    it degenerates to a plain nested-read check (that accessor has no cache). */
 TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
 {
+    /* Each directory holds a single file `f` with the given contents. */
+    auto dirWithF = [](std::string_view contents) {
+        return [contents](FileSystemObjectSink & s) {
+            s.createDirectory([&](FileSystemObjectSink::OnDirectory & dir) {
+                dir.createChild("f", [&](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [&](FileSystemObjectSink::OnRegularFile & crf) { crf(contents); });
+                });
+            });
+        };
+    };
     /* Siblings deliberately share a length, so that a component comparison
        which only looked at sizes would confuse them. */
-    createDirs(tmpDir / "aaa" / "bbb" / "ccc");
-    createDirs(tmpDir / "aaa" / "bbb" / "ddd");
-    createDirs(tmpDir / "aaa" / "zzz");
-    writeFile(tmpDir / "aaa" / "bbb" / "ccc" / "f", "in-ccc");
-    writeFile(tmpDir / "aaa" / "bbb" / "ddd" / "f", "in-ddd");
-    writeFile(tmpDir / "aaa" / "zzz" / "f", "in-zzz");
+    RestoreSink::forPath(tmpDir / "aaa", /*startFsync=*/false)
+        .createDirectory([&](FileSystemObjectSink::OnDirectory & aaa) {
+            aaa.createChild("bbb", [&](FileSystemObjectSink & s) {
+                s.createDirectory([&](FileSystemObjectSink::OnDirectory & bbb) {
+                    bbb.createChild("ccc", dirWithF("in-ccc"));
+                    bbb.createChild("ddd", dirWithF("in-ddd"));
+                });
+            });
+            aaa.createChild("zzz", dirWithF("in-zzz"));
+        });
 
     auto accessor = makeFSSourceAccessor(tmpDir);
 
@@ -167,8 +198,21 @@ TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
     if (geteuid() == 0)
         GTEST_SKIP() << "root bypasses permission checks";
 
-    createDirs(tmpDir / "root" / "mid" / "sub");
-    writeFile(tmpDir / "root" / "mid" / "sub" / "f", "content");
+    RestoreSink::forPath(tmpDir / "root", /*startFsync=*/false)
+        .createDirectory([](FileSystemObjectSink::OnDirectory & root) {
+            root.createChild("mid", [](FileSystemObjectSink & s) {
+                s.createDirectory([](FileSystemObjectSink::OnDirectory & mid) {
+                    mid.createChild("sub", [](FileSystemObjectSink & s) {
+                        s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
+                            sub.createChild("f", [](FileSystemObjectSink & s) {
+                                s.createRegularFile(
+                                    false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content"); });
+                            });
+                        });
+                    });
+                });
+            });
+        });
 
     chmod(tmpDir / "root", 0100);
     chmod(tmpDir / "root" / "mid", 0100);
@@ -193,17 +237,15 @@ TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
 }
 
 /* ----------------------------------------------------------------------------
- * RestoreSink non-directory at root (no dirFd)
+ * RestoreSink non-directory at root (`RestoreSink::forPath`)
  * --------------------------------------------------------------------------*/
 
 TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 {
     auto filePath = tmpDir / "rootfile";
     {
-        RestoreSink sink(false);
-        sink.dstPath = filePath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
+        auto sink = RestoreSink::forPath(filePath, /*startFsync=*/false);
+        sink.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("root content"); });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(filePath), testing::HasContents(CanonPath::root, "root content"));
@@ -217,13 +259,41 @@ TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 #endif
     auto linkPath = tmpDir / "rootlink";
     {
-        RestoreSink sink(false);
-        sink.dstPath = linkPath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createSymlink(CanonPath::root, "symlink_target");
+        auto sink = RestoreSink::forPath(linkPath, /*startFsync=*/false);
+        sink.createSymlink("symlink_target");
     }
 
     EXPECT_THAT(makeFSSourceAccessor(linkPath), testing::HasSymlink(CanonPath::root, "symlink_target"));
+}
+
+/* As with POSIX, a trailing separator means the destination must be a
+   directory. */
+TEST_F(FSSourceAccessorTest, RestoreSinkTrailingSeparator)
+{
+    {
+        auto sink = RestoreSink::forPath(tmpDir / "dir" / "", /*startFsync=*/false);
+        sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+            dir.createChild("file", [](FileSystemObjectSink & s) {
+                s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content"); });
+            });
+        });
+    }
+    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "dir"), testing::HasContents(CanonPath("file"), "content"));
+
+    EXPECT_THAT(
+        [&] {
+            auto sink = RestoreSink::forPath(tmpDir / "file" / "", /*startFsync=*/false);
+            sink.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content"); });
+        },
+        testing::ThrowsSystemError(std::errc::is_a_directory));
+    EXPECT_THAT(
+        [&] {
+            auto sink = RestoreSink::forPath(tmpDir / "link" / "", /*startFsync=*/false);
+            sink.createSymlink("target");
+        },
+        testing::ThrowsSystemError(std::errc::is_a_directory));
+    EXPECT_FALSE(pathExists(tmpDir / "file"));
+    EXPECT_FALSE(pathExists(tmpDir / "link"));
 }
 
 } // namespace nix

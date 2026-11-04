@@ -152,26 +152,54 @@ public:
 };
 
 /**
- * Write to a `MemorySourceAccessor` at the given path
+ * Write to a `MemorySourceAccessor::File`
  */
 struct MemorySink : FileSystemObjectSink
 {
+    using CreateRoot = fun<MemorySourceAccessor::File &(MemorySourceAccessor::File)>;
+
 private:
     void anchor() override;
 
-public:
-    MemorySourceAccessor & dst;
+    CreateRoot createRoot;
 
-    MemorySink(MemorySourceAccessor & dst)
-        : dst(dst)
+public:
+    /**
+     * Write the file system object to wherever `createRoot` puts it.
+     */
+    MemorySink(CreateRoot createRoot)
+        : createRoot(std::move(createRoot))
     {
     }
 
-    void createDirectory(const CanonPath & path) override;
+    /**
+     * Write the file system object to the root of @p dst, which must
+     * outlive this sink.
+     */
+    explicit MemorySink(MemorySourceAccessor & dst)
+        : MemorySink([&dst](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+            return dst.root.emplace(std::move(file));
+        })
+    {
+    }
 
-    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
+    struct MemoryDirectory : OnDirectory
+    {
+        MemorySourceAccessor::File::Directory & dir;
 
-    void createSymlink(const CanonPath & path, const std::string & target) override;
+        MemoryDirectory(MemorySourceAccessor::File::Directory & dir)
+            : dir(dir)
+        {
+        }
+
+        void createChild(std::string_view name, ChildCreatedCallback callback) override;
+    };
+
+    void createDirectory(DirectoryCreatedCallback callback) override;
+
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) override;
+
+    void createSymlink(const std::string & target) override;
 };
 
 template<>

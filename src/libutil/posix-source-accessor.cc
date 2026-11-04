@@ -765,7 +765,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
                 , fsPath(std::move(fsPath_))
             {
                 MemorySink sink{*this};
-                sink.createSymlink(CanonPath::root, target);
+                sink.createSymlink(target);
                 displayPrefix = fsPath.string();
             }
 
