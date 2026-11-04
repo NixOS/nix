@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include "nix/util/filename.hh"
+
 #include <filesystem>
 
 namespace nix {
@@ -23,7 +25,7 @@ class OsFilename
 {
     std::filesystem::path name;
 
-    void validateAssert() const noexcept;
+    static void validateAssert(const std::filesystem::path & p) noexcept;
 
     static void validateThrow(const std::filesystem::path & p);
 
@@ -65,19 +67,42 @@ public:
      */
     static OsFilename fromPathAsserting(std::filesystem::path p)
     {
-        auto ret = OsFilename{std::move(p)};
-        ret.validateAssert();
-        return ret;
+        validateAssert(p);
+        return OsFilename{std::move(p)};
     }
 
     /**
-     * Construct an `OsFilename` from a path, throwing an `Error` if it
+     * Construct an `OsFilename` from a path, throwing a `BadFilename` if it
      * is not a single filename component.
      *
      * Use this when the input comes from users / the external world, and we are
      * not sure whether the invariant will pass.
      */
     static OsFilename fromPathThrowing(std::filesystem::path p);
+
+    /**
+     * Convert from the portable `Filename`, the inverse of `toPortable`,
+     * asserting that it is also a valid file name on this OS. Like the
+     * `OsCanonPath` constructor from `CanonPath`.
+     *
+     * On Unix, every `Filename` is. On Windows, a `Filename` may contain
+     * `\` or be a drive like `C:`, so use `fromPortableThrowing` for
+     * names from the outside world.
+     */
+    explicit OsFilename(FilenameView portable)
+        : name(std::string{portable.str()})
+    {
+        validateAssert(name);
+    }
+
+    /**
+     * Like the constructor from `FilenameView`, but throwing a `BadFilename`
+     * if it is not a valid file name on this OS.
+     */
+    static OsFilename fromPortableThrowing(FilenameView portable)
+    {
+        return fromPathThrowing(std::string{portable.str()});
+    }
 
     const std::filesystem::path & path() const noexcept
     {
@@ -87,6 +112,21 @@ public:
     const std::filesystem::path::value_type * c_str() const noexcept
     {
         return name.c_str();
+    }
+
+    /**
+     * Convert to the portable `Filename`.
+     *
+     * Every `OsFilename` is a valid `Filename`: it is not empty, `.` or
+     * `..`, and contains neither NUL nor a directory separator, which `/`
+     * is on every OS.
+     *
+     * @todo As with `OsCanonPath::toPortable`, the *encoding* does not
+     * round-trip on Windows, where this narrows the `wchar_t` name.
+     */
+    Filename toPortable() const
+    {
+        return Filename::fromStringAsserting(name.string());
     }
 
     auto operator<=>(const OsFilename &) const = default;

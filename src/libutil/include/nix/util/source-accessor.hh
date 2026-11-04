@@ -4,6 +4,7 @@
 #include <variant>
 
 #include "nix/util/canon-path.hh"
+#include "nix/util/filename.hh"
 #include "nix/util/fmt.hh"
 #include "nix/util/os-canon-path.hh"
 #include "nix/util/fun.hh"
@@ -147,7 +148,7 @@ public:
 
     typedef std::optional<Type> DirEntry;
 
-    typedef std::map<std::string, DirEntry> DirEntries;
+    typedef std::map<Filename, DirEntry, std::less<>> DirEntries;
 
     /**
      * @note Like `readFile`, this method should *not* follow symlinks.
@@ -172,7 +173,17 @@ public:
 
     virtual std::string readLink(const CanonPath & path) = 0;
 
-    virtual void dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter = defaultPathFilter);
+    /**
+     * Dump @p path as a NAR, using the `use-case-hack` setting.
+     */
+    void dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter = defaultPathFilter);
+
+    /**
+     * Like the other `dumpPath`, but saying whether to undo the case
+     * hack, removing its suffixes from file names, rather than using the
+     * `use-case-hack` setting.
+     */
+    virtual void dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter, bool useCaseHack);
 
     Hash
     hashPath(const CanonPath & path, PathFilter & filter = defaultPathFilter, HashAlgorithm ha = HashAlgorithm::SHA256);

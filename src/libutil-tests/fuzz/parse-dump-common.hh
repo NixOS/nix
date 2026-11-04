@@ -2,7 +2,7 @@
 
 namespace nix {
 
-int fuzzParseDumpCommon(std::string_view s, bool acceptInvalid)
+int fuzzParseDumpCommon(std::string_view s, bool acceptInvalid, bool useCaseHack)
 {
     struct DrainingFileSystemObjectSink : NullFileSystemObjectSink
     {
@@ -26,7 +26,7 @@ int fuzzParseDumpCommon(std::string_view s, bool acceptInvalid)
     auto parse = [&](FileSystemObjectSink & sink) {
         nix::StringSource source{s};
         try {
-            nix::parseDump(sink, source);
+            nix::parseDump(sink, source, useCaseHack);
             return ParseResult{.accepted = true, .consumed = source.pos};
         } catch (const nix::Error &) {
             return ParseResult{.accepted = false, .consumed = source.pos};

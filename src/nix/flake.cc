@@ -938,7 +938,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             for (auto & [name, entry] : from.readDirectory()) {
                 checkInterrupt();
                 auto from2 = from / name;
-                auto to2 = to / name;
+                auto to2 = to / name.str();
                 auto st = from2.lstat();
                 auto to_st = std::filesystem::symlink_status(to2);
                 if (st.type == SourceAccessor::tDirectory)

@@ -106,10 +106,9 @@ struct CmdCatNar : StoreCommand, MixCat
                     {
                     }
 
-                    void createChild(std::string_view name, ChildCreatedCallback callback) override
+                    void createChild(FilenameView name, ChildCreatedCallback callback) override
                     {
-                        CatRegularFileSink childSink{
-                            parent.currentPath / std::string{name}, parent.neededPath, parent.found};
+                        CatRegularFileSink childSink{parent.currentPath / name.str(), parent.neededPath, parent.found};
                         callback(childSink);
                     }
                 } dir{*this};

@@ -5,28 +5,36 @@
 
 namespace nix {
 
-void OsFilename::validateAssert() const noexcept
+void OsFilename::validateAssert(const std::filesystem::path & p) noexcept
 {
     /* Being `noexcept`, any `Error` escaping here calls `std::terminate`,
        making a violated invariant as fatal as a failed assertion. */
-    validateThrow(name);
+    validateThrow(p);
 }
 
 void OsFilename::validateThrow(const std::filesystem::path & p)
 {
+    auto bad = [&](BadFilename::Problem problem) { throw BadFilename(problem, p); };
     const OsString & native = p.native();
+    if (p.empty())
+        bad(BadFilename::Problem::Empty);
     /* No special path traversal names. */
-    bool invalid = p.empty() || native == OS_STR(".") || native == OS_STR("..");
+    if (native == OS_STR("."))
+        bad(BadFilename::Problem::Dot);
+    if (native == OS_STR(".."))
+        bad(BadFilename::Problem::DotDot);
     /* A NUL would cut the name short in system calls, so that different
        names could refer to the same file. */
-    invalid |= native.contains(OsString::value_type{});
+    if (native.contains(OsString::value_type{}))
+        bad(BadFilename::Problem::Nul);
+    if (
 #ifndef _WIN32
-    invalid |= native.contains('/');
+        native.contains('/')
 #else
-    invalid |= p.has_root_path() || p.has_parent_path() || (p.filename() != p);
+        p.has_root_path() || p.has_parent_path() || (p.filename() != p)
 #endif
-    if (invalid) [[unlikely]]
-        throw Error("invalid filename %1%", PathFmt(p));
+    )
+        bad(BadFilename::Problem::ParentPath);
 }
 
 OsFilename OsFilename::fromPathThrowing(std::filesystem::path p)

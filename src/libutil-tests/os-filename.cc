@@ -1,30 +1,12 @@
 #include "nix/util/error.hh"
 #include "nix/util/os-filename.hh"
 
-#include <type_traits>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace nix {
 
-TEST(OsFilename, validFilenames)
-{
-    // Simple filename
-    auto f1 = OsFilename::fromPathAsserting("foo");
-    ASSERT_EQ(f1.path(), "foo");
-
-    // Filename with extension
-    auto f2 = OsFilename::fromPathAsserting("bar.txt");
-    ASSERT_EQ(f2.path(), "bar.txt");
-
-    // Filename with multiple dots
-    auto f3 = OsFilename::fromPathAsserting("file.tar.gz");
-    ASSERT_EQ(f3.path(), "file.tar.gz");
-
-    // Filename starting with dot (hidden file)
-    auto f4 = OsFilename::fromPathAsserting(".hidden");
-    ASSERT_EQ(f4.path(), ".hidden");
-}
+/* The cases shared with `Filename` are tested in `filename-shared.cc`. */
 
 TEST(OsFilename, validUnicode)
 {
@@ -50,48 +32,62 @@ TEST(OsFilename, invalidUnicode)
     ASSERT_EQ(OsFilename::fromPathThrowing(p), f);
 }
 
-TEST(OsFilename, equality)
+TEST(OsFilename, nulFails)
 {
-    auto a = OsFilename::fromPathAsserting("foo");
-    auto b = OsFilename::fromPathAsserting("foo");
-    auto c = OsFilename::fromPathAsserting("bar");
-
-    ASSERT_EQ(a, b);
-    ASSERT_NE(a, c);
+    using ::testing::Eq;
+    using ::testing::Field;
+    using ::testing::Throws;
+    std::filesystem::path p{std::string{"a\0b", 3}};
+    EXPECT_THAT(
+        [&] { OsFilename::fromPathThrowing(p); },
+        Throws<BadFilename>(Field(&BadFilename::problem, Eq(BadFilename::Problem::Nul))));
+    ASSERT_DEATH(OsFilename::fromPathAsserting(p), "cannot contain a NUL byte");
 }
 
-TEST(OsFilename, noConversionToPath)
+TEST(OsFilename, toPortable)
 {
-    /* The newtype would be pointless if an `OsFilename` could decay into
-       a `std::filesystem::path`; use `path()` instead. */
-    static_assert(!std::is_convertible_v<OsFilename, const std::filesystem::path &>);
+    EXPECT_EQ(OsFilename::fromPathAsserting("foo.txt").toPortable(), "foo.txt"_filename);
+    /* `char8_t` sources are decoded as UTF-8 on every platform, and
+       `toPortable` gives the same bytes as `std::filesystem::path::string`.
+       A `Filename` is not UTF-8, but is treated as such for conversion to
+       and from the native path encoding. */
+    std::filesystem::path p{u8"héllo-日本-\U0001F600"};
+    EXPECT_EQ(OsFilename::fromPathAsserting(p).toPortable().str(), p.string());
+}
 
-    auto f = OsFilename::fromPathAsserting("test.txt");
-    ASSERT_EQ(f.path(), "test.txt");
+TEST(OsFilename, fromPortable)
+{
+    EXPECT_EQ(OsFilename{"foo.txt"_filename}.path(), std::filesystem::path{"foo.txt"});
+    EXPECT_EQ(OsFilename::fromPortableThrowing("foo.txt"_filename), OsFilename{"foo.txt"_filename});
+    EXPECT_EQ(OsFilename{"foo.txt"_filename}.toPortable(), "foo.txt"_filename);
+#ifdef _WIN32
+    /* Valid portable names that are not single file names on Windows. */
+    EXPECT_THROW(OsFilename::fromPortableThrowing("a\\b"_filename), BadFilename);
+    EXPECT_THROW(OsFilename::fromPortableThrowing("C:"_filename), BadFilename);
+#endif
 }
 
 TEST(OsFilename, fromPathThrowingRejects)
 {
-    auto throwsInvalid = ::testing::ThrowsMessage<Error>(::testing::HasSubstr("invalid filename"));
-    for (const auto * p : {
-             "",
-             ".",
-             "..",
-             "/foo",
-             "foo/bar",
+    auto throwsInvalid = [](BadFilename::Problem why) {
+        return ::testing::Throws<BadFilename>(::testing::Field(&BadFilename::problem, ::testing::Eq(why)));
+    };
+    for (const auto & [p, why] : std::initializer_list<std::pair<std::string, BadFilename::Problem>>{
+             {"", BadFilename::Problem::Empty},
+             {".", BadFilename::Problem::Dot},
+             {"..", BadFilename::Problem::DotDot},
+             {"/foo", BadFilename::Problem::ParentPath},
+             {"foo/bar", BadFilename::Problem::ParentPath},
 #ifdef _WIN32
-             "C:foo",
-             "foo\\bar",
-             "..\\evil",
+             {"C:foo", BadFilename::Problem::ParentPath},
+             {"foo\\bar", BadFilename::Problem::ParentPath},
+             {"..\\evil", BadFilename::Problem::ParentPath},
 #endif
+             /* Embedded NULs need an explicit length. */
+             {std::string{"foo\0bar", 7}, BadFilename::Problem::Nul},
+             {std::string{"\0", 1}, BadFilename::Problem::Nul},
          }) {
-        EXPECT_THAT([&] { OsFilename::fromPathThrowing(p); }, throwsInvalid);
-        ASSERT_DEATH(OsFilename::fromPathAsserting(p), "invalid filename");
-    }
-
-    /* Embedded NULs need an explicit length. */
-    for (const auto & p : {std::string{"foo\0bar", 7}, std::string{"\0", 1}}) {
-        EXPECT_THAT([&] { OsFilename::fromPathThrowing(p); }, throwsInvalid);
+        EXPECT_THAT([&] { OsFilename::fromPathThrowing(p); }, throwsInvalid(why));
         ASSERT_DEATH(OsFilename::fromPathAsserting(p), "invalid filename");
     }
 }

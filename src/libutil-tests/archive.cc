@@ -1,4 +1,5 @@
 #include "nix/util/archive.hh"
+#include "nix/util/memory-source-accessor.hh"
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
@@ -79,13 +80,13 @@ INSTANTIATE_TEST_SUITE_P(
         // Unpacking a NAR with a NUL character in a file name should fail.
         std::pair{"nul-character", "bad archive: NAR contains invalid file name 'f"},
         // Likewise for a '.' filename.
-        std::pair{"dot", "bad archive: NAR contains invalid file name '.'"},
+        std::pair{"dot", "bad archive: NAR contains invalid file name '.': cannot be '.'"},
         // Likewise for a '..' filename.
-        std::pair{"dotdot", "bad archive: NAR contains invalid file name '..'"},
+        std::pair{"dotdot", "bad archive: NAR contains invalid file name '..': cannot be '..'"},
         // Likewise for a filename containing a slash.
-        std::pair{"slash", "bad archive: NAR contains invalid file name 'x/y'"},
+        std::pair{"slash", "bad archive: NAR contains invalid file name 'x/y': cannot contain '/'"},
         // Likewise for an empty filename.
-        std::pair{"empty", "bad archive: NAR contains invalid file name ''"},
+        std::pair{"empty", "bad archive: NAR contains invalid file name '': cannot be empty"},
         // Test that the 'executable' field cannot come before the 'contents' field.
         std::pair{"executable-after-contents", "bad archive: expected tag ')', got 'executable'"},
         // Test that the 'name' field cannot come before the 'node' field in a directory entry.
@@ -139,6 +140,81 @@ TEST_F(NarTest, trailingBytesRemainUnreadWithBothContentModes)
         EXPECT_EQ(skippingOffset, narContents.size());
         EXPECT_EQ(drainingOffset, skippingOffset);
     });
+}
+
+/* ----------------------------------------------------------------------------
+ * The case hack
+ * --------------------------------------------------------------------------*/
+
+namespace {
+
+/**
+ * A directory of empty files with these names.
+ */
+ref<MemorySourceAccessor> directoryOf(std::initializer_list<std::string_view> names)
+{
+    auto accessor = make_ref<MemorySourceAccessor>();
+    accessor->addDirectory(CanonPath::root);
+    for (auto name : names)
+        accessor->addFile(CanonPath::root / FilenameView::fromStringThrowing(name), "");
+    return accessor;
+}
+
+std::string dumpToString(SourceAccessor & accessor, bool useCaseHack)
+{
+    StringSink sink;
+    accessor.dumpPath(CanonPath::root, sink, defaultPathFilter, useCaseHack);
+    return std::move(sink.s);
+}
+
+ref<MemorySourceAccessor> parseFromString(const std::string & nar, bool useCaseHack)
+{
+    auto accessor = make_ref<MemorySourceAccessor>();
+    MemorySink sink{*accessor};
+    StringSource source{nar};
+    parseDump(sink, source, useCaseHack);
+    return accessor;
+}
+
+} // namespace
+
+TEST(NarCaseHack, roundTrips)
+{
+    auto nar = dumpToString(*directoryOf({"Foo", "foo"}), /*useCaseHack=*/false);
+
+    /* Names that collide when case is ignored get the suffix... */
+    auto hacked = parseFromString(nar, /*useCaseHack=*/true);
+    EXPECT_THAT(
+        hacked,
+        testing::HasDirectory(
+            CanonPath::root, std::set<std::string>{"Foo", "foo" + std::string{caseHackSuffix} + "1"}));
+
+    /* ...which dumping removes again. */
+    EXPECT_EQ(dumpToString(*hacked, /*useCaseHack=*/true), nar);
+
+    /* Without the case hack, neither happens. */
+    EXPECT_THAT(
+        parseFromString(nar, /*useCaseHack=*/false),
+        testing::HasDirectory(CanonPath::root, std::set<std::string>{"Foo", "foo"}));
+    EXPECT_NE(dumpToString(*hacked, /*useCaseHack=*/false), nar);
+}
+
+TEST(NarCaseHack, rejectsInvalidUnhackedNames)
+{
+    /* Removing the suffix would leave an invalid name. */
+    for (auto prefix : {"", ".", ".."}) {
+        auto accessor = directoryOf({std::string{prefix} + std::string{caseHackSuffix} + "1"});
+        EXPECT_THROW(dumpToString(*accessor, /*useCaseHack=*/true), BadFilename) << prefix;
+        EXPECT_NO_THROW(dumpToString(*accessor, /*useCaseHack=*/false)) << prefix;
+    }
+}
+
+TEST(NarCaseHack, rejectsCollidingUnhackedNames)
+{
+    auto accessor = directoryOf({"a", "a" + std::string{caseHackSuffix} + "1"});
+    EXPECT_THAT(
+        [&] { dumpToString(*accessor, /*useCaseHack=*/true); },
+        ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher("file name collision")));
 }
 
 } // namespace nix
