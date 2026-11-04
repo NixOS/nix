@@ -85,6 +85,7 @@ suites = [
       'delete-no-keep.sh',
       'dependencies.sh',
       'derivation-advanced-attributes.sh',
+      'derivation-invalid-system.sh',
       'derivation-json.sh',
       'dump-db.sh',
       'eval-store.sh',
