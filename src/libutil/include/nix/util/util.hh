@@ -200,16 +200,23 @@ template<typename T>
 T readLittleEndian(unsigned char * p)
 {
     T x = 0;
-    /* Byte types such as char/unsigned char/std::byte are a bit special because
-       they are allowed to alias anything else. Thus a raw loop iterating
-       over the bytes here would be quite inefficient and iterate byte-by-byte
-       (the compiler cannot optimise anything because the pointer might alias
-       something). Use a memcpy + byteswap here as needed. */
     std::memcpy(&x, p, sizeof(T));
     /* Don't need to do anything if we are not on a big endian machine. */
     if constexpr (std::endian::native != std::endian::little)
         x = std::byteswap(x);
     return x;
+}
+
+/**
+ * Write the integer in big endian order to the output.
+ */
+template<typename T>
+    requires std::is_unsigned_v<T> && (sizeof(T) > 1)
+void writeBigEndian(unsigned char * p, T x)
+{
+    if constexpr (std::endian::native != std::endian::big)
+        x = std::byteswap(x);
+    std::memcpy(p, &x, sizeof(T));
 }
 
 /**
