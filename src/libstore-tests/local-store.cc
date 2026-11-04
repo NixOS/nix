@@ -156,21 +156,30 @@ TEST_P(LocalStoreCanonicalisationTest, flatFitsInMemory)
 TEST_P(LocalStoreCanonicalisationTest, simpleNar)
 {
     auto accessor = make_ref<MemorySourceAccessor>();
-    MemorySink memorySink{*accessor};
-    memorySink.createDirectory(CanonPath::root);
-    memorySink.createRegularFile(CanonPath("/regular"), [](auto & crf) { crf("test"); });
-    memorySink.createRegularFile(CanonPath("/executable"), [](auto & crf) {
-        crf("test");
-        crf.isExecutable();
-    });
-    memorySink.createDirectory(CanonPath("/dir"));
-    memorySink.createRegularFile(CanonPath("/dir/regular"), [](auto & crf) { crf("test 2"); });
-    memorySink.createRegularFile(CanonPath("/dir/executable"), [](auto & crf) {
-        crf("test 2");
-        crf.isExecutable();
-    });
-    memorySink.createSymlink(CanonPath("/symlink"), "some target");
-    memorySink.createSymlink(CanonPath("/dir/symlink"), "..");
+    using File = MemorySourceAccessor::File;
+    {
+        MemorySink memorySink{[&](File file) -> File & { return accessor->root.emplace(std::move(file)); }};
+        memorySink.createDirectory([](FileSystemObjectSink::OnDirectory & root) {
+            root.createChild("regular", [](FileSystemObjectSink & s) {
+                s.createRegularFile(false, [](auto & crf) { crf("test"); });
+            });
+            root.createChild("executable", [](FileSystemObjectSink & s) {
+                s.createRegularFile(true, [](auto & crf) { crf("test"); });
+            });
+            root.createChild("dir", [](FileSystemObjectSink & s) {
+                s.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+                    dir.createChild("regular", [](FileSystemObjectSink & s) {
+                        s.createRegularFile(false, [](auto & crf) { crf("test 2"); });
+                    });
+                    dir.createChild("executable", [](FileSystemObjectSink & s) {
+                        s.createRegularFile(true, [](auto & crf) { crf("test 2"); });
+                    });
+                    dir.createChild("symlink", [](FileSystemObjectSink & s) { s.createSymlink(".."); });
+                });
+            });
+            root.createChild("symlink", [](FileSystemObjectSink & s) { s.createSymlink("some target"); });
+        });
+    }
     auto source = sinkToSource([&accessor](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });
     auto sp = store->addToStoreFromDump(
         *source,
@@ -183,7 +192,9 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
         NoRepair);
     assertCanonicalPermissions(store->toRealPath(sp));
 
-    memorySink.createRegularFile(CanonPath("/other"), [](auto & crf) { crf(""); });
+    /* The sink can only create a fresh tree, so modify the existing one
+       through the accessor directly. */
+    accessor->open(CanonPath("/other"), File::Regular{});
     auto sp2 = store->addToStoreSlow("nar-slow", {accessor}, ContentAddressMethod::Raw::NixArchive, getHashAlgo()).path;
     assertCanonicalPermissions(store->toRealPath(sp2));
 
@@ -193,7 +204,7 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
     // So that we always spill to the file system.
     settings.getLocalSettings().narBufferSize = 0;
 
-    memorySink.createDirectory(CanonPath("/dir/entirely-something-else"));
+    accessor->open(CanonPath("/dir/entirely-something-else"), File::Directory{});
     StringSink narDump;
     accessor->dumpPath(CanonPath::root, narDump);
     StringSource narSource{narDump.s};

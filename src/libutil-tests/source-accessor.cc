@@ -38,17 +38,23 @@ TEST_F(FSSourceAccessorTest, works)
     GTEST_SKIP() << "Broken on Windows";
 #endif
     {
-        RestoreSink sink(false);
-        sink.dstPath = tmpDir;
-#ifndef _WIN32
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
-#endif
-        sink.createDirectory(CanonPath("subdir"));
-        sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });
-        sink.createRegularFile(CanonPath("subdir/file2"), [](CreateRegularFileSink & crf) { crf("content2"); });
-        sink.createSymlink(CanonPath("rootlink"), "target");
-        sink.createDirectory(CanonPath("a"));
-        sink.createSymlink(CanonPath("a/dirlink"), "../subdir");
+        RestoreSink::Directory root{openDirectory(tmpDir, FinalSymlink::Follow)};
+        root.createChild("subdir", [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & subdir) {
+                subdir.createChild("file2", [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content2"); });
+                });
+            });
+        });
+        root.createChild("file1", [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content1"); });
+        });
+        root.createChild("rootlink", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+        root.createChild("a", [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & a) {
+                a.createChild("dirlink", [](FileSystemObjectSink & s) { s.createSymlink("../subdir"); });
+            });
+        });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(tmpDir / "file1"), testing::HasContents(CanonPath::root, "content1"));
@@ -152,17 +158,15 @@ TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
 }
 
 /* ----------------------------------------------------------------------------
- * RestoreSink non-directory at root (no dirFd)
+ * RestoreSink non-directory at root (`RestoreSink::forPath`)
  * --------------------------------------------------------------------------*/
 
 TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 {
     auto filePath = tmpDir / "rootfile";
     {
-        RestoreSink sink(false);
-        sink.dstPath = filePath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
+        auto sink = RestoreSink::forPath(filePath, /*startFsync=*/false);
+        sink.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("root content"); });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(filePath), testing::HasContents(CanonPath::root, "root content"));
@@ -176,10 +180,8 @@ TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 #endif
     auto linkPath = tmpDir / "rootlink";
     {
-        RestoreSink sink(false);
-        sink.dstPath = linkPath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createSymlink(CanonPath::root, "symlink_target");
+        auto sink = RestoreSink::forPath(linkPath, /*startFsync=*/false);
+        sink.createSymlink("symlink_target");
     }
 
     EXPECT_THAT(makeFSSourceAccessor(linkPath), testing::HasSymlink(CanonPath::root, "symlink_target"));
