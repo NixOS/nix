@@ -152,26 +152,54 @@ public:
 };
 
 /**
- * Write to a `MemorySourceAccessor` at the given path
+ * Write to a `MemorySourceAccessor::File`
  */
 struct MemorySink : FileSystemObjectSink
 {
 private:
     void anchor() override;
 
-public:
-    MemorySourceAccessor & dst;
+    using CreateRoot = fun<MemorySourceAccessor::File &(MemorySourceAccessor::File)>;
 
-    MemorySink(MemorySourceAccessor & dst)
-        : dst(dst)
+    /**
+     * The accessor being written to, for showing paths in errors.
+     */
+    MemorySourceAccessor & accessor;
+
+    /**
+     * Where in `accessor` this sink creates its file system object.
+     */
+    CanonPath path;
+
+    /**
+     * Puts the file system object at `path`, returning it.
+     */
+    CreateRoot createRoot;
+
+    MemorySink(MemorySourceAccessor & accessor, CanonPath path, CreateRoot createRoot)
+        : accessor(accessor)
+        , path(std::move(path))
+        , createRoot(std::move(createRoot))
     {
     }
 
-    void createDirectory(const CanonPath & path) override;
+public:
+    /**
+     * Write the file system object to the root of @p dst, which must
+     * outlive this sink.
+     */
+    explicit MemorySink(MemorySourceAccessor & dst)
+        : MemorySink(dst, CanonPath::root, [&dst](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+            return dst.root.emplace(std::move(file));
+        })
+    {
+    }
 
-    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
+    void createDirectory(DirectoryCreatedCallback callback) override;
 
-    void createSymlink(const CanonPath & path, const std::string & target) override;
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) override;
+
+    void createSymlink(const std::string & target) override;
 };
 
 template<>
