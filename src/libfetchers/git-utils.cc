@@ -11,7 +11,6 @@
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/users.hh"
-#include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/util.hh"
@@ -52,7 +51,6 @@
 #include <iostream>
 #include <regex>
 #include <ranges>
-#include <future>
 
 namespace std {
 
@@ -1056,33 +1054,36 @@ public:
         return toHash(*git_tree_entry_id(entry));
     }
 
+    /* TODO: LRUCache to keep the memory bounded maybe? */
     boost::unordered_flat_map<CanonPath, TreeEntry> lookupCache;
 
-    /* Recursively look up 'path' relative to the root. */
+    /**
+     * Recursively look up 'path' relative to the root.
+     *
+     * Also adds all tree siblings (if the parent itself exists) to the lookupCache.
+     * @return Non-owning handle of the entry. It lives as long as *this.
+     */
     git_tree_entry * lookup(State & state, const CanonPath & path)
     {
-        auto i = lookupCache.find(path);
-        if (i != lookupCache.end())
+        if (const auto i = lookupCache.find(path); i != lookupCache.end())
             return i->second.get();
 
         auto parent = path.parent();
         if (!parent)
             return nullptr;
 
-        auto name = path.baseName().value();
-
-        auto parentTree = lookupTree(state, *parent);
+        const auto parentTree = lookupTree(state, *parent);
         if (!parentTree)
             return nullptr;
 
-        auto count = git_tree_entrycount(parentTree.get());
+        const auto count = git_tree_entrycount(parentTree.get());
+        const auto name = *path.baseName();
 
         git_tree_entry * res = nullptr;
 
-        /* Add all the tree entries to the cache to speed up
-           subsequent lookups. */
+        /* Add all the tree entries to the cache to speed up subsequent lookups. */
         for (size_t n = 0; n < count; ++n) {
-            auto entry = git_tree_entry_byindex(parentTree.get(), n);
+            const auto * entry = git_tree_entry_byindex(parentTree.get(), n);
 
             TreeEntry copy;
             if (git_tree_entry_dup(Setter(copy), entry))
@@ -1090,12 +1091,18 @@ public:
 
             auto entryName = std::string_view(git_tree_entry_name(entry));
 
-            if (entryName == name)
-                res = copy.get();
-
-            auto path2 = *parent;
+            /* Use the parent as the working copy to save on copies. */
+            auto & path2 = *parent;
             path2.push(entryName);
-            lookupCache.emplace(path2, std::move(copy));
+            const auto [it, inserted] = lookupCache.emplace(path2, std::move(copy));
+            /* Found what we were looking for? */
+            if (entryName == name) {
+                /* Shouldn't happen, but let's double-check. */
+                if (res)
+                    throw Error("duplicate tree entry '%1%'", path2);
+                res = it->second.get();
+            }
+            path2.pop();
         }
 
         return res;
