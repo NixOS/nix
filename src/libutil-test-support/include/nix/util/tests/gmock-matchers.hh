@@ -30,7 +30,7 @@ public:
     template<typename MatcheeStringType>
     bool MatchAndExplain(const MatcheeStringType & s, [[maybe_unused]] ::testing::MatchResultListener * listener) const
     {
-        return filterANSIEscapes(s, /*filterAll=*/true).find(substring) != substring.npos;
+        return stripANSIEscapes(s).find(substring) != substring.npos;
     }
 
     void DescribeTo(::std::ostream * os) const

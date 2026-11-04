@@ -194,6 +194,18 @@ public:
         writeToStdout(fmt(args...));
     }
 
+    /**
+     * Write text styled with ANSI escape sequences to standard output,
+     * dropping the sequences unless `shouldANSI(StandardOutputStream::Stdout)`.
+     */
+    void writeStyledToStdout(std::string_view s);
+
+    template<typename... Args>
+    inline void coutStyled(const Args &... args)
+    {
+        writeStyledToStdout(fmt(args...));
+    }
+
     virtual std::optional<char> ask(std::string_view s)
     {
         return {};

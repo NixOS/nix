@@ -13,11 +13,42 @@ namespace nix {
  */
 bool isTTY(Descriptor fd);
 
+enum class StandardOutputStream {
+    Stdout = 1,
+    Stderr = 2,
+};
+
+/**
+ * Determine whether the output is a real terminal (i.e. not dumb, not a pipe).
+ *
+ * This is probably not what you want, you may want shouldANSI() or something
+ * more specific. Think about how the output should work with a pager or
+ * entirely non-interactive scripting use.
+ *
+ * The user may be redirecting the Nix output to a pager, but have stderr
+ * connected to a terminal. Think about where you are outputting the text when
+ * deciding whether to use STDERR_FILENO or STDOUT_FILENO.
+ *
+ * \param fileno file descriptor number to check if it is a tty
+ */
+bool isOutputARealTerminal(StandardOutputStream fileno);
+
 /**
  * Determine whether ANSI escape sequences are appropriate for the
  * present output.
+ *
+ * This follows the rules described on https://bixense.com/clicolors/
+ * with CLICOLOR defaulted to enabled (and thus ignored).
+ *
+ * That is to say, the following procedure is followed in order:
+ * - NO_COLOR or NOCOLOR set             -> always disable colour
+ * - CLICOLOR_FORCE or FORCE_COLOR set   -> enable colour
+ * - The output is a tty; TERM != "dumb" -> enable colour
+ * - Otherwise                           -> disable colour
+ *
+ * \param fileno which file descriptor number to consider. Use the one you are outputting to
  */
-bool isTTY();
+bool shouldANSI(StandardOutputStream fileno = StandardOutputStream::Stderr);
 
 /**
  * Truncate a string to 'width' printable characters. If 'filterAll'
@@ -28,6 +59,12 @@ bool isTTY();
  */
 std::string filterANSIEscapes(
     std::string_view s, bool filterAll = false, unsigned int width = std::numeric_limits<unsigned int>::max());
+
+/**
+ * Remove all ANSI escape sequences, leaving the rest of the string,
+ * including tabs and carriage returns, unchanged.
+ */
+std::string stripANSIEscapes(std::string_view s);
 
 /**
  * Recalculate the window size, updating a global variable.

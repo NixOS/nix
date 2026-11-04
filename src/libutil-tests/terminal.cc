@@ -69,4 +69,17 @@ TEST(filterANSIEscapes, osc8_bell_as_sep)
     ASSERT_EQ(filterANSIEscapes("\e]8;;http://example.com\a\\This is a link\e]8;;\a"), "\\This is a link");
 }
 
+TEST(stripANSIEscapes, removesEscapes)
+{
+    ASSERT_EQ(stripANSIEscapes("\e[1;31mfoo\e[0m bar"), "foo bar");
+    ASSERT_EQ(stripANSIEscapes("\e]8;;http://example.com\e\\This is a link\e]8;;\e\\"), "This is a link");
+    ASSERT_EQ(stripANSIEscapes("\e]8;;http://example.com\aThis is a link\e]8;;\a"), "This is a link");
+}
+
+TEST(stripANSIEscapes, keepsOtherText)
+{
+    ASSERT_EQ(stripANSIEscapes("foo\tbar\r\n\a"), "foo\tbar\r\n\a");
+    ASSERT_EQ(stripANSIEscapes("f🔍b\e[32mar"), "f🔍bar");
+}
+
 } // namespace nix
