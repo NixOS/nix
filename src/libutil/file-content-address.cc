@@ -77,41 +77,15 @@ void dumpPath(const SourcePath & path, Sink & sink, FileSerialisationMethod meth
     }
 }
 
-void restorePath(
-    const std::filesystem::path & path,
-    Source & source,
-    FileSerialisationMethod method,
-    bool startFsync,
-    RestoreSinkHooks * hooks)
+void restorePath(FileSystemObjectSink & sink, Source & source, FileSerialisationMethod method)
 {
     switch (method) {
-    case FileSerialisationMethod::Flat: {
-        auto fd = valueOr(
-            openNewFileForWrite(
-                path,
-                0666,
-                {
-                    .truncateExisting = false, /* Like RestoreSink, we can only create new files. */
-                    .followSymlinksOnTruncate = false,
-                    .writeOnly = true,
-                }),
-            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening %1%", PathFmt(path)));
-
-        writeFile(fd.get(), source, FsSync::No, &path);
-
-        /* We need to manually invoke the hook with the file descriptor in the
-           flat case. File is always non-executable. */
-        if (hooks)
-            hooks->regularFileCreated(fd.get(), /*executable=*/false);
-
-        if (startFsync)
-            fd.fsync();
-
-        fd.close();
+    case FileSerialisationMethod::Flat:
+        sink.createRegularFile(
+            /*isExecutable=*/false, [&](FileSystemObjectSink::OnRegularFile & crf) { source.drainInto(crf); });
         break;
-    }
     case FileSerialisationMethod::NixArchive:
-        restorePath(path, source, startFsync, hooks);
+        parseDump(sink, source);
         break;
     }
 }

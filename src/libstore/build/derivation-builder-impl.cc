@@ -331,10 +331,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                    by the derivation builder. */
                 auto [rewriteTempDir, rewriteTempDirFd] = localStore.createTempDirInStore();
                 AutoDelete delRewriteTempDir(rewriteTempDir);
-                std::filesystem::path tmpPath = rewriteTempDir / "x";
-                restorePath(tmpPath, *source);
+                auto tmpName = OsFilename::fromPathAsserting("x");
+                RestoreSink restoreSink{rewriteTempDirFd.get(), tmpName};
+                parseDump(restoreSink, *source);
                 deletePath(actualPath);
-                movePath(tmpPath, actualPath);
+                movePath(rewriteTempDir / tmpName.path(), actualPath);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
@@ -449,9 +450,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             /* Copy files to break stale file descriptors. copyRecursive below will use
                reflinking to optimise the copying overhead. */
             auto pathAccessor = makeFSSourceAccessor(actualPath);
-            RestoreSink restoreSink{store->getLocalSettings().fsyncStorePaths};
-            restoreSink.dstPath = tmpOutput;
-            copyRecursive(*pathAccessor, CanonPath::root, restoreSink, CanonPath::root);
+            auto restoreSink = RestoreSink::forPath(tmpOutput, store->getLocalSettings().fsyncStorePaths);
+            copyRecursive(*pathAccessor, CanonPath::root, restoreSink);
             /* This makes it slightly harder to make sense of the control flow. The rule
                of thumb is that actualPath points to the current location of the stuff
                that we'll end up registering. */

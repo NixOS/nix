@@ -60,9 +60,10 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             decompressor->finish();
         });
 
-        if (unpack)
-            restorePath(storePath, *source);
-        else
+        if (unpack) {
+            auto restoreSink = RestoreSink::forPath(storePath, /*startFsync=*/false);
+            parseDump(restoreSink, *source);
+        } else
             writeFile(storePath, *source);
 
         auto executable = ctx.drv.env.find("executable");

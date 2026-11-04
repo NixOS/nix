@@ -163,21 +163,14 @@ TEST_P(LocalStoreCanonicalisationTest, flatFitsInMemory)
 TEST_P(LocalStoreCanonicalisationTest, simpleNar)
 {
     auto accessor = make_ref<MemorySourceAccessor>();
-    MemorySink memorySink{*accessor};
-    memorySink.createDirectory(CanonPath::root);
-    memorySink.createRegularFile(CanonPath("/regular"), [](auto & crf) { crf("test"); });
-    memorySink.createRegularFile(CanonPath("/executable"), [](auto & crf) {
-        crf("test");
-        crf.isExecutable();
-    });
-    memorySink.createDirectory(CanonPath("/dir"));
-    memorySink.createRegularFile(CanonPath("/dir/regular"), [](auto & crf) { crf("test 2"); });
-    memorySink.createRegularFile(CanonPath("/dir/executable"), [](auto & crf) {
-        crf("test 2");
-        crf.isExecutable();
-    });
-    memorySink.createSymlink(CanonPath("/symlink"), "some target");
-    memorySink.createSymlink(CanonPath("/dir/symlink"), "..");
+    accessor->addDirectory(CanonPath::root);
+    accessor->addFile(CanonPath("/regular"), "test");
+    accessor->addFile(CanonPath("/executable"), "test", /*executable=*/true);
+    accessor->addDirectory(CanonPath("/dir"));
+    accessor->addFile(CanonPath("/dir/regular"), "test 2");
+    accessor->addFile(CanonPath("/dir/executable"), "test 2", /*executable=*/true);
+    accessor->addSymlink(CanonPath("/dir/symlink"), "..");
+    accessor->addSymlink(CanonPath("/symlink"), "some target");
     auto source = sinkToSource([&accessor](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });
     auto sp = store->addToStoreFromDump(
         *source,
@@ -190,7 +183,7 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
         NoRepair);
     assertCanonicalPermissions(store->toRealPath(sp));
 
-    memorySink.createRegularFile(CanonPath("/other"), [](auto & crf) { crf(""); });
+    accessor->addFile(CanonPath("/other"), "");
     auto sp2 = store->addToStoreSlow("nar-slow", {accessor}, ContentAddressMethod::Raw::NixArchive, getHashAlgo()).path;
     assertCanonicalPermissions(store->toRealPath(sp2));
 
@@ -200,7 +193,7 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
     // So that we always spill to the file system.
     settings.getLocalSettings().narBufferSize = 0;
 
-    memorySink.createDirectory(CanonPath("/dir/entirely-something-else"));
+    accessor->addDirectory(CanonPath("/dir/entirely-something-else"));
     StringSink narDump;
     accessor->dumpPath(CanonPath::root, narDump);
     StringSource narSource{narDump.s};

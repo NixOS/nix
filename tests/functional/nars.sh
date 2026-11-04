@@ -30,6 +30,18 @@ rm -rf "$TEST_ROOT/out"
 mkdir -p "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
 
+# As with POSIX, a trailing separator means the destination must be a
+# directory, so a regular file cannot be restored there.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/" < "$TEST_ROOT/tmp.nar" | grepQuiet "Is a directory"
+[[ ! -e "$TEST_ROOT/out" ]]
+
+mkdir -p "$TEST_ROOT/dir-src"
+echo hi > "$TEST_ROOT/dir-src/file"
+nix-store --dump "$TEST_ROOT/dir-src" > "$TEST_ROOT/dir.nar"
+nix-store --restore "$TEST_ROOT/out/" < "$TEST_ROOT/dir.nar"
+[[ "$(cat "$TEST_ROOT/out/file")" = hi ]]
+
 # Note that the target of the symlink doesn't exist, but the parent does.
 #
 # A more lenient implementation could allow this, but it would hard/impossible

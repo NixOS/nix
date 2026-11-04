@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <vector>
+
 #include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
@@ -43,15 +45,13 @@ TEST(readLinkAt, works)
 
     bool hasLongSymlinks = true;
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createSymlink(CanonPath("link"), "target");
-        sink.createSymlink(CanonPath("relative"), "../relative/path");
-        sink.createSymlink(CanonPath("absolute"), "/absolute/path");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("link", [](auto & s) { s.createSymlink("target"); });
+        root.createChild("relative", [](auto & s) { s.createSymlink("../relative/path"); });
+        root.createChild("absolute", [](auto & s) { s.createSymlink("/absolute/path"); });
         try {
-            sink.createSymlink(CanonPath("medium"), mediumTarget);
-            sink.createSymlink(CanonPath("long"), longTarget);
+            root.createChild("medium", [&](auto & s) { s.createSymlink(mediumTarget); });
+            root.createChild("long", [&](auto & s) { s.createSymlink(longTarget); });
         } catch (SystemError & e) {
             if (e.is(std::errc::filename_too_long)) {
                 hasLongSymlinks = false;
@@ -59,11 +59,16 @@ TEST(readLinkAt, works)
                 throw;
             }
         }
-        sink.createDirectory(CanonPath("a"));
-        sink.createDirectory(CanonPath("a/b"));
-        sink.createSymlink(CanonPath("a/b/link"), "nested_target");
-        sink.createRegularFile(CanonPath("regular"), [](CreateRegularFileSink &) {});
-        sink.createDirectory(CanonPath("dir"));
+        root.createChild("a", [](auto & s) {
+            s.createDirectory([](auto & a) {
+                a.createChild("b", [](auto & s) {
+                    s.createDirectory(
+                        [](auto & b) { b.createChild("link", [](auto & s) { s.createSymlink("nested_target"); }); });
+                });
+            });
+        });
+        root.createChild("regular", [](auto & s) { s.createRegularFile(false, [](auto &) {}); });
+        root.createChild("dir", [](auto & s) { s.createDirectory([](auto &) {}); });
     }
 
     auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
@@ -100,30 +105,53 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createDirectory(CanonPath("a"));
-        sink.createDirectory(CanonPath("c"));
-        sink.createDirectory(CanonPath("c/d"));
-        sink.createRegularFile(CanonPath("c/d/regular"), [](CreateRegularFileSink & crf) { crf("some contents"); });
-        sink.createSymlink(CanonPath("a/absolute_symlink"), tmpDir.string());
-        sink.createSymlink(CanonPath("a/relative_symlink"), "../.");
-        sink.createSymlink(CanonPath("a/broken_symlink"), "./nonexistent");
-        sink.createDirectory(CanonPath("a/b"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {
-            dirSink.createDirectory(CanonPath("d"));
-            dirSink.createSymlink(CanonPath("c"), "./d");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("a", [&](auto & s) {
+            s.createDirectory([&](auto & a) {
+                a.createChild("absolute_symlink", [&](auto & s) { s.createSymlink(tmpDir.string()); });
+                a.createChild("relative_symlink", [](auto & s) { s.createSymlink("../."); });
+                a.createChild("broken_symlink", [](auto & s) { s.createSymlink("./nonexistent"); });
+                a.createChild("b", [](auto & s) {
+                    s.createDirectory([](auto & b) {
+                        b.createChild("d", [](auto & s) { s.createDirectory([](auto &) {}); });
+                        b.createChild("c", [](auto & s) { s.createSymlink("./d"); });
+                    });
+                });
+            });
         });
-        EXPECT_THROW(sink.createDirectory(CanonPath("a/b/c/e")), SymlinkNotAllowed);
-        // Test that symlinks in intermediate path are detected during nested operations
-        EXPECT_THROW(
-            sink.createDirectory(
-                CanonPath("a/b/c/f"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {}),
-            SymlinkNotAllowed);
-        EXPECT_THROW(
-            sink.createRegularFile(
-                CanonPath("a/b/c/regular"), [](CreateRegularFileSink & crf) { crf("some contents"); }),
-            SymlinkNotAllowed);
+        root.createChild("c", [](auto & s) {
+            s.createDirectory([](auto & c) {
+                c.createChild("d", [](auto & s) {
+                    s.createDirectory([](auto & d) {
+                        d.createChild("regular", [](auto & s) {
+                            s.createRegularFile(false, [](auto & crf) { crf("some contents"); });
+                        });
+                    });
+                });
+            });
+        });
+    }
+
+    /* A sink only ever creates new entries, so it can't be made to
+       traverse a symlink: creating where one (or anything else) already
+       exists fails. */
+    {
+        RestoreSink::Directory ab{testing::valueOrFail(openDirectory(tmpDir / "a" / "b", FinalSymlink::Follow))};
+        for (auto name : {"c", "d"})
+            for (auto & create : std::vector<FileSystemObjectSink::OnDirectory::ChildCreatedCallback>{
+                     [](auto & s) {
+                         s.createDirectory([](auto & dir) {
+                             dir.createChild("pwned", [](auto & s) { s.createRegularFile(false, [](auto &) {}); });
+                         });
+                     },
+                     [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("pwned"); }); },
+                     [](auto & s) { s.createSymlink("pwned"); },
+                 })
+                EXPECT_THAT([&] { ab.createChild(name, create); }, testing::ThrowsSystemError(std::errc::file_exists))
+                    << name;
+
+        /* Nothing appeared at the symlink's target. */
+        EXPECT_TRUE(std::filesystem::is_empty(tmpDir / "a" / "b" / "d"));
     }
 
     auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
@@ -299,10 +327,8 @@ TEST(openFileEnsureBeneathNoSymlinksDeathTest, rejectsONofollow)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
     }
 
     auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
@@ -330,5 +356,17 @@ TEST(openFileEnsureBeneathNoSymlinksDeathTest, rejectsONofollow)
 #  endif
 }
 #endif
+
+TEST(RestoreSink, createChildInvalidName)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+    for (std::string_view name : {"", ".", "..", "a/b"})
+        EXPECT_THROW(root.createChild(name, [](auto & s) { s.createDirectory([](auto &) {}); }), Error) << name;
+
+    EXPECT_TRUE(std::filesystem::is_empty(tmpDir));
+}
 
 } // namespace nix

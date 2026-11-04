@@ -43,15 +43,19 @@ TEST_F(FSSourceAccessorTest, works)
         GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
 #endif
     {
-        RestoreSink sink(false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createDirectory(CanonPath("subdir"));
-        sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });
-        sink.createRegularFile(CanonPath("subdir/file2"), [](CreateRegularFileSink & crf) { crf("content2"); });
-        sink.createSymlink(CanonPath("rootlink"), "target");
-        sink.createDirectory(CanonPath("a"));
-        sink.createSymlink(CanonPath("a/dirlink"), "../subdir");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("subdir", [](auto & s) {
+            s.createDirectory([](auto & subdir) {
+                subdir.createChild(
+                    "file2", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content2"); }); });
+            });
+        });
+        root.createChild("file1", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content1"); }); });
+        root.createChild("rootlink", [](auto & s) { s.createSymlink("target"); });
+        root.createChild("a", [](auto & s) {
+            s.createDirectory(
+                [](auto & a) { a.createChild("dirlink", [](auto & s) { s.createSymlink("../subdir"); }); });
+        });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(tmpDir / "file1"), testing::HasContents(CanonPath::root, "content1"));
@@ -193,17 +197,15 @@ TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
 }
 
 /* ----------------------------------------------------------------------------
- * RestoreSink non-directory at root (no dirFd)
+ * RestoreSink non-directory at root (`RestoreSink::forPath`)
  * --------------------------------------------------------------------------*/
 
 TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 {
     auto filePath = tmpDir / "rootfile";
     {
-        RestoreSink sink(false);
-        sink.dstPath = filePath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
+        auto sink = RestoreSink::forPath(filePath, /*startFsync=*/false);
+        sink.createRegularFile(false, [](auto & crf) { crf("root content"); });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(filePath), testing::HasContents(CanonPath::root, "root content"));
@@ -217,13 +219,49 @@ TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 #endif
     auto linkPath = tmpDir / "rootlink";
     {
-        RestoreSink sink(false);
-        sink.dstPath = linkPath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createSymlink(CanonPath::root, "symlink_target");
+        auto sink = RestoreSink::forPath(linkPath, /*startFsync=*/false);
+        sink.createSymlink("symlink_target");
     }
 
     EXPECT_THAT(makeFSSourceAccessor(linkPath), testing::HasSymlink(CanonPath::root, "symlink_target"));
 }
+
+/* As with POSIX, a trailing separator means the destination must be a
+   directory. */
+TEST_F(FSSourceAccessorTest, RestoreSinkTrailingSeparator)
+{
+    {
+        auto sink = RestoreSink::forPath(tmpDir / "dir" / "", /*startFsync=*/false);
+        sink.createDirectory([](auto & dir) {
+            dir.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content"); }); });
+        });
+    }
+    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "dir"), testing::HasContents(CanonPath("file"), "content"));
+
+    EXPECT_THAT(
+        [&] {
+            auto sink = RestoreSink::forPath(tmpDir / "file" / "", /*startFsync=*/false);
+            sink.createRegularFile(false, [](auto & crf) { crf("content"); });
+        },
+        testing::ThrowsSystemError(std::errc::is_a_directory));
+    EXPECT_THAT(
+        [&] {
+            auto sink = RestoreSink::forPath(tmpDir / "link" / "", /*startFsync=*/false);
+            sink.createSymlink("target");
+        },
+        testing::ThrowsSystemError(std::errc::is_a_directory));
+    EXPECT_FALSE(pathExists(tmpDir / "file"));
+    EXPECT_FALSE(pathExists(tmpDir / "link"));
+}
+
+#ifndef _WIN32
+/* The root directory always exists, and a sink only creates new
+   entries, so it can never be the destination. */
+TEST(RestoreSinkForPath, rejectsRoot)
+{
+    for (auto root : {"/", "//"})
+        EXPECT_THROW(RestoreSink::forPath(root, /*startFsync=*/false), Error) << root;
+}
+#endif
 
 } // namespace nix

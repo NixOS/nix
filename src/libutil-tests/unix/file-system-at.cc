@@ -29,13 +29,11 @@ TEST(fchmodatTryNoFollow, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
-        sink.createDirectory(CanonPath("dir"));
-        sink.createSymlink(CanonPath("filelink"), "file");
-        sink.createSymlink(CanonPath("dirlink"), "dir");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
+        root.createChild("dir", [](auto & s) { s.createDirectory([](auto &) {}); });
+        root.createChild("filelink", [](auto & s) { s.createSymlink("file"); });
+        root.createChild("dirlink", [](auto & s) { s.createSymlink("dir"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
@@ -112,11 +110,9 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
-        sink.createSymlink(CanonPath("link"), "file");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
+        root.createChild("link", [](auto & s) { s.createSymlink("file"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
