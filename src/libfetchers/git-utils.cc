@@ -922,6 +922,8 @@ public:
         Object root;
         std::optional<lfs::Fetch> lfsFetch = std::nullopt;
         GitAccessorOptions options;
+        /* TODO: LRUCache to keep the memory bounded maybe? */
+        boost::unordered_flat_map<CanonPath, TreeEntry> lookupCache;
     };
 
     Sync<State> state_;
@@ -1054,9 +1056,6 @@ public:
         return toHash(*git_tree_entry_id(entry));
     }
 
-    /* TODO: LRUCache to keep the memory bounded maybe? */
-    boost::unordered_flat_map<CanonPath, TreeEntry> lookupCache;
-
     /**
      * Recursively look up 'path' relative to the root.
      *
@@ -1065,7 +1064,7 @@ public:
      */
     git_tree_entry * lookup(State & state, const CanonPath & path)
     {
-        if (const auto i = lookupCache.find(path); i != lookupCache.end())
+        if (const auto i = state.lookupCache.find(path); i != state.lookupCache.end())
             return i->second.get();
 
         auto parent = path.parent();
@@ -1094,7 +1093,7 @@ public:
             /* Use the parent as the working copy to save on copies. */
             auto & path2 = *parent;
             path2.push(entryName);
-            const auto [it, inserted] = lookupCache.emplace(path2, std::move(copy));
+            const auto [it, inserted] = state.lookupCache.emplace(path2, std::move(copy));
             /* Found what we were looking for? */
             if (entryName == name) {
                 /* Shouldn't happen, but let's double-check. */
