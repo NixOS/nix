@@ -1075,14 +1075,14 @@ public:
         if (!parentTree)
             return nullptr;
 
-        auto count = git_tree_entrycount(parentTree->get());
+        auto count = git_tree_entrycount(parentTree.get());
 
         git_tree_entry * res = nullptr;
 
         /* Add all the tree entries to the cache to speed up
            subsequent lookups. */
         for (size_t n = 0; n < count; ++n) {
-            auto entry = git_tree_entry_byindex(parentTree->get(), n);
+            auto entry = git_tree_entry_byindex(parentTree.get(), n);
 
             TreeEntry copy;
             if (git_tree_entry_dup(Setter(copy), entry))
@@ -1101,18 +1101,18 @@ public:
         return res;
     }
 
-    std::optional<Tree> lookupTree(State & state, const CanonPath & path)
+    Tree lookupTree(State & state, const CanonPath & path)
     {
         if (path.isRoot()) {
             if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
                 return dupObject<Tree>((git_tree *) &*state.root);
             else
-                return std::nullopt;
+                return nullptr;
         }
 
         auto entry = lookup(state, path);
         if (!entry || git_tree_entry_type(entry) != GIT_OBJECT_TREE)
-            return std::nullopt;
+            return nullptr;
 
         Tree tree;
         if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(tree), *state.repo, entry))
