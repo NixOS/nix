@@ -5,6 +5,8 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/value-to-json.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/fs-sink.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -78,34 +80,58 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         if (writeTo) {
             logger->stop();
 
-            if (pathExists(*writeTo))
-                throw Error("path '%s' already exists", writeTo->string());
+            /* `RestoreSink` creates everything relative to descriptors,
+               refusing to overwrite anything or follow symlinks. */
+            RestoreSink restoreSink{/*startFsync=*/false};
+            restoreSink.dstPath = *writeTo;
 
-            [&](this const auto & recurse, Value & v, const PosIdx pos, const std::filesystem::path & path) -> void {
+            /* As with POSIX, a trailing separator (e.g. `out/`) means
+               the destination must be a directory. `RestoreSink` wants
+               it without one.
+
+               TODO: Handle this in `RestoreSink` instead, which will be
+               easier once it is fully descriptor-based. */
+            if (!writeTo->has_filename() && writeTo->has_relative_path()) {
+                restoreSink.dstPath = writeTo->parent_path();
+                state->forceValue(*v, pos);
+                if (v->type() != nAttrs)
+                    throw SysError(EISDIR, "writing to %s", PathFmt(*writeTo));
+            }
+
+            [&](this const auto & recurse,
+                FileSystemObjectSink & sink,
+                const CanonPath & path,
+                Value & v,
+                const PosIdx pos,
+                size_t depth) -> void {
+                /* Bound the recursion, and only write what could also be
+                   dumped as a NAR. */
+                if (depth >= narMaxDepth)
+                    throw Error("attribute set nesting exceeds maximum depth of %d", narMaxDepth);
                 state->forceValue(v, pos);
                 if (v.type() == nString) {
                     copyContext(v, context);
-                    writeFile(path, v.string_view());
+                    sink.createRegularFile(path, [&](CreateRegularFileSink & crf) { crf(v.string_view()); });
                 } else if (v.type() == nAttrs) {
-                    [[maybe_unused]] bool directoryCreated = std::filesystem::create_directory(path);
-                    // Directory should not already exist
-                    assert(directoryCreated);
-                    for (auto & attr : *v.attrs()) {
-                        std::string_view name = state->symbols[attr.name];
-                        try {
-                            if (name == "." || name == "..")
-                                throw Error("invalid file name '%s'", name);
-                            recurse(*attr.value, attr.pos, path / name);
-                        } catch (Error & e) {
-                            e.addTrace(
-                                state->positions[attr.pos], HintFmt("while evaluating the attribute '%s'", name));
-                            throw;
+                    sink.createDirectory(path, [&](FileSystemObjectSink & dirSink, const CanonPath & dirPath) {
+                        for (auto & attr : *v.attrs()) {
+                            std::string_view name = state->symbols[attr.name];
+                            try {
+                                /* Each name must be a single path component. */
+                                if (name.empty() || name == "." || name == ".." || name.find('/') != name.npos)
+                                    throw Error("invalid file name '%s'", name);
+                                recurse(dirSink, dirPath / name, *attr.value, attr.pos, depth + 1);
+                            } catch (Error & e) {
+                                e.addTrace(
+                                    state->positions[attr.pos], HintFmt("while evaluating the attribute '%s'", name));
+                                throw;
+                            }
                         }
-                    }
+                    });
                 } else
                     state->error<TypeError>("value at '%s' is not a string or an attribute set", state->positions[pos])
                         .debugThrow();
-            }(*v, pos, *writeTo);
+            }(restoreSink, CanonPath::root, *v, pos, 0);
         }
 
         else if (raw) {

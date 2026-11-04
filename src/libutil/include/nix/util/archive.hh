@@ -8,6 +8,16 @@
 namespace nix {
 
 /**
+ * Maximum directory nesting depth for `dumpPath()`/`parseDump()`.
+ * Bounds stack usage so deep trees cannot overflow the (possibly
+ * coroutine) stack these run on.
+ *
+ * Other code writing out file system objects can use this too, so that
+ * whatever it writes can also be dumped as a NAR.
+ */
+constexpr size_t narMaxDepth = 64;
+
+/**
  * dumpPath creates a Nix archive of the specified path.
  *
  * @param path the file system data to dump. Dumping is recursive so if

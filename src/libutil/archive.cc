@@ -35,11 +35,6 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
-/* Maximum directory nesting depth for dumpPath()/parseDump(). Bounds
-   stack usage so deep trees cannot overflow the (possibly coroutine)
-   stack these run on. */
-static constexpr size_t narMaxDepth = 64;
-
 PathFilter defaultPathFilter = [](const std::string &) { return true; };
 
 void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter)
