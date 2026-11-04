@@ -653,54 +653,20 @@ create_directories() {
     # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
     task "Setting up the basic directory structure"
     if [ -d "$NIX_ROOT" ]; then
-        # if /nix already exists, take ownership
-        #
-        # Caution: notes below are macOS-y
-        # This is a bit of a goldilocks zone for taking ownership
-        # if there are already files on the volume; the volume is
-        # now mounted, but we haven't added a bunch of new files
+        # if /nix already exists, take ownership.
+        # Note that if the old installation has broken permissions, this won't fix it and
+        # can leave the set up less secure than a fresh installation. Assume that the user
+        # knows what they are doing.
+        # Note that setuid bits *are* cleared when chowning.
 
-        # this is probably a bit slow; I've been seeing 3.3-4s even
-        # when promptly installed over a fresh single-user install.
-        # In case anyone's aware of a shortcut.
-        # `|| true`: .Trashes errors w/o full disk perm
+        # Everything inside /nix is root-owned.
+        _sudo "to take root ownership of existing Nix files" \
+              chown -R "0:0" "$NIX_ROOT"
 
-        # rumor per #4488 that macOS 11.2 may not have
-        # sbin on path, and that's where chown is, but
-        # since this bit is cross-platform:
-        # - first try with `command -vp` to try and find
-        #   chown in the usual places
-        #   * to work around some sort of deficiency in
-        #     `command -p` in macOS bash 3.2, we also add
-        #     PATH="$(getconf PATH 2>/dev/null)". As long as
-        #     getconf is found, this should set a sane PATH
-        #     which `command -p` in bash 3.2 appears to use.
-        #     A bash with a properly-working `command -p`
-        #     should ignore this hard-set PATH in favor of
-        #     whatever it obtains internally. See
-        #     github.com/NixOS/nix/issues/5768
-        # - fall back on `command -v` which would find
-        #   any chown on path
-        # if we don't find one, the command is already
-        # hiding behind || true, and the general state
-        # should be one the user can repair once they
-        # figure out where chown is...
-        local get_chr_own
-        get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
-        if [[ -z "$get_chr_own" ]]; then
-            get_chr_own="$(command -v chown)"
-        fi
-
-        if [[ -z "$get_chr_own" ]]; then
-            reminder <<EOF
-I wanted to take root ownership of existing Nix store files,
-but I couldn't locate 'chown'. (You may need to fix your PATH.)
-To manually change file ownership, you can run:
-    sudo chown -R 'root:$NIX_BUILD_GROUP_NAME' '$NIX_ROOT'
-EOF
-        else
-            _sudo "to take root ownership of existing Nix store files" \
-                  "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
+        # But not the store directory itself.
+        if [ -d "$NIX_ROOT/store" ]; then
+            _sudo "to take root ownership of existing Nix store directory" \
+                chown "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT/store"
         fi
     fi
     _sudo "to make the basic directory structure of Nix (part 1)" \
@@ -858,14 +824,19 @@ install_from_extracted_nix() {
 
         if is_os_darwin || is_os_freebsd; then
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-                  cp -RPp ./store/* "$NIX_ROOT/store/"
+                  cp -nRPp ./store/* "$NIX_ROOT/store/"
 
+            # Everything inside the store directory is root-owned.
             _sudo "to chown the $NIX_ROOT/store contents" \
-                  chown -hR 0:0 "$NIX_ROOT"/store/*
+                  chown -R 0:0 "$NIX_ROOT"/store
+
+            # But not the store directory itself.
+            _sudo "to chown the $NIX_ROOT/store directory" \
+                  chown "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT"/store
         else
             # The files will be owned to root by the copy.
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-                  cp -RP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
+                  cp -nRP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
         fi
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
