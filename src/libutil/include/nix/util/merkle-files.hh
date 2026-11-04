@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 
+#include "nix/util/filename.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/serialise.hh"
 
@@ -60,7 +61,7 @@ struct DirectorySink
     /**
      * Insert an existing object as a child of this directory.
      */
-    virtual void insertChild(std::string_view name, TreeEntry entry) = 0;
+    virtual void insertChild(FilenameView name, TreeEntry entry) = 0;
 };
 
 } // namespace merkle

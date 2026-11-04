@@ -14,9 +14,9 @@ struct TestDirectorySink : merkle::DirectorySink
 {
     git::Tree entries;
 
-    void insertChild(std::string_view name, merkle::TreeEntry entry) override
+    void insertChild(FilenameView name, merkle::TreeEntry entry) override
     {
-        auto name2 = std::string{name};
+        auto name2 = std::string(name.str());
         if (entry.mode == merkle::Mode::Directory)
             name2 += '/';
         entries.insert_or_assign(name2, std::move(entry));
@@ -283,9 +283,9 @@ TEST_F(GitTest, both_roundrip)
             {
             }
 
-            void insertChild(std::string_view name, merkle::TreeEntry entry) override
+            void insertChild(FilenameView name, merkle::TreeEntry entry) override
             {
-                dir.entries.insert_or_assign(std::string{name}, parseToFile(entry));
+                dir.entries.insert_or_assign(Filename{name}, parseToFile(entry));
             }
         };
 

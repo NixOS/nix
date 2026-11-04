@@ -28,10 +28,10 @@ OsCanonPath::OsCanonPath(const CanonPath & canonPath)
     bool first = true;
     for (const auto & component : canonPath) {
         /* TODO: Maybe don't fail with an assert here? */
-        assert(!component.contains('\\'));
+        assert(!component.str().contains('\\'));
         if (!first)
             res += std::filesystem::path::preferred_separator;
-        res += string_to_os_string(component);
+        res += string_to_os_string(component.str());
         first = false;
     }
     p = res;
@@ -136,8 +136,8 @@ CanonPath OsCanonPath::toPortable() const
 {
     CanonPath res = CanonPath::root;
     for (const auto & component : *this)
-        /* FIXME: Lossy conversion. */
-        res.push(component.path().string());
+        /* An `OsFilename` is also a valid portable file name. */
+        res.push(component.toPortable());
     return res;
 }
 

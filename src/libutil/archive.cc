@@ -81,24 +81,25 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
 
             /* If we're on a case-insensitive system like macOS, undo
                the case hack applied by restorePath(). */
-            StringMap unhacked;
+            /* Original names, by name with any case hack undone. */
+            std::map<std::string, Filename> unhacked;
             for (auto & i : accessor.readDirectory(path))
                 if (archiveSettings.useCaseHack) {
-                    std::string name(i.first);
-                    size_t pos = i.first.find(caseHackSuffix);
+                    std::string name(i.first.str());
+                    size_t pos = i.first.str().find(caseHackSuffix);
                     if (pos != std::string::npos) {
                         debug("removing case hack suffix from '%s'", path / i.first);
                         name.erase(pos);
                     }
                     if (!unhacked.emplace(name, i.first).second)
                         throw Error(
-                            "file name collision between '%s' and '%s'", (path / unhacked[name]), (path / i.first));
+                            "file name collision between '%s' and '%s'", (path / unhacked.at(name)), (path / i.first));
                 } else
-                    unhacked.emplace(i.first, i.first);
+                    unhacked.emplace(i.first.str(), i.first);
 
             accessor.readDirectory(path, [&](SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath) {
                 for (auto & i : unhacked)
-                    if (filter((filterPath / i.first).abs())) {
+                    if (filter((filterPath / FilenameView::fromStringThrowing(i.first)).abs())) {
                         sink << "entry" << "(" << "name" << i.first << "node";
                         dump(subdirAccessor, subdirRelPath / i.second, filterPath / i.second, depth + 1);
                         sink << ")";
@@ -243,9 +244,8 @@ static void parse(FileSystemObjectSink & sink, Source & source, size_t depth)
                 expectTag("name");
 
                 auto name = getString(narMaxName);
-                if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos
-                    || name.find((char) 0) != std::string::npos)
-                    throw badArchive("NAR contains invalid file name '%1%'", name);
+                if (auto why = Filename::whyInvalid(name))
+                    throw badArchive("NAR contains invalid file name '%s': %s", name, *why);
                 if (name <= prevName)
                     throw badArchive("NAR directory is not sorted");
                 prevName = name;
@@ -267,8 +267,10 @@ static void parse(FileSystemObjectSink & sink, Source & source, size_t depth)
 
                 expectTag("node");
 
-                dirSink.createChild(
-                    name, [&](FileSystemObjectSink & childSink) { parse(childSink, source, depth + 1); });
+                /* Checked above, and the case hack only appends to it. */
+                dirSink.createChild(FilenameView::fromStringAsserting(name), [&](FileSystemObjectSink & childSink) {
+                    parse(childSink, source, depth + 1);
+                });
 
                 expectTag(")");
             }

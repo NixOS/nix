@@ -475,7 +475,7 @@ static CanonPath portablePathOf(const SymlinkNotAllowed & e)
  */
 static OsFilename osBaseNameOf(const CanonPath & path)
 {
-    return OsFilename::fromPathAsserting(*path.baseName());
+    return OsFilename{*path.baseName()};
 }
 
 std::function<void(AutoCloseFD, OsCanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
@@ -705,7 +705,11 @@ try {
        `openSubdirectory()` always gives us a fresh one. */
     for (const auto & entry : DirectoryIterator{openSubdirectory(path)}) {
         checkInterrupt();
-        entries.emplace(os_string_to_string(entry.name.native()), sourceAccessorTypeFromFileType(entry.type));
+        /* `DirectoryIterator` never gives empty names, `.` or `..`, and
+           the OS's file names never contain `/` or NUL. */
+        entries.emplace(
+            Filename::fromStringAsserting(os_string_to_string(entry.name.native())),
+            sourceAccessorTypeFromFileType(entry.type));
     }
     return entries;
 } catch (SymlinkNotAllowed & e) {

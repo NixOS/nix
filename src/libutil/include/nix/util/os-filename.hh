@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/file-path.hh"
+#include "nix/util/filename.hh"
 #include "nix/util/os-string.hh"
 
 #include <filesystem>
@@ -158,6 +159,23 @@ public:
     {
     }
 
+    /**
+     * Convert from the portable `Filename`, the inverse of `toPortable`,
+     * asserting that it is also a valid file name on this OS. Like the
+     * `OsCanonPath` constructor from `CanonPath`.
+     *
+     * On Unix, every `Filename` is. On Windows, a `Filename` may contain
+     * `\` or be a drive like `C:`, so use `fromPortableThrowing` for
+     * names from the outside world.
+     */
+    explicit OsFilename(FilenameView portable);
+
+    /**
+     * Like the constructor from `FilenameView`, but throwing an `Error`
+     * if it is not a valid file name on this OS.
+     */
+    static OsFilename fromPortableThrowing(FilenameView portable);
+
     const std::filesystem::path & path() const noexcept
     {
         return name;
@@ -175,6 +193,18 @@ public:
     {
         return name.c_str();
     }
+
+    /**
+     * Convert to the portable `Filename`.
+     *
+     * Every `OsFilename` is a valid `Filename`: it is not empty, `.` or
+     * `..`, and contains neither NUL nor a directory separator, which `/`
+     * is on every OS.
+     *
+     * @todo As with `OsCanonPath::toPortable`, the *encoding* does not
+     * round-trip on Windows, where this narrows the `wchar_t` name.
+     */
+    Filename toPortable() const;
 
     auto operator<=>(const OsFilename &) const = default;
 };

@@ -44,17 +44,19 @@ TEST_F(FSSourceAccessorTest, works)
 #endif
     {
         RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-        root.createChild("subdir", [](auto & s) {
+        root.createChild("subdir"_filename, [](auto & s) {
             s.createDirectory([](auto & subdir) {
-                subdir.createChild(
-                    "file2", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content2"); }); });
+                subdir.createChild("file2"_filename, [](auto & s) {
+                    s.createRegularFile(false, [](auto & crf) { crf("content2"); });
+                });
             });
         });
-        root.createChild("file1", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content1"); }); });
-        root.createChild("rootlink", [](auto & s) { s.createSymlink("target"); });
-        root.createChild("a", [](auto & s) {
+        root.createChild(
+            "file1"_filename, [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content1"); }); });
+        root.createChild("rootlink"_filename, [](auto & s) { s.createSymlink("target"); });
+        root.createChild("a"_filename, [](auto & s) {
             s.createDirectory(
-                [](auto & a) { a.createChild("dirlink", [](auto & s) { s.createSymlink("../subdir"); }); });
+                [](auto & a) { a.createChild("dirlink"_filename, [](auto & s) { s.createSymlink("../subdir"); }); });
         });
     }
 
@@ -233,7 +235,8 @@ TEST_F(FSSourceAccessorTest, RestoreSinkTrailingSeparator)
     {
         auto sink = RestoreSink::forPath(tmpDir / "dir" / "", /*startFsync=*/false);
         sink.createDirectory([](auto & dir) {
-            dir.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content"); }); });
+            dir.createChild(
+                "file"_filename, [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content"); }); });
         });
     }
     EXPECT_THAT(makeFSSourceAccessor(tmpDir / "dir"), testing::HasContents(CanonPath("file"), "content"));
@@ -349,7 +352,7 @@ TEST_F(FSSourceAccessorTest, physicalPathOfSubdirectoryAccessor)
         called = true;
         EXPECT_EQ(subdir.showPath(rel), accessor->showPath(CanonPath("a")));
         EXPECT_EQ(physicalPath(subdir, rel), tmpDir / "a");
-        EXPECT_EQ(physicalPath(subdir, rel / "b"), tmpDir / "a" / "b");
+        EXPECT_EQ(physicalPath(subdir, rel / "b"_filename), tmpDir / "a" / "b");
     });
     EXPECT_TRUE(called);
 }
