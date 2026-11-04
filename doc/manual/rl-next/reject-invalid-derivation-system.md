@@ -1,7 +1,7 @@
 ---
 synopsis: Reject derivations whose `system` contains a backslash or a double quote
 issues: 16525
-prs: []
+prs: [16758]
 ---
 
 Nix now rejects a derivation whose [`system`](@docroot@/language/derivations.md#attr-system) attribute contains a backslash (`\`) or a double quote (`"`), and reports a clear error before anything is written to the store.
