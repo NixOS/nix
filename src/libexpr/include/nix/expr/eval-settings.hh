@@ -5,6 +5,17 @@
 #include "nix/expr/eval-profiler-settings.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/source-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/types.hh"
+
+#include <cassert>
+#include <cstdint>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

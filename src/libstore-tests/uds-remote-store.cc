@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
+#include <filesystem>
 
 #include "nix/store/uds-remote-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

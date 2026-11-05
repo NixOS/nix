@@ -6,6 +6,11 @@
 
 #include "cmd-config-private.hh"
 
+#include <algorithm>
+#include <cstddef>
+#include <string>
+#include <string_view>
+
 #if HAVE_LOWDOWN
 #  include <sys/queue.h>
 #  include <lowdown.h>

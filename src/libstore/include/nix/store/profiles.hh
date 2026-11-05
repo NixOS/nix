@@ -10,6 +10,12 @@
 #include <filesystem>
 #include <optional>
 #include <time.h>
+#include <cstdint>
+#include <list>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/types.hh"
 #include "nix/store/pathlocks.hh"

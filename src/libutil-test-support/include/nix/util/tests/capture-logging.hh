@@ -1,8 +1,13 @@
 #pragma once
 
 #include "nix/util/logging.hh"
+#include "nix/util/error.hh"
 
 #include <sstream>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <string_view>
 
 namespace nix::testing {
 

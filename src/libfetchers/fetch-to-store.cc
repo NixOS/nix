@@ -2,8 +2,28 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/store/content-address.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/util.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <array>
+#include <cassert>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
 
 namespace nix {
 

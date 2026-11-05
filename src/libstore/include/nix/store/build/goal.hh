@@ -3,10 +3,25 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/util.hh"
 
 #include <coroutine>
 #include <queue>
 #include <variant>
+#include <cassert>
+#include <cstddef>
+#include <ctime>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

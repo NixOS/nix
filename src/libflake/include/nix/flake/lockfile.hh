@@ -2,8 +2,19 @@
 ///@file
 
 #include "nix/flake/flakeref.hh"
+#include "nix/util/ref.hh"
 
 #include <nlohmann/json_fwd.hpp>
+#include <cassert>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 class Store;

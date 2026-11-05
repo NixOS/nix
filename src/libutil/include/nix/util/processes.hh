@@ -24,6 +24,10 @@
 #include <sstream>
 #include <optional>
 #include <thread>
+#include <chrono>
+#include <span>
+#include <string>
+#include <utility>
 
 namespace nix {
 

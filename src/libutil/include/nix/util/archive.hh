@@ -4,6 +4,12 @@
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/file-system.hh"
+
+#include <cstddef>
+#include <ctime>
+#include <filesystem>
+#include <string_view>
 
 namespace nix {
 

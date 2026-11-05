@@ -1,4 +1,18 @@
 #include "nix/store/aws-creds.hh"
+#include "nix/store/config.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
+
+#include <array>
+#include <cstdio>
+#include <exception>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #if NIX_WITH_AWS_AUTH
 

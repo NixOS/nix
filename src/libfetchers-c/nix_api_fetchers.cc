@@ -1,6 +1,9 @@
 #include "nix_api_fetchers.h"
 #include "nix_api_fetchers_internal.hh"
 #include "nix_api_util_internal.h"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/ref.hh"
+#include "nix_api_util.h"
 
 extern "C" {
 

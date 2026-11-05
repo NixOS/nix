@@ -3,6 +3,8 @@
 
 #include <string>
 #include <span>
+#include <cstddef>
+#include <string_view>
 
 namespace nix {
 

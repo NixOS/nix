@@ -3,6 +3,10 @@
 
 #include <cstdint>
 #include <vector>
+#include <cstddef>
+#include <iterator>
+#include <map>
+#include <variant>
 
 #include "nix/util/lru-cache.hh"
 #include "nix/util/pos-idx.hh"

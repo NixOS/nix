@@ -10,9 +10,34 @@
 #include "nix/util/tarfile.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/merkle-tar-adapter.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <ranges>
+#include <regex>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix::fetchers {
 

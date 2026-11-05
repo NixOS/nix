@@ -12,6 +12,7 @@
 #include "nix/util/error.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

@@ -15,6 +15,10 @@ struct CmdStoreRepair : StorePathsCommand
     {
         return
 #include "store-repair.md"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
             ;
     }
 

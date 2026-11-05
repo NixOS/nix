@@ -2,6 +2,9 @@
 ///@file
 
 #include <optional>
+#include <list>
+#include <string>
+#include <string_view>
 
 #include "nix/util/types.hh"
 #include "nix/util/comparator.hh"

@@ -3,8 +3,16 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/sync.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
 
 #include <future>
+#include <exception>
+#include <map>
+#include <set>
+#include <utility>
 
 namespace nix {
 

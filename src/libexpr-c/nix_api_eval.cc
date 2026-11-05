@@ -7,6 +7,10 @@
 #include "nix_api_store_internal.h"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
+#include "nix/expr/attr-set.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <utility>
 
 static const nix::Bindings & get_bindings_or_empty(nix::EvalState & state, nix_value * autoArgs)
 {

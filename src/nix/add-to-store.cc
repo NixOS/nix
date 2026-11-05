@@ -91,6 +91,18 @@ struct CmdAdd : CmdAddToStore
     {
         return
 #include "add.md"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+
+#include <filesystem>
+#include <optional>
+#include <string>
             ;
     }
 };

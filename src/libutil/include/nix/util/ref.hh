@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
+#include <utility>
 
 #include "nix/util/demangle.hh"
 

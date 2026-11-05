@@ -11,6 +11,10 @@
 #include <random>
 #include <algorithm>
 #include <thread>
+#include <cstdio>
+#include <string>
+#include <string_view>
+#include <tuple>
 
 #ifndef _WIN32
 #  include <fcntl.h>

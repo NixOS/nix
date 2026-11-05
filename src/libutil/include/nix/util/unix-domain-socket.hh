@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <unistd.h>
+#include <cstddef>
 
 namespace nix {
 

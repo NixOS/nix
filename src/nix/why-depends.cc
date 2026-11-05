@@ -6,6 +6,13 @@
 #include "nix/util/fun.hh"
 
 #include <queue>
+#include <cassert>
+#include <cctype>
+#include <cstddef>
+#include <limits>
+#include <map>
+#include <optional>
+#include <string>
 
 namespace nix {
 
@@ -67,6 +74,16 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
     {
         return
 #include "why-depends.md"
+#include "nix/cmd/installables.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
             ;
     }
 

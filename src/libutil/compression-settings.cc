@@ -3,8 +3,12 @@
 #include "nix/util/json-impls.hh"
 #include "nix/util/config-impl.hh"
 #include "nix/util/abstract-setting-to-json.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
 
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
 
 namespace nix {
 

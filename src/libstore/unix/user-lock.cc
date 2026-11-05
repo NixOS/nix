@@ -1,6 +1,14 @@
 #include <vector>
 #include <pwd.h>
 #include <grp.h>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
 
 #include "nix/store/user-lock.hh"
 #include "nix/store/local-settings.hh"
@@ -9,6 +17,12 @@
 #include "nix/util/users.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

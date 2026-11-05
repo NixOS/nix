@@ -1,6 +1,8 @@
 #pragma once
 
 #include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/pos-idx.hh"
 
 namespace nix {
 

@@ -5,10 +5,22 @@
 #include "nix/util/system-error.hh"
 
 #include "file-descriptor-private.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/fmt.hh"
 
 #include <span>
 #include <fcntl.h>
 #include <unistd.h>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
 #ifdef _WIN32
 #  include <winnt.h>
 #  include <fileapi.h>

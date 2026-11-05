@@ -3,10 +3,17 @@
 
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/store-dir-config.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

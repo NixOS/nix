@@ -2,6 +2,7 @@
 
 #include "nix_api_fetchers.h"
 #include "nix/store/tests/nix_api_store.hh"
+#include "nix/util/tests/nix_api_util.hh"
 
 namespace nixC {
 

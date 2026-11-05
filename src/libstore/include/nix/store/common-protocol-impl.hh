@@ -11,6 +11,11 @@
 #include "nix/store/common-protocol.hh"
 #include "nix/store/length-prefixed-protocol-helper.hh"
 
+#include <map>
+#include <set>
+#include <tuple>
+#include <vector>
+
 namespace nix {
 
 /* protocol-agnostic templates */

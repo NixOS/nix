@@ -127,6 +127,23 @@ std::string MountedSSHStoreConfig::doc()
 {
     return
 #include "mounted-ssh-store.md"
+#include "nix/store/common-ssh-store-config.hh"
+#include "nix/store/path.hh"
+#include "nix/store/remote-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
         ;
 }
 

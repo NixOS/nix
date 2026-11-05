@@ -1,6 +1,7 @@
 #include "nix/util/error.hh"
 #include "nix/util/system-error.hh"
 #include "nix/main/shared.hh"
+#include "nix/util/fun.hh"
 
 #include <cstring>
 #include <cstddef>
@@ -8,6 +9,8 @@
 
 #include <unistd.h>
 #include <signal.h>
+#include <memory>
+#include <vector>
 
 namespace nix {
 

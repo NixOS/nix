@@ -1,6 +1,9 @@
 #include "nix/util/alignment.hh"
+#include "nix/util/error.hh"
 
 #include <gtest/gtest.h>
+#include <cstdint>
+#include <limits>
 
 namespace nix {
 

@@ -2,6 +2,8 @@
 ///@file
 
 #include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <tuple>
 #include <vector>

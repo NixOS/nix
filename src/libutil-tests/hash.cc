@@ -1,8 +1,15 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include <filesystem>
+#include <optional>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/hash.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

@@ -48,8 +48,50 @@
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <array>
+#include <cassert>
+#include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <iterator>
+#include <memory>
+#include <new>
+#include <set>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "nix/util/strings-inline.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/config.hh"
+#include "nix/expr/counter.hh"
+#include "nix/expr/eval-gc.hh"
+#include "nix/expr/eval-profiler-settings.hh"
+#include "nix/expr/eval-profiler.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/repl-exit-status.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/expr/static-string-data.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/suggestions.hh"
 
 using json = nlohmann::json;
 

@@ -2,6 +2,19 @@
 
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/fetchers/merkle-tar-adapter.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <tuple>
+#include <vector>
 
 namespace nix {
 

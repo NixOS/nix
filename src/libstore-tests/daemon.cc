@@ -7,6 +7,10 @@
 #  include "nix/util/file-descriptor.hh"
 #  include "nix/util/finally.hh"
 #  include "nix/util/signals.hh"
+#  include "nix/store/store-api.hh"
+#  include "nix/store/store-reference.hh"
+#  include "nix/util/ref.hh"
+#  include "nix/util/serialise.hh"
 
 namespace nix {
 

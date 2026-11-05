@@ -1,6 +1,15 @@
 #include "nix/fetchers/attrs.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <variant>
 
 namespace nix::fetchers {
 

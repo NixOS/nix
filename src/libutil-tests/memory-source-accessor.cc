@@ -1,11 +1,21 @@
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/tests/json-characterization.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/test-data.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <string_view>
+#include <filesystem>
+#include <string>
+#include <utility>
 
 namespace nix {
 

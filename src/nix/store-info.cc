@@ -4,6 +4,7 @@
 #include "nix/util/finally.hh"
 
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace nix {
 
@@ -18,6 +19,9 @@ struct CmdInfoStore : StoreCommand, MixJSON
     {
         return
 #include "store-info.md"
+#include "nix/main/common-args.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
             ;
     }
 

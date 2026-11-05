@@ -16,6 +16,11 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 #include <rapidcheck/gen/Arbitrary.hpp>
+#include <iostream>
+#include <ostream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
 
 namespace rc::detail {
 

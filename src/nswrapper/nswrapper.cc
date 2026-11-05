@@ -3,10 +3,13 @@
 #include "nix/util/processes.hh"
 #include "nix/util/util.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
 #include <grp.h>
 #include <string>
 #include <sys/mount.h>
 #include <sys/types.h>
+#include <cstdlib>
+#include <string_view>
 
 namespace nix {
 

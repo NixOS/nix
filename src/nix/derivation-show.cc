@@ -6,6 +6,8 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include <nlohmann/json.hpp>
+#include <string>
+#include <utility>
 
 using json = nlohmann::json;
 
@@ -34,6 +36,9 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
     {
         return
 #include "derivation-show.md"
+#include "nix/cmd/installables.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
             ;
     }
 

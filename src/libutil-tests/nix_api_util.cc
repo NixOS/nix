@@ -6,8 +6,12 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <cstddef>
+#include <string>
 
 #include "util-tests-config.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
 
 namespace nixC {
 

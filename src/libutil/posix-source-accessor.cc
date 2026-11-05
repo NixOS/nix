@@ -6,10 +6,33 @@
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/os-canon-path.hh"
+#include "nix/util/os-filename.hh"
+#include "nix/util/ref.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
 #include <atomic>
+#include <algorithm>
+#include <cassert>
+#include <cerrno>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <functional>
+#include <list>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 #ifndef _WIN32
 #  include <sys/resource.h>

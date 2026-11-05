@@ -2,8 +2,21 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/types.hh"
 
 #include <nlohmann/json.hpp>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <set>
+#include <sstream>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

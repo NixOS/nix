@@ -6,6 +6,10 @@
 #include "nix/util/file-descriptor.hh"
 
 #include <thread>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 
@@ -22,6 +26,10 @@ struct CmdRootsDaemon : StoreConfigCommand
     {
         return
 #include "store-roots-daemon.md"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
             ;
     }
 

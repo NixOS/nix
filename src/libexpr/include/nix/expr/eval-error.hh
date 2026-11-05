@@ -3,6 +3,12 @@
 #include "nix/util/error.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/store/path.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/suggestions.hh"
+
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

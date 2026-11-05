@@ -9,6 +9,14 @@
 #include "unix/signals-private.hh"
 
 #include <thread>
+#include <atomic>
+#include <csignal>
+#include <cstdint>
+#include <exception>
+#include <functional>
+#include <map>
+#include <memory>
+#include <utility>
 
 namespace nix {
 

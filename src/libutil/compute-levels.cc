@@ -2,6 +2,9 @@
 
 #include "util-config-private.hh"
 
+#include <cstddef>
+#include <string>
+
 #if HAVE_LIBCPUID
 #  include <libcpuid/libcpuid.h>
 #  include <map>

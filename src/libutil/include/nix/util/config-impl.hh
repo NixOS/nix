@@ -17,6 +17,16 @@
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/types.hh"
+
+#include <cassert>
+#include <filesystem>
+#include <optional>
+#include <set>
+#include <string>
+#include <type_traits>
 
 namespace nix {
 

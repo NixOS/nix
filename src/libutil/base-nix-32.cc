@@ -1,4 +1,10 @@
 #include <cassert>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string>
+#include <string_view>
 
 #include "nix/util/base-nix-32.hh"
 #include "nix/util/util.hh"

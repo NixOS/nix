@@ -10,8 +10,18 @@
 #include "nix/store/globals.hh"
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/types.hh"
 
 #include <cerrno>
+#include <algorithm>
+#include <cstdint>
+#include <filesystem>
+#include <limits>
+#include <set>
+#include <string>
+#include <system_error>
 
 namespace nix {
 

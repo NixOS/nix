@@ -21,6 +21,11 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <cassert>
+#include <chrono>
+#include <exception>
+#include <string>
+#include <thread>
 
 #ifdef __APPLE__
 #  include <sys/syscall.h>
@@ -32,6 +37,10 @@
 #endif
 
 #include "util-unix-config-private.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 #include <type_traits>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <stdexcept>
+#include <utility>
 
 #include "nix/util/fun.hh"
 

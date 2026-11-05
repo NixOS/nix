@@ -10,6 +10,12 @@
 #include "nix/util/system-error.hh"
 
 #include <nlohmann/json.hpp>
+#include <cerrno>
+#include <cstddef>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace nix {
 
@@ -52,6 +58,20 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
     {
         return
 #include "eval.md"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/print-options.hh"
+#include "nix/expr/print.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
             ;
     }
 

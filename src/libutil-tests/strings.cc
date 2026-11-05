@@ -1,10 +1,17 @@
 #include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
+#include <list>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/strings.hh"
 #include "nix/util/strings-inline.hh"
 #include "nix/util/error.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

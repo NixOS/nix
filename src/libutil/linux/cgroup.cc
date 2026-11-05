@@ -4,6 +4,12 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <chrono>
@@ -13,6 +19,16 @@
 
 #include <dirent.h>
 #include <mntent.h>
+#include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix::linux {
 

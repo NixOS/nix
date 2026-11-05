@@ -6,6 +6,9 @@
 #include <list>
 #include <memory>
 #include <cassert>
+#include <condition_variable>
+#include <cstddef>
+#include <vector>
 
 #include "nix/util/fun.hh"
 #include "nix/util/sync.hh"

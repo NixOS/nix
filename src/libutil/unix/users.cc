@@ -3,10 +3,15 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
 
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace nix {
 

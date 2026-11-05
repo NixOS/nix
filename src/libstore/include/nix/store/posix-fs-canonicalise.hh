@@ -6,6 +6,9 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
+#include <set>
+#include <utility>
 
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"

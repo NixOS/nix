@@ -6,6 +6,8 @@
 
 #include "nix/expr/config.hh"
 
+#include <string>
+
 #if NIX_USE_BOEHMGC
 #  include <gc/gc.h>
 #endif

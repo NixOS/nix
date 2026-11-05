@@ -5,6 +5,12 @@
 #include "nix/util/system-error.hh"
 
 #include <atomic>
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <system_error>
 
 namespace nix {
 
@@ -37,6 +43,20 @@ std::string LocalBinaryCacheStoreConfig::doc()
 {
     return
 #include "local-binary-cache-store.md"
+#include "nix/store/binary-cache-store.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
         ;
 }
 

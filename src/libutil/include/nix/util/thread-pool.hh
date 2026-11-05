@@ -3,6 +3,7 @@
 
 #include "nix/util/error.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/fun.hh"
 
 #include <boost/compat/move_only_function.hpp>
 
@@ -11,6 +12,12 @@
 #include <thread>
 #include <map>
 #include <atomic>
+#include <cassert>
+#include <condition_variable>
+#include <cstddef>
+#include <exception>
+#include <set>
+#include <vector>
 
 namespace nix {
 

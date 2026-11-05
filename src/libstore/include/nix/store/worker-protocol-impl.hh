@@ -10,6 +10,12 @@
 
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/length-prefixed-protocol-helper.hh"
+#include "nix/store/common-protocol.hh"
+
+#include <map>
+#include <set>
+#include <tuple>
+#include <vector>
 
 namespace nix {
 

@@ -3,6 +3,19 @@
 
 #include "nix/cmd/installables.hh"
 #include "nix/flake/flake.hh"
+#include "nix/expr/value.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

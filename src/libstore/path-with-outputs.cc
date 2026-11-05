@@ -1,6 +1,18 @@
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/strings.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

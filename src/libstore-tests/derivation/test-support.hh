@@ -1,10 +1,14 @@
 #pragma once
 
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <string_view>
 
 #include "nix/util/experimental-features.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/characterization.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

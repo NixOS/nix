@@ -7,6 +7,14 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <cassert>
+#include <cstdint>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <utility>
 
 #ifdef __linux__
 #  include <linux/capability.h>
@@ -26,6 +34,10 @@
 #include "nix/util/system-error.hh"
 
 #include "util-unix-config-private.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-canon-path.hh"
+#include "nix/util/os-filename.hh"
 
 namespace nix {
 

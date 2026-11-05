@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include <filesystem>
+#include <list>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
 
 #include "nix/store/build/worker.hh"
 #include "nix/store/derivations.hh"
@@ -11,6 +17,17 @@
 
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/dummy-store.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

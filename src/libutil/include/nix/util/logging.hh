@@ -12,6 +12,16 @@
 #include <type_traits>
 
 #include <nlohmann/json_fwd.hpp>
+#include <array>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

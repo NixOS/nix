@@ -7,8 +7,14 @@
 #include "nix/expr/search-path.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/store/store-reference.hh"
+#include "nix/util/source-path.hh"
 
 #include <filesystem>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

@@ -36,6 +36,14 @@
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
+#include <array>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 #if defined(__APPLE__)
 #  include <membership.h>
@@ -727,6 +735,22 @@ struct CmdDaemon : StoreConfigCommand
     {
         return
 #include "daemon.md"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
             ;
     }
 

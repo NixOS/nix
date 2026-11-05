@@ -15,9 +15,17 @@
 #include <algorithm>
 #include <atomic>
 #include <vector>
+#include <array>
+#include <cassert>
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
 
 #include "util-unix-config-private.hh"
 #include "../file-descriptor-private.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
 
 namespace nix {
 

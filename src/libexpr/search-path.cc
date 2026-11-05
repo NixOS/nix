@@ -1,4 +1,10 @@
 #include "nix/expr/search-path.hh"
+#include "nix/util/types.hh"
+
+#include <cstddef>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

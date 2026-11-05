@@ -12,9 +12,18 @@
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 #include "nix/util/fun.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/json-impls.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 #include <variant>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <type_traits>
 
 namespace nix {
 

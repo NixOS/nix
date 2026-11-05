@@ -12,6 +12,15 @@
 #include <ranges>
 #include <regex>
 #include <span>
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 
@@ -480,6 +489,15 @@ std::string S3BinaryCacheStoreConfig::doc()
 {
     return
 #include "s3-binary-cache-store.md"
+#include "nix/store/binary-cache-store.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
         ;
 }
 

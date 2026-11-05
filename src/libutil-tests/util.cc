@@ -1,6 +1,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/types.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/error.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
@@ -8,6 +9,9 @@
 
 #include <string>
 #include <string_view>
+#include <optional>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

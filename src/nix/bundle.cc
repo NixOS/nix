@@ -47,6 +47,27 @@ struct CmdBundle : InstallableValueCommand
     {
         return
 #include "bundle.md"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/args.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+
+#include <cstddef>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
             ;
     }
 

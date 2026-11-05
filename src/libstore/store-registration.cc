@@ -6,8 +6,27 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/system-error.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/users.hh"
+#include "nix/util/util.hh"
 
 #include <filesystem>
+#include <cstddef>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

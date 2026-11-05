@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <utility>
 
 #include "nix/util/tests/gmock-matchers.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/tests/libstore.hh"
+#include "nix/store/dummy-store.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
 
 namespace nix {
 namespace {

@@ -1,5 +1,6 @@
 #pragma once
 #include <optional>
+#include <filesystem>
 
 #include "nix/util/ref.hh"
 #include "nix/flake/flake.hh"

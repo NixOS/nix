@@ -2,8 +2,13 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/store/path.hh"
 
 #include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
 
 namespace nix {
 

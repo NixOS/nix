@@ -1,4 +1,17 @@
 #include "nix/util/position.hh"
+#include "nix/util/error.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <variant>
 
 namespace nix {
 

@@ -1,8 +1,15 @@
 #include "graphml.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/ref.hh"
 
 #include <iostream>
+#include <string>
+#include <string_view>
+#include <utility>
 
 using std::cout;
 

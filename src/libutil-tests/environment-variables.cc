@@ -1,6 +1,8 @@
 #include "nix/util/environment-variables.hh"
+#include "nix/util/os-string.hh"
 
 #include <gtest/gtest.h>
+#include <optional>
 
 namespace nix {
 

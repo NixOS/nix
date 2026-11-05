@@ -25,6 +25,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/canon-path.hh"
 
 namespace nix::flake::primops {
 

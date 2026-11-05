@@ -6,6 +6,21 @@
 #include "nix/flake/lockfile.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/eval-cache.hh"
+#include "nix/expr/eval.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-path.hh"
+
+#include <cstdint>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

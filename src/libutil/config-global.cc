@@ -1,6 +1,11 @@
 #include "nix/util/config-global.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/fmt.hh"
 
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <map>
+#include <string>
 
 namespace nix {
 

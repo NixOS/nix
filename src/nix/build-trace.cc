@@ -5,6 +5,12 @@
 
 #include <nlohmann/json.hpp>
 #include <ranges>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <variant>
+#include <vector>
 
 namespace nix {
 
@@ -97,6 +103,11 @@ struct CmdBuildTraceDelete : virtual StoreCommand
     {
         return
 #include "build-trace/delete.md"
+#include "nix/cmd/built-path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
             ;
     }
 

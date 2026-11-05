@@ -3,6 +3,8 @@
 
 #include "nix/cmd/installable-value.hh"
 #include "nix/cmd/command.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

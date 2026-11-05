@@ -5,6 +5,13 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/os-filename.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
+
+#include <cstdint>
+#include <filesystem>
+#include <string>
 
 namespace nix {
 

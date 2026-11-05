@@ -1,6 +1,9 @@
 #include <queue>
 
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <functional>
+#include <string>
+#include <vector>
 
 #include "nix/cmd/command.hh"
 
@@ -65,6 +68,13 @@ struct CmdShell : InstallablesCommand, MixEnvironment
     {
         return
 #include "shell.md"
+#include "nix/cmd/installables.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
             ;
     }
 

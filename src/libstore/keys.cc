@@ -2,6 +2,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/signature/local-keys.hh"
 
 namespace nix {
 

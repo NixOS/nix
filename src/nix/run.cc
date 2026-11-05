@@ -13,6 +13,11 @@
 #include "nix/util/system-error.hh"
 
 #include <filesystem>
+#include <cstdlib>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #ifdef __linux__
 #  include <sys/mount.h>
@@ -128,6 +133,15 @@ struct CmdRun : InstallableValueCommand, MixEnvironment
     {
         return
 #include "run.md"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
             ;
     }
 

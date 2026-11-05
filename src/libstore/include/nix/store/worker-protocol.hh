@@ -4,9 +4,21 @@
 #include <algorithm>
 #include <chrono>
 #include <compare>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <optional>
+#include <ostream>
+#include <set>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <vector>
 
 #include "nix/store/common-protocol.hh"
 #include "nix/store/gc-store.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/util/serialise.hh"
 
 namespace nix {
 

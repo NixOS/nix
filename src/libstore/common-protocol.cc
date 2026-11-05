@@ -7,10 +7,16 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/signature/local-keys.hh"
+#include "nix/store/content-address.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
 
 #include <utility>
+#include <cstdint>
+#include <iterator>
+#include <optional>
+#include <string>
 
 namespace nix {
 

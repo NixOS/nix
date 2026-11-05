@@ -7,6 +7,8 @@
 #include <linux/capability.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <cerrno>
+#include <exception>
 
 namespace nix {
 

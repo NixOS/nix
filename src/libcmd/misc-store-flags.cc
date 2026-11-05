@@ -1,4 +1,16 @@
 #include "nix/cmd/misc-store-flags.hh"
+#include "nix/store/content-address.hh"
+#include "nix/util/args.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <cstddef>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix::flag {
 

@@ -3,6 +3,11 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #include <array>
 #include <cctype>
@@ -12,6 +17,22 @@
 #include <sodium.h>
 #include <boost/lexical_cast.hpp>
 #include <stdint.h>
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <concepts>
+#include <cstddef>
+#include <cstdlib>
+#include <exception>
+#include <initializer_list>
+#include <limits>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 #ifdef _WIN32
 #  include <winsock2.h>

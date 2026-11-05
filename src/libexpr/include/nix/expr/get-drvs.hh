@@ -3,9 +3,17 @@
 
 #include "nix/expr/eval.hh"
 #include "nix/store/path.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 #include <string>
 #include <map>
+#include <functional>
+#include <list>
+#include <optional>
+#include <utility>
 
 namespace nix {
 

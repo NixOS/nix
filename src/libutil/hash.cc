@@ -12,12 +12,27 @@
 #include "nix/util/base-n.hh"
 #include "nix/util/base-nix-32.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/types.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
 #include <sodium.h>
+#include <cassert>
+#include <compare>
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
 
 namespace nix {
 

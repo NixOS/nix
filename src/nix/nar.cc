@@ -18,6 +18,8 @@ struct CmdNar : NixMultiCommand
     {
         return
 #include "nar.md"
+
+#include <string>
             ;
     }
 

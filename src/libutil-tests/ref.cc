@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <type_traits>
+#include <string>
 
 #include "nix/util/demangle.hh"
 #include "nix/util/ref.hh"

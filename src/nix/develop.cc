@@ -22,6 +22,16 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <cassert>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "nix/util/strings.hh"
 
@@ -735,6 +745,26 @@ struct CmdPrintDevEnv : Common, MixJSON
     {
         return
 #include "print-dev-env.md"
+#include "nix/cmd/installables.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
             ;
     }
 

@@ -5,6 +5,11 @@
 #include "nix/util/exit.hh"
 
 #include <nlohmann/json.hpp>
+#include <atomic>
+#include <cstddef>
+#include <set>
+#include <string>
+#include <variant>
 
 namespace nix {
 
@@ -19,6 +24,14 @@ struct CmdFlakePrefetchInputs : FlakeCommand
     {
         return
 #include "flake-prefetch-inputs.md"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/sync.hh"
             ;
     }
 

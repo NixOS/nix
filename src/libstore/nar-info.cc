@@ -2,6 +2,19 @@
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <cstddef>
+#include <string>
 
 namespace nix {
 

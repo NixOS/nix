@@ -5,6 +5,10 @@
 #include "nix/util/fun.hh"
 #include <variant>
 #include <concepts>
+#include <optional>
+#include <set>
+#include <type_traits>
+#include <vector>
 
 namespace nix {
 

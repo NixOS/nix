@@ -2,6 +2,10 @@
 ///@file
 
 #include "nix/expr/get-drvs.hh"
+#include "nix/expr/eval.hh"
+
+#include <filesystem>
+#include <string>
 
 namespace nix {
 

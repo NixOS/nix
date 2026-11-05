@@ -55,6 +55,17 @@ struct CmdDumpPath2 : Command
     {
         return
 #include "nar-dump-path.md"
+#include "nix/store/path.hh"
+#include "nix/util/args.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+
+#include <filesystem>
+#include <string>
+#include <utility>
             ;
     }
 

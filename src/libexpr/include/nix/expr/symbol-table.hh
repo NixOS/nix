@@ -10,6 +10,16 @@
 
 #include <boost/version.hpp>
 #include <boost/unordered/concurrent_flat_set.hpp>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <ostream>
+#include <span>
+#include <string_view>
+#include <type_traits>
+#include <vector>
 
 namespace nix {
 

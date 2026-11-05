@@ -2,6 +2,7 @@
 #include <optional>
 
 #include <gtest/gtest.h>
+#include <cstdint>
 
 #include "nix/util/error.hh"
 #include "nix/util/json-utils.hh"

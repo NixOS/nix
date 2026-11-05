@@ -3,10 +3,24 @@
 #include "nix/expr/static-string-data.hh"
 
 #include "expr-config-private.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/util.hh"
 
 #include <sstream>
 
 #include <toml.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

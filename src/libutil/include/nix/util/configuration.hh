@@ -6,6 +6,12 @@
 #include <set>
 
 #include <nlohmann/json_fwd.hpp>
+#include <concepts>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include "nix/util/error.hh"
 #include "nix/util/json-non-null.hh"

@@ -6,6 +6,15 @@
 #include "nix/util/url.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/os-string.hh"
+
+#include <cstddef>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

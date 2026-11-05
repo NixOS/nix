@@ -17,9 +17,16 @@
 #include "nix/util/url.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/store/build-result.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
 
 #include <regex>
 #include <queue>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

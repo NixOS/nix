@@ -8,8 +8,18 @@
 #include "nix/store/path.hh"
 #include "nix/store/derived-path.hh"
 #include <nlohmann/json_fwd.hpp>
+#include <cstddef>
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
+#include <string_view>
 #include "nix/util/comparator.hh"
 #include "nix/util/signature/signer.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/error.hh"
+#include "nix/util/json-impls.hh"
+#include "nix/util/signature/local-keys.hh"
 
 namespace nix {
 

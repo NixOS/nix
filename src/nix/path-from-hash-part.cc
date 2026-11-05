@@ -24,6 +24,11 @@ struct CmdPathFromHashPart : StoreCommand
     {
         return
 #include "path-from-hash-part.md"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
             ;
     }
 

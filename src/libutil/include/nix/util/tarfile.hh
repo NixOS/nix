@@ -2,8 +2,14 @@
 ///@file
 
 #include "nix/util/compression-algo.hh"
+#include "nix/util/fun.hh"
 
 #include <exception>
+#include <ctime>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
 
 struct archive;
 

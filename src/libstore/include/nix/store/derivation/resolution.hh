@@ -2,6 +2,13 @@
 ///@file
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+
+#include <optional>
+#include <string>
 
 namespace nix {
 

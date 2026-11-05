@@ -1,5 +1,8 @@
 #include "nix/util/config-global.hh"
 #include "nix/expr/primops.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/configuration.hh"
 
 namespace nix {
 

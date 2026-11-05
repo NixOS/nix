@@ -4,6 +4,8 @@
 #include "nix/main/common-args.hh"
 
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <string>
 
 using nlohmann::json;
 
@@ -25,6 +27,11 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
     {
         return
 #include "make-content-addressed.md"
+#include "nix/cmd/installables.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
             ;
     }
 

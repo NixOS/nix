@@ -2,6 +2,11 @@
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include <cerrno>
 #include <cstdlib>
@@ -10,6 +15,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <cassert>
+#include <filesystem>
+#include <set>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

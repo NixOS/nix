@@ -10,6 +10,10 @@
 #include <variant>
 
 #include <nlohmann/json_fwd.hpp>
+#include <compare>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

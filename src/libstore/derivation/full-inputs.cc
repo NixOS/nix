@@ -1,9 +1,15 @@
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/util/util.hh"
+#include "nix/store/derived-path-map.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/ref.hh"
 
 #include <algorithm>
 #include <ranges>
+#include <functional>
+#include <set>
+#include <variant>
 
 namespace nix::derivation {
 

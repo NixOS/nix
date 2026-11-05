@@ -5,9 +5,24 @@
 #include "nix/util/hash.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/attr-path.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/suggestions.hh"
 
 #include <functional>
 #include <variant>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix::eval_cache {
 

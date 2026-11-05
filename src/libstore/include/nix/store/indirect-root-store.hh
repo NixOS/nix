@@ -2,6 +2,10 @@
 ///@file
 
 #include "nix/store/local-fs-store.hh"
+#include "nix/store/path.hh"
+
+#include <filesystem>
+#include <string>
 
 namespace nix {
 

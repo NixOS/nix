@@ -12,9 +12,17 @@
 #include <git2/tag.h>
 #include <gtest/gtest.h>
 #include "nix/util/serialise.hh"
+#include "nix/fetchers/merkle-tar-adapter.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/ref.hh"
 
 #include <git2/blob.h>
 #include <git2/tree.h>
+#include <cstring>
+#include <filesystem>
+#include <set>
+#include <string>
+#include <utility>
 
 namespace nix::fetchers {
 

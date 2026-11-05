@@ -1,4 +1,9 @@
 #include "nix/util/library-versions.hh"
+#include "nix/util/fun.hh"
+
+#include <map>
+#include <string>
+#include <utility>
 
 namespace nix {
 

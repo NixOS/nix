@@ -1,6 +1,9 @@
 #include <cstdint>
 
 #include <gtest/gtest.h>
+#include <optional>
+#include <random>
+#include <string>
 
 #include "nix/store/filetransfer-impl.hh"
 

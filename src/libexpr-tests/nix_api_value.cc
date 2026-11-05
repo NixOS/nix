@@ -4,11 +4,15 @@
 
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
+#include "nix/util/tests/nix_api_util.hh"
 
 #include <gmock/gmock.h>
 #include <cstddef>
 #include <cstdlib>
 #include <gtest/gtest.h>
+#include <climits>
+#include <map>
+#include <string>
 
 namespace nixC {
 

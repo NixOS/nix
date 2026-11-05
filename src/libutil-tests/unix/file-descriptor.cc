@@ -6,6 +6,7 @@
 
 #include <unistd.h>
 #include <array>
+#include <cerrno>
 
 namespace nix {
 

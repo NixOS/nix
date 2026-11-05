@@ -1,11 +1,21 @@
 #pragma once
 
 #include "nix/util/source-path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
 
 #include <set>
 #include <unordered_set>
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
 

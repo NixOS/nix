@@ -5,8 +5,15 @@
 #include "nix/store/local-gc.hh"
 #include "local-gc-private.hh"
 #include "nix/util/system-error.hh"
+#include "nix/store/path.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/strings.hh"
 #include <filesystem>
 #include <boost/regex.hpp>
+#include <cerrno>
+#include <string>
+#include <system_error>
+#include <vector>
 
 #if !defined(__linux__) && !defined(__APPLE__)
 // For shelling out to lsof

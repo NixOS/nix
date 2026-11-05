@@ -17,6 +17,14 @@
 #include <fcntl.h>
 #include <regex>
 #include <pwd.h>
+#include <cerrno>
+#include <filesystem>
+#include <iostream>
+#include <list>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 
@@ -103,6 +111,13 @@ static void update(const StringSet & channelNames)
     writeFull(
         fd.get(),
 #include "unpack-channel.nix.gen.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
     );
     fd = -1;
     AutoDelete del(unpackChannelPath, false);

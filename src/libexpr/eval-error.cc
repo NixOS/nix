@@ -2,6 +2,14 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/value.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/suggestions.hh"
+
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

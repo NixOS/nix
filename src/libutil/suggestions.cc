@@ -1,8 +1,14 @@
 #include "nix/util/suggestions.hh"
 #include "nix/util/ansicolor.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/types.hh"
 
 #include <algorithm>
+#include <ostream>
+#include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

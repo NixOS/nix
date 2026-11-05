@@ -5,6 +5,19 @@
 #include "nix/util/ref.hh"
 #include "nix/util/nar-cache.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
 

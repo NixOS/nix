@@ -2,9 +2,19 @@
 ///@file
 
 #include "nix/expr/eval.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/source-path.hh"
 
 #include <string>
 #include <map>
+#include <cstdint>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

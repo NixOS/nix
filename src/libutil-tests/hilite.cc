@@ -1,6 +1,8 @@
 #include "nix/util/hilite.hh"
 
 #include <gtest/gtest.h>
+#include <string>
+#include <vector>
 
 namespace nix {
 /* ----------- tests for fmt.hh -------------------------------------------------*/

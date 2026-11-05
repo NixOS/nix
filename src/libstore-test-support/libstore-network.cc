@@ -2,6 +2,11 @@
 #include "nix/util/error.hh"
 #include "nix/util/system-error.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-string.hh"
+
+#include <filesystem>
 
 #ifdef __linux__
 #  include "nix/util/file-system.hh"

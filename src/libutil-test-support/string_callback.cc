@@ -1,5 +1,7 @@
 #include "nix/util/tests/string_callback.hh"
 
+#include <string>
+
 namespace nix::testing {
 
 void observe_string_cb(const char * start, unsigned int n, void * user_data)

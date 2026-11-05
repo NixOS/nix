@@ -4,6 +4,20 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"
 #include "nix/store/globals.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <map>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

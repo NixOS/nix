@@ -16,6 +16,22 @@
 #include "nix/util/serialise.hh"
 #include "linux/fchmodat2-compat.hh"
 #include "nix/util/system-error.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/store/config.hh"
+#include "nix/store/local-settings.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <algorithm>
 #include <string_view>
@@ -34,6 +50,16 @@
 #include <sys/syscall.h>
 #include <sys/prctl.h>
 #include <grp.h>
+#include <array>
+#include <cerrno>
+#include <cstddef>
+#include <ctime>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #if HAVE_SECCOMP
 #  include <seccomp.h>

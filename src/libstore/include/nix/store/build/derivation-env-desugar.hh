@@ -4,6 +4,12 @@
 #include "nix/util/types.hh"
 #include "nix/store/path.hh"
 
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
+#include <string_view>
+
 namespace nix {
 
 class Store;

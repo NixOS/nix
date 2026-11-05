@@ -1,6 +1,11 @@
 #pragma once
 
 #include "unix-derivation-builder-impl.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/util/types.hh"
+
+#include <memory>
+#include <utility>
 
 namespace nix {
 

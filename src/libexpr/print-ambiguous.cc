@@ -3,6 +3,15 @@
 #include "nix/util/signals.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-error.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <cstddef>
+#include <ostream>
+#include <set>
 
 namespace nix {
 

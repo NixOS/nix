@@ -8,8 +8,27 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/english.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/print-options.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <optional>
+#include <ostream>
+#include <set>
+#include <span>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

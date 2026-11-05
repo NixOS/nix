@@ -4,6 +4,8 @@
 #include <cassert>
 #include <future>
 #include <functional>
+#include <atomic>
+#include <exception>
 
 #include "nix/util/fun.hh"
 

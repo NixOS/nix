@@ -1,4 +1,7 @@
 #include <string>
+#include <cstring>
+#include <list>
+#include <string_view>
 
 #include "nix/util/strings-inline.hh"
 #include "nix/util/error.hh"

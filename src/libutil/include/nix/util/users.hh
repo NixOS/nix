@@ -2,6 +2,9 @@
 ///@file
 
 #include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
 #ifndef _WIN32
 #  include <sys/types.h>
 #endif

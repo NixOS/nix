@@ -2,6 +2,10 @@
 #include <gtest/gtest.h>
 
 #include "nix/expr/tests/libexpr.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
 
 namespace nix {
 

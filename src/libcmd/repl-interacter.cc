@@ -3,6 +3,14 @@
 #include <cstdio>
 
 #include <signal.h>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+#include <iostream>
+#include <limits>
+#include <ostream>
+#include <string>
+#include <system_error>
 
 #if USE_READLINE
 #  include <readline/history.h>
@@ -24,6 +32,10 @@ extern "C" {
 #include "nix/util/serialise.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 

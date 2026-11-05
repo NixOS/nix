@@ -3,6 +3,8 @@
 
 #include <cinttypes>
 #include <functional>
+#include <cstddef>
+#include <cstdint>
 
 namespace nix {
 

@@ -1,6 +1,10 @@
 #pragma once
 
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/ref.hh"
+
+#include <optional>
 
 namespace nix::fetchers {
 

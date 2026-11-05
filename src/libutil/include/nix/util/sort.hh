@@ -6,6 +6,7 @@
 #include <vector>
 #include <type_traits>
 #include <functional>
+#include <cstddef>
 
 /**
  * @file

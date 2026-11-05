@@ -4,12 +4,21 @@
 #include <cstdint>
 #include <optional>
 #include <variant>
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
 
 #include "nix/util/types.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/worker-settings.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

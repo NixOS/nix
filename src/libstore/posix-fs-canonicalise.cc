@@ -6,12 +6,28 @@
 #include "nix/util/fs-sink.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/system-error.hh"
+#include "nix/store/config.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-filename.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #if NIX_SUPPORT_ACL
 #  include <sys/xattr.h>
 #endif
 
 #include <sys/stat.h>
+#include <cassert>
+#include <cerrno>
+#include <cstddef>
+#include <ctime>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

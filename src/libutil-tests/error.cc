@@ -2,6 +2,7 @@
 #include "nix/util/system-error.hh"
 
 #include <gtest/gtest.h>
+#include <system_error>
 
 namespace nix {
 

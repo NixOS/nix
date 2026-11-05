@@ -10,6 +10,8 @@
 #include <vector>
 
 #include <boost/container/small_vector.hpp>
+#include <concepts>
+#include <functional>
 
 namespace nix {
 

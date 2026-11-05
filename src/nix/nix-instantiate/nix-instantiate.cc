@@ -12,8 +12,22 @@
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/args.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/types.hh"
 
 #include <iostream>
+#include <filesystem>
+#include <memory>
+#include <set>
+#include <string>
 
 namespace nix {
 

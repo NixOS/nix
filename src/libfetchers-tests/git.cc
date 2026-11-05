@@ -4,11 +4,17 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/util/url.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 #include <git2.h>
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <memory>
 
 namespace {
 

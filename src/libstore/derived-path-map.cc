@@ -81,6 +81,12 @@ void DerivedPathMap<V>::removeSlot(const SingleDerivedPath & k, fun<bool(ChildNo
 // instantiations
 
 #include "nix/store/build/derivation-trampoline-goal.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/types.hh"
+
+#include <map>
+#include <memory>
 
 namespace nix {
 

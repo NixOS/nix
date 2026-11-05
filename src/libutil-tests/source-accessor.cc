@@ -3,6 +3,8 @@
 #include "nix/util/processes.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/source-accessor.hh"
 
 #ifdef _WIN32
 #  include "nix/util/tests/wine.hh"
@@ -12,6 +14,10 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <rapidcheck/gtest.h>
+#include <filesystem>
+#include <memory>
+#include <set>
+#include <string>
 
 namespace nix {
 

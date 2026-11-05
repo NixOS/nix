@@ -6,6 +6,8 @@
 #include "nix/cmd/editor-for.hh"
 
 #include <unistd.h>
+#include <string>
+#include <utility>
 
 namespace nix {
 
@@ -20,6 +22,12 @@ struct CmdEdit : InstallableValueCommand
     {
         return
 #include "edit.md"
+#include "nix/cmd/command.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/ref.hh"
             ;
     }
 

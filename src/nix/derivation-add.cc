@@ -6,6 +6,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
 #include <nlohmann/json.hpp>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -22,6 +23,10 @@ struct CmdAddDerivation : MixDryRun, StoreCommand
     {
         return
 #include "derivation-add.md"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
             ;
     }
 

@@ -1,6 +1,11 @@
 #include "nix/util/pos-table.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/position.hh"
 
 #include <algorithm>
+#include <cassert>
+#include <iterator>
+#include <string_view>
 
 namespace nix {
 

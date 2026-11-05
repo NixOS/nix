@@ -1,9 +1,18 @@
 #include "nix/expr/json-to-value.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/eval.hh"
+#include "nix/util/error.hh"
+#include "nix/util/util.hh"
 
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <cstddef>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
 
 using json = nlohmann::json;
 

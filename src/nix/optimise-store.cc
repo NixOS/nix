@@ -15,6 +15,9 @@ struct CmdOptimiseStore : StoreCommand
     {
         return
 #include "optimise-store.md"
+#include "nix/util/ref.hh"
+
+#include <string>
             ;
     }
 

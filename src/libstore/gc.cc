@@ -15,6 +15,17 @@
 #include "nix/util/system-error.hh"
 
 #include "store-config-private.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/socket.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/sync.hh"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
@@ -35,6 +46,20 @@
 #endif
 #include <sys/types.h>
 #include <unistd.h>
+#include <cassert>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <future>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

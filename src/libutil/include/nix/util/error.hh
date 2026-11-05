@@ -32,6 +32,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <compare>
+#include <exception>
+#include <ostream>
+#include <source_location>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

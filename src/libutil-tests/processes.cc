@@ -1,9 +1,13 @@
 #include "nix/util/processes.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-string.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <string>
 
 #ifdef __linux__
 #  include <cerrno>

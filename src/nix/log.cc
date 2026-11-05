@@ -16,6 +16,16 @@ struct CmdLog : InstallableCommand
     {
         return
 #include "log.md"
+#include "nix/cmd/installables.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
+
+#include <string>
+#include <variant>
             ;
     }
 

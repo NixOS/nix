@@ -9,12 +9,20 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
 
 #include <ranges>
 
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <poll.h>
+#include <cassert>
+#include <cerrno>
+#include <string>
+#include <utility>
+#include <vector>
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #  include <sys/ucred.h>

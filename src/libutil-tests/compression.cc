@@ -2,6 +2,8 @@
 #include "nix/util/error.hh"
 #include "nix/util/system-error.hh"
 #include "nix/util/config.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/serialise.hh"
 
 #include <gtest/gtest.h>
 #include <zstd.h>
@@ -10,6 +12,11 @@
 #include <random>
 #include <cstdint>
 #include <algorithm>
+#include <array>
+#include <cerrno>
+#include <cstddef>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

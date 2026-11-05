@@ -2,6 +2,24 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/util/util.hh"
 #include "nix/util/strings-inline.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/suggestions.hh"
+#include "nix/util/types.hh"
+
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

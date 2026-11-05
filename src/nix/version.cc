@@ -4,6 +4,7 @@
 #include "nix/util/library-versions.hh"
 
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace nix {
 
@@ -18,6 +19,8 @@ struct CmdVersion : Command, MixJSON
     {
         return
 #include "version.md"
+#include "nix/main/common-args.hh"
+#include "nix/util/args.hh"
             ;
     }
 

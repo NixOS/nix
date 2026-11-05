@@ -8,6 +8,8 @@
  */
 
 #include <iostream>
+#include <string>
+#include <string_view>
 
 #include "nix/util/fmt.hh"
 #include "nix/expr/value/context.hh"

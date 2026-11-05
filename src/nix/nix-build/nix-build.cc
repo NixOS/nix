@@ -8,6 +8,13 @@
 #include <map>
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 #include "nix/util/current-process.hh"
 #include "nix/store/parsed-derivations.hh"
@@ -34,6 +41,24 @@
 #include "nix/util/fun.hh"
 #include "man-pages.hh"
 #include "nix/util/system-error.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/value.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 extern char ** environ __attribute__((weak));
 

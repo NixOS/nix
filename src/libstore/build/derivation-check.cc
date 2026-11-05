@@ -1,4 +1,12 @@
 #include <queue>
+#include <cassert>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
 
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
@@ -6,6 +14,14 @@
 #include "nix/util/hash.hh"
 
 #include "derivation-check.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

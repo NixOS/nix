@@ -17,6 +17,11 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
     {
         return
 #include "store-copy-log.md"
+#include "nix/cmd/installables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
             ;
     }
 

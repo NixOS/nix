@@ -1,5 +1,6 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/os-string.hh"
 
 #include <gtest/gtest.h>
 
@@ -7,6 +8,9 @@
 #include <ranges>
 #include <cstdlib>
 #include <cerrno>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #ifndef _WIN32
 #  include <unistd.h>

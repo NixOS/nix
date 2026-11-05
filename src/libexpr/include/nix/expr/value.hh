@@ -18,9 +18,26 @@
 #include "nix/util/source-path.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/util/checked-arithmetic.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <boost/unordered/unordered_flat_map_fwd.hpp>
 #include <nlohmann/json_fwd.hpp>
+#include <array>
+#include <compare>
+#include <cstdint>
+#include <functional>
+#include <iterator>
+#include <map>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #if defined(__x86_64__) && defined(__SSE2__)
 #  include <emmintrin.h>

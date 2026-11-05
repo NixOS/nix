@@ -43,6 +43,12 @@ struct CmdStoreDelete : StorePathsCommand
     {
         return
 #include "store-delete.md"
+#include "nix/store/path.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
+#include <utility>
             ;
     }
 

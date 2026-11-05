@@ -13,6 +13,11 @@
 #include <boost/asio/associated_cancellation_slot.hpp>
 
 #include <concepts>
+#include <atomic>
+#include <exception>
+#include <future>
+#include <memory>
+#include <ranges>
 
 namespace nix {
 

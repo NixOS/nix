@@ -3,6 +3,9 @@
 
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/symbol-table.hh"
+#include "nix/util/comparator.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <boost/container/static_vector.hpp>
 #include <boost/iterator/function_output_iterator.hpp>
@@ -11,6 +14,13 @@
 #include <functional>
 #include <ranges>
 #include <optional>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <span>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

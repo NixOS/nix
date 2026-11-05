@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
 #include "nix/fetchers/attrs.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 #include <nlohmann/json.hpp>
+#include <cstdint>
+#include <string>
 
 namespace nix::fetchers {
 

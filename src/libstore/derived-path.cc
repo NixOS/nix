@@ -3,6 +3,20 @@
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/comparator.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
+
+#include <compare>
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

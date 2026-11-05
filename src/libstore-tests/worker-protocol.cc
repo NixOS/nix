@@ -2,6 +2,14 @@
 
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <chrono>
+#include <cstddef>
+#include <optional>
+#include <set>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include "nix/util/json-utils.hh"
 #include "nix/store/worker-protocol.hh"
@@ -11,6 +19,18 @@
 #include "nix/store/build-result.hh"
 #include "nix/store/tests/protocol.hh"
 #include "nix/util/tests/characterization.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

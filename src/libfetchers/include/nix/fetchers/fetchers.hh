@@ -10,8 +10,18 @@
 
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/ref.hh"
+#include "nix/util/experimental-features.hh"
 
 namespace nix {
 class Store;

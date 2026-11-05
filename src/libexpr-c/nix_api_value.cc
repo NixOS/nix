@@ -11,6 +11,22 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_store_internal.h"
 #include "nix_api_value.h"
+#include "nix/expr/config.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <iterator>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 static nix::Value & check_value_out(nix_value * value)
 {

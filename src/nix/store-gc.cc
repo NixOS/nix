@@ -31,6 +31,12 @@ struct CmdStoreGC : StoreCommand, MixDryRun
     {
         return
 #include "store-gc.md"
+#include "nix/util/finally.hh"
+#include "nix/util/ref.hh"
+
+#include <cstdint>
+#include <limits>
+#include <string>
             ;
     }
 

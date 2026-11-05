@@ -20,9 +20,13 @@
 #include "nix/util/os-canon-path.hh"
 #include "nix/util/result.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/os-string.hh"
 
 #include <optional>
 #include <system_error>
+#include <cerrno>
+#include <cstdint>
+#include <functional>
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN

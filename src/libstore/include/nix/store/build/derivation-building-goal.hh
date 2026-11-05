@@ -10,6 +10,19 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/store/build/goal.hh"
 #include "nix/store/build/build-log.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
+
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

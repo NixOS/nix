@@ -5,12 +5,19 @@
 #include "nix/util/system-error.hh"
 
 #include "linux-namespaces-private.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include <mutex>
 #include <sys/resource.h>
 
 #include <sys/mount.h>
 #include <sys/statvfs.h>
+#include <cassert>
+#include <cerrno>
+#include <filesystem>
 
 namespace nix {
 

@@ -13,6 +13,30 @@
 #include "nix/util/signals.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/util.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/nar-listing.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/signature/signer.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #include <chrono>
 #include <future>
@@ -22,6 +46,19 @@
 #include <variant>
 
 #include <nlohmann/json.hpp>
+#include <atomic>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

@@ -1,6 +1,12 @@
 #include "nix/store/tests/outputs-spec.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/tests/path.hh"
+#include "nix/util/types.hh"
 
 #include <rapidcheck.h>
+#include <cassert>
+#include <cstdint>
+#include <variant>
 
 namespace rc {
 

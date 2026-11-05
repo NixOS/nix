@@ -8,6 +8,13 @@
 #include "nix/store/derivation/aterm.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <concepts>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 
@@ -19,6 +26,22 @@ std::string DummyStoreConfig::doc()
 {
     return
 #include "dummy-store.md"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/dummy-store.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/util.hh"
         ;
 }
 

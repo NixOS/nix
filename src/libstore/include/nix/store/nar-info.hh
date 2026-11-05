@@ -5,6 +5,15 @@
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/path-info.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/json-impls.hh"
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

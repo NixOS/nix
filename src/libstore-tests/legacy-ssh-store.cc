@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/legacy-ssh-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

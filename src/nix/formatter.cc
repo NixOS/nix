@@ -118,6 +118,15 @@ struct CmdFormatterBuild : MixFormatter, MixOutLinkByDefault
     {
         return
 #include "formatter-build.md"
+#include "nix/main/common-args.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+
+#include <cassert>
+#include <optional>
+#include <string>
+#include <vector>
             ;
     }
 

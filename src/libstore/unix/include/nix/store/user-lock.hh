@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include <sys/types.h>
+#include <utility>
 
 namespace nix {
 

@@ -6,6 +6,11 @@
 #include "nix/util/alignment.hh"
 #include "nix/util/logging.hh"
 
+#include <atomic>
+#include <cstddef>
+#include <memory_resource>
+#include <system_error>
+
 #ifndef _WIN32
 #  include <charconv>
 

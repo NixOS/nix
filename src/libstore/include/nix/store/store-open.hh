@@ -12,6 +12,11 @@
  */
 
 #include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/ref.hh"
+
+#include <list>
+#include <string>
 
 namespace nix {
 

@@ -2,10 +2,25 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
 #include <cassert>
 #include <regex>
+#include <cmath>
+#include <cstdint>
+#include <exception>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

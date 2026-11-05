@@ -4,6 +4,19 @@
 #include "nix/store/remote-store.hh"
 #include "nix/store/remote-store-connection.hh"
 #include "nix/store/indirect-root-store.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
+
+#include <filesystem>
+#include <memory>
+#include <string>
 
 namespace nix {
 

@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <functional>
 
 #include "nix/util/strings.hh"
 

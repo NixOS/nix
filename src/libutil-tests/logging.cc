@@ -3,8 +3,24 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/tests/capture-logging.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/tests/test-data.hh"
 
 #include <gtest/gtest.h>
+#include <cstdio>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

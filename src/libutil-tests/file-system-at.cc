@@ -1,11 +1,22 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <cerrno>
+#include <cstddef>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <system_error>
 
 #include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/os-filename.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/source-accessor.hh"
 
 #ifdef _WIN32
 #  include "nix/util/tests/wine.hh"

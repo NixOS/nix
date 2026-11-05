@@ -12,6 +12,8 @@
 #include "unix/signals-private.hh"
 #include "unix/current-process-private.hh"
 #include "util-unix-config-private.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/types.hh"
 
 #include <cstring>
 #include <cerrno>
@@ -26,6 +28,9 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <sched.h>
+#include <span>
+#include <string>
+#include <utility>
 
 extern char ** environ __attribute__((weak));
 

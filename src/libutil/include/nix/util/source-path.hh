@@ -9,6 +9,20 @@
 #include "nix/util/canon-path.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/std-hash.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fun.hh"
+
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 namespace nix {
 

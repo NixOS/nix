@@ -1,10 +1,19 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <string>
+#include <string_view>
 
 #include "nix/store/path-info.hh"
 
 #include "nix/util/tests/characterization.hh"
 #include "nix/store/tests/libstore.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

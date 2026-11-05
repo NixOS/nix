@@ -1,8 +1,20 @@
 #include "nix/util/archive.hh"
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/tests/test-data.hh"
 
 #include <gtest/gtest.h>
+#include <cstddef>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
 
 namespace nix {
 

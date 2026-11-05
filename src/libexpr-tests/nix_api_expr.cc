@@ -11,8 +11,20 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "expr-tests-config.hh"
+#include "nix/expr/config.hh"
+#include "nix/util/tests/nix_api_util.hh"
 
 namespace nixC {
 

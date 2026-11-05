@@ -13,6 +13,8 @@
 #endif
 
 #include <boost/stacktrace/stacktrace.hpp>
+#include <cstdlib>
+#include <string>
 
 #ifndef _WIN32
 #  include <syslog.h>

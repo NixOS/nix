@@ -3,9 +3,12 @@
 
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <string>
 #include <map>
+#include <ostream>
 
 namespace nix {
 

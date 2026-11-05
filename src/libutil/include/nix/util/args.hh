@@ -8,6 +8,13 @@
 #include <optional>
 
 #include <nlohmann/json_fwd.hpp>
+#include <cstddef>
+#include <limits>
+#include <list>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/types.hh"
 #include "nix/util/experimental-features.hh"

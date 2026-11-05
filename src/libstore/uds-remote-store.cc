@@ -8,6 +8,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <chrono>
+#include <filesystem>
+#include <string>
 
 #ifdef _WIN32
 #  include <winsock2.h>
@@ -42,6 +45,15 @@ std::string UDSRemoteStoreConfig::doc()
 {
     return
 #include "uds-remote-store.md"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/remote-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/socket.hh"
+#include "nix/util/url.hh"
         ;
 }
 

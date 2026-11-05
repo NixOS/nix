@@ -3,6 +3,16 @@
 #include "nix/util/signals.hh"
 
 #include "util-config-private.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+
+#include <cassert>
+#include <filesystem>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

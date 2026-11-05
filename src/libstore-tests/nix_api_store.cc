@@ -1,6 +1,14 @@
 #include <fstream>
 
 #include <nlohmann/json.hpp>
+#include <cstddef>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <set>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "nix_api_util.h"
 #include "nix_api_store.h"
@@ -13,6 +21,11 @@
 #include "nix/util/url.hh"
 
 #include "store-tests-config.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/tests/nix_api_util.hh"
+#include "nix/util/util.hh"
 
 #ifdef _WIN32
 #  include "nix/util/windows-known-folders.hh"

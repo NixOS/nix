@@ -4,6 +4,8 @@
 #include <string>
 #include <string_view>
 #include <optional>
+#include <cstdint>
+#include <map>
 
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
@@ -11,6 +13,9 @@
 #include "nix/util/source-path.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/merkle-files.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix::git {
 

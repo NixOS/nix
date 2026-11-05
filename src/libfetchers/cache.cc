@@ -5,8 +5,18 @@
 #include "nix/util/sync.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/store/path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
 
 #include <nlohmann/json.hpp>
+#include <ctime>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix::fetchers {
 

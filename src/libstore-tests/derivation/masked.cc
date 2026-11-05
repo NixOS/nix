@@ -1,4 +1,12 @@
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
@@ -6,6 +14,13 @@
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix::derivation::masked {
 

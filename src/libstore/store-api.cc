@@ -24,11 +24,54 @@
 #include "nix/util/file-system.hh"
 
 #include "store-config-private.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signature/signer.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/types.hh"
 
 #include <filesystem>
 #include <array>
 
 #include <nlohmann/json.hpp>
+#include <atomic>
+#include <cassert>
+#include <chrono>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <functional>
+#include <future>
+#include <istream>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #ifdef _WIN32
 #  include "nix/util/windows-known-folders.hh"

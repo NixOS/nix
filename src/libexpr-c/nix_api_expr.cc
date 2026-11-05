@@ -1,6 +1,11 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <functional>
+#include <memory>
+#include <new>
+#include <utility>
+#include <vector>
 
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-gc.hh"
@@ -14,6 +19,13 @@
 #include "nix_api_store_internal.h"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
+#include "nix/expr/config.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/types.hh"
 
 #if NIX_USE_BOEHMGC
 #  include <boost/unordered/concurrent_flat_map.hpp>

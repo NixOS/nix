@@ -3,6 +3,9 @@
 
 #include <cerrno>
 #include <cstdlib>
+#include <filesystem>
+#include <set>
+#include <string>
 
 namespace nix {
 

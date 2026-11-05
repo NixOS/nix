@@ -1,8 +1,11 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <optional>
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
 
 namespace nix::fetchers {
 

@@ -30,8 +30,46 @@
 #include <unistd.h>
 
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <variant>
 
 #include "nix/util/strings.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/build/build-log.hh"
+#include "nix/store/build/derivation-building-misc.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/path.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/muxable-pipe.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

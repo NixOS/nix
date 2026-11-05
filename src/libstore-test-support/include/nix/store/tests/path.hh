@@ -2,6 +2,8 @@
 ///@file
 
 #include <rapidcheck/gen/Arbitrary.h>
+#include <ostream>
+#include <string>
 
 #include "nix/store/path.hh"
 

@@ -1,6 +1,21 @@
 #include "unix-derivation-builder-impl.hh"
 #include "child-impl.hh"
 #include "nix/util/system-error.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <filesystem>
+#include <memory>
+#include <utility>
 
 namespace nix {
 

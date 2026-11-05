@@ -5,10 +5,30 @@
 #include "nix/util/canon-path.hh"
 #include "nix/util/strings-inline.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #include <boost/url.hpp>
 
 #include <unordered_set>
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <optional>
+#include <ostream>
+#include <ranges>
+#include <regex>
+#include <span>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

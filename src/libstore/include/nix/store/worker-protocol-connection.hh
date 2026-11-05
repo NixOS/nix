@@ -3,6 +3,13 @@
 
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/path.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/serialise.hh"
+
+#include <exception>
+#include <optional>
 
 namespace nix {
 

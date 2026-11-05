@@ -5,6 +5,10 @@
 #include "nix/store/store-api.hh"
 
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace nix {
 
@@ -128,6 +132,11 @@ struct CmdBuild : InstallablesCommand, MixOutLinkByDefault, MixDryRun, MixJSON, 
     {
         return
 #include "build.md"
+#include "nix/cmd/built-path.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
             ;
     }
 

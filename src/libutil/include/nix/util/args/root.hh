@@ -1,6 +1,17 @@
 #pragma once
 
 #include "nix/util/args.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/types.hh"
+
+#include <cstddef>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

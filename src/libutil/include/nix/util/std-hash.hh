@@ -7,6 +7,7 @@
  */
 
 #include <functional>
+#include <cstddef>
 
 namespace nix {
 

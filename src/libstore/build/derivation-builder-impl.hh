@@ -4,6 +4,17 @@
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/sync.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/types.hh"
+
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <utility>
 #ifndef _WIN32
 #  include "nix/store/user-lock.hh"
 #endif

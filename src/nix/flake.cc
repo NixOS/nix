@@ -29,6 +29,19 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <iomanip>
+#include <cassert>
+#include <cstddef>
+#include <ctime>
+#include <functional>
+#include <map>
+#include <optional>
+#include <ranges>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "nix/util/strings-inline.hh"
 
@@ -1575,6 +1588,39 @@ struct CmdFlake : NixMultiCommand
     {
         return
 #include "flake.md"
+#include "nix/cmd/built-path.hh"
+#include "nix/cmd/installable-flake.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/args.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
             ;
     }
 

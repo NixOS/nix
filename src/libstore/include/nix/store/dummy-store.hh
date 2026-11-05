@@ -3,8 +3,18 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/json-impls.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/json-non-null.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <type_traits>
 
 namespace nix {
 

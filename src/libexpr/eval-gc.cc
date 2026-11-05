@@ -5,6 +5,19 @@
 #include "nix/expr/value.hh"
 
 #include "expr-config-private.hh"
+#include "nix/expr/config.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/util.hh"
+
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <new>
+#include <string_view>
 
 #if NIX_USE_BOEHMGC
 

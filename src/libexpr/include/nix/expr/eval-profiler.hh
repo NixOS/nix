@@ -12,6 +12,8 @@
 #include <bitset>
 #include <optional>
 #include <filesystem>
+#include <cstddef>
+#include <cstdint>
 
 namespace nix {
 

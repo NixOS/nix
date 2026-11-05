@@ -19,6 +19,15 @@
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
+#include <cstddef>
+#include <exception>
+#include <filesystem>
+#include <iterator>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #ifndef _WIN32
 #  include <sys/utsname.h>
@@ -43,6 +52,22 @@
 #endif
 
 #include "store-config-private.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/store/config.hh"
+#include "nix/store/global-paths.hh"
+#include "nix/store/local-settings.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/worker-settings.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/users.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

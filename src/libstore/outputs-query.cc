@@ -3,8 +3,20 @@
 #include "nix/store/derivation/resolution.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/util.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <map>
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

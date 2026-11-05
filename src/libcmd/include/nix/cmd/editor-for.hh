@@ -6,6 +6,9 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
 
+#include <cstdint>
+#include <tuple>
+
 namespace nix {
 
 /**

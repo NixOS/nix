@@ -2,6 +2,13 @@
 ///@file
 
 #include "nix/util/hash.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+
+#include <cstdint>
+#include <set>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

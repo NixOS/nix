@@ -14,6 +14,23 @@
 #include "nix/cmd/compatibility-settings.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/store/globals.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/args.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/util.hh"
+
+#include <cstddef>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

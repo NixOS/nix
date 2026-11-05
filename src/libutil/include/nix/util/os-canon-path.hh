@@ -6,6 +6,9 @@
 
 #include <filesystem>
 #include <optional>
+#include <cstddef>
+#include <iterator>
+#include <utility>
 
 namespace nix {
 

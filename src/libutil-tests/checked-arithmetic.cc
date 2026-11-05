@@ -5,6 +5,9 @@
 #include <rapidcheck/Assertions.h>
 #include <rapidcheck/gtest.h>
 #include <rapidcheck/gen/Arbitrary.hpp>
+#include <concepts>
+#include <optional>
+#include <type_traits>
 
 #include "nix/util/checked-arithmetic.hh"
 

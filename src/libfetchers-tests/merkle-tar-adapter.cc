@@ -5,10 +5,25 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/tests/capture-logging.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/merkle-files.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
+#include <cstddef>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

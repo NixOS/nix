@@ -5,6 +5,14 @@
 #include <cstdint>
 #include <string>
 #include <future>
+#include <cassert>
+#include <cstddef>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/logging.hh"
 #include "nix/util/types.hh"
@@ -18,6 +26,8 @@
 #  include "nix/store/aws-creds.hh"
 #endif
 #include "nix/store/s3-url.hh"
+#include "nix/util/error.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

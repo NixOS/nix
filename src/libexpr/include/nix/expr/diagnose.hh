@@ -7,6 +7,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/fmt.hh"
 
 namespace nix {
 

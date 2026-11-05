@@ -3,6 +3,8 @@
 
 #include "nix/util/types.hh"
 
+#include <string>
+
 namespace nix {
 
 enum class LogFormat {

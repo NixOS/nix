@@ -11,6 +11,12 @@
 #include <ranges>
 
 #include <boost/container_hash/hash.hpp>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 namespace nix {
 

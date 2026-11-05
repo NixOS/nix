@@ -5,6 +5,9 @@
 #include <map>
 #include <list>
 #include <optional>
+#include <cstddef>
+#include <functional>
+#include <utility>
 
 namespace nix {
 

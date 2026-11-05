@@ -2,10 +2,14 @@
 ///@file
 
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <string>
+#include <string_view>
 
 #include "nix/util/types.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/tests/test-data.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 

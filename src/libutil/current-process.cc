@@ -6,7 +6,14 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/strings.hh"
 #include <math.h>
+#include <cmath>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
 
 #ifndef _WIN32
 #  include "unix/current-process-private.hh"

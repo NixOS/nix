@@ -6,6 +6,7 @@
 #include <shared_mutex>
 #include <condition_variable>
 #include <cassert>
+#include <chrono>
 
 #include "nix/util/error.hh"
 

@@ -12,6 +12,13 @@
 #include "nix/util/json-utils.hh"
 #include "nix/store/ssh.hh"
 #include "nix/util/deleter.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #include <git2/attr.h>
 #include <git2/config.h>
@@ -19,6 +26,20 @@
 #include <git2/remote.h>
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cassert>
+#include <cctype>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix::lfs {
 

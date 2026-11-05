@@ -4,6 +4,7 @@
 #include "nix/util/error.hh"
 
 #include <string_view>
+#include <string>
 
 namespace nix {
 

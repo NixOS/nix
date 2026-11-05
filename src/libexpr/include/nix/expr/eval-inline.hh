@@ -5,7 +5,19 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/config.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/print-options.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
 #include <exception>
+#include <cassert>
+#include <cstddef>
+#include <memory>
+#include <new>
+#include <string_view>
+#include <type_traits>
 
 namespace nix {
 

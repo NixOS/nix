@@ -7,9 +7,13 @@
 
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
+#include "nix/util/util.hh"
+#include "nix_api_util.h"
 
 #include <filesystem>
 #include <gtest/gtest.h>
+#include <cassert>
+#include <string>
 
 namespace nixC {
 

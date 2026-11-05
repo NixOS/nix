@@ -4,6 +4,19 @@
 #include "nix/util/source-path.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/serialise.hh"
+
+#include <cassert>
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

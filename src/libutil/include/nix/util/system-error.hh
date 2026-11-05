@@ -9,6 +9,7 @@
  */
 
 #include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
 
 #include <cerrno>
 #include <concepts>

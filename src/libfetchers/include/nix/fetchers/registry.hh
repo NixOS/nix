@@ -4,6 +4,12 @@
 #include "nix/util/types.hh"
 #include "nix/util/source-path.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/attrs.hh"
+
+#include <filesystem>
+#include <memory>
+#include <utility>
+#include <vector>
 
 namespace nix {
 class Store;

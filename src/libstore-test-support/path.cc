@@ -2,9 +2,15 @@
 
 #include <rapidcheck/gen/Arbitrary.h>
 #include <rapidcheck.h>
+#include <cassert>
+#include <cstdint>
+#include <ostream>
+#include <string>
 
 #include "nix/util/tests/hash.hh"
 #include "nix/store/tests/path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/hash.hh"
 
 namespace nix {
 

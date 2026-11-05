@@ -5,10 +5,16 @@
 #include "nix/util/logging.hh"
 
 #include "unix/current-process-private.hh"
+#include "nix/util/fmt.hh"
 
 #include <cmath>
 
 #include <sys/resource.h>
+#include <algorithm>
+#include <cerrno>
+#include <chrono>
+#include <cstddef>
+#include <cstring>
 
 namespace nix {
 

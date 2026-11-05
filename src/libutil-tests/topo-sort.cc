@@ -4,6 +4,10 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <variant>
 
 #include "nix/util/topo-sort.hh"
 #include "nix/util/util.hh"

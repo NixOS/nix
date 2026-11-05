@@ -3,11 +3,26 @@
 #include "nix/store/derivations.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <cstddef>
+#include <filesystem>
+#include <map>
+#include <set>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

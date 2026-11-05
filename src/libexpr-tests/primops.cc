@@ -1,11 +1,27 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <limits>
+#include <new>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <vector>
 
 #include "nix/expr/eval-settings.hh"
 #include "nix/util/memory-source-accessor.hh"
 
 #include "nix/util/tests/capture-logging.hh"
 #include "nix/expr/tests/libexpr.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/value.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

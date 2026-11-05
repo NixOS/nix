@@ -7,6 +7,13 @@
 #include <algorithm>
 
 #include <nlohmann/json.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <ostream>
+#include <sstream>
+#include <string>
+#include <utility>
 
 #include "nix/util/strings.hh"
 
@@ -165,6 +172,15 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     {
         return
 #include "path-info.md"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
             ;
     }
 
