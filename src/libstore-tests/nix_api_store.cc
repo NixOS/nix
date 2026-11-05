@@ -14,6 +14,10 @@
 
 #include "store-tests-config.hh"
 
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
+#endif
+
 namespace nixC {
 
 std::string PATH_SUFFIX = "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-name";
@@ -51,7 +55,11 @@ TEST_F(nix_api_util_context, nix_store_get_storedir_default)
     ASSERT_EQ(NIX_OK, ret);
 
     // These tests run with a unique storeDir, but not a relocated store
+#ifdef _WIN32
+    ASSERT_EQ((nix::windows::known_folders::getProgramData() / "nix" / "store").string(), str);
+#else
     ASSERT_STREQ(NIX_STORE_DIR, str.c_str());
+#endif
 
     nix_store_free(store);
 }

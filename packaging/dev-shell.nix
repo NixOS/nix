@@ -250,6 +250,42 @@ nixComponents.callPackage (
             cdToBuildDir
             ninjaInstallPhase
         }
+      ''
+      # The unit test suites set `HOME` to a fresh `test-home` directory
+      # (see their `meson.build`), which Wine would then look for its prefix
+      # in (`$HOME/.wine`) and fail, since nothing creates it. Pin the prefix
+      # to the user's real one instead.
+      #
+      # TODO: Have the test suites themselves (or Meson) take care of this,
+      # e.g. by creating `test-home`, so `meson test` works without this
+      # shell. CI doesn't need it, because it runs the installed tests via
+      # each package's `tests.run`, which sets up `HOME` itself.
+      + lib.optionalString stdenv.hostPlatform.isWindows ''
+        export WINEPREFIX="''${WINEPREFIX:-$HOME/.wine}"
+      ''
+      # Hack so that `meson test` under Wine can find all the DLLs. Meson
+      # prepends what it finds itself, but it guesses a library's DLL
+      # directory from its link arguments: next to the import library, or
+      # a sibling `bin/` of its `lib/`. That fails for Nixpkgs packages
+      # split across outputs, such as OpenSSL (DLLs in the separate `bin`
+      # output) and Brotli (`libdir` in the `lib` output, DLLs in `out`).
+      #
+      # TODO: Remove this once that is fixed properly. Meson uses a
+      # `bindir` pkg-config variable in preference to guessing, so Nixpkgs
+      # could add one to the `.pc` files of such multi-output packages, or
+      # otherwise make them point at where the DLLs really are. See
+      # https://github.com/NixOS/nixpkgs/issues/431820#issuecomment-6609616946
+      #
+      # CI doesn't need this, because it doesn't use `meson test` for
+      # Windows, but runs the installed tests via each package's
+      # `tests.run`.
+      + lib.optionalString stdenv.hostPlatform.isWindows ''
+        for p in "''${pkgsHostTarget[@]}"; do
+            if compgen -G "$p/bin/*.dll" > /dev/null; then
+                WINEPATH="''${WINEPATH:+$WINEPATH;}Z:$p/bin"
+            fi
+        done
+        export WINEPATH
       '';
 
       # We use this shell with the local checkout, not unpackPhase.

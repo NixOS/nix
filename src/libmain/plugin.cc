@@ -81,7 +81,7 @@ void initPlugins()
             auto ents = DirectoryIterator{pluginFile};
             for (const auto & ent : ents) {
                 checkInterrupt();
-                pluginFiles.emplace_back(ent.path());
+                pluginFiles.emplace_back(pluginFile / ent.name.path());
             }
         } catch (SystemError & e) {
             if (!e.is(std::errc::not_a_directory))

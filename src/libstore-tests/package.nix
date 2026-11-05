@@ -97,7 +97,19 @@ mkMesonExecutable (finalAttrs: {
           (
             lib.optionalString withUnitTests ''
               export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
+            ''
+            # A Unix path isn't a valid local store on Windows. See also
+            # `meson.build`.
+            + lib.optionalString (withUnitTests && !stdenv.hostPlatform.isWindows) ''
               export NIX_REMOTE=$HOME/store
+            ''
+            # The builder's `NIX_STORE` (`/nix/store`) is passed through
+            # Wine, and would become the default store directory, which
+            # isn't an absolute path on Windows.
+            + lib.optionalString (withUnitTests && stdenv.hostPlatform.isWindows) ''
+              unset NIX_STORE
+            ''
+            + lib.optionalString withUnitTests ''
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
             ''
             + lib.optionalString doBenchmarks ''

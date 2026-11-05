@@ -28,6 +28,71 @@
 
 namespace nix {
 
+struct DirectoryIterator::PlatformState : State
+{
+    AutoCloseDir dir;
+};
+
+static std::filesystem::file_type fileTypeFromDirent(unsigned char dType)
+{
+    using T = std::filesystem::file_type;
+    switch (dType) {
+    case DT_REG:
+        return T::regular;
+    case DT_DIR:
+        return T::directory;
+    case DT_LNK:
+        return T::symlink;
+    case DT_CHR:
+        return T::character;
+    case DT_BLK:
+        return T::block;
+    case DT_FIFO:
+        return T::fifo;
+    case DT_SOCK:
+        return T::socket;
+    case DT_UNKNOWN:
+        return T::none;
+    default:
+        return T::unknown;
+    }
+}
+
+DirectoryIterator::DirectoryIterator(AutoCloseFD dirFd)
+{
+    auto s = std::make_shared<PlatformState>();
+    s->dir = AutoCloseDir{::fdopendir(dirFd.get())};
+    if (!s->dir)
+        throw SysError("cannot read directory %s", PathFmt(descriptorToPath(dirFd.get())));
+    /* Now owned by `s->dir`. */
+    dirFd.release();
+    state = std::move(s);
+    ++*this;
+}
+
+DirectoryIterator & DirectoryIterator::operator++()
+{
+    auto & s = static_cast<PlatformState &>(*state);
+    while (true) {
+        errno = 0;
+        auto * dirent = ::readdir(s.dir.get());
+        if (!dirent) {
+            if (errno)
+                throw SysError("reading directory %s", PathFmt(descriptorToPath(::dirfd(s.dir.get()))));
+            state.reset();
+            return *this;
+        }
+        std::string_view name = dirent->d_name;
+        if (name == "." || name == "..")
+            continue;
+        s.entry = DirectoryEntry{
+            .name = OsFilename::fromPathAsserting(name),
+            .type = fileTypeFromDirent(dirent->d_type),
+        };
+        return *this;
+    }
+}
+
 AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
     return AutoCloseFD{open(
@@ -175,7 +240,7 @@ static void _deletePath(
 
     auto name = OsFilename::fromPathThrowing(path.filename());
 
-    auto st_ = maybeFstatat(parentfd, name.path());
+    auto st_ = maybeFstatat(parentfd, OsCanonPath{name});
     if (!st_)
         return;
     auto & st = *st_;
@@ -210,7 +275,7 @@ static void _deletePath(
         /* Make the directory accessible, but only if we really need to. */
         if (needsPermissionChange)
             try {
-                unix::fchmodatTryNoFollow(parentfd, name, st.st_mode | PERM_MASK);
+                unix::fchmodatTryNoFollow(parentfd, OsCanonPath{name}, st.st_mode | PERM_MASK);
             } catch (SysError & e) {
                 e.addTrace({}, "while making directory %1% accessible for deletion", PathFmt(path));
                 if (e.errNo == EOPNOTSUPP)
@@ -258,7 +323,9 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
     auto parentDirPath = path.parent_path();
     assert(parentDirPath != path);
 
-    AutoCloseFD dirfd = openDirectory(parentDirPath);
+    /* It's ok to follow symlinks in the parent since we only need to
+       ensure that there's no TOCTOU when traversing inside the path. */
+    AutoCloseFD dirfd = openDirectory(parentDirPath, FinalSymlink::Follow);
     if (!dirfd) {
         if (errno == ENOENT)
             return;

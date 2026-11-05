@@ -14,11 +14,15 @@
  * issues.
  */
 
+#include "nix/util/error.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/os-canon-path.hh"
+#include "nix/util/result.hh"
+#include "nix/util/source-accessor.hh"
 
 #include <optional>
+#include <system_error>
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -34,14 +38,109 @@
 namespace nix {
 
 /**
+ * Read a symlink relative to a directory file descriptor.
+ * On Linux, this also supports reading from O_PATH descriptors with CanonPath::root.
+ *
+ * @throws SystemError on any I/O errors.
+ * @throws Interrupted if interrupted.
+ */
+OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path);
+
+/**
+ * Create a symlink to a file relative to a directory file descriptor.
+ *
+ * On Windows, creates a file symlink. On Unix, equivalent to symlinkat.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createFileSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target);
+
+/**
+ * Create a symlink to a directory relative to a directory file descriptor.
+ *
+ * On Windows, creates a directory symlink. On Unix, equivalent to symlinkat.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createDirectorySymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target);
+
+/**
+ * Create a symlink relative to a directory file descriptor, detecting target type.
+ *
+ * On Windows, stats the target to determine whether to create a file or
+ * directory symlink. Falls back to file symlink if the target does not exist.
+ * On Unix, equivalent to symlinkat.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target);
+
+/**
+ * Open a directory relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to the directory
+ *
+ * @return On success, the file descriptor for the directory. On failure, an
+ * error code.
+ *
+ * @note Does not follow symlinks - if path is a symlink, will fail to open.
+ */
+Result<AutoCloseFD, std::error_code> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path);
+
+/**
+ * Create a directory relative to a directory file descriptor, and (best
+ * effort, see below) open it.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to the new directory
+ * @param mode File mode for the new directory.
+ *             Unix only.
+ *
+ * @return On success, the file descriptor for the new directory if gotten
+ * atomically, otherwise null (see below). On failure, an error code.
+ *
+ * @post @parblock
+ * A file descriptor is only returned if it was opened atomically with the
+ * creation of the directory it refers to. Opening the new directory is best
+ * effort: if we cannot guarantee atomicity, we just return null, and a caller
+ * that needs the directory opened has to open it itself, knowing that
+ * something else could have replaced the directory in the meantime.
+ *
+ * Currently, atomically creating and opening is only possible on Windows.
+ * Some Unixes, including (it seems) upcoming versions of Linux, could
+ * also do this, with `O_CREAT | O_DIRECTORY | O_EXCL`. For Linux, see
+ * https://lore.kernel.org/all/20261024213539.1307600-1-jkoolstra@xs4all.nl/
+ * @endparblock
+ */
+Result<AutoCloseFD, std::error_code> createDirectoryAt(
+    Descriptor dirFd,
+    const OsCanonPath & path
+#ifndef _WIN32
+    ,
+    mode_t mode = 0777
+#endif
+);
+
+/**
  * Get status of an open file/directory handle.
  *
  * @param fd File descriptor/handle
  * @throws SystemError on I/O errors.
  */
 PosixStat fstat(Descriptor fd);
-
-#ifndef _WIN32
 
 /**
  * Get status of a file relative to a directory file descriptor.
@@ -54,7 +153,7 @@ PosixStat fstat(Descriptor fd);
  *
  * @pre `path` must be relative (not absolute) and non-empty.
  */
-std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const std::filesystem::path & path);
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const OsCanonPath & path);
 
 /**
  * Get status of a file relative to a directory file descriptor.
@@ -66,18 +165,7 @@ std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const std::filesystem::p
  *
  * @pre `path` must be relative (not absolute) and non-empty.
  */
-PosixStat fstatat(Descriptor dirFd, const std::filesystem::path & path);
-
-#endif
-
-/**
- * Read a symlink relative to a directory file descriptor.
- * On Linux, this also supports reading from O_PATH descriptors with CanonPath::root.
- *
- * @throws SystemError on any I/O errors.
- * @throws Interrupted if interrupted.
- */
-OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path);
+PosixStat fstatat(Descriptor dirFd, const OsCanonPath & path);
 
 /**
  * Open a file relative to @p dirFd, ensuring the path stays beneath

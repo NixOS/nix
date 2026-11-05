@@ -4,6 +4,7 @@
 #include "nix/util/signals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/file-system-at.hh"
 
 #if NIX_SUPPORT_ACL
 #  include <sys/xattr.h>
@@ -171,7 +172,7 @@ static void canonicalisePathMetaData_(
     if (S_ISDIR(st.st_mode)) {
         for (auto & i : DirectoryIterator{path}) {
             checkInterrupt();
-            canonicalisePathMetaData_(i.path(), options, inodesSeen);
+            canonicalisePathMetaData_(path / i.name.path(), options, inodesSeen);
         }
     }
 }

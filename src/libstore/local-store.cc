@@ -1440,7 +1440,7 @@ std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
            the GC between createTempDir() and when we acquire a lock on it.
            We'll repeat until 'tmpDir' exists and we've locked it.
            Make the directory accessible only to the current user. */
-        tmpDirFn = createTempDir(std::filesystem::path{config->realStoreDir.get()}, "tmp", /*mode=*/0700);
+        tmpDirFn = createTempDir(config->realStoreDir.get(), "tmp", /*mode=*/0700);
         tmpDirFd = openDirectory(tmpDirFn, FinalSymlink::DontFollow);
         if (!tmpDirFd) {
             continue;
@@ -1493,17 +1493,17 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
-            auto name = link.path().filename();
+            auto & name = link.name.path();
+            auto linkPath = linksDir / name;
             printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
             std::string hash =
-                hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
+                hashPath(makeFSSourceAccessor(linkPath), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError(
-                    "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
+                printError("link %s was modified! expected hash %s, got '%s'", PathFmt(linkPath), name.string(), hash);
                 if (repair) {
-                    unlinkIfExists(link.path());
-                    printInfo("removed link %s", PathFmt(link.path()));
+                    unlinkIfExists(linkPath);
+                    printInfo("removed link %s", PathFmt(linkPath));
                 } else {
                     errors = true;
                 }
@@ -1589,7 +1589,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
     for (auto & i : DirectoryIterator{config->realStoreDir.get()}) {
         checkInterrupt();
         try {
-            storePathsInStoreDir.insert({i.path().filename().string()});
+            storePathsInStoreDir.insert({i.name.path().string()});
         } catch (BadStorePath &) {
         }
     }
