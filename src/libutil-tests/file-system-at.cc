@@ -330,12 +330,27 @@ TEST(recursiveSyncAt, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     auto root = tmpDir / "root";
-    createDirs(root / "sub");
-    writeFile(root / "file", "hello");
-    writeFile(root / "sub" / "file", "world");
-    /* Dangling, so following it would fail. */
-    createSymlink("nonexistent", root / "dangling");
-    createSymlink("nonexistent", tmpDir / "dangling");
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("root"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & rootDir) {
+                rootDir.createChild("sub"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
+                        sub.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("world"); });
+                        });
+                    });
+                });
+                rootDir.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("hello"); });
+                });
+                /* Dangling, so following it would fail. */
+                rootDir.createChild(
+                    "dangling"_filename, [](FileSystemObjectSink & s) { s.createSymlink("nonexistent"); });
+            });
+        });
+        top.createChild("dangling"_filename, [](FileSystemObjectSink & s) { s.createSymlink("nonexistent"); });
+    }
 
     auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
 
@@ -366,20 +381,41 @@ TEST(deletePathAt, works)
 #endif
 
     auto outside = tmpDir / "outside";
-    writeFile(outside, "keep me");
-
-    createDirs(tmpDir / "a" / "tree" / "sub");
-    writeFile(tmpDir / "a" / "tree" / "file", "hello");
-    writeFile(tmpDir / "a" / "tree" / "sub" / "read-only", "world");
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("outside"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("keep me"); });
+        });
+        top.createChild("a"_filename, [&](FileSystemObjectSink & s) {
+            s.createDirectory([&](FileSystemObjectSink::OnDirectory & a) {
+                a.createChild("tree"_filename, [&](FileSystemObjectSink & s) {
+                    s.createDirectory([&](FileSystemObjectSink::OnDirectory & tree) {
+                        tree.createChild("sub"_filename, [](FileSystemObjectSink & s) {
+                            s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
+                                sub.createChild("read-only"_filename, [](FileSystemObjectSink & s) {
+                                    s.createRegularFile(
+                                        false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("world"); });
+                                });
+                            });
+                        });
+                        tree.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("hello"); });
+                        });
+                        if (symlinks)
+                            tree.createChild(
+                                "link"_filename, [&](FileSystemObjectSink & s) { s.createSymlink(outside.string()); });
+                    });
+                });
+            });
+        });
+        if (symlinks)
+            top.createChild("link-to-a"_filename, [](FileSystemObjectSink & s) { s.createSymlink("a"); });
+    }
     std::filesystem::permissions(
         tmpDir / "a" / "tree" / "sub" / "read-only",
         std::filesystem::perms::owner_write | std::filesystem::perms::group_write
             | std::filesystem::perms::others_write,
         std::filesystem::perm_options::remove);
-    if (symlinks) {
-        createSymlink(outside, tmpDir / "a" / "tree" / "link");
-        createSymlink(tmpDir / "a", tmpDir / "link-to-a");
-    }
 
     auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
 
@@ -424,11 +460,45 @@ TEST(movePathAt, works)
     symlinks = !windows::isWine() || windows::wineSymlinksSupported(tmpDir);
 #endif
 
-    createDirs(tmpDir / "src" / "tree");
-    writeFile(tmpDir / "src" / "tree" / "file", "hello");
-    createDirs(tmpDir / "dst" / "sub");
-    writeFile(tmpDir / "dst" / "sub" / "replaced", "old");
-    writeFile(tmpDir / "src" / "new", "new");
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("src"_filename, [&](FileSystemObjectSink & s) {
+            s.createDirectory([&](FileSystemObjectSink::OnDirectory & src) {
+                src.createChild("tree"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory & tree) {
+                        tree.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("hello"); });
+                        });
+                    });
+                });
+                src.createChild("new"_filename, [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("new"); });
+                });
+                src.createChild("read-only"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+                });
+                if (symlinks) {
+                    src.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+                    src.createChild("another"_filename, [](FileSystemObjectSink & s) {
+                        s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("x"); });
+                    });
+                }
+            });
+        });
+        top.createChild("dst"_filename, [&](FileSystemObjectSink & s) {
+            s.createDirectory([&](FileSystemObjectSink::OnDirectory & dst) {
+                dst.createChild("sub"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
+                        sub.createChild("replaced"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("old"); });
+                        });
+                    });
+                });
+                if (symlinks)
+                    dst.createChild("sub-link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("sub"); });
+            });
+        });
+    }
 
     auto srcFd = testing::valueOrFail(openDirectory(tmpDir / "src", FinalSymlink::Follow));
     auto dstFd = testing::valueOrFail(openDirectory(tmpDir / "dst", FinalSymlink::Follow));
@@ -449,7 +519,6 @@ TEST(movePathAt, works)
 #ifndef _WIN32
     /* A read-only directory, which has to be made writable temporarily
        to be moved, but ends up read-only again. */
-    createDirs(tmpDir / "src" / "read-only");
     nix::chmod(tmpDir / "src" / "read-only", 0555);
     movePathAt(srcFd.get(), OsFilename::fromPathAsserting("read-only"), dstFd.get(), sub("sub", "read-only"));
     EXPECT_EQ(nix::lstat(tmpDir / "dst" / "sub" / "read-only").st_mode & 0777, 0555);
@@ -458,14 +527,11 @@ TEST(movePathAt, works)
 
     if (symlinks) {
         /* A symlink is moved itself. */
-        createSymlink("target", tmpDir / "src" / "link");
         movePathAt(
             srcFd.get(), OsFilename::fromPathAsserting("link"), dstFd.get(), OsFilename::fromPathAsserting("link"));
         EXPECT_EQ(readLink(tmpDir / "dst" / "link"), "target");
 
         /* Not through a symlink in the parent directories. */
-        createSymlink(tmpDir / "dst" / "sub", tmpDir / "dst" / "sub-link");
-        writeFile(tmpDir / "src" / "another", "x");
         EXPECT_THROW(
             movePathAt(srcFd.get(), OsFilename::fromPathAsserting("another"), dstFd.get(), sub("sub-link", "another")),
             SymlinkNotAllowed);
