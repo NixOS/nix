@@ -453,12 +453,22 @@ std::filesystem::path defaultTempDir();
 bool isExecutableFileAmbient(const std::filesystem::path & exe);
 
 /**
- * Return temporary path constructed by appending a suffix to a root path.
+ * Return a temporary path in the directory @p root.
  *
- * The constructed path looks like `<root><suffix>-<pid>-<unique>`. To create a
- * path nested in a directory, provide a suffix starting with `/`.
+ * The constructed path looks like `<root>/<suffix>-<pid>-<unique>`.
  */
 std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix = ".tmp");
+
+/**
+ * Return a temporary file name, like the final component of
+ * `makeTempPath`, for use with `*At` functions.
+ *
+ * The constructed name looks like `<prefix>-<pid>-<unique>`.
+ *
+ * @throws Error if that is not a valid file name, e.g. because @p prefix
+ * contains a separator.
+ */
+OsFilename makeTempName(std::string_view prefix);
 
 /**
  * Used in various places.
