@@ -213,7 +213,7 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
         if (!maybeFstatat(getRealStoreDirFd(), OsFilename{path.filename()}))
             return nullptr;
     }
-    return makeFSSourceAccessor(std::move(absPath));
+    return makeFSSourceAccessor(getRealStoreDirFd(), OsFilename{path.filename()}, std::move(absPath));
 }
 
 const std::filesystem::path LocalFSStore::drvsLogDir = "drvs";
