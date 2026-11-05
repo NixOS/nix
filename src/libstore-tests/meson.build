@@ -69,6 +69,7 @@ sources = files(
   's3-binary-cache-store.cc',
   's3-url.cc',
   'serve-protocol.cc',
+  'sqlite-retry.cc',
   'ssh-store.cc',
   'store-open.cc',
   'store-reference.cc',
