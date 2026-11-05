@@ -340,8 +340,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 auto tmpName = OsFilename::fromPathAsserting("x");
                 RestoreSink restoreSink{rewriteTempDirFd.get(), tmpName};
                 parseDump(restoreSink, *source);
-                deletePath(actualPath);
-                movePath(rewriteTempDir / tmpName.path(), actualPath);
+                deletePathAt(actualDirFd, actualName);
+                movePathAt(rewriteTempDirFd.get(), tmpName, actualDirFd, actualName);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
@@ -583,9 +583,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 /* Can delete our scratch copy now. */
                 deletePathAt(actualDirFd, actualName);
             } else {
-                auto destPath = store->toRealPath(newInfo.path);
-                deletePath(destPath);
-                movePath(actualPath, destPath);
+                auto destName = OsFilename{newInfo.path.filename()};
+                deletePathAt(store->getRealStoreDirFd(), destName);
+                movePathAt(actualDirFd, actualName, store->getRealStoreDirFd(), destName);
             }
         }
 
@@ -599,8 +599,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                     if (diffHook || settings.keepFailed) {
                         auto dst = store->toRealPath(newInfo.path);
                         dst += ".check";
-                        deletePath(dst);
-                        movePath(actualPath, dst);
+                        auto dstName = OsFilename::fromPathAsserting(std::string(newInfo.path.to_string()) + ".check");
+                        deletePathAt(store->getRealStoreDirFd(), dstName);
+                        movePathAt(actualDirFd, actualName, store->getRealStoreDirFd(), dstName);
 
                         if (diffHook) {
                             handleDiffHook(

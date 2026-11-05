@@ -264,6 +264,19 @@ void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFr
  */
 void deletePathAt(Descriptor dirFd, const OsCanonPath & path);
 
+/**
+ * Like `movePath`, but with @p src relative to the directory
+ * @p srcDirFd and @p dst relative to the directory @p dstDirFd.
+ *
+ * No symlinks are followed in the parent directories of @p src or
+ * @p dst. If @p src is a symlink, the symlink itself is moved, and if
+ * @p dst is one, it is replaced.
+ *
+ * @pre `src` and `dst` must be non-empty.
+ * @throws SystemError on I/O errors.
+ */
+void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst);
+
 #ifdef __linux__
 namespace linux {
 

@@ -6,7 +6,12 @@
 #include "nix/util/util.hh"
 #include "nix/util/system-error.hh"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstring>
 #include <span>
+#include <tuple>
+#include <vector>
 
 #include <fileapi.h>
 #define WIN32_LEAN_AND_MEAN
@@ -685,6 +690,63 @@ void deletePathAt(Descriptor dirFd, const OsCanonPath & path)
 {
     uint64_t dummy;
     deletePathAt(dirFd, path, dummy);
+}
+
+/**
+ * Open the parent directory of @p path beneath @p dirFd, without
+ * following symlinks, for `*At` functions that operate on the final
+ * component of @p path.
+ *
+ * @return The parent directory, owned if it had to be opened, and the
+ * final component of @p path.
+ */
+static std::tuple<AutoCloseFD, Descriptor, OsFilename> openParentBeneath(Descriptor dirFd, const OsCanonPath & path)
+{
+    using namespace nix::windows;
+
+    assert(!path.empty());
+    auto lastIt = std::ranges::prev(path.end());
+    OsFilename name = *lastIt;
+    auto parent = path.parent();
+    if (parent->empty())
+        return {AutoCloseFD{}, dirFd, std::move(name)};
+    auto parentFd = valueOr(
+        openFileEnsureBeneathNoSymlinks(
+            dirFd,
+            *parent,
+            FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            FILE_DIRECTORY_FILE),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path())));
+    auto fd = parentFd.get();
+    return {std::move(parentFd), fd, std::move(name)};
+}
+
+void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst)
+{
+    using namespace nix::windows;
+
+    auto [srcParentOwned, srcParent, srcName] = openParentBeneath(srcDirFd, src);
+    auto [dstParentOwned, dstParent, dstName] = openParentBeneath(dstDirFd, dst);
+
+    /* Not following symlinks, so that they are moved themselves. */
+    auto handle = ntOpenAt(srcParent, srcName.path().native(), DELETE | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+
+    /* `FILE_RENAME_INFO` ends in the variable-length new name, which is
+       relative to `RootDirectory`. */
+    const auto & newName = dstName.path().native();
+    auto nameBytes = newName.size() * sizeof(wchar_t);
+    std::vector<std::byte> buf(std::max(sizeof(FILE_RENAME_INFO), offsetof(FILE_RENAME_INFO, FileName) + nameBytes));
+    auto * info = reinterpret_cast<FILE_RENAME_INFO *>(buf.data());
+    info->ReplaceIfExists = TRUE;
+    info->RootDirectory = dstParent;
+    info->FileNameLength = static_cast<DWORD>(nameBytes);
+    std::memcpy(info->FileName, newName.data(), nameBytes);
+
+    if (!SetFileInformationByHandle(handle.get(), FileRenameInfo, info, static_cast<DWORD>(buf.size())))
+        throw WinError(
+            "renaming %1% to %2%",
+            PathFmt(descriptorToPath(srcDirFd) / src.path()),
+            PathFmt(descriptorToPath(dstDirFd) / dst.path()));
 }
 
 } // namespace nix

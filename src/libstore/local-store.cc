@@ -1190,13 +1190,15 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 /* Now that the content address / signed NAR contents is checked, we can move the path into place.
                    TODO: We should use atomic exchange (RENAME_EXCHANGE and renamex_np with RENAME_SWAP) if possible. */
 
+                auto name = OsFilename{info.path.filename()};
+
                 /* Delete the path for good measure even if not repairing. */
-                deletePathAt(getRealStoreDirFd(), OsFilename{info.path.filename()});
+                deletePathAt(getRealStoreDirFd(), name);
 
                 try {
-                    /* movePath and not renameFile because at this point the top-level directory is
+                    /* movePathAt and not a plain rename because at this point the top-level directory is
                        read-only. */
-                    movePath(tempPath, realPath);
+                    movePathAt(tempDirFd.get(), OsFilename::fromPathAsserting("x"), getRealStoreDirFd(), name);
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;
@@ -1400,9 +1402,13 @@ StorePath LocalStore::addToStoreFromDump(
             } else {
                 /* Move the temporary path we restored above. */
                 try {
-                    /* movePath and not renameFile because at this point the top-level directory is
+                    /* movePathAt and not a plain rename because at this point the top-level directory is
                        read-only. */
-                    movePath(tempPath, realPath);
+                    movePathAt(
+                        tempDirFd.get(),
+                        OsFilename::fromPathAsserting("x"),
+                        getRealStoreDirFd(),
+                        OsFilename{dstPath.filename()});
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;

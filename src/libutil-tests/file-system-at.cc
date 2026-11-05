@@ -411,6 +411,68 @@ TEST(deletePathAt, works)
 }
 
 /* ----------------------------------------------------------------------------
+ * movePathAt
+ * --------------------------------------------------------------------------*/
+
+TEST(movePathAt, works)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    bool symlinks = true;
+#ifdef _WIN32
+    symlinks = !windows::isWine() || windows::wineSymlinksSupported(tmpDir);
+#endif
+
+    createDirs(tmpDir / "src" / "tree");
+    writeFile(tmpDir / "src" / "tree" / "file", "hello");
+    createDirs(tmpDir / "dst" / "sub");
+    writeFile(tmpDir / "dst" / "sub" / "replaced", "old");
+    writeFile(tmpDir / "src" / "new", "new");
+
+    auto srcFd = testing::valueOrFail(openDirectory(tmpDir / "src", FinalSymlink::Follow));
+    auto dstFd = testing::valueOrFail(openDirectory(tmpDir / "dst", FinalSymlink::Follow));
+
+    auto sub = [](std::string_view a, std::string_view b) {
+        return OsCanonPath::fromPathAsserting(std::filesystem::path{a} / b);
+    };
+
+    /* A directory, between two directory handles, into a subdirectory. */
+    movePathAt(srcFd.get(), OsFilename::fromPathAsserting("tree"), dstFd.get(), sub("sub", "tree"));
+    EXPECT_FALSE(pathExists(tmpDir / "src" / "tree"));
+    EXPECT_EQ(readFile(tmpDir / "dst" / "sub" / "tree" / "file"), "hello");
+
+    /* Replacing an existing file. */
+    movePathAt(srcFd.get(), OsFilename::fromPathAsserting("new"), dstFd.get(), sub("sub", "replaced"));
+    EXPECT_EQ(readFile(tmpDir / "dst" / "sub" / "replaced"), "new");
+
+#ifndef _WIN32
+    /* A read-only directory, which has to be made writable temporarily
+       to be moved, but ends up read-only again. */
+    createDirs(tmpDir / "src" / "read-only");
+    nix::chmod(tmpDir / "src" / "read-only", 0555);
+    movePathAt(srcFd.get(), OsFilename::fromPathAsserting("read-only"), dstFd.get(), sub("sub", "read-only"));
+    EXPECT_EQ(nix::lstat(tmpDir / "dst" / "sub" / "read-only").st_mode & 0777, 0555);
+    nix::chmod(tmpDir / "dst" / "sub" / "read-only", 0755);
+#endif
+
+    if (symlinks) {
+        /* A symlink is moved itself. */
+        createSymlink("target", tmpDir / "src" / "link");
+        movePathAt(
+            srcFd.get(), OsFilename::fromPathAsserting("link"), dstFd.get(), OsFilename::fromPathAsserting("link"));
+        EXPECT_EQ(readLink(tmpDir / "dst" / "link"), "target");
+
+        /* Not through a symlink in the parent directories. */
+        createSymlink(tmpDir / "dst" / "sub", tmpDir / "dst" / "sub-link");
+        writeFile(tmpDir / "src" / "another", "x");
+        EXPECT_THROW(
+            movePathAt(srcFd.get(), OsFilename::fromPathAsserting("another"), dstFd.get(), sub("sub-link", "another")),
+            SymlinkNotAllowed);
+    }
+}
+
+/* ----------------------------------------------------------------------------
  * openFileEnsureBeneathNoSymlinks — O_NOFOLLOW is forbidden
  * --------------------------------------------------------------------------*/
 
