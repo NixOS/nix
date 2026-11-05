@@ -29,6 +29,11 @@ subdir('nix-meson-build-support/subprojects')
 
 rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
+# See ../libutil-test-support/meson.build
+deps_private_no_pkgconfig += cxx.find_library(
+  'rapidcheck',
+  dirs : [ rapidcheck.get_variable('libdir') ],
+)
 
 subdir('nix-meson-build-support/common')
 
@@ -47,9 +52,7 @@ this_library = library(
   soversion : nix_soversion,
   dependencies : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
   include_directories : include_dirs,
-  # TODO: Remove `-lrapidcheck` when https://github.com/emil-e/rapidcheck/pull/326
-  #       is available. See also ../libutil/build.meson
-  link_args : linker_export_flags + [ '-lrapidcheck' ],
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )

@@ -29,7 +29,7 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
     auto entries = DirectoryIterator{out};
     if (entries == DirectoryIterator{})
         throw Error("channel tarball '%s' is empty", src);
-    fileName = entries->path().string();
+    fileName = (out / entries->name.path()).string();
     fileCount = std::distance(entries.begin(), entries.end());
 
     if (fileCount != 1)

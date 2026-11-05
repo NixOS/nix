@@ -143,6 +143,15 @@ RC_GTEST_FIXTURE_PROP(StorePathTest, prop_round_rip, (const StorePath & p))
 
 RC_GTEST_FIXTURE_PROP(StorePathTest, prop_check_regex_eq_parse, ())
 {
+    /* See below for why path separators are not generated. */
+    auto notSeparator = [](char c) {
+        return c != '/'
+#ifdef _WIN32
+               && c != '\\'
+#endif
+            ;
+    };
+
     static auto nameFuzzer = rc::gen::container<std::string>(rc::gen::oneOf(
         // alphanum, repeated to weigh heavier
         rc::gen::oneOf(rc::gen::inRange('0', '9'), rc::gen::inRange('a', 'z'), rc::gen::inRange('A', 'Z')),
@@ -161,20 +170,21 @@ RC_GTEST_FIXTURE_PROP(StorePathTest, prop_check_regex_eq_parse, ())
         rc::gen::just('.'),
         rc::gen::just('-'),
         rc::gen::just('-'),
-        // ascii symbol ranges, excluding '/' (see below)
+        // ascii symbol ranges, excluding '/' (and '\\' on Windows)
         rc::gen::oneOf(
             rc::gen::inRange(' ', '.'),
             rc::gen::inRange(':', '@'),
-            rc::gen::inRange('[', '`'),
+            rc::gen::suchThat(rc::gen::inRange('[', '`'), notSeparator),
             rc::gen::inRange('{', '~')),
         // typical whitespace
         rc::gen::oneOf(rc::gen::just(' '), rc::gen::just('\t'), rc::gen::just('\n'), rc::gen::just('\r')),
-        // some chance of control codes, non-ascii or other garbage we missed, excluding '/' (see below)
-        rc::gen::suchThat(rc::gen::inRange('\0', '\xff'), [](char c) { return c != '/'; })));
+        // some chance of control codes, non-ascii or other garbage we missed, excluding separators (see below)
+        rc::gen::suchThat(rc::gen::inRange('\0', '\xff'), notSeparator)));
 
     /* Note: names containing '/' are not generated, since `parseStorePath()` canonicalises the path, so such a
        name may be parsed as a different name (e.g. a trailing slash is removed, and `/.` and `/..` components
-       are resolved) and can't be compared against the regex. `bad_slash` above covers them. */
+       are resolved) and can't be compared against the regex. `bad_slash` above covers them. The same goes for
+       '\\' on Windows, where it is a path separator too. */
     auto name = *nameFuzzer;
 
     std::string path = store->storeDir + "/575s52sh487i0ylmbs9pvi606ljdszr0-" + name;

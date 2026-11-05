@@ -6,6 +6,11 @@
 #include "nix/util/fs-sink.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
+#ifdef _WIN32
+#  include "nix/util/tests/wine.hh"
+#  include "nix/util/windows-environment.hh"
+#endif
+
 namespace nix {
 
 /* ----------------------------------------------------------------------------
@@ -14,11 +19,12 @@ namespace nix {
 
 TEST(readLinkAt, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
 
     constexpr size_t maxPathLength =
 #ifdef _WIN32
@@ -57,12 +63,12 @@ TEST(readLinkAt, works)
 
     auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("link")), OS_STR("target"));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("relative")), OS_STR("../relative/path"));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("absolute")), OS_STR("/absolute/path"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("link")), OS_STR("target"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("relative")), OS_STR("../relative/path"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("absolute")), OS_STR("/absolute/path"));
     if (hasLongSymlinks) {
-        EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("medium")), string_to_os_string(mediumTarget));
-        EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("long")), string_to_os_string(longTarget));
+        EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("medium")), string_to_os_string(mediumTarget));
+        EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("long")), string_to_os_string(longTarget));
     }
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
 
@@ -70,9 +76,9 @@ TEST(readLinkAt, works)
     EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
-    EXPECT_THROW(readLinkAt(dirFd.get(), CanonPath("regular")), SystemError);
-    EXPECT_THROW(readLinkAt(dirFd.get(), CanonPath("dir")), SystemError);
-    EXPECT_THROW(readLinkAt(dirFd.get(), CanonPath("nonexistent")), SystemError);
+    EXPECT_THROW(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("regular")), SystemError);
+    EXPECT_THROW(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("dir")), SystemError);
+    EXPECT_THROW(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("nonexistent")), SystemError);
 }
 
 /* ----------------------------------------------------------------------------
@@ -81,11 +87,12 @@ TEST(readLinkAt, works)
 
 TEST(openFileEnsureBeneathNoSymlinks, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
 
     {
         RestoreSink sink(/*startFsync=*/false);
@@ -124,7 +131,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
        `.errNo`. */
     auto check = [](std::string_view what, AutoCloseFD fd) {
         if (!fd)
-            throw SysError("openFileEnsureBeneathNoSymlinks: %s", what);
+            throw NativeSysError("openFileEnsureBeneathNoSymlinks: %s", what);
         return fd;
     };
 
@@ -188,6 +195,9 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     };
 
     using nix::testing::ThrowsSysError;
+#ifdef _WIN32
+    using nix::testing::ThrowsWinError;
+#endif
 
     // Symlinks in the path (any position) are rejected.
     EXPECT_THROW(openRead("a/absolute_symlink"), SymlinkNotAllowed);
@@ -234,10 +244,31 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
     EXPECT_THROW(openCreateExclusive("a/absolute_symlink/broken_symlink"), SymlinkNotAllowed);
 
-    // Non-symlink failure modes: errno must survive.
-    EXPECT_THAT([&] { openRead("c/d/regular/a"); }, ThrowsSysError(ENOTDIR));
-    EXPECT_THAT([&] { openReadDir("c/d/regular"); }, ThrowsSysError(ENOTDIR));
-    EXPECT_THAT([&] { openRead("c/d/nonexistent"); }, ThrowsSysError(ENOENT));
+    // Non-symlink failure modes: error codes must survive.
+    EXPECT_THAT(
+        [&] { openRead("c/d/regular/a"); },
+#ifdef _WIN32
+        ThrowsWinError(ERROR_DIRECTORY)
+#else
+        ThrowsSysError(ENOTDIR)
+#endif
+    );
+    EXPECT_THAT(
+        [&] { openReadDir("c/d/regular"); },
+#ifdef _WIN32
+        ThrowsWinError(ERROR_DIRECTORY)
+#else
+        ThrowsSysError(ENOTDIR)
+#endif
+    );
+    EXPECT_THAT(
+        [&] { openRead("c/d/nonexistent"); },
+#ifdef _WIN32
+        ThrowsWinError(ERROR_FILE_NOT_FOUND)
+#else
+        ThrowsSysError(ENOENT)
+#endif
+    );
 
     // Happy paths.
     EXPECT_TRUE(openRead("c/d/regular"));
@@ -275,14 +306,19 @@ TEST(openFileEnsureBeneathNoSymlinksDeathTest, rejectsONofollow)
        owns symlink policy. Verify the assert fires for every flag
        combination that includes `O_NOFOLLOW`. */
     EXPECT_DEATH(
-        openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath("file"), O_RDONLY | O_NOFOLLOW, 0), "O_NOFOLLOW");
+        openFileEnsureBeneathNoSymlinks(dirFd.get(), OsFilename::fromPathAsserting("file"), O_RDONLY | O_NOFOLLOW, 0),
+        "O_NOFOLLOW");
     EXPECT_DEATH(
-        openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath("file"), O_RDONLY | O_DIRECTORY | O_NOFOLLOW, 0),
+        openFileEnsureBeneathNoSymlinks(
+            dirFd.get(), OsFilename::fromPathAsserting("file"), O_RDONLY | O_DIRECTORY | O_NOFOLLOW, 0),
         "O_NOFOLLOW");
 #  if defined(__linux__)
-    EXPECT_DEATH(openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath("file"), O_PATH | O_NOFOLLOW, 0), "O_NOFOLLOW");
     EXPECT_DEATH(
-        openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath("file"), O_PATH | O_DIRECTORY | O_NOFOLLOW, 0),
+        openFileEnsureBeneathNoSymlinks(dirFd.get(), OsFilename::fromPathAsserting("file"), O_PATH | O_NOFOLLOW, 0),
+        "O_NOFOLLOW");
+    EXPECT_DEATH(
+        openFileEnsureBeneathNoSymlinks(
+            dirFd.get(), OsFilename::fromPathAsserting("file"), O_PATH | O_DIRECTORY | O_NOFOLLOW, 0),
         "O_NOFOLLOW");
 #  endif
 }

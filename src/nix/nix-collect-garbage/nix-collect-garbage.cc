@@ -31,10 +31,16 @@ void removeOldGenerations(std::filesystem::path dir)
     for (auto & i : DirectoryIterator{dir}) {
         checkInterrupt();
 
-        auto path = i.path().string();
-        auto type = i.symlink_status().type();
+        auto path = (dir / i.name.path()).string();
+        auto type = i.type != std::filesystem::file_type::none ? i.type : std::filesystem::symlink_status(path).type();
 
-        if (type == std::filesystem::file_type::symlink && canWrite) {
+// Allow selecting a subset of enum values
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+        switch (type) {
+        case std::filesystem::file_type::symlink: {
+            if (!canWrite)
+                break;
             std::string link;
             try {
                 link = readLink(path).string();
@@ -51,9 +57,15 @@ void removeOldGenerations(std::filesystem::path dir)
                 } else
                     deleteOldGenerations(path, dryRun);
             }
-        } else if (type == std::filesystem::file_type::directory) {
-            removeOldGenerations(path);
+            break;
         }
+        case std::filesystem::file_type::directory:
+            removeOldGenerations(path);
+            break;
+        default:
+            break;
+        }
+#pragma GCC diagnostic pop
     }
 }
 

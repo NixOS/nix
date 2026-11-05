@@ -13,6 +13,7 @@
 #include "nix/util/topo-sort.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/store/keys.hh"
@@ -144,6 +145,11 @@ LocalStore::LocalStore(ref<const Config> config)
     } else {
         makeStoreWritable();
     }
+    /* Only now, since `makeStoreWritable()` may have moved us into a new
+       mount namespace with the store remounted read-write; a handle
+       opened before that would still refer to the old mount. Not
+       virtual, since we are still constructing. */
+    LocalFSStore::init();
     createDirs(linksDir);
     auto profilesDir = config->stateDir.get() / "profiles";
     createDirs(profilesDir);
@@ -176,11 +182,13 @@ LocalStore::LocalStore(ref<const Config> config)
                 "warning: the group '%1%' specified in 'build-users-group' does not exist",
                 localSettings.buildUsersGroup);
         else if (!config->readOnly) {
-            auto st = stat(config->realStoreDir.get());
+            auto st = fstat(getRealStoreDirFd());
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                chown(config->realStoreDir.get(), 0, gr->gr_gid);
-                chmod(config->realStoreDir.get(), perm);
+                if (::fchown(getRealStoreDirFd(), 0, gr->gr_gid) == -1)
+                    throw SysError("changing owner of %s", PathFmt(config->realStoreDir.get()));
+                if (::fchmod(getRealStoreDirFd(), perm) == -1)
+                    throw SysError("changing permissions of %s", PathFmt(config->realStoreDir.get()));
             }
         }
     }
@@ -1440,7 +1448,7 @@ std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
            the GC between createTempDir() and when we acquire a lock on it.
            We'll repeat until 'tmpDir' exists and we've locked it.
            Make the directory accessible only to the current user. */
-        tmpDirFn = createTempDir(std::filesystem::path{config->realStoreDir.get()}, "tmp", /*mode=*/0700);
+        tmpDirFn = createTempDir(config->realStoreDir.get(), "tmp", /*mode=*/0700);
         tmpDirFd = openDirectory(tmpDirFn, FinalSymlink::DontFollow);
         if (!tmpDirFd) {
             continue;
@@ -1493,17 +1501,17 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
-            auto name = link.path().filename();
+            auto & name = link.name.path();
+            auto linkPath = linksDir / name;
             printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
             std::string hash =
-                hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
+                hashPath(makeFSSourceAccessor(linkPath), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError(
-                    "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
+                printError("link %s was modified! expected hash %s, got '%s'", PathFmt(linkPath), name.string(), hash);
                 if (repair) {
-                    unlinkIfExists(link.path());
-                    printInfo("removed link %s", PathFmt(link.path()));
+                    unlinkIfExists(linkPath);
+                    printInfo("removed link %s", PathFmt(linkPath));
                 } else {
                     errors = true;
                 }
@@ -1586,10 +1594,10 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : DirectoryIterator{config->realStoreDir.get()}) {
+    for (auto & i : DirectoryIterator{reopenDirectory(getRealStoreDirFd())}) {
         checkInterrupt();
         try {
-            storePathsInStoreDir.insert({i.path().filename().string()});
+            storePathsInStoreDir.insert({i.name.path().string()});
         } catch (BadStorePath &) {
         }
     }

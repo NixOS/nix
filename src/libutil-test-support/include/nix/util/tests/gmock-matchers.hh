@@ -127,4 +127,19 @@ MATCHER_P2(HasDirectory, path, dirents, "")
     return true;
 }
 
+#ifdef _WIN32
+/**
+ * Matches a callable that throws `WinError` whose `lastError` equals `expected`.
+ *
+ * Example:
+ *
+ *     EXPECT_THAT([&]{ openFile("nope"); }, ThrowsWinError(ERROR_FILE_NOT_FOUND));
+ */
+inline auto ThrowsWinError(DWORD expected)
+{
+    return ::testing::Throws<windows::WinError>(::testing::Field(&windows::WinError::lastError, expected));
+}
+
+#endif
+
 } // namespace nix::testing
