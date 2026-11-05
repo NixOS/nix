@@ -119,12 +119,27 @@ MATCHER_P2(HasDirectory, path, dirents, "")
     auto actual = arg->readDirectory(path);
     std::set<std::string> actualKeys, expectedKeys(dirents.begin(), dirents.end());
     for (auto & [k, _] : actual)
-        actualKeys.insert(k);
+        actualKeys.insert(k.str());
     if (actualKeys != expectedKeys) {
         *result_listener << arg->showPath(path) << " has entries " << ::testing::PrintToString(actualKeys);
         return false;
     }
     return true;
 }
+
+#ifdef _WIN32
+/**
+ * Matches a callable that throws `WinError` whose `lastError` equals `expected`.
+ *
+ * Example:
+ *
+ *     EXPECT_THAT([&]{ openFile("nope"); }, ThrowsWinError(ERROR_FILE_NOT_FOUND));
+ */
+inline auto ThrowsWinError(DWORD expected)
+{
+    return ::testing::Throws<windows::WinError>(::testing::Field(&windows::WinError::lastError, expected));
+}
+
+#endif
 
 } // namespace nix::testing

@@ -4,6 +4,7 @@
 #include "nix/util/signals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/file-system-at.hh"
 
 #if NIX_SUPPORT_ACL
 #  include <sys/xattr.h>

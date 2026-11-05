@@ -81,7 +81,9 @@ void parseTree(merkle::DirectorySink & sink, Source & source, HashAlgorithm hash
         Hash hash(hashAlgo);
         std::copy(hashStr.begin(), hashStr.end(), hash.hash);
 
-        sink.insertChild(name, TreeEntry{.mode = mode, .hash = hash});
+        /* Checked, since a crafted tree object could have names that Git
+           itself would reject. */
+        sink.insertChild(FilenameView::fromStringThrowing(name), TreeEntry{.mode = mode, .hash = hash});
     }
 }
 
@@ -168,7 +170,7 @@ Mode dump(const SourcePath & path, Sink & sink, fun<DumpHook> hook, PathFilter &
 
             auto entry = hook(child);
 
-            auto name2 = name;
+            auto name2 = name.str();
             if (entry.mode == Mode::Directory)
                 name2 += "/";
 

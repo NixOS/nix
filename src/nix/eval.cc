@@ -80,30 +80,25 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         if (writeTo) {
             logger->stop();
 
-            /* `RestoreSink` creates everything relative to descriptors,
-               refusing to overwrite anything or follow symlinks. */
-            RestoreSink restoreSink{/*startFsync=*/false};
-            restoreSink.dstPath = *writeTo;
-
             /* As with POSIX, a trailing separator (e.g. `out/`) means
                the destination must be a directory. `RestoreSink` wants
                it without one.
 
-               TODO: Handle this in `RestoreSink` instead, which will be
-               easier once it is fully descriptor-based. */
+               TODO: Handle this in `RestoreSink::forPath` instead. */
+            auto dstPath = *writeTo;
             if (!writeTo->has_filename() && writeTo->has_relative_path()) {
-                restoreSink.dstPath = writeTo->parent_path();
+                dstPath = writeTo->parent_path();
                 state->forceValue(*v, pos);
                 if (v->type() != nAttrs)
                     throw SysError(EISDIR, "writing to %s", PathFmt(*writeTo));
             }
 
-            [&](this const auto & recurse,
-                FileSystemObjectSink & sink,
-                const CanonPath & path,
-                Value & v,
-                const PosIdx pos,
-                size_t depth) -> void {
+            /* `RestoreSink` creates everything relative to descriptors,
+               refusing to overwrite anything or follow symlinks. */
+            auto restoreSink = RestoreSink::forPath(dstPath, /*startFsync=*/false);
+
+            [&](this const auto & recurse, FileSystemObjectSink & sink, Value & v, const PosIdx pos, size_t depth)
+                -> void {
                 /* Bound the recursion, and only write what could also be
                    dumped as a NAR. */
                 if (depth >= narMaxDepth)
@@ -111,16 +106,19 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                 state->forceValue(v, pos);
                 if (v.type() == nString) {
                     copyContext(v, context);
-                    sink.createRegularFile(path, [&](CreateRegularFileSink & crf) { crf(v.string_view()); });
+                    sink.createRegularFile(
+                        /*isExecutable=*/false,
+                        [&](FileSystemObjectSink::OnRegularFile & crf) { crf(v.string_view()); });
                 } else if (v.type() == nAttrs) {
-                    sink.createDirectory(path, [&](FileSystemObjectSink & dirSink, const CanonPath & dirPath) {
+                    sink.createDirectory([&](FileSystemObjectSink::OnDirectory & dirSink) {
                         for (auto & attr : *v.attrs()) {
                             std::string_view name = state->symbols[attr.name];
                             try {
                                 /* Each name must be a single path component. */
-                                if (name.empty() || name == "." || name == ".." || name.find('/') != name.npos)
-                                    throw Error("invalid file name '%s'", name);
-                                recurse(dirSink, dirPath / name, *attr.value, attr.pos, depth + 1);
+                                dirSink.createChild(
+                                    FilenameView::fromStringThrowing(name), [&](FileSystemObjectSink & childSink) {
+                                        recurse(childSink, *attr.value, attr.pos, depth + 1);
+                                    });
                             } catch (Error & e) {
                                 e.addTrace(
                                     state->positions[attr.pos], HintFmt("while evaluating the attribute '%s'", name));
@@ -131,7 +129,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                 } else
                     state->error<TypeError>("value at '%s' is not a string or an attribute set", state->positions[pos])
                         .debugThrow();
-            }(restoreSink, CanonPath::root, *v, pos, 0);
+            }(restoreSink, *v, pos, 0);
         }
 
         else if (raw) {

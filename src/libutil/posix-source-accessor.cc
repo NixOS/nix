@@ -374,7 +374,7 @@ static CanonPath portablePathOf(const SymlinkNotAllowed & e)
  */
 static OsFilename osBaseNameOf(const CanonPath & path)
 {
-    return OsFilename::fromPathAsserting(path.baseName().value());
+    return OsFilename::fromPathAsserting(path.baseName().value().str());
 }
 
 std::function<void(AutoCloseFD, OsCanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
@@ -615,7 +615,9 @@ try {
             type = std::nullopt;
             break;
         }
-        entries.emplace(name, type);
+        /* `readdir` never gives empty names, or ones containing `/` or
+           NUL, and `.` and `..` are skipped above. */
+        entries.emplace(Filename::fromStringAsserting(std::string{name}), type);
     }
 
     if (errno)
@@ -833,7 +835,9 @@ SourceAccessor::DirEntries WindowsSourceAccessor::readDirectory(const CanonPath 
                     throw SystemError(e.code(), "getting status of '%s'", PathFmt(entry.path()));
             }
         }();
-        res.emplace(entry.path().filename().string(), type);
+        /* `DirectoryIterator` never gives empty names, `.` or `..`, and
+           Windows file names cannot contain `/`. */
+        res.emplace(Filename::fromStringAsserting(entry.path().filename().string()), type);
     }
     return res;
 }
@@ -852,11 +856,14 @@ std::optional<std::filesystem::path> WindowsSourceAccessor::getPhysicalPath(cons
 
 void WindowsSourceAccessor::assertNoSymlinks(CanonPath path)
 {
-    while (!path.isRoot()) {
-        auto st = cachedLstat(path);
+    /* On Windows, iterate from root outward so we detect symlinks before
+       trying to access paths beyond them (which would fail with INVALID_NAME). */
+    CanonPath current = CanonPath::root;
+    for (auto & component : path) {
+        current = current / component;
+        auto st = cachedLstat(current);
         if (st && S_ISLNK(st->st_mode))
-            throw SymlinkNotAllowed(path, "path '%s' is a symlink", showPath(path));
-        path.pop();
+            throw SymlinkNotAllowed(current, "path '%s' is a symlink", showPath(current));
     }
 }
 
@@ -894,8 +901,10 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
                 , mtime(mtime)
                 , fsPath(std::move(fsPath_))
             {
-                MemorySink sink{*this};
-                sink.createSymlink(CanonPath::root, target);
+                MemorySink sink{[&](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+                    return root.emplace(std::move(file));
+                }};
+                sink.createSymlink(target);
                 displayPrefix = fsPath.native();
             }
 
@@ -934,7 +943,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
 
         auto relPath = OsFilename::fromPathAsserting(root.filename());
         if (trackLastModified) {
-            auto st = fstatat(parentFd.get(), root.filename());
+            auto st = fstatat(parentFd.get(), relPath);
             mtime = st.st_mtime;
         }
 

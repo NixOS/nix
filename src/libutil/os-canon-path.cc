@@ -23,14 +23,23 @@ static_assert(std::ranges::common_range<OsCanonPath>);
 OsCanonPath::OsCanonPath(const CanonPath & canonPath)
 {
     for (const auto & component : canonPath) {
-        p /= component;
+#ifdef _WIN32
+        assert(component.str().find('\\') == component.str().npos && "CanonPath component cannot contain backslash");
+#endif
+        p /= component.str();
     }
-    // No need to validate — CanonPath guarantees no empty/dot/dotdot components
+    // No need to further validate — CanonPath guarantees no empty/dot/dotdot components,
+    // and operator/ produces preferred separators.
 }
 
 void OsCanonPath::validate() const
 {
     assert(!p.has_root_path() && "OsCanonPath cannot have a root path");
+#ifdef _WIN32
+    assert(
+        p.native().find(L'/') == std::wstring::npos
+        && "OsCanonPath must use preferred (backslash) separators on Windows");
+#endif
     for (const auto & component : p) {
         const auto & s = component.native();
         assert(!s.empty() && "OsCanonPath cannot have empty components");
@@ -116,7 +125,8 @@ CanonPath OsCanonPath::toPortable() const
 {
     CanonPath res = CanonPath::root;
     for (const auto & component : *this)
-        res.push(component.path().string());
+        /* An `OsFilename` is also a valid portable file name. */
+        res.push(FilenameView::fromStringAsserting(component.path().string()));
     return res;
 }
 

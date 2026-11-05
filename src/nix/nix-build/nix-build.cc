@@ -105,18 +105,18 @@ static SourcePath resolveShellExprPath(SourcePath path)
 {
     auto resolvedOrDir = resolveExprPath(path, false);
     if (resolvedOrDir.resolveSymlinks().lstat().type == SourceAccessor::tDirectory) {
-        if ((resolvedOrDir / "shell.nix").pathExists()) {
+        if ((resolvedOrDir / "shell.nix"_filename).pathExists()) {
             if (compatibilitySettings.nixShellAlwaysLooksForShellNix) {
-                return resolvedOrDir / "shell.nix";
+                return resolvedOrDir / "shell.nix"_filename;
             } else {
                 warn(
                     "Skipping '%1%', because the setting '%2%' is disabled. This is a deprecated behavior. Consider enabling '%2%'.",
-                    resolvedOrDir / "shell.nix",
+                    resolvedOrDir / "shell.nix"_filename,
                     "nix-shell-always-looks-for-shell-nix");
             }
         }
-        if ((resolvedOrDir / "default.nix").pathExists()) {
-            return resolvedOrDir / "default.nix";
+        if ((resolvedOrDir / "default.nix"_filename).pathExists()) {
+            return resolvedOrDir / "default.nix"_filename;
         }
         throw Error("neither '%s' nor '%s' found in '%s'", "shell.nix", "default.nix", resolvedOrDir);
     }
