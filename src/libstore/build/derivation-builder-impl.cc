@@ -7,6 +7,7 @@
 #include "nix/store/restricted-store.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/file-content-address.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/git.hh"
 #include "nix/util/processes.hh"
@@ -560,7 +561,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                     "failed to lock correct output path of %s, namely %s, not moving output",
                     store->printStorePath(drvPath),
                     PathFmt(store->toRealPath(newInfo.path)));
-                deletePath(actualPath);
+                deletePathAt(actualDirFd, actualName);
                 /* Trigger the hash-mismatch error. */
                 checkCAOutput(*store, drvPath, *output, newInfo, outputName);
                 unreachable();
@@ -580,7 +581,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                    else. No moving needed. */
                 assert(newInfo.ca);
                 /* Can delete our scratch copy now. */
-                deletePath(actualPath);
+                deletePathAt(actualDirFd, actualName);
             } else {
                 auto destPath = store->toRealPath(newInfo.path);
                 deletePath(destPath);
