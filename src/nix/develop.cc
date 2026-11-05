@@ -257,6 +257,9 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     /* Remove derivation checks. */
     if (drv.structuredAttrs) {
         drv.structuredAttrs->structuredAttrs.erase("outputChecks");
+        /* `unparse` writes `verbatim` when it is set, so keeping it
+           would also keep `outputChecks`. */
+        drv.structuredAttrs->verbatim.reset();
     } else {
         drv.env.erase("allowedReferences");
         drv.env.erase("allowedRequisites");
