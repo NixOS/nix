@@ -117,6 +117,125 @@ public:
 };
 
 /**
+ * Shared, reusable implementation for a `SystemError` for a particular kind of
+ * native error code.
+ *
+ * This is used for `SysError` (for `errno`) and `windows::WinError` (for
+ * `GetLastError()`).
+ *
+ * `Derived` must provide these static methods:
+ *
+ * - `ambientError()`, the ambient code, which the constructors not taking one
+ *   use.
+ *
+ * - `toErrorCode(code)`, the `std::error_code` that a `Derived` for `code` has.
+ *
+ * - `renderError(code)`, the description of `code` that a `Derived` for it
+ *   appends to its message.
+ *
+ * Together, `ambientError` and `toErrorCode` are for checking what went wrong,
+ * e.g. by comparing with `std::errc`, where that is an expected outcome rather
+ * than an exception, without constructing a `Derived` just to call
+ * `SystemError::is`. If it does need throwing after all, pass the code to the
+ * constructor taking one.
+ *
+ * The native code itself is stored in `Fields::*field`, e.g. `SysError::errNo`
+ * or `WinError::lastError`. Each kind of code keeps its own name, so that code
+ * using one where the other is meant, e.g. comparing a `WinError` code with an
+ * `errno` value, does not mistakenly compile because of bad implicit
+ * conversions.
+ *
+ * The field is in a separate base, `Fields`, rather than in `Derived` itself,
+ * since `Derived`'s own members are not yet constructed when this class's
+ * constructors set it.
+ */
+template<typename Derived, typename Fields, auto Fields::* field>
+class NativeCodeSystemError : public Fields, public CloneableError<Derived, SystemError>
+{
+    using Base = CloneableError<Derived, SystemError>;
+
+public:
+    using NativeCode = std::remove_cvref_t<decltype(std::declval<Fields &>().*field)>;
+
+    /**
+     * Construct using the explicitly-provided error code, which
+     * `Derived::renderError` describes in the message.
+     */
+    template<typename... Args>
+    NativeCodeSystemError(NativeCode code, Args &&... args)
+        : Fields{code}
+        , Base(
+              typename Base::DisambigVarArgs{},
+              Derived::toErrorCode(code),
+              Derived::renderError(code),
+              std::forward<Args>(args)...)
+    {
+    }
+
+    /**
+     * Construct using the explicitly-provided error code, which
+     * `Derived::renderError` describes in the message.
+     *
+     * Unlike above, the `HintFmt` already exists rather than being made on
+     * the spot.
+     */
+    NativeCodeSystemError(NativeCode code, const HintFmt & hf)
+        : Fields{code}
+        , Base(typename Base::DisambigHintFmt{}, Derived::toErrorCode(code), Derived::renderError(code), hf)
+    {
+    }
+
+    /**
+     * Construct using the ambient error code.
+     *
+     * Be sure to not perform another operation that may change it before
+     * calling this constructor!
+     */
+    template<typename... Args>
+    NativeCodeSystemError(Args &&... args)
+        : NativeCodeSystemError(Derived::ambientError(), std::forward<Args>(args)...)
+    {
+    }
+
+    /**
+     * Construct using the ambient error code and a function that
+     * produces a `HintFmt`. The error code is read first, then the
+     * function is called, so the function is safe to change it.
+     */
+    NativeCodeSystemError(auto && mkHintFmt)
+        requires std::invocable<decltype(mkHintFmt)> && std::same_as<std::invoke_result_t<decltype(mkHintFmt)>, HintFmt>
+        : NativeCodeSystemError(captureAmbientError(std::forward<decltype(mkHintFmt)>(mkHintFmt)))
+    {
+    }
+
+private:
+    /**
+     * Helper to ensure the error code is captured before mkHintFmt is
+     * called. C++ argument evaluation order is unspecified, so we can't
+     * rely on `NativeCodeSystemError(Derived::ambientError(), mkHintFmt())`
+     * evaluating `Derived::ambientError()` first.
+     */
+    static std::pair<NativeCode, HintFmt> captureAmbientError(auto && mkHintFmt)
+    {
+        NativeCode e = Derived::ambientError();
+        return {e, mkHintFmt()};
+    }
+
+    NativeCodeSystemError(std::pair<NativeCode, HintFmt> && p)
+        : NativeCodeSystemError(p.first, std::move(p.second))
+    {
+    }
+};
+
+/**
+ * The fields of `SysError` that `NativeCodeSystemError` sets.
+ */
+struct SysErrorFields
+{
+    int errNo;
+};
+
+/**
  * POSIX system error, created using `errno`, `strerror` friends.
  *
  * Throw this, but prefer not to catch this, and catch `SystemError`
@@ -132,79 +251,35 @@ public:
  * support is too WIP to justify the code churn, but if it is finished
  * then a better identifier becomes moe worth it.
  */
-class SysError final : public CloneableError<SysError, SystemError>
+class SysError final : public NativeCodeSystemError<SysError, SysErrorFields, &SysErrorFields::errNo>
 {
     void anchor() override;
 
 public:
-    int errNo;
+    using NativeCodeSystemError::NativeCodeSystemError;
 
     /**
-     * Construct using the explicitly-provided error number. `strerror`
-     * will be used to try to add additional information to the message.
+     * The ambient `errno`. See `NativeCodeSystemError`.
      */
-    template<typename... Args>
-    SysError(int errNo, Args &&... args)
-        : CloneableError(
-              DisambigVarArgs{},
-              std::make_error_code(static_cast<std::errc>(errNo)),
-              strerror(errNo),
-              std::forward<Args>(args)...)
-        , errNo(errNo)
+    static NativeCode ambientError()
     {
+        return errno;
     }
 
     /**
-     * Construct using the explicitly-provided error number. `strerror`
-     * will be used to try to add additional information to the message.
-     *
-     * Unlike above, the `HintFmt` already exists rather than being made on
-     * the spot.
+     * See `NativeCodeSystemError`.
      */
-    SysError(int errNo, const HintFmt & hf)
-        : CloneableError(DisambigHintFmt{}, std::make_error_code(static_cast<std::errc>(errNo)), strerror(errNo), hf)
-        , errNo(errNo)
+    static std::error_code toErrorCode(NativeCode code)
     {
+        return std::make_error_code(static_cast<std::errc>(code));
     }
 
     /**
-     * Construct using the ambient `errno`.
-     *
-     * Be sure to not perform another `errno`-modifying operation before
-     * calling this constructor!
+     * With `strerror`. See `NativeCodeSystemError`.
      */
-    template<typename... Args>
-    SysError(Args &&... args)
-        : SysError(errno, std::forward<Args>(args)...)
+    static std::string renderError(NativeCode code)
     {
-    }
-
-    /**
-     * Construct using the ambient `errno` and a function that produces
-     * a `HintFmt`. errno is read first, then the function is called, so
-     * the function is safe to modify `errno`.
-     */
-    SysError(auto && mkHintFmt)
-        requires std::invocable<decltype(mkHintFmt)> && std::same_as<std::invoke_result_t<decltype(mkHintFmt)>, HintFmt>
-        : SysError(captureErrno(std::forward<decltype(mkHintFmt)>(mkHintFmt)))
-    {
-    }
-
-private:
-    /**
-     * Helper to ensure errno is captured before mkHintFmt is called.
-     * C++ argument evaluation order is unspecified, so we can't rely on
-     * `SysError(errno, mkHintFmt())` evaluating errno first.
-     */
-    static std::pair<int, HintFmt> captureErrno(auto && mkHintFmt)
-    {
-        int e = errno;
-        return {e, mkHintFmt()};
-    }
-
-    SysError(std::pair<int, HintFmt> && p)
-        : SysError(p.first, std::move(p.second))
-    {
+        return strerror(code);
     }
 };
 
@@ -213,90 +288,46 @@ private:
 namespace windows {
 
 /**
+ * The fields of `WinError` that `NativeCodeSystemError` sets.
+ */
+struct WinErrorFields
+{
+    DWORD lastError;
+};
+
+/**
  * Windows Error type.
  *
  * Unless you need to catch a specific error number, don't catch this in
  * portable code. Catch `SystemError` instead.
  */
-class WinError : public CloneableError<WinError, SystemError>
+class WinError : public NativeCodeSystemError<WinError, WinErrorFields, &WinErrorFields::lastError>
 {
     void anchor() override;
 
 public:
-    DWORD lastError;
+    using NativeCodeSystemError::NativeCodeSystemError;
 
     /**
-     * Construct using the explicitly-provided error number.
-     * `FormatMessageA` will be used to try to add additional
-     * information to the message.
+     * The ambient `GetLastError()`. See `NativeCodeSystemError`.
      */
-    template<typename... Args>
-    WinError(DWORD lastError, Args &&... args)
-        : CloneableError(
-              DisambigVarArgs{},
-              std::error_code(lastError, std::system_category()),
-              renderError(lastError),
-              std::forward<Args>(args)...)
-        , lastError(lastError)
+    static NativeCode ambientError()
     {
+        return GetLastError();
     }
 
     /**
-     * Construct using the explicitly-provided error number.
-     * `FormatMessageA` will be used to try to add additional
-     * information to the message.
-     *
-     * Unlike above, the `HintFmt` already exists rather than being made on
-     * the spot.
+     * See `NativeCodeSystemError`.
      */
-    WinError(DWORD lastError, const HintFmt & hf)
-        : CloneableError(
-              DisambigHintFmt{}, std::error_code(lastError, std::system_category()), renderError(lastError), hf)
-        , lastError(lastError)
+    static std::error_code toErrorCode(NativeCode code)
     {
+        return std::error_code(code, std::system_category());
     }
 
     /**
-     * Construct using `GetLastError()` and the ambient "last error".
-     *
-     * Be sure to not perform another last-error-modifying operation
-     * before calling this constructor!
+     * With `FormatMessageA`. See `NativeCodeSystemError`.
      */
-    template<typename... Args>
-    WinError(Args &&... args)
-        : WinError(GetLastError(), std::forward<Args>(args)...)
-    {
-    }
-
-    /**
-     * Construct using `GetLastError()` and a function that produces a
-     * `HintFmt`. `GetLastError()` is called first, then the function is
-     * called, so the function is safe to modify the last error.
-     */
-    WinError(auto && mkHintFmt)
-        requires std::invocable<decltype(mkHintFmt)> && std::same_as<std::invoke_result_t<decltype(mkHintFmt)>, HintFmt>
-        : WinError(captureLastError(std::forward<decltype(mkHintFmt)>(mkHintFmt)))
-    {
-    }
-
-private:
-    /**
-     * Helper to ensure GetLastError() is captured before mkHintFmt is called.
-     * C++ argument evaluation order is unspecified, so we can't rely on
-     * `WinError(GetLastError(), mkHintFmt())` evaluating GetLastError() first.
-     */
-    static std::pair<DWORD, HintFmt> captureLastError(auto && mkHintFmt)
-    {
-        DWORD e = GetLastError();
-        return {e, mkHintFmt()};
-    }
-
-    WinError(std::pair<DWORD, HintFmt> && p)
-        : WinError(p.first, std::move(p.second))
-    {
-    }
-
-    static std::string renderError(DWORD lastError);
+    static std::string renderError(NativeCode code);
 };
 
 } // namespace windows
