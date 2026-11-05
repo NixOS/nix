@@ -5,6 +5,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/config.hh"
 
 #include "linux/linux-namespaces-private.hh"
 #include "unix/signals-private.hh"
@@ -28,6 +29,15 @@
 extern char ** environ __attribute__((weak));
 
 namespace nix {
+
+/* ASan's vfork() interceptor unpoisons the stack shadow from the thread's
+   stack bottom up to the current stack pointer in the parent. When we are
+   running on a stack ASan doesn't know about (e.g. a Boost fcontext coroutine
+   stack, as with Store::addToStore's sinkToSource), that size computation
+   underflows and ASan memsets a huge range, crashing with SIGSEGV. So with
+   ASan we use the portable fork()-based spawnProgram from unix/processes.cc
+   instead. */
+#if !NIX_ASAN_ENABLED
 
 namespace {
 
@@ -185,17 +195,17 @@ struct ExecChildParams
             dieWithErrno("making relocated error pipe O_CLOEXEC");
     }
 
-#if HAVE_CLOSEFROM
+#  if HAVE_CLOSEFROM
     /* glibc uses this in its posix_spawn implementation and also exposes it
        in <unistd.h>. Notably, it has a fallback for kernels that don't support
        close_range. */
     ::closefrom(relocatedErrorPipeFD + 1);
-#elifdef SYS_close_range
+#  elifdef SYS_close_range
     /* This is mostly best-effort. This code should only be used on musl and it
        would only fail on older kernels. Reimplementing /proc/self/fd iteration
        like what glibc does in __closefrom_fallback is a lot of complex code. */
     ::syscall(SYS_close_range, relocatedErrorPipeFD + 1, ~0u, 0);
-#endif
+#  endif
 
     /* Close everything in [3, maxTo) range that isn't supposed to be kept. maxTo + 1
        is the error pipe that's CLOEXEC and shouldn't be closed and maxTo is already
@@ -221,15 +231,15 @@ struct ExecChildParams
        version of the syscall, while musl "fixes it up" to use the 32 bit version.
        The end result is that we have to make sure to use the right one still. */
 
-#ifdef SYS_setuid32
-#  define NIX_SYS_setuid SYS_setuid32
-#  define NIX_SYS_setgid SYS_setgid32
-#  define NIX_SYS_setgroups SYS_setgroups32
-#else
-#  define NIX_SYS_setuid SYS_setuid
-#  define NIX_SYS_setgid SYS_setgid
-#  define NIX_SYS_setgroups SYS_setgroups
-#endif
+#  ifdef SYS_setuid32
+#    define NIX_SYS_setuid SYS_setuid32
+#    define NIX_SYS_setgid SYS_setgid32
+#    define NIX_SYS_setgroups SYS_setgroups32
+#  else
+#    define NIX_SYS_setuid SYS_setuid
+#    define NIX_SYS_setgid SYS_setgid
+#    define NIX_SYS_setgroups SYS_setgroups
+#  endif
 
     if (params.setGid && ::syscall(NIX_SYS_setgid, params.gid) == -1)
         dieWithErrno("setgid failed");
@@ -246,9 +256,9 @@ struct ExecChildParams
     if (params.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
         dieWithErrno("setting death signal");
 
-#undef NIX_SYS_setuid
-#undef NIX_SYS_setgid
-#undef NIX_SYS_setgroups
+#  undef NIX_SYS_setuid
+#  undef NIX_SYS_setgid
+#  undef NIX_SYS_setgroups
 
     if (savedStackSize) {
         struct ::rlimit limit;
@@ -393,5 +403,7 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
 
     return pid;
 }
+
+#endif // !NIX_ASAN_ENABLED
 
 } // namespace nix
