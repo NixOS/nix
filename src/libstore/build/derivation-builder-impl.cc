@@ -224,7 +224,10 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 
             /* Pass blank Sink as we are not ready to hash data at this stage. */
             NullSink blank;
-            references = scanForReferences(blank, actualPath, referenceablePaths);
+            references = scanForReferences(
+                blank,
+                {makeFSSourceAccessor(realStoreDirFdInHost(), OsFilename{scratchOutput->filename()}, actualPath)},
+                referenceablePaths);
         }
 
         StringSet referencedOutputs;
@@ -330,7 +333,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 /* FIXME: Is this actually streaming? */
                 auto source = sinkToSource([&](Sink & nextSink) {
                     RewritingSink rsink(rewrites, nextSink);
-                    dumpPath(actualPath, rsink);
+                    SourcePath{makeFSSourceAccessor(actualDirFd, actualName, actualPath)}.dumpPath(rsink);
                     rsink.flush();
                 });
                 /* Put the temporary copy in a directory inaccessible to the builder.
