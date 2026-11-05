@@ -45,13 +45,13 @@ StorePathSet PathRefScanSink::getResultPaths()
     return found;
 }
 
-StorePathSet scanForReferences(Sink & toTee, const std::filesystem::path & path, const StorePathSet & refs)
+StorePathSet scanForReferences(Sink & toTee, const SourcePath & path, const StorePathSet & refs)
 {
     PathRefScanSink refsSink = PathRefScanSink::fromPaths(refs);
     TeeSink sink{refsSink, toTee};
 
     /* Look for the hashes in the NAR dump of the path. */
-    dumpPath(path, sink);
+    path.dumpPath(sink);
 
     return refsSink.getResultPaths();
 }
