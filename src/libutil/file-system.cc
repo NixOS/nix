@@ -467,13 +467,23 @@ std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesyst
     return createTempFile(defaultTempDir(), prefix);
 }
 
-std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)
+static uint32_t nextTempCounter()
 {
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic<uint32_t> counter(std::random_device{}());
+    return counter.fetch_add(1, std::memory_order_relaxed);
+}
+
+std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)
+{
     assert(!std::filesystem::path(suffix).is_absolute());
     auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
-    return tmpRoot / fmt("%s-%s-%s", suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
+    return tmpRoot / fmt("%s-%s-%s", suffix, getpid(), nextTempCounter());
+}
+
+OsFilename makeTempName(std::string_view prefix)
+{
+    return OsFilename::fromPathThrowing(fmt("%s-%s-%s", prefix, getpid(), nextTempCounter()));
 }
 
 void createSymlink(const std::filesystem::path & target, const std::filesystem::path & link)

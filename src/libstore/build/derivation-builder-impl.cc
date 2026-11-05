@@ -69,39 +69,40 @@ static void handleDiffHook(
     }
 }
 
-static void replaceValidPath(const std::filesystem::path & storePath, const std::filesystem::path & tmpPath)
+static void
+replaceValidPath(Descriptor storeDirFd, const OsFilename & name, Descriptor tmpDirFd, const OsFilename & tmpName)
 {
-    /* We can't atomically replace storePath (the original) with
-       tmpPath (the replacement), so we have to move it out of the
+    /* We can't atomically replace `name` (the original) with
+       `tmpName` (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
-    std::filesystem::path oldPath;
+    std::optional<OsFilename> oldName;
 
-    if (pathExists(storePath)) {
+    if (maybeFstatat(storeDirFd, name)) {
         // why do we loop here?
-        // although makeTempPath should be unique, we can't
+        // although makeTempName should be unique, we can't
         // guarantee that.
         do {
-            oldPath = makeTempPath(storePath, ".old");
+            oldName = makeTempName(name.path().string() + ".old");
             // store paths are often directories so we can't just unlink() it
             // let's make sure the path doesn't exist before we try to use it
-        } while (pathExists(oldPath));
-        movePath(storePath, oldPath);
+        } while (maybeFstatat(storeDirFd, *oldName));
+        movePathAt(storeDirFd, name, storeDirFd, *oldName);
     }
     try {
-        movePath(tmpPath, storePath);
+        movePathAt(tmpDirFd, tmpName, storeDirFd, name);
     } catch (...) {
         try {
             // attempt to recover
-            if (!oldPath.empty())
-                movePath(oldPath, storePath);
+            if (oldName)
+                movePathAt(storeDirFd, *oldName, storeDirFd, name);
         } catch (...) {
             ignoreExceptionExceptInterrupt();
         }
         throw;
     }
-    if (!oldPath.empty())
-        deletePath(oldPath);
+    if (oldName)
+        deletePathAt(storeDirFd, *oldName);
 }
 
 SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
@@ -572,7 +573,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         if (store->toRealPath(newInfo.path) != actualPath) {
             if (buildMode == bmRepair) {
                 /* Path already exists, need to replace it */
-                replaceValidPath(store->toRealPath(newInfo.path), actualPath);
+                replaceValidPath(
+                    store->getRealStoreDirFd(), OsFilename{newInfo.path.filename()}, actualDirFd, actualName);
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
