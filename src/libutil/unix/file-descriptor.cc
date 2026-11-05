@@ -71,6 +71,14 @@ AutoCloseFD dupDescriptor(Descriptor fd)
     return AutoCloseFD{newFd};
 }
 
+AutoCloseFD openNullFD()
+{
+    AutoCloseFD fd = ::open("/dev/null", O_RDWR | O_CLOEXEC);
+    if (!fd)
+        throw SysError("opening '/dev/null'");
+    return fd;
+}
+
 //////////////////////////////////////////////////////////////////////
 
 void Pipe::create(bool nonBlocking)

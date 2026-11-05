@@ -93,6 +93,24 @@ AutoCloseFD dupDescriptor(Descriptor fd)
     return AutoCloseFD{newHandle};
 }
 
+AutoCloseFD openNullFD()
+{
+    using namespace nix::windows;
+
+    AutoCloseFD fd = ::CreateFileW(
+        OS_STR("NUL"),
+        GENERIC_READ | GENERIC_WRITE,
+        // We don't care who reads / writes / deletes this file since it's NUL anyways
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        /*lpSecurityAttributes=*/nullptr,
+        OPEN_EXISTING,
+        0,
+        /*hTemplateFile=*/nullptr);
+    if (!fd)
+        throw WinError("opening 'NUL'");
+    return fd;
+}
+
 //////////////////////////////////////////////////////////////////////
 
 void Pipe::create()

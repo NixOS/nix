@@ -445,4 +445,12 @@ INSTANTIATE_TEST_SUITE_P(
         return res;
     });
 
+TEST(openNullFD, works)
+{
+    AutoCloseFD fd;
+    ASSERT_NO_THROW(fd = openNullFD());
+    ASSERT_NO_THROW(writeFull(fd.get(), "garbage"));
+    ASSERT_EQ(drainFD(fd.get()), "");
+}
+
 } // namespace nix

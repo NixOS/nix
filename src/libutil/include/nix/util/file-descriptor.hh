@@ -296,6 +296,13 @@ public:
  */
 AutoCloseFD dupDescriptor(Descriptor fd);
 
+/**
+ * Open a /dev/null file descriptor as read/write.
+ *
+ * @throws SystemError on error.
+ */
+AutoCloseFD openNullFD();
+
 class Pipe
 {
 public:
