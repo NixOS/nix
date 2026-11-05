@@ -65,10 +65,18 @@ size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterru
 
 AutoCloseFD dupDescriptor(Descriptor fd)
 {
-    int newFd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
-    if (newFd == -1)
+    AutoCloseFD newFd = ::fcntl(fd, F_DUPFD_CLOEXEC, 0);
+    if (!newFd)
         throw SysError("duplicating file descriptor");
-    return AutoCloseFD{newFd};
+    return newFd;
+}
+
+AutoCloseFD openNullFD()
+{
+    AutoCloseFD fd = ::open("/dev/null", O_RDWR | O_CLOEXEC);
+    if (!fd)
+        throw SysError("opening '/dev/null'");
+    return fd;
 }
 
 //////////////////////////////////////////////////////////////////////

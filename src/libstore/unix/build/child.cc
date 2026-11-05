@@ -1,5 +1,6 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/file-descriptor.hh"
 
 #include "child-impl.hh"
 
@@ -12,7 +13,6 @@ void commonChildInit()
 {
     logger = makeSimpleLogger().release();
 
-    static const std::string pathNullDevice = "/dev/null";
     restoreProcessContext(false);
 
     /* Put the child in a separate session (and thus a separate
@@ -27,12 +27,9 @@ void commonChildInit()
         throw SysError("cannot dup stderr into stdout");
 
     /* Reroute stdin to /dev/null. */
-    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR | O_CLOEXEC);
-    if (fdDevNull == -1)
-        throw SysError("cannot open '%1%'", pathNullDevice);
-    if (dup2(fdDevNull, STDIN_FILENO) == -1)
+    AutoCloseFD fdDevNull = openNullFD();
+    if (dup2(fdDevNull.get(), STDIN_FILENO) == -1)
         throw SysError("cannot dup null device into stdin");
-    close(fdDevNull);
 }
 
 } // namespace nix

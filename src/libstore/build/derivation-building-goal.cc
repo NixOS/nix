@@ -18,7 +18,6 @@
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/current-process.hh"
 
 #include <chrono>
 #include <algorithm>
@@ -145,15 +144,46 @@ struct PostBuildHookState
     }
 };
 
-/* Only used on Unix; on Windows every call site throws instead. */
-#ifndef _WIN32
 static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
     const StorePath & drvPath,
-    const StorePathSet & outputPaths);
+    const StorePathSet & outputPaths)
+{
+    auto state =
+        std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
+
+    auto hook = workerSettings.postBuildHook.get();
+
+    OsStringMap hookEnvironment = getEnvOs();
+
+    hookEnvironment[OS_STR("DRV_PATH")] = string_to_os_string(store.printStorePath(drvPath));
+    hookEnvironment[OS_STR("OUT_PATHS")] =
+        string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
+
+    AutoCloseFD nullFD = openNullFD();
+#ifdef _WIN32
+    windows::setHandleInheritability(nullFD.get(), true);
 #endif
+
+    state->pid = spawnProgram(
+        {
+            .program = std::filesystem::path(hook),
+            .lookupPath = true,
+            .environment = hookEnvironment,
+        },
+        std::to_array<FdRedirection>({
+            {.from = nullFD.get(), .to = FdRedirection::stdInput},
+            {.from = state->out->writeSide.get(), .to = FdRedirection::stdOut},
+            {.from = FdRedirection::stdOut, .to = FdRedirection::stdError},
+        }));
+
+    state->out->writeSide.close();
+
+    return state;
+}
 
 Goal::Co<Goal::ExitCode> DerivationBuildingGoal::init()
 {
@@ -1138,57 +1168,6 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
         };
     }
 }
-
-#ifndef _WIN32
-static std::unique_ptr<PostBuildHookState> runPostBuildHook(
-    const WorkerSettings & workerSettings,
-    const StoreDirConfig & store,
-    Logger & logger,
-    const StorePath & drvPath,
-    const StorePathSet & outputPaths)
-{
-    auto state =
-        std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
-
-    auto hook = workerSettings.postBuildHook.get();
-
-    OsStringMap hookEnvironment = getEnvOs();
-
-    hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
-    hookEnvironment.emplace(
-        OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
-    hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
-
-    ProcessOptions processOptions;
-
-    state->pid = startProcess(
-        [&] {
-            replaceEnv(hookEnvironment);
-            if (dup2(state->out->writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
-            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
-                throw SysError("cannot dup stdout into stderr");
-
-            Strings args_;
-            args_.push_front(hook);
-
-            restoreProcessContext();
-
-            /* On Linux, it's crucial that this is done after restoreProcessContext() since
-               that needs an open mountns file descriptor (fdSavedMountNamespace). */
-            unix::closeExtraFDs();
-
-            execvp(requireCString(hook), stringsToCharPtrs(args_).data());
-
-            throw SysError("executing %s", PathFmt(hook));
-        },
-        processOptions);
-
-    state->out->writeSide.close();
-
-    return state;
-}
-#endif
 
 BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
 {

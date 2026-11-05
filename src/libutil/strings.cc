@@ -1,8 +1,9 @@
 #include <string>
 
-#include "nix/util/strings-inline.hh"
+#include "nix/util/strings-inline.hh" // IWYU pragma: keep
 #include "nix/util/error.hh"
 #include "nix/util/util.hh"
+#include "nix/util/os-string.hh" // IWYU pragma: keep
 
 namespace nix {
 
