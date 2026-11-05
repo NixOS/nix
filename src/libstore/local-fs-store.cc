@@ -210,7 +210,7 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
             return nullptr;
         /* A valid store object exists on disk, so opening it is
            expected to succeed. */
-        return makeFSSourceAccessor(std::move(absPath));
+        return makeFSSourceAccessor(getRealStoreDirFd(), OsFilename{path.filename()}, std::move(absPath));
     } else {
         /* Return non-null as long as some file system data exists,
            even if the store object is not fully registered. */
