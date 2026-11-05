@@ -6,6 +6,7 @@
 #include "nix/util/processes.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/config.hh"
 
 #include <cerrno>
 #include <filesystem>
@@ -296,7 +297,9 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
     return pid;
 }
 
-#ifndef __linux__
+/* On Linux, the vfork()-based spawnProgram in linux/processes.cc is used
+   instead, except with ASan. See the comment there for why. */
+#if !defined(__linux__) || NIX_ASAN_ENABLED
 
 Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fdr)
 {
@@ -331,7 +334,7 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
                trickery. */
             args_.push_front(options.argv0.value_or(options.program.native()));
 
-            restoreProcessContext();
+            restoreProcessContext(options.restoreMounts);
 
             /* Unlike the Linux case, it doesn't matter much that we are closing
                the FDs before or after restoreProcessContext(), but on Linux
