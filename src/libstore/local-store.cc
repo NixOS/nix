@@ -1440,7 +1440,8 @@ StorePath LocalStore::addToStoreFromDump(
             HashResult narHash = {dumpHash, size};
             if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink{HashAlgorithm::SHA256};
-                dumpPath(realPath, narSink);
+                SourcePath{makeFSSourceAccessor(getRealStoreDirFd(), OsFilename{dstPath.filename()}, realPath)}
+                    .dumpPath(narSink);
                 narHash = narSink.finish();
             }
 
@@ -1561,7 +1562,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 auto hashSink = HashSink(info->narHash.algo);
 
-                dumpPath(toRealPath(i), hashSink);
+                SourcePath{makeFSSourceAccessor(getRealStoreDirFd(), OsFilename{i.filename()}, toRealPath(i))}.dumpPath(
+                    hashSink);
                 auto current = hashSink.finish();
 
                 if (info->narHash != nullHash && info->narHash != current.hash) {
