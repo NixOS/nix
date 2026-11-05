@@ -295,11 +295,6 @@ void writeFile(
 void syncParent(const std::filesystem::path & path);
 
 /**
- * Flush a file or entire directory tree to disk.
- */
-void recursiveSync(const std::filesystem::path & path);
-
-/**
  * Delete a path; i.e., in the case of a directory, it is deleted
  * recursively. It's not an error if the path does not exist. The
  * second variant returns the number of bytes and blocks freed.
