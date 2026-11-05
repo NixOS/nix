@@ -467,7 +467,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             /* Copy files to break stale file descriptors. copyRecursive below will use
                reflinking to optimise the copying overhead. */
             auto pathAccessor = makeFSSourceAccessor(actualDirFd, actualName, actualPath);
-            auto restoreSink = RestoreSink::forPath(tmpOutput, store->getLocalSettings().fsyncStorePaths);
+            RestoreSink restoreSink{tempDirFd.get(), tmpName, store->getLocalSettings().fsyncStorePaths};
             copyRecursive(*pathAccessor, CanonPath::root, restoreSink);
             /* This makes it slightly harder to make sense of the control flow. The rule
                of thumb is that actualPath points to the current location of the stuff
