@@ -174,7 +174,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             continue;
         }
 
-        auto optSt = maybeLstat(actualPath);
+        auto optSt = maybeFstatat(realStoreDirFdInHost(), OsFilename{scratchOutput->filename()});
         if (!optSt)
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
