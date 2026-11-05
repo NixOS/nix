@@ -101,10 +101,13 @@ endif
 include_dirs = [ include_directories('.') ]
 
 if build_unit_tests
+  rapidcheck = dependency('rapidcheck')
   unit_dependencies = fuzz_dependencies + [
     dependency('nix-util-c'),
     dependency('nix-util-test-support'),
-    dependency('rapidcheck'),
+    rapidcheck,
+    # See ../libutil-test-support/meson.build
+    cxx.find_library('rapidcheck', dirs : [ rapidcheck.get_variable('libdir') ]),
     dependency('gtest', main : false),
     dependency('gmock'),
     dependency('libzstd', version : '>= 1.4.0'),
@@ -124,8 +127,7 @@ if build_unit_tests
     config_priv_h,
     dependencies : unit_dependencies,
     include_directories : include_dirs,
-    # TODO: -lrapidcheck, see ../libutil-support/build.meson
-    link_args : linker_export_flags + [ '-lrapidcheck' ],
+    link_args : linker_export_flags,
     install : true,
     cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
   )
