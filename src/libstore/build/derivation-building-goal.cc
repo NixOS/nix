@@ -149,7 +149,36 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StoreDirConfig & store,
     Logger & logger,
     const StorePath & drvPath,
-    const StorePathSet & outputPaths);
+    const StorePathSet & outputPaths)
+{
+    auto state =
+        std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
+
+    auto hook = workerSettings.postBuildHook.get();
+
+    OsStringMap hookEnvironment = getEnvOs();
+
+    hookEnvironment[OS_STR("DRV_PATH")] = string_to_os_string(store.printStorePath(drvPath));
+    hookEnvironment[OS_STR("OUT_PATHS")] =
+        string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
+
+    state->pid = spawnProgram(
+        {
+            .program = std::filesystem::path(hook),
+            .lookupPath = true,
+            .environment = hookEnvironment,
+        },
+        std::to_array<FdRedirection>({
+            {.from = state->out->writeSide.get(), .to = FdRedirection::stdOut},
+            {.from = FdRedirection::stdOut, .to = FdRedirection::stdError},
+            /* TODO: Don't inherit stdin? */
+        }));
+
+    state->out->writeSide.close();
+
+    return state;
+}
 
 Goal::Co<Goal::ExitCode> DerivationBuildingGoal::init()
 {
@@ -1133,42 +1162,6 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
             .builtOutputs = std::move(builtOutputs),
         };
     }
-}
-
-static std::unique_ptr<PostBuildHookState> runPostBuildHook(
-    const WorkerSettings & workerSettings,
-    const StoreDirConfig & store,
-    Logger & logger,
-    const StorePath & drvPath,
-    const StorePathSet & outputPaths)
-{
-    auto state =
-        std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
-
-    auto hook = workerSettings.postBuildHook.get();
-
-    OsStringMap hookEnvironment = getEnvOs();
-
-    hookEnvironment[OS_STR("DRV_PATH")] = string_to_os_string(store.printStorePath(drvPath));
-    hookEnvironment[OS_STR("OUT_PATHS")] =
-        string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
-    hookEnvironment[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
-
-    state->pid = spawnProgram(
-        {
-            .program = std::filesystem::path(hook),
-            .lookupPath = true,
-            .environment = hookEnvironment,
-        },
-        std::to_array<FdRedirection>({
-            {.from = state->out->writeSide.get(), .to = FdRedirection::stdOut},
-            {.from = FdRedirection::stdOut, .to = FdRedirection::stdError},
-            /* TODO: Don't inherit stdin? */
-        }));
-
-    state->out->writeSide.close();
-
-    return state;
 }
 
 BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
