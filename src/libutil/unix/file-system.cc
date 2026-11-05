@@ -291,21 +291,25 @@ static void _deletePath(
     }
 }
 
-static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
+/**
+ * Delete @p path, which is in the directory @p parentfd. @p path is
+ * only used for messages and, on FreeBSD, to recognise mount points.
+ */
+static void deletePathIn(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed)
 {
-    assert(path.is_absolute());
-    auto parentDirPath = path.parent_path();
-    assert(parentDirPath != path);
-
-    /* It's ok to follow symlinks in the parent since we only need to
-       ensure that there's no TOCTOU when traversing inside the path. */
-    auto dirfdOrError = openDirectory(parentDirPath, FinalSymlink::Follow);
-    if (!dirfdOrError) {
-        if (dirfdOrError.error() == ENOENT)
-            return;
-        throw SysError(dirfdOrError.error(), "opening directory %s", PathFmt(parentDirPath));
+    bytesFreed = 0;
+#ifdef __FreeBSD__
+    std::set<std::filesystem::path> mountedPaths;
+    struct statfs * mntbuf;
+    int count;
+    if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
+        throw SysError("getmntinfo");
     }
-    auto dirfd = std::move(dirfdOrError).value();
+
+    for (int i = 0; i < count; i++) {
+        mountedPaths.emplace(mntbuf[i].f_mntonname);
+    }
+#endif
 
     std::exception_ptr ex;
 
@@ -328,7 +332,7 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
         forceDontChmod = caps[CAP_TO_INDEX(CAP_DAC_OVERRIDE)].effective & CAP_TO_MASK(CAP_DAC_OVERRIDE);
 #endif
 
-    _deletePath(dirfd.get(), path, bytesFreed, ex, forceDontChmod MOUNTEDPATHS_ARG);
+    _deletePath(parentfd, path, bytesFreed, ex, forceDontChmod MOUNTEDPATHS_ARG);
 
     if (ex)
         std::rethrow_exception(ex);
@@ -342,20 +346,50 @@ void deletePath(const std::filesystem::path & path)
 
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
-    bytesFreed = 0;
-#ifdef __FreeBSD__
-    std::set<std::filesystem::path> mountedPaths;
-    struct statfs * mntbuf;
-    int count;
-    if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
-        throw SysError("getmntinfo");
+    assert(path.is_absolute());
+    auto parentDirPath = path.parent_path();
+    assert(parentDirPath != path);
+
+    /* It's ok to follow symlinks in the parent since we only need to
+       ensure that there's no TOCTOU when traversing inside the path. */
+    auto dirfdOrError = openDirectory(parentDirPath, FinalSymlink::Follow);
+    if (!dirfdOrError) {
+        bytesFreed = 0;
+        if (dirfdOrError.error() == ENOENT)
+            return;
+        throw SysError(dirfdOrError.error(), "opening directory %s", PathFmt(parentDirPath));
+    }
+    auto dirfd = std::move(dirfdOrError).value();
+
+    deletePathIn(dirfd.get(), path, bytesFreed);
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFreed)
+{
+    assert(!path.empty());
+
+    Descriptor parentFd = dirFd;
+    AutoCloseFD parentFdOwned;
+    if (auto parent = path.parent(); !parent->empty()) {
+        auto parentFdOrError = openFileEnsureBeneathNoSymlinks(dirFd, *parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (!parentFdOrError) {
+            bytesFreed = 0;
+            if (parentFdOrError.error() == ENOENT)
+                return;
+            throw SysError(
+                parentFdOrError.error(), "opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path()));
+        }
+        parentFdOwned = std::move(parentFdOrError).value();
+        parentFd = parentFdOwned.get();
     }
 
-    for (int i = 0; i < count; i++) {
-        mountedPaths.emplace(mntbuf[i].f_mntonname);
-    }
-#endif
-    _deletePath(path, bytesFreed MOUNTEDPATHS_ARG);
+    deletePathIn(parentFd, descriptorToPath(dirFd) / path.path(), bytesFreed);
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path)
+{
+    uint64_t dummy;
+    deletePathAt(dirFd, path, dummy);
 }
 
 void chown(const std::filesystem::path & path, uid_t owner, gid_t group)

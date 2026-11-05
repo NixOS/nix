@@ -377,9 +377,10 @@ public:
     }
 
     /**
-     * Called by `collectGarbage` to recursively delete a path.
-     * The default implementation simply calls `deletePath`, but it can be
-     * overridden by stores that wish to provide their own deletion behaviour.
+     * Called by `collectGarbage` to recursively delete @p name in the
+     * store directory. The default implementation simply calls
+     * `deletePathAt`, but it can be overridden by stores that wish to
+     * provide their own deletion behaviour.
      *
      * @param isKnownPath true if this is a known store path, false if it's
      *        garbage/unknown content found in the store directory
@@ -389,7 +390,7 @@ public:
      *             Initialised to zero by this function so that the caller may not need to initialise
      *             it.
      */
-    virtual void deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath);
+    virtual void deleteStorePath(const OsFilename & name, uint64_t & bytesFreed, bool isKnownPath);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking

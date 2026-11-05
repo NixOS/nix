@@ -981,7 +981,7 @@ void UnixDerivationBuilderImpl::cleanupBuild(bool force)
     if (force) {
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(store->toRealPath(i.second));
+            deletePathAt(store->getRealStoreDirFd(), OsFilename{i.second.filename()});
     }
 
     if (topTmpDir != "") {

@@ -243,6 +243,27 @@ void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTim
  */
 void recursiveSyncAt(Descriptor dirFd, const OsFilename & name);
 
+/**
+ * Delete @p path relative to the directory @p dirFd, recursively if it
+ * is a directory. No symlinks are followed: neither in the parent
+ * directories of @p path, nor within it, nor @p path itself, which is
+ * deleted if it is a symlink. It is not an error if @p path does not
+ * exist.
+ *
+ * @param[out] bytesFreed Estimation of how many bytes of disk space have
+ *                        been reclaimed. Initialised to zero internally, so
+ *                        the caller doesn't need to initialise it.
+ *
+ * @pre `path` must be non-empty.
+ * @throws SystemError on I/O errors.
+ */
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFreed);
+
+/**
+ * Like the other overload, without reporting the bytes freed.
+ */
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path);
+
 #ifdef __linux__
 namespace linux {
 

@@ -352,6 +352,65 @@ TEST(recursiveSyncAt, works)
 #endif
 
 /* ----------------------------------------------------------------------------
+ * deletePathAt
+ * --------------------------------------------------------------------------*/
+
+TEST(deletePathAt, works)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    bool symlinks = true;
+#ifdef _WIN32
+    symlinks = !windows::isWine() || windows::wineSymlinksSupported(tmpDir);
+#endif
+
+    auto outside = tmpDir / "outside";
+    writeFile(outside, "keep me");
+
+    createDirs(tmpDir / "a" / "tree" / "sub");
+    writeFile(tmpDir / "a" / "tree" / "file", "hello");
+    writeFile(tmpDir / "a" / "tree" / "sub" / "read-only", "world");
+    std::filesystem::permissions(
+        tmpDir / "a" / "tree" / "sub" / "read-only",
+        std::filesystem::perms::owner_write | std::filesystem::perms::group_write
+            | std::filesystem::perms::others_write,
+        std::filesystem::perm_options::remove);
+    if (symlinks) {
+        createSymlink(outside, tmpDir / "a" / "tree" / "link");
+        createSymlink(tmpDir / "a", tmpDir / "link-to-a");
+    }
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A whole tree, through a parent directory. The symlink in it is
+       deleted, not followed. */
+    uint64_t bytesFreed;
+    deletePathAt(dirFd.get(), OsCanonPath::fromPathAsserting(std::filesystem::path{"a"} / "tree"), bytesFreed);
+    EXPECT_FALSE(pathExists(tmpDir / "a" / "tree"));
+    EXPECT_TRUE(pathExists(tmpDir / "a"));
+    EXPECT_EQ(readFile(outside), "keep me");
+    EXPECT_GE(bytesFreed, 10u);
+
+    /* Missing, and with a missing parent: not an error. */
+    EXPECT_NO_THROW(deletePathAt(dirFd.get(), OsFilename::fromPathAsserting("nonexistent")));
+    EXPECT_NO_THROW(
+        deletePathAt(dirFd.get(), OsCanonPath::fromPathAsserting(std::filesystem::path{"nonexistent"} / "child")));
+
+    if (symlinks) {
+        /* Not through a symlink in the parent directories. */
+        EXPECT_THROW(
+            deletePathAt(dirFd.get(), OsCanonPath::fromPathAsserting(std::filesystem::path{"link-to-a"} / "x")),
+            SymlinkNotAllowed);
+
+        /* A symlink itself. */
+        deletePathAt(dirFd.get(), OsFilename::fromPathAsserting("link-to-a"));
+        EXPECT_FALSE(pathExists(tmpDir / "link-to-a"));
+        EXPECT_TRUE(pathExists(tmpDir / "a"));
+    }
+}
+
+/* ----------------------------------------------------------------------------
  * openFileEnsureBeneathNoSymlinks — O_NOFOLLOW is forbidden
  * --------------------------------------------------------------------------*/
 

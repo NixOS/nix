@@ -7,6 +7,7 @@
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
 #endif
+#include "nix/util/file-system-at.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/environment-variables.hh"
@@ -516,7 +517,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                     continue;
                 auto storePath = status.known->path;
                 debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
-                deletePath(localStore->toRealPath(storePath));
+                deletePathAt(localStore->getRealStoreDirFd(), OsFilename{storePath.filename()});
             }
         }
 

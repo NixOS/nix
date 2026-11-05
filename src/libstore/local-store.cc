@@ -427,10 +427,11 @@ AutoCloseFD LocalStore::openGCLock()
     return openLockFile(fnGCLock, /*create=*/true);
 }
 
-void LocalStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
+void LocalStore::deleteStorePath(const OsFilename & name, uint64_t & bytesFreed, bool isKnownPath)
 {
+    auto path = config->realStoreDir.get() / name.path();
     try {
-        deletePath(path, bytesFreed);
+        deletePathAt(getRealStoreDirFd(), name, bytesFreed);
     } catch (SystemError & e) {
         if (config->ignoreGcDeleteFailure) {
             logWarning(
@@ -1190,7 +1191,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                    TODO: We should use atomic exchange (RENAME_EXCHANGE and renamex_np with RENAME_SWAP) if possible. */
 
                 /* Delete the path for good measure even if not repairing. */
-                deletePath(realPath);
+                deletePathAt(getRealStoreDirFd(), OsFilename{info.path.filename()});
 
                 try {
                     /* movePath and not renameFile because at this point the top-level directory is
@@ -1375,7 +1376,7 @@ StorePath LocalStore::addToStoreFromDump(
         /* The path may have been created by another process in the meantime, so check again. */
         if (repair || !isValidPathUncached(dstPath)) {
 
-            deletePath(realPath);
+            deletePathAt(getRealStoreDirFd(), OsFilename{dstPath.filename()});
 
             autoGC();
 

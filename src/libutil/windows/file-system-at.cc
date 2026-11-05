@@ -591,4 +591,100 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     return outcome::success(std::move(finalResult.value()));
 }
 
+/**
+ * Delete @p name in the directory @p parentFd, like
+ * `deletePathAt`. @p path is only used for messages.
+ */
+static void
+deletePathIn(Descriptor parentFd, const OsFilename & name, const std::filesystem::path & path, uint64_t & bytesFreed)
+{
+    using namespace nix::windows;
+
+    checkInterrupt();
+
+    /* `DELETE` to delete it, and `FILE_WRITE_ATTRIBUTES` to make it
+       deletable if it is read-only. Not following symlinks, so that
+       they are deleted themselves. */
+    auto result = maybeNtOpenAt(
+        parentFd,
+        name.path().native(),
+        DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | SYNCHRONIZE,
+        FILE_OPEN_REPARSE_POINT);
+    if (!result) {
+        auto lastError = RtlNtStatusToDosError(result.error());
+        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+            return;
+        throw WinError(lastError, "opening %s for deletion", PathFmt(path));
+    }
+    auto handle = std::move(result.value());
+
+    FILE_BASIC_INFO basicInfo;
+    if (!GetFileInformationByHandleEx(handle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
+        throw WinError("getting attributes of %s", PathFmt(path));
+
+    if ((basicInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        && !(basicInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+        for (const auto & entry : DirectoryIterator{reopenDirectory(handle.get())})
+            deletePathIn(handle.get(), entry.name, path / entry.name.path(), bytesFreed);
+    } else {
+        /* Like on Unix, assume that a file with two links was
+           optimised, so that deleting it frees space too. */
+        auto st = fstat(handle.get());
+        if (st.st_nlink <= 2)
+            bytesFreed += st.st_size;
+    }
+
+    /* Deleting fails on read-only files, so clear that first. Zero
+       means "unchanged" to `SetFileInformationByHandle`, hence
+       `FILE_ATTRIBUTE_NORMAL` when no other attribute is left. */
+    if (basicInfo.FileAttributes & FILE_ATTRIBUTE_READONLY) {
+        basicInfo.FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
+        if (!basicInfo.FileAttributes)
+            basicInfo.FileAttributes = FILE_ATTRIBUTE_NORMAL;
+        if (!SetFileInformationByHandle(handle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
+            throw WinError("making %s writable for deletion", PathFmt(path));
+    }
+
+    /* Deleted once `handle` is closed. */
+    FILE_DISPOSITION_INFO dispositionInfo{.DeleteFile = TRUE};
+    if (!SetFileInformationByHandle(handle.get(), FileDispositionInfo, &dispositionInfo, sizeof(dispositionInfo)))
+        throw WinError("deleting %s", PathFmt(path));
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFreed)
+{
+    using namespace nix::windows;
+
+    assert(!path.empty());
+
+    bytesFreed = 0;
+
+    Descriptor parentFd = dirFd;
+    AutoCloseFD parentFdOwned;
+    if (auto parent = path.parent(); !parent->empty()) {
+        auto parentFdOrError = openFileEnsureBeneathNoSymlinks(
+            dirFd,
+            *parent,
+            FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            FILE_DIRECTORY_FILE);
+        if (!parentFdOrError) {
+            auto lastError = parentFdOrError.error();
+            if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+                return;
+            throw WinError(lastError, "opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path()));
+        }
+        parentFdOwned = std::move(parentFdOrError).value();
+        parentFd = parentFdOwned.get();
+    }
+
+    auto lastIt = std::ranges::prev(path.end());
+    deletePathIn(parentFd, *lastIt, descriptorToPath(dirFd) / path.path(), bytesFreed);
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path)
+{
+    uint64_t dummy;
+    deletePathAt(dirFd, path, dummy);
+}
+
 } // namespace nix
