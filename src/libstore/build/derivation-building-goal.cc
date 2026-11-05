@@ -163,6 +163,11 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
         string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
     hookEnvironment[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
 
+    AutoCloseFD nullFD = openNullFD();
+#ifdef _WIN32
+    windows::setHandleInheritability(nullFD.get(), true);
+#endif
+
     state->pid = spawnProgram(
         {
             .program = std::filesystem::path(hook),
@@ -170,9 +175,9 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
             .environment = hookEnvironment,
         },
         std::to_array<FdRedirection>({
+            {.from = nullFD.get(), .to = FdRedirection::stdInput},
             {.from = state->out->writeSide.get(), .to = FdRedirection::stdOut},
             {.from = FdRedirection::stdOut, .to = FdRedirection::stdError},
-            /* TODO: Don't inherit stdin? */
         }));
 
     state->out->writeSide.close();
