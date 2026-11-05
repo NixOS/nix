@@ -1149,10 +1149,10 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
 
     OsStringMap hookEnvironment = getEnvOs();
 
-    hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
-    hookEnvironment.emplace(
-        OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
-    hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
+    hookEnvironment[OS_STR("DRV_PATH")] = string_to_os_string(store.printStorePath(drvPath));
+    hookEnvironment[OS_STR("OUT_PATHS")] =
+        string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
 
     state->pid = spawnProgram(
         {
