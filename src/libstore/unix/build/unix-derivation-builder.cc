@@ -325,7 +325,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
             continue;
 
         /* Ensure scratch path is ours to use. */
-        deletePath(store->printStorePath(scratchPath));
+        deletePathAt(store->getRealStoreDirFd(), OsFilename{scratchPath.filename()});
 
         /* Rewrite and unrewrite paths */
         {
