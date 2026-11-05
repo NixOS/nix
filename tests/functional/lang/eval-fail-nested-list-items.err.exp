@@ -1,5 +1,5 @@
 error:
-       … while evaluating a path segment
+       … in an operand of '+'
          at /pwd/lang/eval-fail-nested-list-items.nix:12:3:
            11| ""
            12| + (

@@ -6,7 +6,7 @@ error:
              |   ^
             4|     "1"
 
-       … while evaluating a path segment
+       … while evaluating a string interpolation
          at /pwd/lang/eval-fail-interpolation-list.nix:2:2:
             1| # Interpolation does weak coercion after peeling.
             2| "${{
