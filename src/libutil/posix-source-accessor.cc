@@ -706,6 +706,68 @@ ref<SourceAccessor> getFSSourceAccessor()
     return rootFS;
 }
 
+namespace {
+
+/* A helper class that holds the symlink destination in memory. */
+class SymlinkSourceAccessor : public MemorySourceAccessor
+{
+    bool trackLastModified;
+    std::time_t mtime;
+    std::filesystem::path fsPath;
+
+public:
+    SymlinkSourceAccessor(std::string target, std::filesystem::path fsPath_, bool trackLastModified, std::time_t mtime)
+        : trackLastModified(trackLastModified)
+        , mtime(mtime)
+        , fsPath(std::move(fsPath_))
+    {
+        MemorySink sink{*this};
+        sink.createSymlink(target);
+        displayPrefix = fsPath.string();
+    }
+
+    std::optional<std::time_t> getLastModified() override
+    {
+        return trackLastModified ? std::optional{mtime} : std::nullopt;
+    }
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return fsPath;
+        return fsPath / path.rel(); /* RHS must be a relative path. */
+    }
+
+    std::string showPath(const CanonPath & path) override
+    {
+        /* When rendering the file itself omit the trailing slash. */
+        return path.isRoot() ? displayPrefix : SourceAccessor::showPath(path);
+    }
+};
+
+} // namespace
+
+/**
+ * Make an accessor for the regular file or directory @p fd, whose
+ * status is @p st, at @p root.
+ */
+static ref<SourceAccessor>
+makeFSSourceAccessor(AutoCloseFD fd, const PosixStat & st, std::filesystem::path root, bool trackLastModified)
+{
+    if (S_ISREG(st.st_mode))
+        return make_ref<PosixFileSourceAccessor>(std::move(fd), std::move(root), trackLastModified, st);
+
+    else if (S_ISDIR(st.st_mode)) {
+        auto res = make_ref<PosixDirectorySourceAccessor>(
+            std::move(fd), std::move(root), trackLastModified, PosixDirectorySourceAccessor::getGlobalFdLimit() / 8);
+        PosixDirectorySourceAccessor::registerAccessor(res);
+        return res;
+    }
+
+    else
+        throw Error("file %1% has an unsupported type", PathFmt(root));
+}
+
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified, FinalSymlink finalSymlink)
 {
     assert(root.is_absolute());
@@ -742,44 +804,6 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
             throw NativeSysError(fd.error(), "opening file %1%", PathFmt(root));
 #endif
 
-        /* A helper class that holds the symlink destination in memory. */
-        class SymlinkSourceAccessor : public MemorySourceAccessor
-        {
-            bool trackLastModified;
-            std::time_t mtime;
-            std::filesystem::path fsPath;
-
-        public:
-            SymlinkSourceAccessor(
-                std::string target, std::filesystem::path fsPath_, bool trackLastModified, std::time_t mtime)
-                : trackLastModified(trackLastModified)
-                , mtime(mtime)
-                , fsPath(std::move(fsPath_))
-            {
-                MemorySink sink{*this};
-                sink.createSymlink(target);
-                displayPrefix = fsPath.string();
-            }
-
-            std::optional<std::time_t> getLastModified() override
-            {
-                return trackLastModified ? std::optional{mtime} : std::nullopt;
-            }
-
-            std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
-            {
-                if (path.isRoot())
-                    return fsPath;
-                return fsPath / path.rel(); /* RHS must be a relative path. */
-            }
-
-            std::string showPath(const CanonPath & path) override
-            {
-                /* When rendering the file itself omit the trailing slash. */
-                return path.isRoot() ? displayPrefix : SourceAccessor::showPath(path);
-            }
-        };
-
         assert(root.has_parent_path());
         assert(root.has_filename());
 
@@ -811,21 +835,40 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
 #ifndef _WIN32
     auto st = nix::fstat(fd.value().get());
 #endif
-    if (S_ISREG(st.st_mode))
-        return make_ref<PosixFileSourceAccessor>(std::move(fd).value(), std::move(root), trackLastModified, st);
+    return makeFSSourceAccessor(std::move(fd).value(), st, std::move(root), trackLastModified);
+}
 
-    else if (S_ISDIR(st.st_mode)) {
-        auto res = make_ref<PosixDirectorySourceAccessor>(
-            std::move(fd).value(),
-            std::move(root),
-            trackLastModified,
-            PosixDirectorySourceAccessor::getGlobalFdLimit() / 8);
-        PosixDirectorySourceAccessor::registerAccessor(res);
-        return res;
+ref<SourceAccessor>
+makeFSSourceAccessor(Descriptor dirFd, const OsFilename & name, std::filesystem::path root, bool trackLastModified)
+{
+    assert(root.is_absolute());
+
+    auto st = fstatat(dirFd, name);
+
+    if (S_ISLNK(st.st_mode)) {
+        auto linkTarget = os_string_to_string(readLinkAt(dirFd, name));
+        return make_ref<SymlinkSourceAccessor>(std::move(linkTarget), std::move(root), trackLastModified, st.st_mtime);
     }
 
-    else
-        throw Error("file %1% has an unsupported type", PathFmt(root));
+    auto fd = valueOr(
+        openFileEnsureBeneathNoSymlinks(
+            dirFd,
+            name,
+#ifdef _WIN32
+            /* Neither `FILE_DIRECTORY_FILE` nor `FILE_NON_DIRECTORY_FILE`,
+               so that either can be opened, like `O_RDONLY` on Unix. */
+            GENERIC_READ,
+            0
+#else
+            O_RDONLY | O_CLOEXEC
+#endif
+            ),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %1%", PathFmt(root)));
+
+    /* The type may have changed since the `fstatat` above, so go by
+       what was actually opened. */
+    auto openedSt = nix::fstat(fd.get());
+    return makeFSSourceAccessor(std::move(fd), openedSt, std::move(root), trackLastModified);
 }
 
 } // namespace nix

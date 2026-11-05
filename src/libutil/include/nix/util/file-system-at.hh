@@ -277,6 +277,18 @@ void deletePathAt(Descriptor dirFd, const OsCanonPath & path);
  */
 void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst);
 
+/**
+ * Like `makeFSSourceAccessor(std::filesystem::path, bool, FinalSymlink)`
+ * with `FinalSymlink::DontFollow`, but for @p name in the directory
+ * @p dirFd.
+ *
+ * @param root The path of @p name in @p dirFd. It is not used to
+ * access the file system, only for display and
+ * `SourceAccessor::getPhysicalPath`.
+ */
+ref<SourceAccessor> makeFSSourceAccessor(
+    Descriptor dirFd, const OsFilename & name, std::filesystem::path root, bool trackLastModified = false);
+
 #ifdef __linux__
 namespace linux {
 

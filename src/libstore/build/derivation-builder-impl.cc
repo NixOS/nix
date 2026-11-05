@@ -411,11 +411,16 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                     MaskedHashSink caSink{outputHash.hashAlgo, oldHashPart};
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
-                        {makeFSSourceAccessor(actualPath), CanonPath::root}, caSink, (FileSerialisationMethod) fim);
+                        {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root},
+                        caSink,
+                        (FileSerialisationMethod) fim);
                     return caSink.finish().hash;
                 }
                 case FileIngestionMethod::Git: {
-                    return git::dumpHash(outputHash.hashAlgo, {makeFSSourceAccessor(actualPath), CanonPath::root}).hash;
+                    return git::dumpHash(
+                               outputHash.hashAlgo,
+                               {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root})
+                        .hash;
                 }
                 }
                 assert(false);
@@ -437,7 +442,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 
             {
                 HashResult narHashAndSize = hashPath(
-                    {makeFSSourceAccessor(actualPath), CanonPath::root},
+                    {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.hash;
@@ -458,7 +463,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 
             /* Copy files to break stale file descriptors. copyRecursive below will use
                reflinking to optimise the copying overhead. */
-            auto pathAccessor = makeFSSourceAccessor(actualPath);
+            auto pathAccessor = makeFSSourceAccessor(actualDirFd, actualName, actualPath);
             auto restoreSink = RestoreSink::forPath(tmpOutput, store->getLocalSettings().fsyncStorePaths);
             copyRecursive(*pathAccessor, CanonPath::root, restoreSink);
             /* This makes it slightly harder to make sense of the control flow. The rule
@@ -482,7 +487,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                             std::string{scratchPath->hashPart()}, std::string{requiredFinalPath.hashPart()});
                     rewriteOutput(outputRewrites);
                     HashResult narHashAndSize = hashPath(
-                        {makeFSSourceAccessor(actualPath), CanonPath::root},
+                        {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root},
                         FileSerialisationMethod::NixArchive,
                         HashAlgorithm::SHA256);
                     ValidPathInfo newInfo0{requiredFinalPath, {*store, narHashAndSize.hash}};

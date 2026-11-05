@@ -1155,7 +1155,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 if (info.ca) {
                     auto & specified = *info.ca;
                     auto actualHash = ({
-                        SourcePath sourcePath = {makeFSSourceAccessor(tempPath)};
+                        SourcePath sourcePath = {
+                            makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath)};
                         Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
                         switch (fim) {
@@ -1209,7 +1210,10 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
                     auto copySink = RestoreSink::forPath(
                         realPath, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get());
-                    copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink);
+                    copyRecursive(
+                        *makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath),
+                        CanonPath::root,
+                        copySink);
                 }
 
                 /* Clean up the staging directory. */
@@ -1355,7 +1359,11 @@ StorePath LocalStore::addToStoreFromDump(
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
         methodsMatch ? dumpHash
-                     : hashPath(makeFSSourceAccessor(tempPath), hashMethod.getFileIngestionMethod(), hashAlgo).first,
+                     : hashPath(
+                           makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath),
+                           hashMethod.getFileIngestionMethod(),
+                           hashAlgo)
+                           .first,
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1419,7 +1427,10 @@ StorePath LocalStore::addToStoreFromDump(
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
                     auto copySink = RestoreSink::forPath(
                         realPath, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get());
-                    copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink);
+                    copyRecursive(
+                        *makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath),
+                        CanonPath::root,
+                        copySink);
                     delTempDir->deletePath();
                 }
             }
