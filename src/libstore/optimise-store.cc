@@ -4,6 +4,7 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/system-error.hh"
 
 #include <cstdlib>
 #include <cstring>

@@ -1,5 +1,6 @@
 #ifdef __FreeBSD__
 #  include "nix/util/freebsd-jail.hh"
+#  include "nix/util/system-error.hh"
 
 #  include <sys/resource.h>
 #  include <sys/param.h>

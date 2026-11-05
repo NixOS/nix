@@ -1,5 +1,6 @@
 #include "nix/util/processes.hh"
 #include "nix/util/current-process.hh"
+#include "nix/util/system-error.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

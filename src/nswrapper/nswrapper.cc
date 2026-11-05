@@ -2,6 +2,7 @@
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/util.hh"
+#include "nix/util/system-error.hh"
 #include <grp.h>
 #include <string>
 #include <sys/mount.h>

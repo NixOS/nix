@@ -13,6 +13,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/url.hh"
 #include "nix/store/path.hh"
+#include "nix/util/system-error.hh"
 
 #include "man-pages.hh"
 

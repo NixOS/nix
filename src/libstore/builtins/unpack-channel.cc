@@ -1,5 +1,6 @@
 #include "nix/store/builtins.hh"
 #include "nix/util/tarfile.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

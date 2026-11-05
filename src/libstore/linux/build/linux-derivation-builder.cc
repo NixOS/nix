@@ -15,6 +15,7 @@
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
 #include "linux/fchmodat2-compat.hh"
+#include "nix/util/system-error.hh"
 
 #include <algorithm>
 #include <string_view>

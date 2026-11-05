@@ -1,5 +1,6 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include <cmath>
 
 #define WIN32_LEAN_AND_MEAN

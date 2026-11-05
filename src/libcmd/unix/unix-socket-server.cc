@@ -8,6 +8,7 @@
 #include "nix/util/strings.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
+#include "nix/util/system-error.hh"
 
 #include <ranges>
 

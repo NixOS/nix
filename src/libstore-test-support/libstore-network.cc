@@ -1,5 +1,6 @@
 #include "nix/store/tests/libstore-network.hh"
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/environment-variables.hh"
 
 #ifdef __linux__

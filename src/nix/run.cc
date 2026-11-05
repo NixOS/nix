@@ -10,6 +10,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/util/util.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/system-error.hh"
 
 #include <filesystem>
 

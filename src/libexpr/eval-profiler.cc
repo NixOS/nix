@@ -2,6 +2,7 @@
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
 #include "nix/util/lru-cache.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

@@ -3,6 +3,7 @@
 #include "nix/util/source-path.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

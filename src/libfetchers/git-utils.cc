@@ -1,4 +1,5 @@
 #include "nix/fetchers/git-utils.hh"
+#include "nix/util/system-error.hh"
 
 #include "fetchers-config-private.hh"
 #include "nix/fetchers/git-lfs-fetch.hh"

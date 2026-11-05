@@ -3,6 +3,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/system-error.hh"
 
 #include <nlohmann/json.hpp>
 

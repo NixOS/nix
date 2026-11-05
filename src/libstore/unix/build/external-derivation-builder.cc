@@ -1,5 +1,6 @@
 #include "unix-derivation-builder-impl.hh"
 #include "child-impl.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

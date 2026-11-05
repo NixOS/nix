@@ -5,6 +5,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/system-error.hh"
 
 #ifdef _WIN32
 #  include "nix/util/tests/wine.hh"

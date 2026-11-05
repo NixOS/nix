@@ -2,6 +2,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/system-error.hh"
 
 #include "linux-namespaces-private.hh"
 

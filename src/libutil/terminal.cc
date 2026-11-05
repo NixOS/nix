@@ -2,6 +2,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/file-descriptor.hh"
 
 #ifdef _WIN32
