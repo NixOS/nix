@@ -185,6 +185,7 @@ sources = [ config_priv_h ] + files(
   'experimental-features.cc',
   'file-content-address.cc',
   'file-descriptor.cc',
+  'file-system-at.cc',
   'file-system.cc',
   'filename.cc',
   'fs-sink.cc',

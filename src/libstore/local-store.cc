@@ -1218,8 +1218,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
                 if (config->getLocalSettings().fsyncStorePaths) {
-                    recursiveSync(realPath);
-                    syncParent(realPath);
+                    recursiveSyncAt(getRealStoreDirFd(), OsFilename{info.path.filename()});
+                    syncDescriptor(getRealStoreDirFd());
                 }
 
                 registerValidPath(info);
@@ -1429,8 +1429,8 @@ StorePath LocalStore::addToStoreFromDump(
             optimisePath(realPath, repair);
 
             if (localSettings.fsyncStorePaths) {
-                recursiveSync(realPath);
-                syncParent(realPath);
+                recursiveSyncAt(getRealStoreDirFd(), OsFilename{dstPath.filename()});
+                syncDescriptor(getRealStoreDirFd());
             }
 
             auto info = ValidPathInfo::makeFromCA(*this, name, std::move(desc), narHash.hash);

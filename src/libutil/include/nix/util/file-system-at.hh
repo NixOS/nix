@@ -231,6 +231,18 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
  */
 void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTime, time_t modificationTime);
 
+/**
+ * Flush the file or entire directory tree @p name, relative to the
+ * directory @p dirFd, to disk. Symlinks are not followed, at the top or
+ * within the tree.
+ *
+ * This does not flush @p dirFd itself, so the entry for @p name in it
+ * is only durable once the caller syncs that too.
+ *
+ * @throws SystemError on I/O errors.
+ */
+void recursiveSyncAt(Descriptor dirFd, const OsFilename & name);
+
 #ifdef __linux__
 namespace linux {
 

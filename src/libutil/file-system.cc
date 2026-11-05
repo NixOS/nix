@@ -14,7 +14,6 @@
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
-#include <deque>
 #include <filesystem>
 
 #include <fcntl.h>
@@ -322,62 +321,6 @@ void syncParent(const std::filesystem::path & path)
         NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
     /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
     fd.fsync();
-}
-
-void recursiveSync(const std::filesystem::path & path)
-{
-    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
-    /* If it's a file or symlink, just fsync and return. */
-    auto st = lstat(path);
-    if (S_ISREG(st.st_mode)) {
-        auto fd = valueOr(
-            openFileReadonly(path, FinalSymlink::DontFollow),
-            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
-        fd.fsync();
-        return;
-    } else if (S_ISLNK(st.st_mode))
-        return;
-
-    /* Otherwise, perform a depth-first traversal of the directory and
-       fsync all the files. */
-    std::deque<std::filesystem::path> dirsToEnumerate;
-    dirsToEnumerate.push_back(path);
-    std::vector<std::filesystem::path> dirsToFsync;
-    while (!dirsToEnumerate.empty()) {
-        auto currentDir = dirsToEnumerate.back();
-        dirsToEnumerate.pop_back();
-        for (const auto & entry : DirectoryIterator(currentDir)) {
-            auto entryPath = currentDir / entry.name.path();
-            auto type = entry.type != std::filesystem::file_type::none
-                            ? entry.type
-                            : std::filesystem::symlink_status(entryPath).type();
-            NIX_INCOMPLETE_SWITCH_BEGIN
-            switch (type) {
-            case std::filesystem::file_type::directory:
-                dirsToEnumerate.emplace_back(std::move(entryPath));
-                break;
-            case std::filesystem::file_type::regular: {
-                auto fd = valueOr(
-                    openFileReadonly(entryPath, FinalSymlink::DontFollow),
-                    NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %1%", PathFmt(entryPath)));
-                fd.fsync();
-                break;
-            }
-            default:
-                break;
-            }
-            NIX_INCOMPLETE_SWITCH_END
-        }
-        dirsToFsync.emplace_back(std::move(currentDir));
-    }
-
-    /* Fsync all the directories. */
-    for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        auto fd = valueOr(
-            openDirectory(*dir, FinalSymlink::DontFollow),
-            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %1%", PathFmt(*dir)));
-        fd.fsync();
-    }
 }
 
 void createDirs(const std::filesystem::path & path)

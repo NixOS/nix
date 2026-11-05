@@ -318,6 +318,40 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 }
 
 /* ----------------------------------------------------------------------------
+ * recursiveSyncAt
+ * --------------------------------------------------------------------------*/
+
+/* Not on Windows, where flushing needs write access that
+   `recursiveSyncAt` doesn't open with yet. */
+#ifndef _WIN32
+TEST(recursiveSyncAt, works)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    auto root = tmpDir / "root";
+    createDirs(root / "sub");
+    writeFile(root / "file", "hello");
+    writeFile(root / "sub" / "file", "world");
+    /* Dangling, so following it would fail. */
+    createSymlink("nonexistent", root / "dangling");
+    createSymlink("nonexistent", tmpDir / "dangling");
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A whole tree, including a symlink within it. */
+    EXPECT_NO_THROW(recursiveSyncAt(dirFd.get(), OsFilename::fromPathAsserting("root")));
+
+    /* A regular file or symlink at the top. */
+    auto rootFd = testing::valueOrFail(openDirectory(root, FinalSymlink::Follow));
+    EXPECT_NO_THROW(recursiveSyncAt(rootFd.get(), OsFilename::fromPathAsserting("file")));
+    EXPECT_NO_THROW(recursiveSyncAt(dirFd.get(), OsFilename::fromPathAsserting("dangling")));
+
+    EXPECT_THROW(recursiveSyncAt(dirFd.get(), OsFilename::fromPathAsserting("nonexistent")), SystemError);
+}
+#endif
+
+/* ----------------------------------------------------------------------------
  * openFileEnsureBeneathNoSymlinks — O_NOFOLLOW is forbidden
  * --------------------------------------------------------------------------*/
 
