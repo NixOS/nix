@@ -599,6 +599,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
 
     // Mark the directory as writable so that we can delete its children
     if (andDelete && std::filesystem::is_directory(fromStatus)) {
+        // NOLINTNEXTLINE(bugprone-unsafe-functions): `nix::chmod` can neither add bits nor not follow symlinks
         std::filesystem::permissions(
             from,
             std::filesystem::perms::owner_write,
@@ -626,6 +627,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
     setWriteTime(to, lstat(from));
     if (andDelete) {
         if (!std::filesystem::is_symlink(fromStatus))
+            // NOLINTNEXTLINE(bugprone-unsafe-functions): `nix::chmod` can neither add bits nor not follow symlinks
             std::filesystem::permissions(
                 from,
                 std::filesystem::perms::owner_write,
