@@ -105,10 +105,11 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthor
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
 
     for (auto & entry : DirectoryIterator{cacheDir})
-        if (entry.path().extension() == ".narinfo") {
-            auto content = readFile(entry.path());
+        if (entry.name.path().extension() == ".narinfo") {
+            auto entryPath = cacheDir / entry.name.path();
+            auto content = readFile(entryPath);
             content = std::regex_replace(content, std::regex("URL: nar/"), fmt("URL: https://127.0.0.1:%d/nar/", port));
-            writeFile(entry.path(), content);
+            writeFile(entryPath, content);
         }
 
     auto config = makeConfig();

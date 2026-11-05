@@ -133,7 +133,7 @@ std::tuple<StorePath, Hash> prefetchFile(
                 throw Error("archive '%s' is empty", url.to_string());
             /* If the archive unpacks to a single file/directory, then use
                that as the top-level. */
-            tmpFile = entries->path();
+            tmpFile = unpacked / entries->name.path();
             auto fileCount = std::distance(entries, DirectoryIterator{});
             if (fileCount != 1) {
                 /* otherwise, use the directory itself */

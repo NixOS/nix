@@ -1,4 +1,5 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/file-path-impl.hh"
 #include "nix/util/signals.hh"
@@ -34,34 +35,12 @@
 
 namespace nix {
 
-DirectoryIterator::DirectoryIterator(const std::filesystem::path & p)
+DirectoryIterator::DirectoryIterator(const std::filesystem::path & path)
 {
-    try {
-        // **Attempt to create the underlying directory_iterator**
-        it_ = std::filesystem::directory_iterator(p);
-    } catch (const std::filesystem::filesystem_error & e) {
-        // **Catch filesystem_error and throw SystemError**
-        // Adapt the error message as needed for SystemError
-        throw SystemError(e.code(), "cannot read directory %s", PathFmt(p));
-    }
-}
-
-DirectoryIterator & DirectoryIterator::operator++()
-{
-    // **Attempt to increment the underlying iterator**
-    std::error_code ec;
-    it_.increment(ec);
-    if (ec) {
-        // Try to get path info if possible, might fail if iterator is bad
-        try {
-            if (it_ != std::filesystem::directory_iterator{}) {
-                throw SysError("cannot read directory past %s: %s", PathFmt(it_->path()), ec.message());
-            }
-        } catch (...) {
-            throw SysError("cannot read directory");
-        }
-    }
-    return *this;
+    auto fd = openDirectory(path, FinalSymlink::Follow);
+    if (!fd)
+        throw NativeSysError("cannot read directory %s", PathFmt(path));
+    *this = DirectoryIterator{std::move(fd)};
 }
 
 std::filesystem::path
@@ -216,11 +195,19 @@ bool pathAccessible(const std::filesystem::path & path)
 std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::read_symlink on Windows yet
+    auto parentDir = openDirectory(path.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(path));
+    return readLinkAt(parentDir.get(), OsFilename::fromPathThrowing(path.filename()));
+#else
     try {
         return std::filesystem::read_symlink(path);
     } catch (std::filesystem::filesystem_error & e) {
         throw SystemError(e.code(), "reading symbolic link %s", PathFmt(path));
     }
+#endif
 }
 
 std::string readFile(const std::filesystem::path & path)
@@ -362,15 +349,28 @@ void recursiveSync(const std::filesystem::path & path)
         auto currentDir = dirsToEnumerate.back();
         dirsToEnumerate.pop_back();
         for (auto & entry : DirectoryIterator(currentDir)) {
-            auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
-                dirsToEnumerate.emplace_back(entry.path());
-            } else if (std::filesystem::is_regular_file(st)) {
-                AutoCloseFD fd = openFileReadonly(entry.path(), FinalSymlink::DontFollow);
+            auto entryPath = currentDir / entry.name.path();
+            auto type = entry.type != std::filesystem::file_type::none
+                            ? entry.type
+                            : std::filesystem::symlink_status(entryPath).type();
+// Allow selecting a subset of enum values
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+            switch (type) {
+            case std::filesystem::file_type::directory:
+                dirsToEnumerate.emplace_back(std::move(entryPath));
+                break;
+            case std::filesystem::file_type::regular: {
+                AutoCloseFD fd = openFileReadonly(entryPath, FinalSymlink::DontFollow);
                 if (!fd)
-                    throw NativeSysError("opening file %1%", PathFmt(entry.path()));
+                    throw NativeSysError("opening file %1%", PathFmt(entryPath));
                 fd.fsync();
+                break;
             }
+            default:
+                break;
+            }
+#pragma GCC diagnostic pop
         }
         dirsToFsync.emplace_back(std::move(currentDir));
     }
@@ -539,10 +539,18 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
 
 void createSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
 {
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::create_symlink on Windows yet
+    auto parentDir = openDirectory(link.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(link));
+    createUnknownSymlinkAt(parentDir.get(), OsFilename::fromPathThrowing(link.filename()), target.native());
+#else
     std::error_code ec;
     std::filesystem::create_symlink(target, link, ec);
     if (ec)
-        throw SysError(ec.value(), "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+        throw SystemError(ec, "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+#endif
 }
 
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
@@ -552,11 +560,11 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         tmp = tmp.lexically_normal();
 
         try {
-            std::filesystem::create_symlink(target, tmp);
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() == std::errc::file_exists)
+            createSymlink(target, tmp);
+        } catch (SystemError & e) {
+            if (e.is(std::errc::file_exists))
                 continue;
-            throw SystemError(e.code(), "creating symlink %1% -> %2%", PathFmt(tmp), PathFmt(target));
+            throw;
         }
 
         try {
@@ -569,11 +577,6 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
 
         break;
     }
-}
-
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
-{
-    setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
 }
 
 void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents)
@@ -600,13 +603,23 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);
         for (auto & entry : DirectoryIterator(from)) {
-            copyFile(entry, to / entry.path().filename(), andDelete);
+            copyFile(from / entry.name.path(), to / entry.name.path(), andDelete);
         }
     } else {
         throw Error("file %s has an unsupported type", PathFmt(from));
     }
 
-    setWriteTime(to, lstat(from));
+    /* TODO: Temporary. Once `copyFile` is descriptor-based throughout, it
+       will already have a handle to the destination's parent, and won't
+       need to `lstat` and reopen by path here. */
+    {
+        auto st = lstat(from);
+        auto parentFd = openDirectory(to.parent_path(), FinalSymlink::Follow);
+        if (!parentFd)
+            throw NativeSysError("opening parent directory of %s", PathFmt(to));
+        setWriteTime(parentFd.get(), OsFilename::fromPathThrowing(to.filename()), st.st_atime, st.st_mtime);
+    }
+
     if (andDelete) {
         if (!std::filesystem::is_symlink(fromStatus))
             std::filesystem::permissions(

@@ -6,6 +6,7 @@
 #include <windows.h>
 
 #include <boost/format.hpp>
+#include <array>
 #include <chrono>
 
 // Verify that our S_IFLNK polyfill doesn't conflict with Windows file type constants
@@ -16,16 +17,82 @@ static_assert(S_IFLNK != S_IFCHR, "S_IFLNK must not equal S_IFCHR");
 
 namespace nix {
 
-void setWriteTime(
-    const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
+struct DirectoryIterator::PlatformState : State
 {
-    // FIXME use `std::filesystem::last_write_time`.
-    //
-    // Would be nice to use std::filesystem unconditionally, but
-    // doesn't support access time just modification time.
-    //
-    // System clock vs File clock issues also make that annoying.
-    warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
+    AutoCloseFD handle;
+
+    alignas(LONGLONG) std::array<std::byte, 64 * 1024> buf;
+
+    /**
+     * Offset of the next record in `buf`, or `std::nullopt` once the
+     * records in `buf` are used up and the next batch must be read.
+     */
+    std::optional<size_t> next;
+
+    bool restart = true;
+};
+
+DirectoryIterator::DirectoryIterator(AutoCloseFD dirFd)
+{
+    using namespace nix::windows;
+
+    /* `openDirectory()` can open non-directories too (thanks to
+       `FILE_FLAG_BACKUP_SEMANTICS`), so report those up front, as
+       `ENOTDIR` would on Unix. */
+    BY_HANDLE_FILE_INFORMATION info;
+    if (!GetFileInformationByHandle(dirFd.get(), &info))
+        throw WinError("getting file information for %s", PathFmt(descriptorToPath(dirFd.get())));
+    if (!(info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+        throw WinError(DWORD{ERROR_DIRECTORY}, "cannot read directory %s", PathFmt(descriptorToPath(dirFd.get())));
+
+    auto s = std::make_shared<PlatformState>();
+    s->handle = std::move(dirFd);
+    state = std::move(s);
+    ++*this;
+}
+
+DirectoryIterator & DirectoryIterator::operator++()
+{
+    using namespace nix::windows;
+    using T = std::filesystem::file_type;
+
+    auto & s = static_cast<PlatformState &>(*state);
+    while (true) {
+        if (!s.next) {
+            if (!GetFileInformationByHandleEx(
+                    s.handle.get(),
+                    s.restart ? FileIdBothDirectoryRestartInfo : FileIdBothDirectoryInfo,
+                    s.buf.data(),
+                    s.buf.size())) {
+                if (GetLastError() == ERROR_NO_MORE_FILES) {
+                    state.reset();
+                    return *this;
+                }
+                throw WinError("reading directory %s", PathFmt(descriptorToPath(s.handle.get())));
+            }
+            s.restart = false;
+            s.next = 0;
+        }
+
+        auto & info = *reinterpret_cast<const FILE_ID_BOTH_DIR_INFO *>(s.buf.data() + *s.next);
+        if (info.NextEntryOffset)
+            *s.next += info.NextEntryOffset;
+        else
+            s.next.reset();
+
+        std::wstring_view name{info.FileName, info.FileNameLength / sizeof(wchar_t)};
+        if (name == L"." || name == L"..")
+            continue;
+        s.entry = DirectoryEntry{
+            .name = OsFilename::fromPathAsserting(std::filesystem::path{name}),
+            /* Every reparse point is reported as a symlink, consistent
+               with `fstat`. */
+            .type = info.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT ? T::symlink
+                    : info.FileAttributes & FILE_ATTRIBUTE_DIRECTORY   ? T::directory
+                                                                       : T::regular,
+        };
+        return *this;
+    }
 }
 
 AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
@@ -48,7 +115,10 @@ AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink fi
         FILE_SHARE_READ | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
+        /* `FILE_FLAG_BACKUP_SEMANTICS` so that directories can be opened
+           too, like `open(O_RDONLY)` on Unix. */
+        FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS
+            | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
         /*hTemplateFile=*/nullptr)};
 }
 

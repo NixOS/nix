@@ -46,6 +46,11 @@ void ChrootDerivationBuilder::prepareSandbox()
     chrootRootDir = std::move(rootDir);
     autoDelChroot.emplace(std::move(cleanup));
 
+    auto chrootStoreDir = chrootRootDir / std::filesystem::path{store->storeDir}.relative_path();
+    chrootStoreDirFd = openDirectory(chrootStoreDir, FinalSymlink::DontFollow);
+    if (!chrootStoreDirFd)
+        throw NativeSysError("opening %s", PathFmt(chrootStoreDir));
+
     // Start with the default sandbox paths
     pathsInChroot = getPathsInSandbox();
 
@@ -81,6 +86,12 @@ std::filesystem::path ChrootDerivationBuilder::realPathInHost(const StorePath & 
     // FIXME: why the needsHashRewrite() conditional?
     return !needsHashRewrite() ? chrootRootDir / std::filesystem::path{store->printStorePath(p)}.relative_path()
                                : store->toRealPath(p);
+}
+
+Descriptor ChrootDerivationBuilder::realStoreDirFdInHost()
+{
+    /* Same condition as `realPathInHost()`. */
+    return !needsHashRewrite() ? chrootStoreDirFd.get() : UnixDerivationBuilderImpl::realStoreDirFdInHost();
 }
 
 void ChrootDerivationBuilder::cleanupBuild(bool force)

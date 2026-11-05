@@ -162,7 +162,7 @@ jobs:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
     - name: Build and test Windows components
       run: |
-        nix build --file ci/gha/tests/windows.nix crossBuild unitTests.nix-util-tests -L
+        nix build --file ci/gha/tests/windows.nix crossBuild unitTests -L
 
   installer_test:
     needs: [tests]
