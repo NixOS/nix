@@ -19,6 +19,7 @@
 #include "man-pages.hh"
 #include "nix/util/socket.hh"
 #include "nix/util/current-process.hh"
+#include "nix/util/system-error.hh"
 
 #include <algorithm>
 #include <climits>

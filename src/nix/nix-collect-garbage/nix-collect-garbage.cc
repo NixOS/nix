@@ -1,6 +1,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/gc-store.hh"

@@ -2,6 +2,7 @@
 #include "nix/store/builtins.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/system-error.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>

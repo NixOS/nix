@@ -95,6 +95,7 @@ headers = [ config_pub_h ] + files(
   'strings.hh',
   'suggestions.hh',
   'sync.hh',
+  'system-error.hh',
   'table.hh',
   'tarfile.hh',
   'terminal.hh',

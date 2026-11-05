@@ -1,5 +1,6 @@
 #include "nix/util/compression.hh"
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/config.hh"
 
 #include <gtest/gtest.h>

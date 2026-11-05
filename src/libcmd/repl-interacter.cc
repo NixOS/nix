@@ -23,6 +23,7 @@ extern "C" {
 #include "nix/util/file-system.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

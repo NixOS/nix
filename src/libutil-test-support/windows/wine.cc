@@ -1,6 +1,7 @@
 #include "nix/util/tests/wine.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/file-system-at.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix::windows {
 

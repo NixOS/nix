@@ -1,4 +1,5 @@
 #include "nix/cmd/command.hh"
+#include "nix/util/system-error.hh"
 
 #include "cli-config-private.hh"
 #include "nix/util/config-global.hh"

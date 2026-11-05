@@ -3,6 +3,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
+#include "nix/util/system-error.hh"
 
 #include <memory>
 #include <span>

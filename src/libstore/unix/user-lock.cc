@@ -8,6 +8,7 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/util/users.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

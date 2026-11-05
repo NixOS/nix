@@ -22,6 +22,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/socket.hh"
+#include "nix/util/system-error.hh"
 
 #include <variant>
 #include <utility>

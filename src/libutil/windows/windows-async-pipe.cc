@@ -1,4 +1,5 @@
 #include "nix/util/windows-async-pipe.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix::windows {
 

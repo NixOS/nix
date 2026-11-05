@@ -12,6 +12,7 @@
 #include "nix/fetchers/tarball.hh"
 #include "self-exe.hh"
 #include "man-pages.hh"
+#include "nix/util/system-error.hh"
 
 #include <fcntl.h>
 #include <regex>

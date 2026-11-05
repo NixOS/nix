@@ -2,6 +2,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/system-error.hh"
 
 #include "file-descriptor-private.hh"
 

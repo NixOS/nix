@@ -2,6 +2,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/config.hh"
+#include "nix/util/system-error.hh"
 
 #include <boost/context/detail/exception.hpp>
 

@@ -1,5 +1,6 @@
 #include "nix/util/nar-cache.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/system-error.hh"
 
 #include <nlohmann/json.hpp>
 #include <sys/types.h>

@@ -14,6 +14,7 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/util/system-error.hh"
 
 #include <sys/un.h>
 #include <fcntl.h>

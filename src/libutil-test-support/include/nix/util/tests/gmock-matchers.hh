@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/terminal.hh"
 #include <gmock/gmock.h>

@@ -10,6 +10,7 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/executable-path.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

@@ -6,6 +6,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/config.hh"
+#include "nix/util/system-error.hh"
 
 #include "linux/linux-namespaces-private.hh"
 #include "unix/signals-private.hh"

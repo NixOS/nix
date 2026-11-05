@@ -7,6 +7,7 @@
 #include "nix/util/muxable-pipe.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/system-error.hh"
 
 #include <windows.h>
 

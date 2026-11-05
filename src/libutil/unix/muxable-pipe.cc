@@ -2,6 +2,7 @@
 
 #include "nix/util/util.hh"
 #include "nix/util/muxable-pipe.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

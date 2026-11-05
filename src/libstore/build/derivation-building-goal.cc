@@ -2,6 +2,7 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/daemon.hh"
+#include "nix/util/system-error.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"

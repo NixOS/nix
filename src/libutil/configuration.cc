@@ -5,6 +5,7 @@
 #include "nix/util/experimental-features.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/system-error.hh"
 
 #include "nix/util/config-impl.hh"
 

@@ -1,6 +1,7 @@
 #include <fcntl.h>
 
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/fs-sink.hh"

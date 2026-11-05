@@ -6,6 +6,7 @@
 #include "nix/store/store-open.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/hash.hh"
+#include "nix/util/system-error.hh"
 
 #ifndef _WIN32
 

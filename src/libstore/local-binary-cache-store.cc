@@ -2,6 +2,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/system-error.hh"
 
 #include <atomic>
 
