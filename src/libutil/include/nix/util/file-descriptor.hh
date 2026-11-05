@@ -9,14 +9,18 @@
  * @ref file-system-at.hh.
  */
 
-#include "nix/util/canon-path.hh"
 #include "nix/util/error.hh"
-#include "nix/util/os-string.hh"
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #endif
+
+#include <sys/types.h>
+
+#include <span>
+#include <cstddef>
+#include <type_traits>
 
 namespace nix {
 

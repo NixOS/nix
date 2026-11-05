@@ -5,6 +5,7 @@
 #include "nix/util/tarfile.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/os-string.hh"
+#include "nix/util/canon-path.hh"
 
 namespace nix {
 
@@ -231,6 +232,7 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
         auto path = archive_entry_pathname(entry);
         if (!path)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
+        /* TODO: Reject `..` components like the above ARCHIVE_EXTRACT_SECURE_NODOTDOT. */
         auto cpath = CanonPath{path};
         if (r == ARCHIVE_WARN)
             warn("getting archive member '%1%': %2%", path, archive_error_string(archive.archive));

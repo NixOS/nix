@@ -2,6 +2,7 @@
 #include "nix/util/chunked-vector.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/canon-path.hh"
 #include "nix/util/util.hh"
 
 #include <cassert>
