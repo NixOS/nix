@@ -107,6 +107,18 @@ path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" 
 [[ $(cat "$path/a/b/foo") = foo ]]
 [[ $(cat "$path/bla") = abc ]]
 
+# Test that a tarball URL that isn't in canonical form (`+` rather
+# than `%2B`) hits the cache.
+rm -rf "$TEST_ROOT/tar_root"
+mkdir -p "$TEST_ROOT/tar_root"
+echo v1 > "$TEST_ROOT/tar_root/foo"
+tar cvf "$TEST_ROOT/a+b.tar" -C "$TEST_ROOT/tar_root" .
+expr="builtins.readFile ((fetchTree { type = \"tarball\"; url = \"file://$TEST_ROOT/a+b.tar\"; }) + \"/foo\")"
+[[ $(nix eval --impure --raw --expr "$expr") = v1 ]]
+echo v2 > "$TEST_ROOT/tar_root/foo"
+tar cvf "$TEST_ROOT/a+b.tar" -C "$TEST_ROOT/tar_root" .
+[[ $(nix eval --impure --raw --expr "$expr") = v1 ]]
+
 # Test that unpacking an empty file does not segfault (see https://github.com/NixOS/nix/issues/15116).
 touch "$TEST_ROOT/empty"
 expectStderr 1 nix store prefetch-file --unpack "file://$TEST_ROOT/empty" | grepQuiet "archive.*is empty"

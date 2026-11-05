@@ -9,7 +9,7 @@ let
   pkgs = config.nodes.machine.nixpkgs.pkgs;
 
   root = pkgs.runCommand "nixpkgs-flake" { } ''
-    mkdir -p $out/{stable,tags}
+    mkdir -p $out/{stable,tags,plus}
 
     set -x
     dir=nixpkgs-${nixpkgs.shortRev}
@@ -26,6 +26,14 @@ let
     cat >$out/tags/.htaccess <<EOF
     Redirect "/tags/latest.tar.gz" "/stable/${nixpkgs.rev}.tar.gz"
     Header always set Link "<http://localhost/stable/${nixpkgs.rev}.tar.gz?rev=${nixpkgs.rev}&revCount=1234>; rel=\"immutable\""
+    EOF
+
+    # Like above, but redirect to a URL that contains a `+`, which Nix
+    # encodes as `%2B` in the locked URL (like FlakeHub URLs).
+    ln $out/stable/${nixpkgs.rev}.tar.gz $out/stable/1.0+rev-${nixpkgs.rev}.tar.gz
+    cat >$out/plus/.htaccess <<EOF
+    Redirect "/plus/latest.tar.gz" "/stable/1.0+rev-${nixpkgs.rev}.tar.gz"
+    Header always set Link "<http://localhost/stable/1.0+rev-${nixpkgs.rev}.tar.gz?rev=${nixpkgs.rev}&revCount=1234>; rel=\"immutable\""
     EOF
   '';
 in
@@ -100,6 +108,15 @@ in
       # Check that fetching fails if we provide incorrect attributes.
       machine.fail("nix flake metadata --json http://localhost/tags/latest.tar.gz?rev=493300eb13ae6fb387fbd47bf54a85915acc31c0")
       machine.fail("nix flake metadata --json http://localhost/tags/latest.tar.gz?narHash=sha256-tbudgBSg+bHWHiHnlteNzN8TUvI80ygS9IULh4rklEw=")
+
+      # Check that the locked URL of a redirect to a URL containing a
+      # `+` hits the tarball cache.
+      out = machine.succeed("nix flake metadata --json http://localhost/plus/latest.tar.gz")
+      print(out)
+      info = json.loads(out)
+      assert info["locked"]["url"] == "http://localhost/stable/1.0%2Brev-${nixpkgs.rev}.tar.gz"
+      machine.succeed("systemctl stop httpd.service")
+      machine.succeed("nix flake metadata --json " + info["locked"]["url"])
     '';
 
 }
