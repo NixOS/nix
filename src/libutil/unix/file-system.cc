@@ -2,6 +2,8 @@
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
+#include <tuple>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -398,15 +400,25 @@ void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
         throw SysError("changing ownership of %s", PathFmt(path));
 }
 
-void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
+/**
+ * Move @p srcName in @p srcParent to @p dstName in @p dstParent, like
+ * `movePath`. @p srcPath and @p dstPath are only used for messages.
+ */
+static void movePathIn(
+    Descriptor srcParent,
+    const OsFilename & srcName,
+    const std::filesystem::path & srcPath,
+    Descriptor dstParent,
+    const OsFilename & dstName,
+    const std::filesystem::path & dstPath)
 {
     /* If we have O_PATH (Linux, FreeBSD), then we can open the to-be-renamed
        file without requiring any permissions and "pin" the inode that we'll
        fchmod. This avoids operating on paths, which is prone to TOCTOU. */
 #ifdef O_PATH
-    AutoCloseFD fd = ::open(src.c_str(), O_NOFOLLOW | O_CLOEXEC | O_PATH);
+    AutoCloseFD fd = ::openat(srcParent, srcName.c_str(), O_NOFOLLOW | O_CLOEXEC | O_PATH);
     if (!fd)
-        throw SysError("failed to open file %1%", PathFmt(src));
+        throw SysError("failed to open file %1%", PathFmt(srcPath));
 
     auto changePermsOnFile = [&](mode_t newMode) -> int {
         /* AT_EMPTY_PATH here is supported since 6.6, but reports EINVAL without fchmodat2. */
@@ -426,7 +438,7 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
 
     const PosixStat st = nix::fstat(fd.get());
 #else
-    const PosixStat st = nix::lstat(src);
+    const PosixStat st = nix::fstatat(srcParent, srcName);
 #endif
 
     bool changePerm = (::geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
@@ -434,34 +446,95 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
         const mode_t newMode = st.st_mode | S_IWUSR;
 #ifdef O_PATH
         if (changePermsOnFile(newMode) == -1)
-            throw SysError("making %s writable for renaming", PathFmt(src));
+            throw SysError("making %s writable for renaming", PathFmt(srcPath));
 #else
-        nix::chmod(src, newMode);
+        unix::fchmodatTryNoFollow(srcParent, srcName, newMode);
 #endif
     }
 
-    if (::rename(src.c_str(), dst.c_str()) == -1) {
+    if (::renameat(srcParent, srcName.c_str(), dstParent, dstName.c_str()) == -1) {
         const int savedErrno = errno;
         if (changePerm) {
             /* Ignore all errors on restoring permissions. We want to throw the
-               original error originating from ::rename. */
+               original error originating from ::renameat. */
 #ifdef O_PATH
             changePermsOnFile(st.st_mode);
 #else
-            ::chmod(src.c_str(), st.st_mode);
+            try {
+                unix::fchmodatTryNoFollow(srcParent, srcName, st.st_mode);
+            } catch (SysError &) {
+            }
 #endif
         }
-        throw SysError(savedErrno, "renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+        throw SysError(savedErrno, "renaming %1% to %2%", PathFmt(srcPath), PathFmt(dstPath));
     }
 
     if (changePerm) {
 #ifdef O_PATH
         if (changePermsOnFile(st.st_mode) == -1)
-            throw SysError("restoring permissions on %s", PathFmt(dst));
+            throw SysError("restoring permissions on %s", PathFmt(dstPath));
 #else
-        nix::chmod(dst, st.st_mode);
+        unix::fchmodatTryNoFollow(dstParent, dstName, st.st_mode);
 #endif
     }
+}
+
+/**
+ * Open the parent directory of @p path, following symlinks, and
+ * return it with the final component of @p path.
+ */
+static std::pair<AutoCloseFD, OsFilename> openParentOf(const std::filesystem::path & path)
+{
+    auto parentPath = path.parent_path();
+    if (parentPath.empty())
+        parentPath = ".";
+    auto parentFd = valueOr(
+        openDirectory(parentPath, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(parentPath)));
+    return {std::move(parentFd), OsFilename::fromPathThrowing(path.filename())};
+}
+
+void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
+{
+    auto [srcParent, srcName] = openParentOf(src);
+    auto [dstParent, dstName] = openParentOf(dst);
+    movePathIn(srcParent.get(), srcName, src, dstParent.get(), dstName, dst);
+}
+
+/**
+ * Open the parent directory of @p path beneath @p dirFd, without
+ * following symlinks, for `*At` functions that operate on the final
+ * component of @p path.
+ *
+ * @return The parent directory, owned if it had to be opened, and the
+ * final component of @p path.
+ */
+static std::tuple<AutoCloseFD, Descriptor, OsFilename> openParentBeneath(Descriptor dirFd, const OsCanonPath & path)
+{
+    assert(!path.empty());
+    auto lastIt = std::ranges::prev(path.end());
+    OsFilename name = *lastIt;
+    auto parent = path.parent();
+    if (parent->empty())
+        return {AutoCloseFD{}, dirFd, std::move(name)};
+    auto parentFd = valueOr(
+        openFileEnsureBeneathNoSymlinks(dirFd, *parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path())));
+    auto fd = parentFd.get();
+    return {std::move(parentFd), fd, std::move(name)};
+}
+
+void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst)
+{
+    auto [srcParentOwned, srcParent, srcName] = openParentBeneath(srcDirFd, src);
+    auto [dstParentOwned, dstParent, dstName] = openParentBeneath(dstDirFd, dst);
+    movePathIn(
+        srcParent,
+        srcName,
+        descriptorToPath(srcDirFd) / src.path(),
+        dstParent,
+        dstName,
+        descriptorToPath(dstDirFd) / dst.path());
 }
 
 void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
