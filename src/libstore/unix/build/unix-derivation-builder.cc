@@ -195,9 +195,9 @@ bool UnixDerivationBuilderImpl::decideWhetherDiskFull()
     {
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(store->getRealStoreDir().c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (fstatvfs(store->getRealStoreDirFd(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
-        if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (fstatvfs(tmpDirFd.get(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
     }
 #endif
