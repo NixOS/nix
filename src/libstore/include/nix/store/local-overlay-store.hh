@@ -197,7 +197,7 @@ private:
      * Check which layers the store object exists in to try to avoid
      * needing to remount.
      */
-    void deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath) override;
+    void deleteStorePath(const OsFilename & name, uint64_t & bytesFreed, bool isKnownPath) override;
 
     /**
      * Deduplicate by removing store objects from the upper layer that
