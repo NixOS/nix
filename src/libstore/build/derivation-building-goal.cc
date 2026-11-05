@@ -18,7 +18,6 @@
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/current-process.hh"
 
 #include <chrono>
 #include <algorithm>
@@ -145,15 +144,12 @@ struct PostBuildHookState
     }
 };
 
-/* Only used on Unix; on Windows every call site throws instead. */
-#ifndef _WIN32
 static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
     const StorePath & drvPath,
     const StorePathSet & outputPaths);
-#endif
 
 Goal::Co<Goal::ExitCode> DerivationBuildingGoal::init()
 {
@@ -1139,7 +1135,6 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
     }
 }
 
-#ifndef _WIN32
 static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
@@ -1159,36 +1154,22 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
         OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
     hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
 
-    ProcessOptions processOptions;
-
-    state->pid = startProcess(
-        [&] {
-            replaceEnv(hookEnvironment);
-            if (dup2(state->out->writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
-            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
-                throw SysError("cannot dup stdout into stderr");
-
-            Strings args_;
-            args_.push_front(hook);
-
-            restoreProcessContext();
-
-            /* On Linux, it's crucial that this is done after restoreProcessContext() since
-               that needs an open mountns file descriptor (fdSavedMountNamespace). */
-            unix::closeExtraFDs();
-
-            execvp(requireCString(hook), stringsToCharPtrs(args_).data());
-
-            throw SysError("executing %s", PathFmt(hook));
+    state->pid = spawnProgram(
+        {
+            .program = std::filesystem::path(hook),
+            .lookupPath = true,
+            .environment = hookEnvironment,
         },
-        processOptions);
+        std::to_array<FdRedirection>({
+            {.from = state->out->writeSide.get(), .to = FdRedirection::stdOut},
+            {.from = FdRedirection::stdOut, .to = FdRedirection::stdError},
+            /* TODO: Don't inherit stdin? */
+        }));
 
     state->out->writeSide.close();
 
     return state;
 }
-#endif
 
 BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
 {
