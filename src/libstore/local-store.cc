@@ -1156,8 +1156,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 if (info.ca) {
                     auto & specified = *info.ca;
                     auto actualHash = ({
-                        SourcePath sourcePath = {
-                            makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath)};
+                        SourcePath sourcePath = {makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath)};
                         Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
                         switch (fim) {
@@ -1200,7 +1199,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 try {
                     /* movePathAt and not a plain rename because at this point the top-level directory is
                        read-only. */
-                    movePathAt(tempDirFd.get(), OsFilename::fromPathAsserting("x"), getRealStoreDirFd(), name);
+                    movePathAt(tempDirFd.get(), tempName, getRealStoreDirFd(), name);
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;
@@ -1209,12 +1208,10 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                        are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
                        Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
-                    auto copySink = RestoreSink::forPath(
-                        realPath, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get());
+                    RestoreSink copySink{
+                        getRealStoreDirFd(), name, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get()};
                     copyRecursive(
-                        *makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath),
-                        CanonPath::root,
-                        copySink);
+                        *makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath), CanonPath::root, copySink);
                 }
 
                 /* Clean up the staging directory. */
@@ -1314,6 +1311,7 @@ StorePath LocalStore::addToStoreFromDump(
     }
 
     std::unique_ptr<AutoDelete> delTempDir;
+    const auto tempName = OsFilename::fromPathAsserting("x");
     std::filesystem::path tempPath;
     std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
@@ -1334,7 +1332,6 @@ StorePath LocalStore::addToStoreFromDump(
 
         std::tie(tempDir, tempDirFd) = createTempDirInStore();
         delTempDir = std::make_unique<AutoDelete>(tempDir);
-        auto tempName = OsFilename::fromPathAsserting("x");
         tempPath = tempDir / tempName.path();
 
         RestoreSink restoreSink{
@@ -1361,7 +1358,7 @@ StorePath LocalStore::addToStoreFromDump(
         hashMethod,
         methodsMatch ? dumpHash
                      : hashPath(
-                           makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath),
+                           makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath),
                            hashMethod.getFileIngestionMethod(),
                            hashAlgo)
                            .first,
@@ -1398,8 +1395,11 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive: {
-                    auto restoreSink =
-                        RestoreSink::forPath(realPath, localSettings.fsyncStorePaths, canonicalisingRestoreHooks.get());
+                    RestoreSink restoreSink{
+                        getRealStoreDirFd(),
+                        OsFilename{dstPath.filename()},
+                        localSettings.fsyncStorePaths,
+                        canonicalisingRestoreHooks.get()};
                     restorePath(restoreSink, dumpSource, (FileSerialisationMethod) fim);
                     break;
                 }
@@ -1413,11 +1413,7 @@ StorePath LocalStore::addToStoreFromDump(
                 try {
                     /* movePathAt and not a plain rename because at this point the top-level directory is
                        read-only. */
-                    movePathAt(
-                        tempDirFd.get(),
-                        OsFilename::fromPathAsserting("x"),
-                        getRealStoreDirFd(),
-                        OsFilename{dstPath.filename()});
+                    movePathAt(tempDirFd.get(), tempName, getRealStoreDirFd(), OsFilename{dstPath.filename()});
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;
@@ -1426,12 +1422,13 @@ StorePath LocalStore::addToStoreFromDump(
                        are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
                        Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
-                    auto copySink = RestoreSink::forPath(
-                        realPath, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get());
+                    RestoreSink copySink{
+                        getRealStoreDirFd(),
+                        OsFilename{dstPath.filename()},
+                        /*startFsync=*/false,
+                        /*hooks=*/canonicalisingRestoreHooks.get()};
                     copyRecursive(
-                        *makeFSSourceAccessor(tempDirFd.get(), OsFilename::fromPathAsserting("x"), tempPath),
-                        CanonPath::root,
-                        copySink);
+                        *makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath), CanonPath::root, copySink);
                     delTempDir->deletePath();
                 }
             }
