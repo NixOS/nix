@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <widechar_width.h>
 #include <cstdlib> // for ptsname and ptsname_r
+#include <optional>
 
 namespace {
 
@@ -99,9 +100,23 @@ bool shouldANSI(StandardOutputStream fileno)
     return cached[int(fileno) - 1];
 }
 
-static std::string_view eatEscape(std::string_view::const_iterator & i, std::string_view::const_iterator end)
+namespace {
+
+struct Escape
+{
+    std::string_view seq;
+    /**
+     * The final byte of a complete CSI sequence, e.g. `m` for SGR.
+     */
+    std::optional<char> csiFinal;
+};
+
+} // namespace
+
+static Escape eatEscape(std::string_view::const_iterator & i, std::string_view::const_iterator end)
 {
     auto start = i++;
+    std::optional<char> csiFinal;
 
     if (i != end && *i == '[') {
         i++;
@@ -113,7 +128,7 @@ static std::string_view eatEscape(std::string_view::const_iterator & i, std::str
             i++;
         // eat final byte
         if (i != end && *i >= 0x40 && *i <= 0x7e)
-            i++;
+            csiFinal = *i++;
     } else if (i != end && *i == ']') {
         // OSC
         i++;
@@ -136,7 +151,7 @@ static std::string_view eatEscape(std::string_view::const_iterator & i, std::str
             i++;
     }
 
-    return {start, i};
+    return {{start, i}, csiFinal};
 }
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
@@ -149,10 +164,9 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
         if (*i == '\e') {
             auto e = eatEscape(i, s.end());
-            char last = e.size() > 2 && e[1] == '[' ? e.back() : 0;
 
-            if (!filterAll && last == 'm')
-                t += e;
+            if (!filterAll && e.csiFinal == 'm')
+                t += e.seq;
         }
 
         else if (*i == '\t') {
