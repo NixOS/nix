@@ -593,6 +593,12 @@ static void printUnquotedString(std::string & res, std::string_view s)
     res += '"';
 }
 
+static void checkPlatform(std::string_view platform)
+{
+    if (platform.find_first_of("\\\"") != std::string_view::npos)
+        throw Error("derivation system '%s' must not contain a backslash or a double quote", platform);
+}
+
 /**
  * Print a `[...]`-delimited list, calling `printItem` for each item.
  */
@@ -831,6 +837,7 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
     printStorePaths(store, s, drv.inputs.srcs, supportWindowsStoreDir);
 
     s += ',';
+    checkPlatform(drv.platform);
     printUnquotedString(s, drv.platform);
     s += ',';
     printString(s, drv.builder);
