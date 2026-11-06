@@ -375,19 +375,16 @@ public:
                 return;
             auto lastLine = chomp(*line);
             auto i = state->its.find(act);
-            assert(i != state->its.end());
-            ActInfo info = *i->second;
+            if (i == state->its.end())
+                return;
+            ActInfo & info = *i->second;
             if (printBuildLogs) {
-                auto suffix = "> ";
-                if (type == resPostBuildLogLine) {
-                    suffix = " (post)> ";
-                }
+                const char * suffix = (type == resPostBuildLogLine) ? " (post)> " : "> ";
                 log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
             } else {
-                state->activities.erase(i->second);
+                /* Bump activity for round-robin. Modify the lastLine in-place without invalidating iterators. */
+                state->activities.splice(state->activities.end(), state->activities, i->second);
                 info.lastLine = lastLine;
-                state->activities.emplace_back(info);
-                i->second = std::prev(state->activities.end());
                 update(*state);
             }
         }
@@ -407,7 +404,8 @@ public:
             if (!phase)
                 return;
             auto i = state->its.find(act);
-            assert(i != state->its.end());
+            if (i == state->its.end())
+                return;
             i->second->phase = *phase;
             update(*state);
         }
@@ -420,7 +418,8 @@ public:
             if (!done || !expected || !running || !failed)
                 return;
             auto i = state->its.find(act);
-            assert(i != state->its.end());
+            if (i == state->its.end())
+                return;
             ActInfo & actInfo = *i->second;
             actInfo.done = *done;
             actInfo.expected = *expected;
@@ -435,7 +434,8 @@ public:
             if (!expectedType || !expected)
                 return;
             auto i = state->its.find(act);
-            assert(i != state->its.end());
+            if (i == state->its.end())
+                return;
             ActInfo & actInfo = *i->second;
             auto type = (ActivityType) *expectedType;
             auto & j = actInfo.expectedByType[type];
@@ -450,7 +450,8 @@ public:
             if (!lastLine)
                 return;
             auto i = state->its.find(act);
-            assert(i != state->its.end());
+            if (i == state->its.end())
+                return;
             ActInfo & actInfo = *i->second;
             actInfo.lastLine = *lastLine;
             update(*state);
