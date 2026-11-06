@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/downstream-placeholder.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
 
 namespace nix {
 

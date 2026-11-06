@@ -2,6 +2,10 @@
 
 #include "nix/util/error.hh"
 #include "nix/util/os-string.hh"
+#include "nix/util/fmt.hh"
+
+#include <filesystem>
+#include <utility>
 
 namespace nix {
 

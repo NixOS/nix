@@ -8,6 +8,10 @@
 #include "nix/util/json-impls.hh"
 
 #include <variant>
+#include <compare>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include <nlohmann/json_fwd.hpp>
 

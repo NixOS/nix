@@ -11,16 +11,19 @@
 
 #include "nix/util/error.hh"
 
+#include <cstddef>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #endif
 
 #include <sys/types.h>
-
-#include <span>
-#include <cstddef>
-#include <type_traits>
 
 namespace nix {
 

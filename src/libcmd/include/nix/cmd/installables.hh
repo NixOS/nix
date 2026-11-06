@@ -7,8 +7,13 @@
 #include "nix/cmd/built-path.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build-result.hh"
+#include "nix/util/ref.hh"
 
 #include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

@@ -3,6 +3,13 @@
 
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/path.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/serialise.hh"
+
+#include <map>
+#include <string_view>
 
 namespace nix {
 

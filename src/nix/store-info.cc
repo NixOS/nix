@@ -2,8 +2,12 @@
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/finally.hh"
+#include "nix/main/common-args.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
 
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace nix {
 

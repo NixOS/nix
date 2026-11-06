@@ -2,6 +2,7 @@
 #if !defined(_WIN32) && !defined(__CYGWIN__)
 
 #  include "nix/util/monitor-fd.hh"
+#  include "nix/util/file-descriptor.hh"
 
 #  include <sys/file.h>
 #  include <gtest/gtest.h>

@@ -1,5 +1,12 @@
 #include "nix/expr/function-trace.hh"
 #include "nix/util/logging.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <chrono>
+#include <span>
 
 namespace nix {
 

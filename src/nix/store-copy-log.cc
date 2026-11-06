@@ -3,6 +3,11 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/log-store.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
 
 namespace nix {
 

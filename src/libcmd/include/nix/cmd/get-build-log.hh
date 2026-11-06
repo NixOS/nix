@@ -1,12 +1,16 @@
 #pragma once
 ///@file
 
-#include "nix/store/store-api.hh"
+#include "nix/util/ref.hh"
 
 #include <string>
 #include <string_view>
 
 namespace nix {
+
+class StorePath;
+
+class Store;
 
 /**
  * Fetch the build log for a store path, searching the store and its

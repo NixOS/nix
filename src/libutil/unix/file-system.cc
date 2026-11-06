@@ -2,6 +2,14 @@
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <cassert>
+#include <cstdint>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <utility>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -23,6 +31,11 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-canon-path.hh"
+#include "nix/util/os-filename.hh"
+#include "nix/util/error.hh"
 
 #include "util-unix-config-private.hh"
 #include "unix/unix-modes.hh"

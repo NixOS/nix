@@ -4,6 +4,12 @@
 #include <limits>
 #include <set>
 #include <string>
+#include <atomic>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <vector>
 
 #include "nix/store/store-api.hh"
 #include "nix/store/submit-store.hh"
@@ -11,6 +17,20 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

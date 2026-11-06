@@ -4,8 +4,10 @@
 #include "nix/util/merkle-files.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/tarfile.hh"
+#include "nix/util/hash.hh"
 
 #include <memory>
+#include <string>
 
 namespace nix::merkle {
 

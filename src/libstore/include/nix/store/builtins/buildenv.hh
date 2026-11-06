@@ -1,8 +1,11 @@
 #pragma once
 ///@file
 
-#include "nix/store/store-api.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/error.hh"
+
+#include <filesystem>
+#include <vector>
 
 namespace nix {
 

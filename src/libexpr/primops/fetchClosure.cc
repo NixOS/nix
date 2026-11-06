@@ -3,6 +3,21 @@
 #include "nix/store/realisation.hh"
 #include "nix/store/make-content-addressed.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

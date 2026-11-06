@@ -6,6 +6,8 @@
 #include <boost/core/demangle.hpp>
 #include <exception>
 #include <sstream>
+#include <cstdlib>
+#include <string>
 
 // Darwin and FreeBSD stdenv do not define _GNU_SOURCE but do have _Unwind_Backtrace.
 #if defined(__APPLE__) || defined(__FreeBSD__)

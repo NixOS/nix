@@ -1,14 +1,28 @@
 #pragma once
 ///@file
 
-#include "nix/cmd/installable-value.hh"
 #include "nix/util/args.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/store/path.hh"
 #include "nix/store/store-reference.hh"
 #include "nix/flake/lockfile.hh"
+#include "nix/cmd/built-path.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 #include <optional>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

@@ -1,4 +1,10 @@
 #include "nix/store/build/build-log.hh"
+#include "nix/util/logging.hh"
+
+#include <cstddef>
+#include <memory>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

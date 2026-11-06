@@ -1,6 +1,16 @@
 #include "nix/util/util.hh"
 #include "nix/expr/value/context.hh"
 #include "nix/store/store-dir-config.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+
+#include <cstddef>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

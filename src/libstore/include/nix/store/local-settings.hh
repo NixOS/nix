@@ -8,11 +8,17 @@
 #include "nix/store/build/derivation-builder.hh"
 
 #include "nix/store/config.hh"
+#include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/util/util.hh"
 
 #include <limits>
 #include <optional>
 #include <string>
 #include <vector>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <set>
 
 namespace nix {
 

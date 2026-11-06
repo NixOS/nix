@@ -1,6 +1,17 @@
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/util.hh"
+
+#include <string>
+#include <variant>
 
 namespace nix {
 

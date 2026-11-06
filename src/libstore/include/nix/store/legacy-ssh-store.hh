@@ -5,7 +5,31 @@
 #include "nix/store/ssh.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/pool.hh"
-#include "nix/store/serve-protocol.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

@@ -1,5 +1,11 @@
 #include <cstring>
 #include <span>
+#include <cassert>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
@@ -16,6 +22,10 @@
 #include "nix/util/base-nix-32.hh"
 
 #include "nix/store/globals.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/repair-flag.hh"
 
 extern "C" {
 

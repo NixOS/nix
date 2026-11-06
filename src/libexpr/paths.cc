@@ -2,6 +2,17 @@
 #include "nix/expr/eval.hh"
 #include "nix/util/mounted-source-accessor.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-path.hh"
+
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

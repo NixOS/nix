@@ -5,6 +5,9 @@
 #include <string>
 #include <list>
 #include <map>
+#include <cstddef>
+#include <functional>
+#include <string_view>
 
 namespace nix {
 

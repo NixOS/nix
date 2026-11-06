@@ -4,12 +4,11 @@
 #include <filesystem>
 #include <optional>
 #include <chrono>
+#include <cstddef>
 
 #ifndef _WIN32
 #  include <sys/resource.h>
 #endif
-
-#include "nix/util/types.hh"
 
 namespace nix {
 

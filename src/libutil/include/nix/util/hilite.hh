@@ -4,6 +4,7 @@
 #include <boost/regex.hpp>
 #include <vector>
 #include <string>
+#include <string_view>
 
 namespace nix {
 

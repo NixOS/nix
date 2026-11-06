@@ -1,6 +1,8 @@
 #include "nix/util/signature/signer.hh"
+#include "nix/util/signature/local-keys.hh"
 
 #include <sodium.h>
+#include <string_view>
 
 namespace nix {
 

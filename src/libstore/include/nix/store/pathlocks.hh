@@ -2,6 +2,11 @@
 ///@file
 
 #include <filesystem>
+#include <list>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/file-descriptor.hh"
 

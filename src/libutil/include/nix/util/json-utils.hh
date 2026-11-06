@@ -2,6 +2,12 @@
 ///@file
 
 #include <nlohmann/json.hpp>
+#include <limits>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <type_traits>
 
 #include "nix/util/error.hh"
 #include "nix/util/types.hh"

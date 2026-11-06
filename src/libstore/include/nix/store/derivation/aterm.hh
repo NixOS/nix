@@ -3,6 +3,12 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/full-inputs.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/util/configuration.hh"
+
+#include <set>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

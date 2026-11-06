@@ -4,6 +4,10 @@
 #include "nix/util/args.hh"
 #include "nix/util/repair-flag.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/file-descriptor.hh"
+
+#include <string>
+#include <type_traits>
 
 namespace nix {
 

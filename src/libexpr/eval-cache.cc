@@ -5,7 +5,37 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/store-dir-config.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/suggestions.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 // Need specialization involving `SymbolStr` just in this one module.
+
+#include <algorithm>
+#include <atomic>
+#include <cassert>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "nix/util/strings-inline.hh"
 
 namespace nix::eval_cache {

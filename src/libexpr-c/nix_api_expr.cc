@@ -1,12 +1,24 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <functional>
+#include <memory>
+#include <new>
+#include <utility>
+#include <vector>
 
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-gc.hh"
 #include "nix/store/globals.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/util/ref.hh"
+#include "nix/expr/config.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/types.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"

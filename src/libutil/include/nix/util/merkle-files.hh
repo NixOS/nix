@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 #include "nix/util/hash.hh"
 #include "nix/util/serialise.hh"

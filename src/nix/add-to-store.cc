@@ -6,6 +6,18 @@
 #include "nix/store/submit-store.hh"
 #include "nix/util/file-system.hh"
 #include "nix/cmd/misc-store-flags.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+
+#include <filesystem>
+#include <optional>
+#include <string>
 
 namespace nix {
 

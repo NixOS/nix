@@ -6,10 +6,35 @@
 #include "nix/util/archive.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/types.hh"
-#include "nix/store/store-api.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/merkle-tar-adapter.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix::fetchers {
 

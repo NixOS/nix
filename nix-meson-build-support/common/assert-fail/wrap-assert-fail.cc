@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cinttypes>
 #include <string_view>
+#include <algorithm>
 
 extern "C" [[noreturn]] void __attribute__((weak))
 __wrap___assert_fail(const char * assertion, const char * file, unsigned int line, const char * function)

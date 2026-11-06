@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 #include <numeric>
+#include <cstddef>
+#include <iterator>
+#include <span>
+#include <string>
+#include <string_view>
 
 #include "nix/util/base-n.hh"
 #include "nix/util/error.hh"

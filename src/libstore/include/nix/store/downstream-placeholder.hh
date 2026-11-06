@@ -5,6 +5,11 @@
 #include "nix/util/json-impls.hh"
 #include "nix/store/path.hh"
 #include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/configuration.hh"
+
+#include <string>
+#include <variant>
 
 namespace nix {
 

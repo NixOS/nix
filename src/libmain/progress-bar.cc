@@ -6,12 +6,32 @@
 #include "nix/util/file-system.hh"
 #include "nix/store/names.hh"
 #include "nix/util/util.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include <map>
 #include <thread>
 #include <sstream>
 #include <iostream>
 #include <chrono>
+#include <algorithm>
+#include <cassert>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <list>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

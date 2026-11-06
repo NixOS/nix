@@ -3,6 +3,11 @@
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/path.hh"
+#include "nix/fetchers/attrs.hh"
+
+#include <optional>
+#include <string_view>
+#include <utility>
 
 namespace nix::fetchers {
 

@@ -3,6 +3,9 @@
 #include "nix/util/util.hh"
 #include "nix/util/url.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #ifdef __linux__
 #  include "nix/util/file-descriptor.hh"
@@ -14,6 +17,16 @@
 #include <sqlite3.h>
 
 #include <thread>
+#include <cassert>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <ctime>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

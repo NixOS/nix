@@ -6,8 +6,13 @@
 #include "nix/store/worker-protocol-connection.hh"
 #include "nix/util/pool.hh"
 #include "nix/util/lru-cache.hh"
+#include "nix/store/path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/serialise.hh"
 
 #include <utility>
+#include <chrono>
+#include <variant>
 
 namespace nix {
 

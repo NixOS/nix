@@ -15,7 +15,6 @@
 #include "graphml.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/source-accessor.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/export-import.hh"
 #include "nix/util/strings.hh"
@@ -32,12 +31,42 @@
 
 #include <iostream>
 #include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <filesystem>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 
 #include "nix/util/exit.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+#include "nix/util/source-path.hh"
+
 #include "nix/store/serve-protocol-impl.hh"
 
 namespace nix_store {

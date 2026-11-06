@@ -1,11 +1,20 @@
 #include <nlohmann/json.hpp>
 #include <ranges>
 #include <sodium.h>
+#include <cstddef>
+#include <set>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/base-n.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

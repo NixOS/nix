@@ -5,6 +5,16 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/remote-store.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+
+#include <memory>
+#include <optional>
+#include <string>
 
 namespace nix {
 

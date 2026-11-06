@@ -1,12 +1,12 @@
 #pragma once
 ///@file
 
-#include "nix/util/error.hh"
-
 #include <cassert>
 #include <limits>
 #include <type_traits>
 #include <bit>
+
+#include "nix/util/error.hh"
 
 namespace nix {
 

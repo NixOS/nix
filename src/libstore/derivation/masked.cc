@@ -3,9 +3,22 @@
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/util.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-dir-config.hh"
+#include "nix/util/error.hh"
+#include "nix/util/hash.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <optional>
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

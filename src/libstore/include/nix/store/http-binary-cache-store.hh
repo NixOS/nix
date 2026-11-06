@@ -5,9 +5,25 @@
 #include "nix/store/binary-cache-store.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/sync.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+#include "nix/util/compression-settings.hh"
 
 #include <chrono>
 #include <exception>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

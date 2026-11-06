@@ -4,6 +4,7 @@
 
 #include "nix/store/personality.hh"
 #include "store-config-private.hh"
+#include "nix/store/local-settings.hh"
 
 #include <sys/prctl.h>
 

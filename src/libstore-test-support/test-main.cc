@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <string_view>
 
 #include "nix/store/globals.hh"
 #include "nix/util/logging.hh"

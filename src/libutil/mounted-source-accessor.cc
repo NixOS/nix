@@ -1,6 +1,22 @@
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/util.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

@@ -1,7 +1,16 @@
 #include <poll.h>
+#include <cassert>
+#include <cerrno>
+#include <optional>
+#include <set>
+#include <string_view>
+#include <vector>
 
 #include "nix/util/util.hh"
 #include "nix/util/muxable-pipe.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

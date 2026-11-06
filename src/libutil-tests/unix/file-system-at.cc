@@ -1,11 +1,17 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <cerrno>
+#include <filesystem>
+#include <string_view>
 
 #include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/os-filename.hh"
+#include "nix/util/error.hh"
 
 #ifdef __linux__
 #  include "nix/util/linux-namespaces.hh"

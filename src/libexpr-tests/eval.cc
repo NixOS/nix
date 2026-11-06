@@ -3,12 +3,28 @@
 #include <gtest/gtest-spi.h>
 
 #include <stdexcept>
+#include <string>
 
 #include "nix/expr/eval.hh"
 #include "nix/expr/tests/libexpr.hh"
 #include "nix/expr/tests/gc.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/finally.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/config.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/value.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/store-open.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

@@ -1,5 +1,7 @@
 #include "nix/util/pool.hh"
+#include "nix/util/ref.hh"
 #include <gtest/gtest.h>
+#include <cstddef>
 
 namespace nix {
 

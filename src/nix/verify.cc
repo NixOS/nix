@@ -6,8 +6,25 @@
 #include "nix/store/keys.hh"
 
 #include <atomic>
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <set>
+#include <string>
+#include <vector>
 
 #include "nix/util/exit.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

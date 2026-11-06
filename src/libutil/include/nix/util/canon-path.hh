@@ -9,6 +9,12 @@
 #include <set>
 #include <vector>
 #include <ranges>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 #include <boost/container_hash/hash.hpp>
 

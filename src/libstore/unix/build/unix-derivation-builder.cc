@@ -14,6 +14,27 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/store/config.hh"
+#include "nix/store/daemon.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-settings.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-dir-config.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/signals.hh"
 
 #include <sys/un.h>
 #include <fcntl.h>
@@ -38,17 +59,29 @@
 #include <iostream>
 #include <list>
 #include <atomic>
+#include <cassert>
+#include <cerrno>
+#include <csignal>
+#include <cstdint>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <variant>
+#include <vector>
 
-#include "nix/util/strings.hh"
-#include "nix/util/signals.hh"
-
-#include "store-config-private.hh"
 #include "build/derivation-check.hh"
 #include "unix/build/child-impl.hh"
 #include "unix-derivation-builder-impl.hh"
 
 #ifdef __linux__
 #  include "chroot-linux-derivation-builder.hh"
+#  include "linux-derivation-builder.hh"
 #endif
 
 #ifdef __FreeBSD__

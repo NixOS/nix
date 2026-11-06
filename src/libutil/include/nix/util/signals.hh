@@ -7,6 +7,7 @@
 #include "nix/util/logging.hh"
 
 #include <functional>
+#include <memory>
 
 #if defined(__FreeBSD__)
 // SIGUSR1 is used by bdwgc

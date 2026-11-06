@@ -1,6 +1,7 @@
 #include "nix/util/error.hh"
 
 #include <gtest/gtest.h>
+#include <system_error>
 
 namespace nix {
 

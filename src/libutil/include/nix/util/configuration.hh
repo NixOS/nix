@@ -4,6 +4,12 @@
 #include <filesystem>
 #include <map>
 #include <set>
+#include <concepts>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include <nlohmann/json_fwd.hpp>
 

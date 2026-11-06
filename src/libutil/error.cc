@@ -6,11 +6,31 @@
 #include "nix/util/signals.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/position.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
 
 #include <cinttypes>
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <cassert>
+#include <cerrno>
+#include <compare>
+#include <cstddef>
+#include <cstdio>
+#include <exception>
+#include <memory>
+#include <new>
+#include <set>
+#include <source_location>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

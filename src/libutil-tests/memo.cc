@@ -2,6 +2,7 @@
 #include <string>
 
 #include "nix/util/memo.hh"
+#include "nix/util/fun.hh"
 
 namespace nix {
 

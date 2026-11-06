@@ -2,6 +2,10 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <variant>
 
 #include <gtest/gtest.h>
 

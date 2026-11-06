@@ -15,6 +15,17 @@
 #include <optional>
 #include <ranges>
 #include <concepts>
+#include <array>
+#include <cctype>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <initializer_list>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
 
 #include "nix/store/local-overlay-store.hh"
+#include "nix/util/configuration.hh"
 
 namespace nix {
 

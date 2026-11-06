@@ -22,6 +22,29 @@
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/submit-store.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <variant>
 #include <utility>
@@ -31,6 +54,22 @@
 #endif
 
 #include <sstream>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <memory>
+#include <new>
+#include <optional>
+#include <set>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix::daemon {
 

@@ -1,6 +1,19 @@
 #include "nix/store/build/goal.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/store/worker-settings.hh"
+#include "nix/store/build-result.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+
+#include <cassert>
+#include <ctime>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

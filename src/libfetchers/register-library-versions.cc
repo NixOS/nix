@@ -5,6 +5,7 @@
 #include "nix/util/fmt.hh"
 
 #include <git2/global.h>
+#include <string>
 
 namespace nix {
 

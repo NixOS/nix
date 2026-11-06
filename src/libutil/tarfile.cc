@@ -1,11 +1,26 @@
 #include <archive.h>
 #include <archive_entry.h>
+#include <algorithm>
+#include <cstddef>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/serialise.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/canon-path.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 

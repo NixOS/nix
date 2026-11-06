@@ -6,9 +6,16 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <filesystem>
+#include <optional>
+#include <string_view>
 
 #include "nix/store/outputs-spec.hh"
 #include "nix/fetchers/registry.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 

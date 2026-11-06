@@ -7,6 +7,16 @@
 #include "nix/util/chunked-vector.hh"
 #include "nix/util/bump-memory-resource.hh"
 #include "nix/util/error.hh"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <ostream>
+#include <span>
+#include <string_view>
+#include <type_traits>
+#include <vector>
 
 #include <boost/version.hpp>
 #include <boost/unordered/concurrent_flat_set.hpp>

@@ -2,6 +2,8 @@
 
 #include "nix/util/file-descriptor.hh"
 
+#include <cstddef>
+
 namespace nix {
 
 struct FdSink;

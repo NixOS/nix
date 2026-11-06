@@ -1,7 +1,14 @@
 #include "nix/store/names.hh"
 #include "nix/util/util.hh"
+#include "nix/util/types.hh"
 
 #include <regex>
+#include <cctype>
+#include <compare>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

@@ -5,6 +5,12 @@
 #include "nix/store/store-cast.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/util/error.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/ref.hh"
+
+#include <cstdint>
+#include <limits>
+#include <string>
 
 namespace nix {
 

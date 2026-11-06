@@ -1,6 +1,14 @@
 #include "nix/cmd/get-build-log.hh"
 #include "nix/store/log-store.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
+#include <string_view>
 
 namespace nix {
 

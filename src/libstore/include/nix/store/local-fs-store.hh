@@ -4,6 +4,15 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/ref.hh"
+
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
 

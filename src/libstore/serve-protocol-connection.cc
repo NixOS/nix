@@ -3,6 +3,19 @@
 #include "nix/store/build-result.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/serve-protocol.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/serialise.hh"
+
+#include <algorithm>
+#include <cassert>
+#include <map>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

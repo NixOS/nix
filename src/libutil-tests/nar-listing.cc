@@ -1,6 +1,14 @@
 #include <string_view>
+#include <filesystem>
+#include <utility>
 
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/nar-listing.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

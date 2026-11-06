@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <sys/types.h>
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

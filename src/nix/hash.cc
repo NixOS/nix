@@ -8,6 +8,20 @@
 #include "nix/cmd/misc-store-flags.hh"
 #include "man-pages.hh"
 #include "nix/util/fun.hh"
+#include "nix/util/args.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/types.hh"
+
+#include <cassert>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace nix {
 

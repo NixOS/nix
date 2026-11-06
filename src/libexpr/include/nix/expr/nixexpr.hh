@@ -7,17 +7,29 @@
 #include <vector>
 #include <memory_resource>
 #include <algorithm>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <limits>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/symbol-table.hh"
-#include "nix/expr/eval-error.hh"
 #include "nix/expr/static-string-data.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/expr/counter.hh"
 #include "nix/util/pos-table.hh"
 #include "nix/util/error.hh"
 #include "nix/util/bump-memory-resource.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 

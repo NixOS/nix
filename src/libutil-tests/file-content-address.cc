@@ -1,7 +1,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <string_view>
 
 #include "nix/util/file-content-address.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

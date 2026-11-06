@@ -2,6 +2,11 @@
 ///@file
 
 #include <filesystem>
+#include <list>
+#include <optional>
+#include <set>
+#include <string_view>
+#include <type_traits>
 
 #include "nix/util/types.hh"
 #include "nix/util/os-string.hh"

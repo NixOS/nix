@@ -6,9 +6,11 @@
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/tests/nix_api_util.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <string>
 
 namespace nixC {
 

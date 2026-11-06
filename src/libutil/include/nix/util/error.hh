@@ -27,8 +27,15 @@
 #include <optional>
 #include <utility>
 #include <algorithm>
-#include <concepts>
 #include <type_traits>
+#include <compare>
+#include <exception>
+#include <ostream>
+#include <source_location>
+#include <string>
+#include <string_view>
+#include <cerrno>
+#include <system_error>
 
 #include <sys/types.h>
 #include <sys/stat.h>

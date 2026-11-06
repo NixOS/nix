@@ -6,6 +6,8 @@
 #include <set>
 #include <map>
 #include <list>
+#include <cstddef>
+#include <type_traits>
 
 namespace nix {
 

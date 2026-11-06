@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <utility>
 
 #include "nix/store/store-open.hh"
 #include "nix/store/store-reference.hh"

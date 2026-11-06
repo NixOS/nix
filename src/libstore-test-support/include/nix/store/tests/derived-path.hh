@@ -5,9 +5,6 @@
 
 #include "nix/store/derived-path.hh"
 
-#include "nix/store/tests/path.hh"
-#include "nix/store/tests/outputs-spec.hh"
-
 namespace rc {
 
 template<>

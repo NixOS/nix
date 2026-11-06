@@ -3,10 +3,14 @@
 
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <string>
 #include <map>
 #include <nlohmann/json_fwd.hpp>
+#include <ostream>
 
 namespace nix {
 

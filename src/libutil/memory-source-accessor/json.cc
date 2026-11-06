@@ -1,8 +1,14 @@
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/error.hh"
+#include "nix/util/nar-listing.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
+#include <cstdint>
+#include <optional>
+#include <variant>
 
 namespace nlohmann {
 

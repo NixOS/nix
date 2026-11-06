@@ -1,13 +1,17 @@
 #pragma once
 ///@file
 
-#include "nix/util/canon-path.hh"
 #include "nix/util/os-filename.hh"
 
 #include <filesystem>
 #include <optional>
+#include <cstddef>
+#include <iterator>
+#include <utility>
 
 namespace nix {
+
+class CanonPath;
 
 /**
  * A newtype around `std::filesystem::path` that asserts at construction

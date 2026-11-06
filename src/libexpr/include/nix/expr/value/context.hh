@@ -4,8 +4,16 @@
 #include "nix/util/comparator.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/util/variant-wrapper.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
 
 #include <nlohmann/json_fwd.hpp>
+#include <set>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

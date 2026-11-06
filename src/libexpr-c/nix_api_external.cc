@@ -8,8 +8,14 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_value.h"
 #include "nix/expr/value/context.hh"
+#include "nix/expr/config.hh"
+#include "nix/util/types.hh"
 
 #include <nlohmann/json.hpp>
+#include <cstdint>
+#include <ostream>
+#include <string>
+#include <utility>
 
 extern "C" {
 

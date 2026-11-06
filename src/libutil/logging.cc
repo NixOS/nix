@@ -9,10 +9,26 @@
 #include "nix/util/sync.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
 
 #include <atomic>
 #include <sstream>
 #include <nlohmann/json.hpp>
+#include <cstdint>
+#include <exception>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

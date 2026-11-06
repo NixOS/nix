@@ -1,4 +1,18 @@
 #include "nix/util/source-path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+
+#include <cassert>
+#include <compare>
+#include <filesystem>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
 
 namespace nix {
 

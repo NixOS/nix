@@ -4,6 +4,8 @@
 #include <type_traits>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <string>
 
 namespace nix {
 

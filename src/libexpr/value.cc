@@ -2,6 +2,8 @@
 
 #include "expr-config-private.hh"
 
+#include <cstddef>
+
 #if HAVE_LIBCPUID
 #  include <libcpuid/libcpuid.h>
 #endif

@@ -15,6 +15,10 @@
 #include <unistd.h>
 #include <widechar_width.h>
 #include <cstdlib> // for ptsname and ptsname_r
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace {
 

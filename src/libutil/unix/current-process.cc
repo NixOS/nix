@@ -2,10 +2,16 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/fmt.hh"
 
 #include "unix/current-process-private.hh"
 
 #include <cmath>
+#include <algorithm>
+#include <cerrno>
+#include <chrono>
+#include <cstddef>
+#include <cstring>
 
 #include <sys/resource.h>
 

@@ -1,4 +1,13 @@
 #include "nix/util/logging.hh"
+#include "nix/util/error.hh"
+
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

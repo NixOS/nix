@@ -2,9 +2,17 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/error.hh"
+#include "nix/util/os-string.hh"
 
 #include "self-exe.hh"
 #include "cli-config-private.hh"
+
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

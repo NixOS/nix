@@ -8,6 +8,8 @@
 #include <string_view>
 #include <string>
 #include <vector>
+#include <concepts>
+#include <functional>
 
 #include <boost/container/small_vector.hpp>
 

@@ -2,6 +2,7 @@
 #include "nix/util/base-n.hh"
 
 #include <gtest/gtest.h>
+#include <span>
 
 namespace nix {
 

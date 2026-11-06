@@ -5,8 +5,11 @@
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
 
 #include <string>
+#include <memory>
+#include <string_view>
 
 namespace nix {
 

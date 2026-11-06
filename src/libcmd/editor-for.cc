@@ -3,6 +3,16 @@
 #include "nix/util/source-path.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/strings.hh"
+
+#include <cstdint>
+#include <tuple>
+#include <utility>
 
 namespace nix {
 

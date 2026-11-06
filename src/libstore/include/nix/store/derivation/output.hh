@@ -6,8 +6,14 @@
 #include "nix/store/outputs-spec.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/util/variant-wrapper.hh"
+#include "nix/util/hash.hh"
 
 #include <variant>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

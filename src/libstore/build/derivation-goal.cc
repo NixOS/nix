@@ -8,12 +8,41 @@
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh" // Don't remove is actually needed
 #include "nix/store/outputs-query.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/build/derivation-building-misc.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/derivation-options.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/store/worker-settings.hh"
 
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <cstdlib>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

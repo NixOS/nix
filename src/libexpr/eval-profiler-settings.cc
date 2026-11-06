@@ -2,8 +2,10 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/config-impl.hh"
 #include "nix/util/abstract-setting-to-json.hh"
+#include "nix/util/error.hh"
 
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace nix {
 

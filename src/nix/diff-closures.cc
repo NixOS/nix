@@ -4,8 +4,22 @@
 #include "nix/store/names.hh"
 
 #include <regex>
+#include <cstdint>
+#include <cstdlib>
+#include <map>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "nix/util/strings.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

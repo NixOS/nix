@@ -3,17 +3,28 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
-#include "nix/util/canon-path.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/util/url.hh"
 
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/ref.hh"
+#include "nix/util/experimental-features.hh"
 
 namespace nix {
+
+class CanonPath;
 class Store;
 class StorePath;
 struct SourceAccessor;

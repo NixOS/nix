@@ -2,10 +2,15 @@
 #include "nix_api_util_internal.h"
 #include "nix/util/tests/nix_api_util.hh"
 #include "nix/util/tests/string_callback.hh"
+#include "nix/util/error.hh"
 
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <cstddef>
+#include <exception>
+#include <stdexcept>
+#include <string>
 
 namespace nixC {
 

@@ -2,7 +2,20 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-dir-config.hh"
+#include "nix/util/error.hh"
+#include "nix/util/signature/signer.hh"
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <cstddef>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

@@ -1,12 +1,19 @@
 #include "nix/util/url.hh"
 #include "nix/util/tests/capture-logging.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/error.hh"
+#include "nix/util/types.hh"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
 #include <ranges>
 #include <optional>
+#include <filesystem>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

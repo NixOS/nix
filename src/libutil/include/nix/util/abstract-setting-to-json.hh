@@ -2,8 +2,9 @@
 ///@file
 
 #include <nlohmann/json.hpp>
+#include <map>
+#include <string>
 #include "nix/util/configuration.hh"
-#include "nix/util/json-utils.hh"
 
 namespace nix {
 template<typename T>

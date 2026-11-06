@@ -4,12 +4,19 @@
 #include <filesystem>
 #include <ranges>
 #include <span>
+#include <cstdint>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "nix/util/error.hh"
-#include "nix/util/canon-path.hh"
 #include "nix/util/split.hh"
 #include "nix/util/util.hh"
-#include "nix/util/variant-wrapper.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

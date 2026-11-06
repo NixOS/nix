@@ -1,9 +1,13 @@
 #pragma once
 ///@file
 
-#include "nix/store/store-api.hh"
+#include "nix/store/path.hh"
+
+#include <map>
 
 namespace nix {
+
+class Store;
 
 /** Rewrite a closure of store paths to be completely content addressed.
  */

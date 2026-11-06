@@ -4,6 +4,17 @@
 #include "nix/store/profiles.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/diagnose.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <cstddef>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <system_error>
 
 namespace nix {
 

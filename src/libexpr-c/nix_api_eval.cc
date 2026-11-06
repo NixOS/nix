@@ -1,5 +1,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/get-drvs.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/util/pos-idx.hh"
 
 #include "nix_api_expr.h"
 #include "nix_api_expr_internal.h"
@@ -7,6 +9,8 @@
 #include "nix_api_store_internal.h"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
+
+#include <utility>
 
 static const nix::Bindings & get_bindings_or_empty(nix::EvalState & state, nix_value * autoArgs)
 {

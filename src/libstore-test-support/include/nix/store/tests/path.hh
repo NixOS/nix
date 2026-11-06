@@ -2,10 +2,12 @@
 ///@file
 
 #include <rapidcheck/gen/Arbitrary.h>
-
-#include "nix/store/path.hh"
+#include <ostream>
+#include <string>
 
 namespace nix {
+
+class StorePath;
 
 struct StorePathName
 {

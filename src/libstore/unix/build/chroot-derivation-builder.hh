@@ -2,6 +2,14 @@
 
 #include "unix-derivation-builder-impl.hh"
 #include "chroot.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/store/path.hh"
+#include "nix/util/types.hh"
+
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <utility>
 
 namespace nix {
 

@@ -1,7 +1,11 @@
 #pragma once
 
 #include "nix/expr/value.hh"
-#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value/context.hh"
+
+#include <cstddef>
+#include <ostream>
+#include <set>
 
 namespace nix {
 

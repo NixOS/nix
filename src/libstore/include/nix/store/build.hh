@@ -2,6 +2,10 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+
+#include <vector>
 
 namespace nix {
 

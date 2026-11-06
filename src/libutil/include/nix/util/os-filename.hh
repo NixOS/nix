@@ -2,6 +2,7 @@
 ///@file
 
 #include <filesystem>
+#include <utility>
 
 namespace nix {
 

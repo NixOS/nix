@@ -7,6 +7,10 @@
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/config.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
 
 #include <cerrno>
 #include <filesystem>
@@ -15,6 +19,11 @@
 #include <future>
 #include <iostream>
 #include <atomic>
+#include <cassert>
+#include <chrono>
+#include <exception>
+#include <string>
+#include <thread>
 
 #include <grp.h>
 #include <sys/types.h>

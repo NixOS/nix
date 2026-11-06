@@ -3,10 +3,17 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

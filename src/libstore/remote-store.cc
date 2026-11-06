@@ -22,9 +22,37 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/socket.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/types.hh"
 
 #include <variant>
 #include <utility>
+#include <algorithm>
+#include <chrono>
+#include <cstddef>
+#include <exception>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <vector>
 
 #ifndef _WIN32
 #  include <sys/socket.h>

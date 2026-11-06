@@ -2,9 +2,17 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/signals.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <cstdlib>
 #include <nlohmann/json.hpp>
+#include <ostream>
 
 namespace nix {
 using json = nlohmann::json;

@@ -1,8 +1,25 @@
 #include "nix/util/base-n.hh"
 #include "nix/store/machines.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <algorithm>
+#include <cstddef>
+#include <filesystem>
+#include <iterator>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

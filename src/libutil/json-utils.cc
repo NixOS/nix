@@ -3,6 +3,10 @@
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 
+#include <functional>
+#include <string>
+#include <string_view>
+
 namespace nix {
 
 const nlohmann::json & valueAt(const nlohmann::json::object_t & map, std::string_view key)

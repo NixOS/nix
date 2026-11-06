@@ -1,4 +1,14 @@
 #include "nix/util/source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

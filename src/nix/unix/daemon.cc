@@ -19,11 +19,35 @@
 #include "man-pages.hh"
 #include "nix/util/socket.hh"
 #include "nix/util/current-process.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <algorithm>
 #include <climits>
 #include <cstring>
 #include <variant>
+#include <array>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 #include <unistd.h>
 #include <signal.h>

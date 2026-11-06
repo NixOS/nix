@@ -5,8 +5,6 @@
 #include "nix/util/error.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/file-descriptor.hh"
-#include "nix/util/file-path.hh"
-#include "nix/util/logging.hh"
 #include "nix/util/ansicolor.hh"
 #include "nix/util/os-string.hh"
 
@@ -24,6 +22,10 @@
 #include <sstream>
 #include <optional>
 #include <thread>
+#include <chrono>
+#include <span>
+#include <string>
+#include <utility>
 
 namespace nix {
 

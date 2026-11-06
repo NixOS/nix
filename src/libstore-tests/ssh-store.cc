@@ -1,8 +1,13 @@
 #include <gtest/gtest.h>
+#include <filesystem>
 
 #include "nix/store/ssh-store.hh"
 #include "nix/util/config-impl.hh"
 #include "nix/util/abstract-setting-to-json.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

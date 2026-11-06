@@ -3,20 +3,34 @@
 
 #include <filesystem>
 #include <nlohmann/json_fwd.hpp>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "nix/store/build-result.hh"
 #include "nix/store/daemon.hh"
 #include "nix/store/derivation-options.hh"
-#include "nix/store/build/derivation-building-misc.hh"
-#include "nix/store/derivations.hh"
-#include "nix/store/parsed-derivations.hh"
-#include "nix/util/processes.hh"
 #include "nix/util/muxable-pipe.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/store/build/derivation-building-misc.hh"
 
 namespace nix {
+
+struct InitialOutput;
 
 /**
  * Rethrow the current exception as a subclass of `Error`.

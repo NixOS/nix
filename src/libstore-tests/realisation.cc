@@ -1,6 +1,10 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
@@ -9,6 +13,8 @@
 
 #include "nix/util/tests/json-characterization.hh"
 #include "nix/store/tests/libstore.hh"
+#include "nix/store/path.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

@@ -8,8 +8,18 @@
 #include <cstdint>
 #include <string>
 #include <variant>
+#include <compare>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <string_view>
+#include <tuple>
 
 #include "nix/util/source-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

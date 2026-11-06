@@ -1,7 +1,15 @@
 #pragma once
 ///@file
 
-#include "nix/util/source-accessor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/serialise.hh"
+
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

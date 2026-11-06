@@ -3,11 +3,22 @@
 
 #include <memory>
 #include <type_traits>
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/fun.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

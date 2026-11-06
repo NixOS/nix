@@ -4,6 +4,7 @@
 #include <atomic>
 #include <memory_resource>
 #include <new>
+#include <cstddef>
 
 namespace nix {
 

@@ -2,6 +2,13 @@
 ///@file
 
 #include "nix/util/file-system.hh"
+#include "nix/util/error.hh"
+#include "nix/util/os-string.hh"
+
+#include <filesystem>
+#include <functional>
+#include <optional>
+#include <vector>
 
 namespace nix {
 

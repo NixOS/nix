@@ -1,4 +1,11 @@
 #include "nix/store/indirect-root-store.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+
+#include <cstdlib>
+#include <filesystem>
 
 namespace nix {
 

@@ -1,6 +1,12 @@
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/os-string.hh"
+
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #ifndef _WIN32
 #  include "unix/xdg-dirs.hh"

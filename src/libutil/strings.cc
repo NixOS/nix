@@ -1,4 +1,7 @@
 #include <string>
+#include <cstring>
+#include <list>
+#include <string_view>
 
 #include "nix/util/strings-inline.hh" // IWYU pragma: keep
 #include "nix/util/error.hh"

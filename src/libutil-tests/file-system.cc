@@ -1,11 +1,18 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/error.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
 #include <ranges>
+#include <cstdio>
+#include <filesystem>
+#include <string_view>
+#include <vector>
 
 #ifdef _WIN32
 #  define FS_SEP L"\\"

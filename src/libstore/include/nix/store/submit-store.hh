@@ -2,6 +2,17 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-info.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+
+#include <string>
+#include <string_view>
 
 namespace nix {
 

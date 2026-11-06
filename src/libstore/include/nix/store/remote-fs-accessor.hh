@@ -4,9 +4,24 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/nar-cache.hh"
-#include "nix/store/store-api.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
+
+class StorePath;
+
+class Store;
 
 class RemoteFSAccessor : public SourceAccessor
 {

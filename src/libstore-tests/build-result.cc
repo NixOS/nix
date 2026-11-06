@@ -1,8 +1,15 @@
 #include <gtest/gtest.h>
+#include <chrono>
+#include <filesystem>
+#include <string_view>
+#include <utility>
 
 #include "nix/store/build-result.hh"
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/path.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

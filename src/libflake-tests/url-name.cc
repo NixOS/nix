@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <optional>
 
 #include "nix/flake/url-name.hh"
 #include "nix/util/url.hh"

@@ -1,4 +1,7 @@
 #include <cstdint>
+#include <optional>
+#include <random>
+#include <string>
 
 #include <gtest/gtest.h>
 

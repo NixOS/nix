@@ -3,6 +3,8 @@
 
 #include "nix/expr/value.hh"
 
+#include <cstddef>
+
 namespace nix {
 
 template<size_t N>

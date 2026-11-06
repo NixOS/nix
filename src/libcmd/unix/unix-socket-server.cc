@@ -8,8 +8,16 @@
 #include "nix/util/strings.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
 
 #include <ranges>
+#include <cassert>
+#include <cerrno>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <sys/socket.h>
 #include <sys/un.h>

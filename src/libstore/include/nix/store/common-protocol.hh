@@ -1,11 +1,20 @@
 #pragma once
 ///@file
 
-#include "nix/util/serialise.hh"
+#include "nix/util/error.hh"
 
 #include <variant>
+#include <cstdint>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <tuple>
+#include <vector>
 
 namespace nix {
+
+struct Sink;
 
 struct StoreDirConfig;
 struct Source;

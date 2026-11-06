@@ -1,5 +1,19 @@
 #include <atomic>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <list>
+#include <optional>
+#include <string>
+#include <utility>
 #include "nix/util/source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 

@@ -3,6 +3,9 @@
 
 #include "nix/util/serialise.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/ref.hh"
+
+#include <memory>
 
 namespace nix {
 

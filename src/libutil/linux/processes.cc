@@ -6,6 +6,8 @@
 #include "nix/util/util.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/config.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/types.hh"
 
 #include "linux/linux-namespaces-private.hh"
 #include "unix/signals-private.hh"
@@ -14,6 +16,9 @@
 
 #include <cstring>
 #include <cerrno>
+#include <span>
+#include <string>
+#include <utility>
 
 #include <sys/resource.h>
 #include <sys/types.h>

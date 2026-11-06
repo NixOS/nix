@@ -3,10 +3,12 @@
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <cassert>
+#include <cstddef>
+#include <string>
 
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/expr/value.hh"
-#include "nix/expr/nixexpr.hh"
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-gc.hh"
@@ -14,6 +16,10 @@
 #include "nix/expr/eval-settings.hh"
 
 #include "nix/store/tests/libstore.hh"
+#include "nix/store/store-open.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 class LibExprTest : public LibStoreTest

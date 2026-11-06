@@ -2,8 +2,19 @@
 ///@file
 
 #include "nix/cmd/installables.hh"
+#include "nix/util/ref.hh"
+
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
+
+class Store;
+class StorePath;
+struct DerivedPath;
+struct ExtendedOutputsSpec;
 
 struct InstallableDerivedPath : Installable
 {

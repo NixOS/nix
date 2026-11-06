@@ -4,6 +4,19 @@
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/registry.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/util/args.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+
+#include <cstddef>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

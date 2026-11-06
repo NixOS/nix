@@ -4,6 +4,13 @@
 #include "nix/util/strings.hh"
 #include "nix/util/canon-path.hh"
 #include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/merkle-files.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
 
 #include <cassert>
 #include <map>
@@ -13,6 +20,12 @@
 #include <utility>
 #include <thread>
 #include <variant>
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <string>
 
 /**
  * Implementation of `nix::merkle::makeTarSink`.

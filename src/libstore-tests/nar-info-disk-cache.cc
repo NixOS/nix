@@ -4,6 +4,7 @@
 #include <rapidcheck/gtest.h>
 #include "nix/store/globals.hh"
 #include "nix/store/sqlite.hh"
+#include "nix/util/file-system.hh"
 #include <sqlite3.h>
 
 namespace nix {

@@ -5,6 +5,7 @@
 #include <vector>
 #include <set>
 #include <thread>
+#include <cstdint>
 
 namespace nix {
 TEST(ChunkedVector, InitEmpty)

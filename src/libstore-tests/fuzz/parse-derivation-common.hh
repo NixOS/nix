@@ -1,5 +1,13 @@
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/store-dir-config.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/serialise.hh"
+
+#include <cassert>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

@@ -8,8 +8,17 @@
 #include "nix/main/loggers.hh"
 #include "nix/util/util.hh"
 #include "nix/main/plugin.hh"
+#include "nix/util/args.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/types.hh"
 
 #include <utility>
+#include <cstddef>
+#include <map>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

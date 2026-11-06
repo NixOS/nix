@@ -3,8 +3,23 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/util/fun.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/variant-wrapper.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
+#include <cstddef>
+#include <functional>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <variant>
 
 namespace nix {
 

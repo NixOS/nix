@@ -6,6 +6,20 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/json-impls.hh"
+#include "nix/util/error.hh"
+#include "nix/util/json-non-null.hh"
+
+#include <cassert>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 namespace nix {
 

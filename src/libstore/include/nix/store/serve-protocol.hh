@@ -1,7 +1,16 @@
 #pragma once
 ///@file
 
-#include "nix/store/common-protocol.hh"
+#include "nix/util/serialise.hh"
+
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <map>
+#include <ostream>
+#include <set>
+#include <tuple>
+#include <vector>
 
 namespace nix {
 

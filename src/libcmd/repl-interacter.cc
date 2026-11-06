@@ -2,6 +2,13 @@
 
 #include <cstdio>
 #include <iostream>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <ostream>
+#include <string>
+#include <system_error>
 
 #include <signal.h>
 
@@ -24,6 +31,10 @@ extern "C" {
 #include "nix/util/file-system.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 

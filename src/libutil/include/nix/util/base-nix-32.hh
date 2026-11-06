@@ -6,6 +6,8 @@
 #include <optional>
 #include <string>
 #include <span>
+#include <cstddef>
+#include <string_view>
 
 #include "nix/util/array-from-string-literal.hh"
 

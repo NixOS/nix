@@ -7,6 +7,13 @@
 #include <list>
 #include <algorithm>
 #include <random>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <string>
+#include <tuple>
+#include <utility>
 
 namespace nix {
 

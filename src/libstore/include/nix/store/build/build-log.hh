@@ -7,6 +7,9 @@
 #include <list>
 #include <map>
 #include <string>
+#include <cstddef>
+#include <memory>
+#include <string_view>
 
 namespace nix {
 

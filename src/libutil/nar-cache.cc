@@ -1,10 +1,23 @@
 #include "nix/util/nar-cache.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/nar-accessor.hh"
+#include "nix/util/nar-listing.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/util.hh"
+#include "nix/util/error.hh"
 
 #include <nlohmann/json.hpp>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
 

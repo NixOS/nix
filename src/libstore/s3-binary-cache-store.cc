@@ -6,12 +6,30 @@
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/store/binary-cache-store.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
 
 #include <cassert>
 #include <cstring>
 #include <ranges>
 #include <regex>
 #include <span>
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

@@ -4,6 +4,8 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/unix-domain-socket.hh"
+#include "nix/util/error.hh"
+#include "nix/util/socket.hh"
 
 #include <algorithm>
 #include <filesystem>
@@ -13,6 +15,11 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <array>
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

@@ -1,4 +1,10 @@
 #include <string_view>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string>
 
 #include "nix/util/array-from-string-literal.hh"
 #include "nix/util/util.hh"

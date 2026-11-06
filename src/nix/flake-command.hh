@@ -3,6 +3,11 @@
 #include "nix/cmd/command.hh"
 #include "nix/cmd/installable-flake.hh"
 #include "nix/flake/flake.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/util/args.hh"
+
+#include <string>
+#include <vector>
 
 namespace nix {
 

@@ -7,6 +7,11 @@
 #include <limits>
 #include <atomic>
 #include <ranges>
+#include <array>
+#include <cassert>
+#include <memory>
+#include <new>
+#include <utility>
 
 #include "nix/util/error.hh"
 

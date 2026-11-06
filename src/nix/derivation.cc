@@ -1,5 +1,7 @@
 #include "nix/cmd/command.hh"
 
+#include <string>
+
 namespace nix {
 
 struct CmdDerivation : NixMultiCommand

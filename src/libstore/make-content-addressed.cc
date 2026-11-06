@@ -1,5 +1,21 @@
 #include "nix/store/make-content-addressed.hh"
 #include "nix/store/references.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <map>
+#include <ranges>
+#include <string>
+#include <utility>
 
 namespace nix {
 

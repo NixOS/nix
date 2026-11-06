@@ -4,6 +4,10 @@
 #include <boost/format.hpp>
 #include <string>
 #include <filesystem>
+#include <ostream>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 #include "nix/util/ansicolor.hh"
 
 namespace nix {

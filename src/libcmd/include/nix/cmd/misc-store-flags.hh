@@ -3,6 +3,10 @@
 
 #include "nix/util/args.hh"
 #include "nix/store/content-address.hh"
+#include "nix/util/file-content-address.hh"
+
+#include <optional>
+#include <string>
 
 namespace nix::flag {
 

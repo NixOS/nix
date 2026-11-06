@@ -4,8 +4,16 @@
 #include "nix/util/archive.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/repair-flag.hh"
 
 #include <algorithm>
+#include <cstdint>
+#include <ranges>
 
 namespace nix {
 

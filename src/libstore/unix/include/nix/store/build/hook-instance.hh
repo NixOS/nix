@@ -4,9 +4,12 @@
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/types.hh"
 
 #include <chrono>
 #include <functional>
+#include <map>
 
 namespace nix {
 

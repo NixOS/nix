@@ -4,8 +4,13 @@
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <string_view>
 
 #include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
 
 struct sqlite3;
 struct sqlite3_stmt;

@@ -26,6 +26,14 @@
 
 #include <functional>
 #include <optional>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
 
 /**
  * Polyfill for MinGW

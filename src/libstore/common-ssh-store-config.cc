@@ -1,5 +1,8 @@
 #include "nix/store/common-ssh-store-config.hh"
 #include "nix/store/ssh.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

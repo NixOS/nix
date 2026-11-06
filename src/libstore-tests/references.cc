@@ -1,11 +1,26 @@
 #include "nix/store/references.hh"
 #include "nix/store/path-references.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #include <gtest/gtest.h>
 
 #include <random>
 #include <set>
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

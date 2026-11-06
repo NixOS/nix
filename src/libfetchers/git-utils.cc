@@ -17,6 +17,22 @@
 #include "nix/util/thread-pool.hh"
 #include "nix/util/pool.hh"
 #include "nix/util/deleter.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/fetchers/merkle-tar-adapter.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/merkle-files.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
 
 #include <git2/version.h>
 #include <git2/attr.h>
@@ -52,6 +68,25 @@
 #include <regex>
 #include <ranges>
 #include <future>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <exception>
+#include <filesystem>
+#include <functional>
+#include <limits>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace std {
 

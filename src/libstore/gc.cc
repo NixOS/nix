@@ -12,6 +12,17 @@
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/socket.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/sync.hh"
 
 #include "store-config-private.hh"
 
@@ -24,6 +35,20 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <variant>
+#include <cassert>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <future>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <vector>
 #if HAVE_STATVFS
 #  include <sys/statvfs.h>
 #endif

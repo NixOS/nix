@@ -1,6 +1,13 @@
 #pragma once
 #include "nix/store/build/goal.hh"
 #include "nix/store/build/worker.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/util.hh"
+
+#include <coroutine>
+#include <exception>
+#include <future>
+#include <memory>
 
 namespace nix {
 

@@ -2,9 +2,21 @@
 #include "nix/store/build/hook-instance.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <chrono>
 #include <utility>
+#include <array>
+#include <csignal>
+#include <filesystem>
+#include <map>
+#include <string>
 
 namespace nix {
 

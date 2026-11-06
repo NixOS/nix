@@ -3,6 +3,13 @@
 
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/fun.hh"
+
+#include <cstddef>
+#include <map>
+#include <optional>
+#include <set>
+#include <string_view>
+#include <vector>
 #ifdef _WIN32
 #  include "nix/util/windows-async-pipe.hh"
 #endif

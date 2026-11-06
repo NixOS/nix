@@ -1,5 +1,7 @@
 #include "nix/util/args.hh"
 #include <list>
+#include <string>
+#include <string_view>
 
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>

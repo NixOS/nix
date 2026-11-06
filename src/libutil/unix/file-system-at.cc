@@ -3,9 +3,31 @@
 #include "nix/util/signals.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-canon-path.hh"
+#include "nix/util/os-filename.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/result.hh"
+#include "nix/util/error.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <atomic>
+#include <cassert>
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <iterator>
+#include <optional>
+#include <ranges>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 #if defined(__linux__)
 #  include <sys/syscall.h> /* pull __NR_* definitions */

@@ -3,10 +3,23 @@
 #include "nix/store/globals.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/users.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <ctime>
+#include <filesystem>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

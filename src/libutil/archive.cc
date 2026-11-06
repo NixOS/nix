@@ -3,6 +3,14 @@
 #include <limits>
 #include <fcntl.h>
 #include <map>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
 
 #include <strings.h> // for strcasecmp
 
@@ -12,6 +20,13 @@
 #include "nix/util/source-path.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 
