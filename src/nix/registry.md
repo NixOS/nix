@@ -34,7 +34,15 @@ highest precedence:
 * Overrides specified on the command line using the option
   `--override-flake`.
 
-Note that the system and user registries are not used to resolve flake references in `flake.nix`. They are only used to resolve flake references on the command line.
+> **Note**
+>
+> The system and user registries are not used to resolve flake references in `flake.nix` for generating the `flake.lock` file.
+> They are only used to resolve flake references on the command line.
+>
+> This limitation is in place to avoid accidents
+> where users have local registry overrides that map `nixpkgs` to a `path:` flake in the local file system,
+> which is default for most NixOS flake configurations,
+> which then may unexpectedly end up in committed lock files pushed to other users.
 
 # Registry format
 
