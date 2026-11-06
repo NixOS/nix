@@ -4,6 +4,7 @@
 #include "nix/util/file-path.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/util.hh"
+#include "nix/util/system-error.hh"
 
 #include <span>
 

@@ -5,6 +5,7 @@
 #include "nix/store/globals.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/thread-pool.hh"
+#include "nix/util/system-error.hh"
 
 #include <filesystem>
 

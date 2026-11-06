@@ -14,6 +14,7 @@
 
 #include "nix/util/signals.hh"
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

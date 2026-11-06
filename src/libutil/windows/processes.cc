@@ -1,6 +1,7 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/executable-path.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"

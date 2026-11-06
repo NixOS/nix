@@ -1,6 +1,7 @@
 #include "nix/util/bump-memory-resource.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/alignment.hh"
 #include "nix/util/logging.hh"

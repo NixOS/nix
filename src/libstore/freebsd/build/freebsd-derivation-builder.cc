@@ -6,6 +6,7 @@
 #include "nix/util/freebsd-jail.hh"
 #include "nix/util/util.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/util/system-error.hh"
 
 #include <stdlib.h>
 #include <string.h>

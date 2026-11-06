@@ -6,6 +6,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/util/system-error.hh"
 
 #include <atomic>
 #include <random>

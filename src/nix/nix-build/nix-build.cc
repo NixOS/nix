@@ -33,6 +33,7 @@
 #include "nix/store/build.hh"
 #include "nix/util/fun.hh"
 #include "man-pages.hh"
+#include "nix/util/system-error.hh"
 
 extern char ** environ __attribute__((weak));
 

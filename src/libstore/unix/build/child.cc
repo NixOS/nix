@@ -1,6 +1,7 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/system-error.hh"
 
 #include "child-impl.hh"
 

@@ -5,6 +5,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/file-system-at.hh"
+#include "nix/util/system-error.hh"
 
 #if NIX_SUPPORT_ACL
 #  include <sys/xattr.h>

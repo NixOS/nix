@@ -1,6 +1,7 @@
 #include "../local-gc-private.hh"
 
 #include "nix/util/error.hh"
+#include "nix/util/system-error.hh"
 #include "nix/util/fmt.hh"
 #include "nix/util/signals.hh"
 

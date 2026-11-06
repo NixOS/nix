@@ -3,6 +3,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
+#include "nix/util/system-error.hh"
 
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <chrono>

@@ -3,6 +3,7 @@
 #include "nix/util/git.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 

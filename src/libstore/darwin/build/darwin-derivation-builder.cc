@@ -1,5 +1,6 @@
 #include "unix-derivation-builder-impl.hh"
 #include "darwin-derivation-builder.hh"
+#include "nix/util/system-error.hh"
 
 #include <map>
 #include <spawn.h>

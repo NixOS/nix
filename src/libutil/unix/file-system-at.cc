@@ -3,6 +3,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/system-error.hh"
 
 #include <fcntl.h>
 #include <unistd.h>

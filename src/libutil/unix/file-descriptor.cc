@@ -2,6 +2,7 @@
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
+#include "nix/util/system-error.hh"
 
 #ifdef __APPLE__
 #  include <libproc.h> /* For closeExtraFDs. */

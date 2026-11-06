@@ -2,6 +2,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/nar-accessor.hh"
 #include "nix/main/common-args.hh"
+#include "nix/util/system-error.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {

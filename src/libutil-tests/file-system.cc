@@ -1,5 +1,6 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/system-error.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>

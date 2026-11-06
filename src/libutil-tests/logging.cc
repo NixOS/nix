@@ -2,6 +2,7 @@
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/tests/capture-logging.hh"
+#include "nix/util/system-error.hh"
 
 #include <gtest/gtest.h>
 

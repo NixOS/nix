@@ -4,6 +4,7 @@
 #include "nix/util/signals.hh"
 #include "nix/store/local-gc.hh"
 #include "local-gc-private.hh"
+#include "nix/util/system-error.hh"
 #include <filesystem>
 #include <boost/regex.hpp>
 

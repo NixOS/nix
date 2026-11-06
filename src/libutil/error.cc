@@ -22,10 +22,6 @@ void UsageError::anchor() {}
 
 void UnimplementedError::anchor() {}
 
-void SystemError::anchor() {}
-
-void SysError::anchor() {}
-
 void BaseError::addTrace(std::shared_ptr<const Pos> && e, HintFmt hint, TracePrint print)
 {
     err.traces.push_front(Trace{.pos = std::move(e), .hint = hint, .print = print});
