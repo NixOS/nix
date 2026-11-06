@@ -1,6 +1,11 @@
 #include "nix/util/fs-sink.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/tests/gmock-matchers.hh"
+
+#ifndef _WIN32
+#  include <fcntl.h>
+#endif
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
@@ -162,6 +167,43 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
     EXPECT_THAT(accessor, HasContents(CanonPath("a/b/g"), "new"));
     EXPECT_THAT(accessor, HasDirectory(CanonPath("a/b"), (std::set<std::string>{"g", "l"})));
     EXPECT_THAT(accessor, HasSymlink(CanonPath("a/b/l"), "g"));
+}
+
+/* Directories that are traversable but not listable (mode 0111) should
+   still be usable, both as the accessor's root and as intermediate
+   directories, since resolving paths through them only needs search
+   permission. See https://github.com/NixOS/nix/issues/16164. */
+TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
+{
+#if !defined(O_SEARCH) && !defined(O_PATH)
+    GTEST_SKIP() << "needs `O_SEARCH` or `O_PATH` to open directories without read permission";
+#else
+    if (geteuid() == 0)
+        GTEST_SKIP() << "root bypasses permission checks";
+
+    createDirs(tmpDir / "root" / "mid" / "sub");
+    writeFile(tmpDir / "root" / "mid" / "sub" / "f", "content");
+
+    chmod(tmpDir / "root", 0100);
+    chmod(tmpDir / "root" / "mid", 0100);
+
+    /* Search-only accessor root (#16164). */
+    auto accessor = makeFSSourceAccessor(tmpDir / "root");
+    /* Path resolution through a search-only intermediate directory (#16165). */
+    EXPECT_THAT(accessor, HasContents(CanonPath("mid/sub/f"), "content"));
+    /* A readable directory can be listed even if its parent is search-only. */
+    EXPECT_THAT(accessor, HasDirectory(CanonPath("mid/sub"), std::set<std::string>{"f"}));
+    /* `fstat` on the search-only root descriptor itself. */
+    EXPECT_EQ(accessor->lstat(CanonPath::root).type, SourceAccessor::tDirectory);
+    /* `fstatat` relative to the search-only root descriptor. */
+    EXPECT_EQ(accessor->lstat(CanonPath("mid")).type, SourceAccessor::tDirectory);
+
+    /* Listing them still requires read permission. */
+    EXPECT_THAT(
+        [&] { accessor->readDirectory(CanonPath::root); }, testing::ThrowsSystemError(std::errc::permission_denied));
+    EXPECT_THAT(
+        [&] { accessor->readDirectory(CanonPath("mid")); }, testing::ThrowsSystemError(std::errc::permission_denied));
+#endif
 }
 
 /* ----------------------------------------------------------------------------

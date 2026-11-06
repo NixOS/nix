@@ -23,6 +23,8 @@
 #  define HAVE_FCHMODAT2 0
 #endif
 
+#include "unix/unix-modes.hh"
+
 namespace nix {
 
 #ifdef __linux__
@@ -165,10 +167,9 @@ static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
         AutoCloseFD parentFd2 = ::openat(
             getParentFd(), /* First iteration uses dirFd. */
             component.c_str(),
-            O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
-#ifdef __linux__
-                | O_PATH /* Linux-specific optimization. Files are open only for path resolution purposes. */
-#endif
+            /* Directories are open only for path resolution purposes, so
+               don't require read permission on them where possible. */
+            unix::traversableDirAccessMode | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
 #ifdef __FreeBSD__
                 | O_RESOLVE_BENEATH /* Further guard against any possible SNAFUs. */
 #endif

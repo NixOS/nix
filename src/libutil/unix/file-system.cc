@@ -20,6 +20,7 @@
 #include "nix/util/util.hh"
 
 #include "util-unix-config-private.hh"
+#include "unix/unix-modes.hh"
 
 namespace nix {
 
@@ -27,6 +28,14 @@ AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink final
 {
     return AutoCloseFD{open(
         path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW))};
+}
+
+AutoCloseFD openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink)
+{
+    return open(
+        path.c_str(),
+        unix::traversableDirAccessMode | O_DIRECTORY | O_CLOEXEC
+            | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW));
 }
 
 AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink)

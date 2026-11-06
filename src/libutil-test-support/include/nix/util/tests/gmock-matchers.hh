@@ -66,4 +66,18 @@ inline auto ThrowsSysError(int expected)
     return ::testing::Throws<SysError>(::testing::Field(&SysError::errNo, expected));
 }
 
+/**
+ * Matches a callable that throws `SystemError` whose error code is
+ * equivalent to `expected`.
+ *
+ * Example:
+ *
+ *     EXPECT_THAT([&]{ openFile("nope"); }, ThrowsSystemError(std::errc::no_such_file_or_directory));
+ */
+inline auto ThrowsSystemError(std::errc expected)
+{
+    return ::testing::Throws<SystemError>(
+        ::testing::Property(&SystemError::ec, ::testing::Eq(std::make_error_condition(expected))));
+}
+
 } // namespace nix::testing
