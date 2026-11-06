@@ -8,7 +8,6 @@
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
 
-#include <filesystem>
 #include <gtest/gtest.h>
 
 namespace nixC {

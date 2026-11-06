@@ -8,7 +8,6 @@
 #include "nix/util/args.hh"
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
-#include "nix/util/executable-path.hh"
 #include "nix/store/filetransfer.hh"
 
 #include <algorithm>

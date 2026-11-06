@@ -26,7 +26,6 @@
 #include "nix/store/build.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/experimental-features.hh"
-#include "nix/store/globals.hh"
 
 namespace nix {
 

@@ -42,7 +42,6 @@
 #include "nix/util/strings.hh"
 #include "nix/util/signals.hh"
 
-#include "store-config-private.hh"
 #include "build/derivation-check.hh"
 #include "unix/build/child-impl.hh"
 #include "unix-derivation-builder-impl.hh"

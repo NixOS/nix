@@ -11,7 +11,6 @@
 #include "nix/util/thread-pool.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/archive.hh"
 #include "nix/util/util.hh"
 
 #include <chrono>

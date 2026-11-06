@@ -18,7 +18,6 @@
 #include <boost/asio/executor_work_guard.hpp>
 
 #include <queue>
-#include <set>
 
 namespace nix {
 

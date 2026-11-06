@@ -7,7 +7,6 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/nixexpr.hh"
-#include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-gc.hh"
 #include "nix/expr/eval-inline.hh"

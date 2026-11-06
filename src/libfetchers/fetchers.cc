@@ -6,7 +6,6 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/fetchers/fetch-settings.hh"
-#include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/url.hh"
 #include "nix/util/users.hh"
 #include "nix/store/pathlocks.hh"

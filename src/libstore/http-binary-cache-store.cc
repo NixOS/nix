@@ -6,7 +6,6 @@
 #include "nix/util/callback.hh"
 #include "nix/util/closure.hh"
 #include "nix/store/store-registration.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/topo-sort.hh"
 

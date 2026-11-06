@@ -1,7 +1,6 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "nix/fetchers/fetch-settings.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 #include "nix/util/url.hh"
