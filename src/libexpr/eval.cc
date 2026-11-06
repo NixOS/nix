@@ -10,6 +10,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
@@ -40,7 +41,6 @@
 #include <optional>
 #include <unistd.h>
 #include <sys/time.h>
-#include <fstream>
 #include <functional>
 #include <ranges>
 #include <mutex>
@@ -972,9 +972,7 @@ Value * EvalState::getBool(bool b)
     return b ? &Value::vTrue : &Value::vFalse;
 }
 
-static Counter nrThunks;
-
-static inline void mkThunk(Value & v, Env & env, Expr * expr)
+void EvalState::mkThunk(Value & v, Env & env, Expr * expr)
 {
     v.mkThunk(&env, expr);
     nrThunks++;
@@ -1068,7 +1066,7 @@ void EvalState::mkSingleDerivedPathString(const SingleDerivedPath & p, Value & v
 Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.allocValue();
-    mkThunk(*v, env, this);
+    state.mkThunk(*v, env, this);
     return v;
 }
 
@@ -1313,7 +1311,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             Value * vAttr;
             if (hasOverrides && i.second.kind != AttrDef::Kind::Inherited) {
                 vAttr = state.allocValue();
-                mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), i.second.e);
+                state.mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), i.second.e);
             } else
                 vAttr = i.second.e->maybeThunk(state, *i.second.chooseByKind(&env2, &env, inheritEnv));
             env2.values[displ++] = vAttr;
@@ -3075,7 +3073,7 @@ void EvalState::maybePrintStats()
     }
 }
 
-void EvalState::printStatistics()
+nlohmann::json EvalState::getStatisticsJSON()
 {
     std::chrono::microseconds cpuTimeDuration = getCpuUserTime();
     float cpuTime = std::chrono::duration_cast<std::chrono::duration<float>>(cpuTimeDuration).count();
@@ -3097,10 +3095,6 @@ void EvalState::printStatistics()
     auto gcCycles = getGCCycles();
 #endif
 
-    auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
-    std::fstream fs;
-    if (outPath != "-")
-        fs.open(outPath, std::fstream::out);
     json topObj = json::object();
     topObj["cpuTime"] = cpuTime;
     topObj["time"] = {
@@ -3204,10 +3198,45 @@ void EvalState::printStatistics()
         auto & list = topObj["symbols"];
         symbols.dump([&](std::string_view s) { list.emplace_back(s); });
     }
+
+    return topObj;
+}
+
+EvalState::Stats EvalState::getStats()
+{
+    Stats s{};
+    s.nrThunks = nrThunks.load();
+    s.nrFunctionCalls = nrFunctionCalls.load();
+    s.nrPrimOpCalls = nrPrimOpCalls.load();
+    s.nrLookups = nrLookups.load();
+    s.nrOpUpdates = nrOpUpdates.load();
+#if NIX_USE_BOEHMGC
+    GC_word heapSize = 0, totalBytes = 0;
+    GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
+    s.gcHeapSize = (uint64_t) heapSize;
+    s.gcTotalBytes = (uint64_t) totalBytes;
+#endif
+    return s;
+}
+
+void EvalState::printStatistics()
+{
+    auto statistics = getStatisticsJSON().dump(2) + "\n";
+
+    auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
     if (outPath == "-") {
-        std::cerr << topObj.dump(2) << std::endl;
-    } else {
-        fs << topObj.dump(2) << std::endl;
+        writeToStderr(statistics);
+        return;
+    }
+
+    std::filesystem::path path = outPath;
+    try {
+        auto fd = openNewFileForWrite(path, 0666, {.truncateExisting = true, .followSymlinksOnTruncate = true});
+        if (!fd)
+            throw NativeSysError("opening %s to write the evaluation statistics", PathFmt(path));
+        writeFull(fd.get(), statistics, false);
+    } catch (Error & e) {
+        logWarning(e.info());
     }
 }
 

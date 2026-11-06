@@ -88,3 +88,9 @@ out="$(expectStderr 0 nix eval --option foobar baz --expr '""' --raw)"
 # Test flag alias
 out="$(nix eval --expr '{}' --build-cores 1)"
 [[ "$(echo "$out" | wc -l)" = 1 ]]
+
+# Test that the evaluation statistics go to NIX_SHOW_STATS_PATH
+NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$TEST_ROOT/stats.json" nix eval --expr 1
+jq -e .nrThunks "$TEST_ROOT/stats.json"
+out="$(NIX_SHOW_STATS=1 NIX_SHOW_STATS_PATH="$TEST_ROOT/missing/stats.json" expectStderr 0 nix eval --expr 1)"
+echo "$out" | grepQuiet "warning:.*missing/stats.json"
