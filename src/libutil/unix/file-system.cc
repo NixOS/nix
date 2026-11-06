@@ -31,13 +31,13 @@ namespace nix {
 
 AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return AutoCloseFD{open(
-        path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW))};
+    return ::open(
+        path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW));
 }
 
 AutoCloseFD openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return open(
+    return ::open(
         path.c_str(),
         unix::traversableDirAccessMode | O_DIRECTORY | O_CLOEXEC
             | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW));
@@ -45,8 +45,7 @@ AutoCloseFD openDirectoryTraversable(const std::filesystem::path & path, FinalSy
 
 AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return AutoCloseFD{
-        open(path.c_str(), O_RDONLY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW))};
+    return ::open(path.c_str(), O_RDONLY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW));
 }
 
 AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
@@ -59,7 +58,7 @@ AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode,
     } else {
         flags |= O_EXCL; /* O_CREAT | O_EXCL already ensures that symlinks are not followed. */
     }
-    return AutoCloseFD{open(path.c_str(), flags, mode)};
+    return ::open(path.c_str(), flags, mode);
 }
 
 std::filesystem::path descriptorToPath(Descriptor fd)

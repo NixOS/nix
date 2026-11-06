@@ -349,8 +349,7 @@ void createSymlink(const std::filesystem::path & target, const std::filesystem::
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link);
 
 /**
- * Recursively copy the content of `oldPath` to `newPath`. If `andDelete` is
- * `true`, then also remove `oldPath`.
+ * Recursively copy the content of `oldPath` to `newPath`.
  *
  * @todo Delete this. This function is prone to TOCTOU races and follows
  * symlinks in the destination.
@@ -358,8 +357,7 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
  * If contents is set, always create a regular file, even if the source is a
  * link.
  */
-void copyFile(
-    const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents = false);
+void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool contents);
 
 /**
  * Automatic cleanup of resources.

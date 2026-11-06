@@ -33,10 +33,6 @@ void HttpsBinaryCacheStoreTest::SetUp()
     if (IsSkipped())
         return;
 
-#ifdef _WIN32
-    GTEST_SKIP() << "HTTPS store tests are not supported on Windows";
-#endif
-
     tmpDir = createTempDir();
     cacheDir = tmpDir / "cache";
     delTmpDir = std::make_unique<AutoDelete>(tmpDir);
@@ -64,22 +60,14 @@ void HttpsBinaryCacheStoreTest::SetUp()
     openssl({"x509", "-req", "-in", (tmpDir / "client.csr").string(), "-CA", caCert.string(), "-CAkey", caKey.string(), "-CAcreateserial", "-out", clientCert.string(), "-days", "1"});
     // clang-format on
 
-#ifndef _WIN32 /* FIXME: Can't yet start background processes on windows */
-    auto args = serverArgs();
-    serverPid = startProcess(
-        [&] {
-            if (chdir(cacheDir.c_str()) == -1)
-                _exit(1);
-            std::vector<char *> argv;
-            argv.push_back(const_cast<char *>("openssl"));
-            for (auto & a : args)
-                argv.push_back(const_cast<char *>(a.c_str()));
-            argv.push_back(nullptr);
-            execvp("openssl", argv.data());
-            _exit(1);
+    serverPid = spawnProgram(
+        {
+            .program = OS_STR("openssl"),
+            .lookupPath = true,
+            .args = serverArgs(),
+            .chdir = cacheDir,
         },
-        {.dieWithParent = true});
-#endif
+        /*fdr=*/{});
 
     /* As an optimization, sleep for a bit to allow the server to come up to avoid retrying when connecting.
        This won't make the tests fail, but does make them run faster. We don't need to overcomplicate by waiting
@@ -95,35 +83,41 @@ void HttpsBinaryCacheStoreTest::SetUp()
 
 void HttpsBinaryCacheStoreTest::TearDown()
 {
-#ifndef _WIN32 /* FIXME: Can't yet start background processes on windows */
     if (serverPid)
         serverPid.kill();
-#endif
     delTmpDir.reset();
     testFileTransferSettings.reset();
 }
 
-std::vector<std::string> HttpsBinaryCacheStoreTest::serverArgs()
+OsStrings HttpsBinaryCacheStoreTest::serverArgs()
 {
     return {
-        "s_server",
-        "-accept",
-        std::to_string(port),
-        "-cert",
-        serverCert.string(),
-        "-key",
-        serverKey.string(),
-        "-WWW", /* Serve from current directory. */
-        "-quiet",
+        OS_STR("s_server"),
+        OS_STR("-accept"),
+        string_to_os_string(std::to_string(port)),
+        OS_STR("-cert"),
+        serverCert.native(),
+        OS_STR("-key"),
+        serverKey.native(),
+        OS_STR("-WWW"), /* Serve from current directory. */
+        OS_STR("-quiet"),
     };
 }
 
-std::vector<std::string> HttpsBinaryCacheStoreMtlsTest::serverArgs()
+OsStrings HttpsBinaryCacheStoreMtlsTest::serverArgs()
 {
     auto args = HttpsBinaryCacheStoreTest::serverArgs();
     /* With the -Verify option the client must supply a certificate or an error occurs, which is not the
        case with -verify. */
-    args.insert(args.end(), {"-CAfile", caCert.string(), "-Verify", "1", "-verify_return_error"});
+    args.insert(
+        args.end(),
+        {
+            OS_STR("-CAfile"),
+            caCert.native(),
+            OS_STR("-Verify"),
+            OS_STR("1"),
+            OS_STR("-verify_return_error"),
+        });
     return args;
 }
 
