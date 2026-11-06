@@ -155,7 +155,7 @@ the Python example could have been written as:
 
 ```python
 #! /usr/bin/env nix
-#! nix shell --impure --file deps.nix -i python
+#! nix shell --impure --file deps.nix --command python
 ```
 
 where the file `deps.nix` in the same directory as the `#!`-script
