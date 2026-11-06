@@ -44,7 +44,9 @@ TEST_F(FSSourceAccessorTest, works)
         RestoreSink sink(false);
         sink.dstPath = tmpDir;
 #ifndef _WIN32
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        ASSERT_TRUE(dirFd);
+        sink.dirFd = std::move(dirFd).value();
 #endif
         sink.createDirectory(CanonPath("subdir"));
         sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });

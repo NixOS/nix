@@ -20,6 +20,7 @@
 #include "nix/util/os-canon-path.hh"
 #include "nix/util/result.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/system-error.hh"
 
 #include <optional>
 #include <system_error>
@@ -98,7 +99,7 @@ void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const Os
  *
  * @note Does not follow symlinks - if path is a symlink, will fail to open.
  */
-Result<AutoCloseFD, std::error_code> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path);
+Result<AutoCloseFD, NativeError> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path);
 
 /**
  * Create a directory relative to a directory file descriptor, and (best
@@ -125,7 +126,7 @@ Result<AutoCloseFD, std::error_code> openDirectoryAt(Descriptor dirFd, const OsC
  * https://lore.kernel.org/all/20261024213539.1307600-1-jkoolstra@xs4all.nl/
  * @endparblock
  */
-Result<AutoCloseFD, std::error_code> createDirectoryAt(
+Result<AutoCloseFD, NativeError> createDirectoryAt(
     Descriptor dirFd,
     const OsCanonPath & path
 #ifndef _WIN32
@@ -190,17 +191,15 @@ PosixStat fstatat(Descriptor dirFd, const OsCanonPath & path);
  * @note With `O_CREAT | O_EXCL`, a pre-existing symlink at the
  *     final component causes the OS to return `EEXIST` rather
  *     than `ELOOP`, so `SymlinkNotAllowed` is *not* thrown — the
- *     caller sees a failed descriptor with `errno == EEXIST`.
+ *     caller sees a failure with `EEXIST`.
  *
- * @return A valid descriptor on success, or an invalid descriptor
- *     on non-symlink errors (Unix: `errno` set, e.g. `ENOENT`,
- *     `ENOTDIR`, `EACCES`; Windows: last error set). The caller is
- *     responsible for checking the return value.
+ * @return The descriptor, or on non-symlink errors the native error
+ *     code (e.g. `ENOENT`, `ENOTDIR`, `EACCES` on Unix).
  *
- *     `errno` will never be `ELOOP` because that case is translated
+ *     The error will never be `ELOOP` because that case is translated
  *     to a `SymlinkNotAllowed` throw instead.
  */
-AutoCloseFD openFileEnsureBeneathNoSymlinks(
+Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd,         /** Directory handle to open relative to */
     const OsCanonPath & path, /** path Relative path (with no `..` or `.` components) */
 #ifdef _WIN32
@@ -226,9 +225,10 @@ namespace linux {
  * @param mode Mode for O_{CREAT,TMPFILE}
  * @param resolve RESOLVE_* flags
  *
- * @return nullopt if openat2 is not supported by the kernel.
+ * @return nullopt if openat2 is not supported by the kernel, otherwise
+ * the descriptor or the native error code.
  */
-std::optional<AutoCloseFD>
+std::optional<Result<AutoCloseFD, NativeError>>
 openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve);
 
 } // namespace linux

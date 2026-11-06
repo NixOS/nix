@@ -150,8 +150,8 @@ public:
                     .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
                 });
             if (!fd)
-                throw SysError("opening file %s", PathFmt(profileFile));
-            return fd;
+                throw NativeSysError(fd.error(), "opening file %s", PathFmt(profileFile));
+            return std::move(fd).value();
         }())
         , posCache(state)
     {

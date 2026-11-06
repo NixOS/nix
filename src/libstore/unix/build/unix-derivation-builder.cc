@@ -276,9 +276,11 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
 
     /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
        POSIX semantics.*/
-    tmpDirFd = openDirectory(tmpDir, FinalSymlink::DontFollow);
-    if (!tmpDirFd)
-        throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
+    auto tmpDirFdRes = openDirectory(tmpDir, FinalSymlink::DontFollow);
+    if (!tmpDirFdRes)
+        throw SysError(
+            tmpDirFdRes.error(), "failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
+    tmpDirFd = std::move(tmpDirFdRes).value();
 
     chownToBuilder(tmpDirFd.get(), tmpDir);
 
@@ -831,13 +833,13 @@ void UnixDerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::pa
 
 void UnixDerivationBuilderImpl::writeBuilderFile(const OsFilename & name, std::string_view contents)
 {
-    AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
+    auto fd = openFileEnsureBeneathNoSymlinks(
         tmpDirFd.get(), OsCanonPath{name}, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
     auto path = tmpDir / name.path(); /* This is used only for error messages. */
     if (!fd)
-        throw SysError("creating file %s", PathFmt(path));
-    writeFile(fd.get(), contents);
-    chownToBuilder(fd.get(), path);
+        throw SysError(fd.error(), "creating file %s", PathFmt(path));
+    writeFile(fd.value().get(), contents);
+    chownToBuilder(fd.value().get(), path);
 }
 
 void UnixDerivationBuilderImpl::runChild(RunChildArgs args)

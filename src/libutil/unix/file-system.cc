@@ -30,26 +30,41 @@
 
 namespace nix {
 
-AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
+/**
+ * Wrap the result of `open`, which fails with `-1` and sets `errno`.
+ */
+static Result<AutoCloseFD, NativeError> openResult(int fd)
 {
-    return ::open(
-        path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW));
+    if (fd == -1)
+        return outcome::failure(errno);
+    return outcome::success(AutoCloseFD{fd});
 }
 
-AutoCloseFD openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink)
+Result<AutoCloseFD, NativeError> openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return ::open(
-        path.c_str(),
-        unix::traversableDirAccessMode | O_DIRECTORY | O_CLOEXEC
-            | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW));
+    return openResult(
+        ::open(
+            path.c_str(),
+            O_RDONLY | O_DIRECTORY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW)));
 }
 
-AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink)
+Result<AutoCloseFD, NativeError> openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return ::open(path.c_str(), O_RDONLY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW));
+    return openResult(
+        ::open(
+            path.c_str(),
+            unix::traversableDirAccessMode | O_DIRECTORY | O_CLOEXEC
+                | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW)));
 }
 
-AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
+Result<AutoCloseFD, NativeError> openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink)
+{
+    return openResult(
+        ::open(path.c_str(), O_RDONLY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW)));
+}
+
+Result<AutoCloseFD, NativeError>
+openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
 {
     auto flags = (params.writeOnly ? O_WRONLY : O_RDWR) | O_CREAT | O_CLOEXEC;
     if (params.truncateExisting) {
@@ -59,7 +74,7 @@ AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode,
     } else {
         flags |= O_EXCL; /* O_CREAT | O_EXCL already ensures that symlinks are not followed. */
     }
-    return ::open(path.c_str(), flags, mode);
+    return openResult(::open(path.c_str(), flags, mode));
 }
 
 std::filesystem::path descriptorToPath(Descriptor fd)
@@ -269,12 +284,13 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
 
     /* It's ok to follow symlinks in the parent since we only need to
        ensure that there's no TOCTOU when traversing inside the path. */
-    AutoCloseFD dirfd = openDirectory(parentDirPath, FinalSymlink::Follow);
-    if (!dirfd) {
-        if (errno == ENOENT)
+    auto dirfdRes = openDirectory(parentDirPath, FinalSymlink::Follow);
+    if (!dirfdRes) {
+        if (dirfdRes.error() == ENOENT)
             return;
-        throw SysError("opening directory %s", PathFmt(parentDirPath));
+        throw SysError(dirfdRes.error(), "opening directory %s", PathFmt(parentDirPath));
     }
+    auto dirfd = std::move(dirfdRes).value();
 
     std::exception_ptr ex;
 

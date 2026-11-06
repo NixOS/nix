@@ -125,9 +125,9 @@ getParentFdAndName(Descriptor dirFd, const std::filesystem::path & dstPath, cons
 #endif
         );
         if (!parentFd)
-            throw SysError("opening parent directory of %s", PathFmt(append(dstPath, path)));
-        auto fd = parentFd.get();
-        return {std::move(parentFd), fd, std::move(name)};
+            throw NativeSysError(parentFd.error(), "opening parent directory of %s", PathFmt(append(dstPath, path)));
+        auto fd = parentFd.value().get();
+        return {std::move(parentFd).value(), fd, std::move(name)};
     }
 
     /* Without dirFd, we're creating the root entry itself, so path
@@ -155,9 +155,9 @@ getParentFdAndName(Descriptor dirFd, const std::filesystem::path & dstPath, cons
         parentPath = ".";
     auto parentFd = openDirectory(parentPath, FinalSymlink::Follow);
     if (!parentFd)
-        throw NativeSysError("opening parent directory of %s", PathFmt(p));
-    auto fd = parentFd.get();
-    return {std::move(parentFd), fd, std::move(name)};
+        throw NativeSysError(parentFd.error(), "opening parent directory of %s", PathFmt(p));
+    auto fd = parentFd.value().get();
+    return {std::move(parentFd).value(), fd, std::move(name)};
 }
 
 void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
@@ -178,7 +178,7 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
 
     RestoreSink dirSink{startFsync, hooks};
     dirSink.dstPath = append(dstPath, path);
-    dirSink.dirFd = openFileEnsureBeneathNoSymlinks(
+    auto dirFdRes = openFileEnsureBeneathNoSymlinks(
         dirFd.get(),
         path,
 #ifdef _WIN32
@@ -189,9 +189,9 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
         0
 #endif
     );
-
-    if (!dirSink.dirFd)
-        throw SysError("opening directory %s", PathFmt(dirSink.dstPath));
+    if (!dirFdRes)
+        throw NativeSysError(dirFdRes.error(), "opening directory %s", PathFmt(dirSink.dstPath));
+    dirSink.dirFd = std::move(dirFdRes).value();
 
     callback(dirSink, CanonPath::root);
     if (hooks)
@@ -209,7 +209,7 @@ void RestoreSink::createDirectory(const CanonPath & path)
     {
         auto result = createDirectoryAt(fd, name);
         if (!result)
-            throw SystemError(result.error(), "creating directory %s", PathFmt(append(dstPath, path)));
+            throw NativeSysError(result.error(), "creating directory %s", PathFmt(append(dstPath, path)));
 
         /* Creating it may have opened it too; see `createDirectoryAt`. */
         if (!dirFd)
@@ -219,7 +219,7 @@ void RestoreSink::createDirectory(const CanonPath & path)
     if (!dirFd) {
         /* Open directory for further *at operations relative to the sink root
            directory.  Unfortunately not atomic with creating it; see `createDirectoryAt`. */
-        dirFd = openFileEnsureBeneathNoSymlinks(
+        auto dirFdRes = openFileEnsureBeneathNoSymlinks(
             fd,
             OsCanonPath{name},
 #ifdef _WIN32
@@ -230,8 +230,9 @@ void RestoreSink::createDirectory(const CanonPath & path)
             0
 #endif
         );
-        if (!dirFd)
-            throw NativeSysError("opening directory %s", PathFmt(append(dstPath, path)));
+        if (!dirFdRes)
+            throw NativeSysError(dirFdRes.error(), "opening directory %s", PathFmt(append(dstPath, path)));
+        dirFd = std::move(dirFdRes).value();
     }
 };
 
@@ -281,24 +282,23 @@ void RestoreRegularFile::anchor() {}
 void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
 {
     auto [_parentFd, fd, name] = getParentFdAndName(dirFd.get(), dstPath, path);
-    auto crf = RestoreRegularFile(
-        startFsync,
-        openFileEnsureBeneathNoSymlinks(
-            fd,
-            OsCanonPath{name},
+    auto fdRes = openFileEnsureBeneathNoSymlinks(
+        fd,
+        OsCanonPath{name},
 #ifdef _WIN32
-            FILE_WRITE_DATA | SYNCHRONIZE,
-            0,
-            FILE_CREATE
+        FILE_WRITE_DATA | SYNCHRONIZE,
+        0,
+        FILE_CREATE
 #else
-            /* O_EXCL together with O_CREAT ensures symbolic links in the last
-               component are not followed. */
-            O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC,
-            0666
+        /* O_EXCL together with O_CREAT ensures symbolic links in the last
+           component are not followed. */
+        O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC,
+        0666
 #endif
-            ));
-    if (!crf.fd)
-        throw NativeSysError("creating file %s", PathFmt(append(dstPath, path)));
+    );
+    if (!fdRes)
+        throw NativeSysError(fdRes.error(), "creating file %s", PathFmt(append(dstPath, path)));
+    auto crf = RestoreRegularFile(startFsync, std::move(fdRes).value());
     func(crf);
     crf.flush();
     if (hooks)
@@ -327,13 +327,13 @@ void RestoreRegularFile::preallocateContents(uint64_t len)
         if (len > std::numeric_limits<off_t>::max())
             throw Error("cannot preallocate contents for a file because it's too large");
 
-        errno = posix_fallocate(fd.get(), 0, len);
+        int err = posix_fallocate(fd.get(), 0, len);
         /* Note that EINVAL may indicate that the underlying
            filesystem doesn't support preallocation (e.g. on
            OpenSolaris).  Since preallocation is just an
            optimisation, ignore it. */
-        if (errno && errno != EINVAL && errno != EOPNOTSUPP && errno != ENOSYS)
-            throw SysError("preallocating file of %1% bytes", len);
+        if (err && err != EINVAL && err != EOPNOTSUPP && err != ENOSYS)
+            throw SysError(err, "preallocating file of %1% bytes", len);
     }
 #endif
 }

@@ -86,7 +86,7 @@ void restorePath(
 {
     switch (method) {
     case FileSerialisationMethod::Flat: {
-        AutoCloseFD fd = openNewFileForWrite(
+        auto fdRes = openNewFileForWrite(
             path,
             0666,
             {
@@ -95,8 +95,9 @@ void restorePath(
                 .writeOnly = true,
             });
 
-        if (!fd)
-            throw NativeSysError("opening %1%", PathFmt(path));
+        if (!fdRes)
+            throw NativeSysError(fdRes.error(), "opening %1%", PathFmt(path));
+        auto fd = std::move(fdRes).value();
 
         writeFile(fd.get(), source, FsSync::No, &path);
 

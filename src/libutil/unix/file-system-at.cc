@@ -34,7 +34,8 @@ namespace nix {
 
 namespace linux {
 
-std::optional<AutoCloseFD> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve)
+std::optional<Result<AutoCloseFD, NativeError>>
+openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve)
 {
 #  if HAVE_OPENAT2
     /* Cache the result of whether openat2 is not supported. */
@@ -52,7 +53,9 @@ std::optional<AutoCloseFD> openat2(Descriptor dirFd, const char * path, uint64_t
             return std::nullopt;
         }
 
-        return AutoCloseFD{static_cast<Descriptor>(res)};
+        if (res < 0)
+            return outcome::failure(errno);
+        return outcome::success(AutoCloseFD{static_cast<Descriptor>(res)});
     }
 #  endif
     return std::nullopt;
@@ -146,7 +149,7 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const OsCanonPath & path, mode_
     }
 }
 
-static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
+static Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinksIterative(
     Descriptor dirFd,
     const OsCanonPath & path,
     int flags,
@@ -184,18 +187,18 @@ static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
         );
 
         if (!parentFd2) {
-            if (errno == ENOTDIR) /* Path component might be a symlink. */ {
+            auto err = errno;
+            if (err == ENOTDIR) /* Path component might be a symlink. */ {
                 /* Does not follow final symlink. We know `component` is a
                    single component so we don't have to worry about intermediate
                    symlinks either. */
                 if (auto st = maybeFstatat(getParentFd(), component); st && S_ISLNK(st->st_mode))
                     throw SymlinkNotAllowed(currentRelPath);
-                errno = ENOTDIR; /* Restore the errno. */
-            } else if (errno == NIX_ERR_OPEN_SYMLINK) {
+            } else if (err == NIX_ERR_OPEN_SYMLINK) {
                 throw SymlinkNotAllowed(currentRelPath);
             }
 
-            return AutoCloseFD{};
+            return outcome::failure(err);
         }
 
         if (dirFdCallback && parentFd)
@@ -211,20 +214,18 @@ static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
     AutoCloseFD res = ::openat(getParentFd(), lastComponent.c_str(), flags | O_NOFOLLOW, mode);
 
     if (!res) {
-        if (errno == NIX_ERR_OPEN_SYMLINK)
+        auto err = errno;
+        if (err == NIX_ERR_OPEN_SYMLINK)
             throw SymlinkNotAllowed(path);
         /* `O_DIRECTORY | O_NOFOLLOW` on a trailing symlink returns
            `ENOTDIR` rather than `ELOOP`. Post-check via `fstatat` to
            disambiguate — only on the error path, so the common
            successful-directory-open case pays no extra syscall. */
-        if (errno == ENOTDIR) {
+        if (err == ENOTDIR) {
             if (auto st = maybeFstatat(getParentFd(), lastComponent); st && S_ISLNK(st->st_mode))
                 throw SymlinkNotAllowed(path);
-            /* Put back errno so the caller will get the original
-               error. */
-            errno = ENOTDIR;
         }
-        return res;
+        return outcome::failure(err);
     }
 
     /* For `O_PATH`, the defensive `| O_NOFOLLOW` we added above
@@ -234,10 +235,10 @@ static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
        are asking for a path reference, and interior symlinks are
        already guarded by the component-by-component walk above. */
 
-    return res;
+    return outcome::success(std::move(res));
 }
 
-AutoCloseFD openFileEnsureBeneathNoSymlinks(
+Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd,
     const OsCanonPath & path,
     int flags,
@@ -276,7 +277,7 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
 
     if (auto maybeFd = linux::openat2(
             dirFd, path.c_str(), flagsAdj, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)) {
-        if (!*maybeFd && errno == NIX_ERR_OPEN_SYMLINK)
+        if (!*maybeFd && maybeFd->error() == NIX_ERR_OPEN_SYMLINK)
             throw SymlinkNotAllowed(path);
         return std::move(*maybeFd);
     }
@@ -331,24 +332,24 @@ void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const Os
     symlinkAt(dirFd, path, target);
 }
 
-Result<AutoCloseFD, std::error_code> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
+Result<AutoCloseFD, NativeError> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
 {
     assert(!path.empty());
     // Use O_NOFOLLOW to avoid following symlinks - if path is a symlink, this will fail with ENOTDIR
     AutoCloseFD fd = ::openat(dirFd, path.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (!fd)
-        return outcome::failure(std::error_code(errno, std::system_category()));
-    return fd;
+        return outcome::failure(errno);
+    return outcome::success(std::move(fd));
 }
 
-Result<AutoCloseFD, std::error_code> createDirectoryAt(Descriptor dirFd, const OsCanonPath & path, mode_t mode)
+Result<AutoCloseFD, NativeError> createDirectoryAt(Descriptor dirFd, const OsCanonPath & path, mode_t mode)
 {
     assert(!path.empty());
     if (::mkdirat(dirFd, path.c_str(), mode) == -1)
-        return outcome::failure(std::error_code(errno, std::system_category()));
+        return outcome::failure(errno);
     /* `mkdirat` doesn't open it, and opening it separately would not
        be atomic, so leave that to the caller. */
-    return AutoCloseFD{};
+    return outcome::success(AutoCloseFD{});
 }
 
 PosixStat fstat(Descriptor fd)

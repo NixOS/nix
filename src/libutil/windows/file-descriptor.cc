@@ -131,7 +131,7 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
-off_t lseek(HANDLE h, off_t offset, int whence)
+Result<off_t, NativeError> seek(Descriptor fd, off_t offset, int whence)
 {
     DWORD method;
     switch (whence) {
@@ -145,21 +145,17 @@ off_t lseek(HANDLE h, off_t offset, int whence)
         method = FILE_END;
         break;
     default:
-        throw Error("lseek: invalid whence %d", whence);
+        throw Error("seek: invalid whence %d", whence);
     }
 
     LARGE_INTEGER li;
     li.QuadPart = offset;
     LARGE_INTEGER newPos;
 
-    if (!SetFilePointerEx(h, li, &newPos, method)) {
-        /* Convert to a POSIX error, since caller code works with this as if it were
-           a POSIX lseek. */
-        errno = std::error_code(GetLastError(), std::system_category()).default_error_condition().value();
-        return -1;
-    }
+    if (!SetFilePointerEx(fd, li, &newPos, method))
+        return outcome::failure(GetLastError());
 
-    return newPos.QuadPart;
+    return outcome::success(static_cast<off_t>(newPos.QuadPart));
 }
 
 void syncDescriptor(Descriptor fd)

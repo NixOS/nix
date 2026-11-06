@@ -43,15 +43,15 @@ std::tuple<OsStrings, AutoCloseFD, AutoDelete> editorFor(const SourcePath & file
         {.truncateExisting = false, .followSymlinksOnTruncate = false, .writeOnly = false});
 
     if (!tempFd)
-        throw NativeSysError("failed to create temporary file %s", PathFmt(tempPath));
+        throw NativeSysError(tempFd.error(), "failed to create temporary file %s", PathFmt(tempPath));
 
     /* Copy the contents into the created copy. */
-    FdSink fileSink(tempFd.get());
+    FdSink fileSink(tempFd.value().get());
     file2.readFile(fileSink);
     fileSink.flush();
     args.push_back(tempPath);
 
-    return {std::move(args), std::move(tempFd), std::move(autoDel)};
+    return {std::move(args), std::move(tempFd).value(), std::move(autoDel)};
 }
 
 } // namespace nix

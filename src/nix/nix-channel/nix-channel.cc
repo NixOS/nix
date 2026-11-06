@@ -54,9 +54,9 @@ static void writeChannels()
             .followSymlinksOnTruncate = true, /* Back-compat. */
         });
     if (!channelsFD)
-        throw SysError("opening '%1%' for writing", channelsList.string());
+        throw NativeSysError(channelsFD.error(), "opening '%1%' for writing", channelsList.string());
     for (const auto & channel : channels)
-        writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
+        writeFull(channelsFD.value().get(), channel.second + " " + channel.first + "\n");
 }
 
 // Adds a channel.

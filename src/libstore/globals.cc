@@ -610,7 +610,7 @@ void initLibStore(bool loadConfig)
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
     if (hasPrefix(defaultTempDir().string(), "/var/folders/"))
-        unsetenv("TMPDIR");
+        unsetEnv("TMPDIR");
 #endif
 
     initLibStoreDone = true;

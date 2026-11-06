@@ -9,12 +9,12 @@ bool wineSymlinksSupported(const std::filesystem::path & dir)
 {
     auto dirFd = openDirectory(dir, FinalSymlink::Follow);
     if (!dirFd)
-        throw NativeSysError("opening directory %s", PathFmt(dir));
+        throw NativeSysError(dirFd.error(), "opening directory %s", PathFmt(dir));
 
     auto name = OsFilename::fromPathAsserting("wine-symlink-probe");
     bool supported = true;
     try {
-        createFileSymlinkAt(dirFd.get(), name, OS_STR("target"));
+        createFileSymlinkAt(dirFd.value().get(), name, OS_STR("target"));
     } catch (SystemError &) {
         supported = false;
     }

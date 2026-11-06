@@ -1286,15 +1286,16 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
 
     auto logFileName = dir / (baseName.substr(2) + (logSettings.compressLog ? ".bz2" : ""));
 
-    fd = openNewFileForWrite(
+    auto fdRes = openNewFileForWrite(
         logFileName,
         0666,
         {
             .truncateExisting = true,
             .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
         });
-    if (!fd)
-        throw SysError("creating log file %1%", PathFmt(logFileName));
+    if (!fdRes)
+        throw NativeSysError(fdRes.error(), "creating log file %1%", PathFmt(logFileName));
+    fd = std::move(fdRes).value();
 
     fileSink = std::make_shared<FdSink>(fd.get());
 

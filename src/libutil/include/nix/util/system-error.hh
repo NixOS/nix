@@ -347,4 +347,10 @@ using NativeSysError =
 #endif
     ;
 
+/**
+ * The native error code that `NativeSysError` is for: an `errno` value on
+ * Unix, and a `GetLastError()` value on Windows.
+ */
+using NativeError = NativeSysError::NativeCode;
+
 } // namespace nix

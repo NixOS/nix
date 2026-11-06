@@ -80,8 +80,8 @@ struct CmdCatNar : StoreCommand, MixCat
     {
         auto fd = openFileReadonly(narPath);
         if (!fd)
-            throw NativeSysError("opening NAR file %s", PathFmt(narPath));
-        auto source = FdSource{fd.get()};
+            throw NativeSysError(fd.error(), "opening NAR file %s", PathFmt(narPath));
+        auto source = FdSource{fd.value().get()};
 
         struct CatRegularFileSink : NullFileSystemObjectSink
         {

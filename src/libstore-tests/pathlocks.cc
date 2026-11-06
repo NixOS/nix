@@ -41,8 +41,8 @@ TEST_F(LockFileTest, exclusiveConflictsWithExclusive)
 {
     auto a = open();
     auto b = open();
-    ASSERT_TRUE(lockFile(a.get(), ltWrite, false));
-    ASSERT_FALSE(lockFile(b.get(), ltWrite, false));
+    ASSERT_TRUE(lockFile(a.value().get(), ltWrite, false));
+    ASSERT_FALSE(lockFile(b.value().get(), ltWrite, false));
 }
 
 TEST_F(LockFileTest, sharedLocksCoexist)

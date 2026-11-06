@@ -509,7 +509,7 @@ TEST_P(JSONLogMessageCharacterisationTest, writesExpectedLogs)
         /*parent=*/0);
 
     std::map<ActivityId, Activity> activities;
-    FdSource input(inputFd.get());
+    FdSource input(inputFd.value().get());
 
     while (true) {
         try {
@@ -520,7 +520,7 @@ TEST_P(JSONLogMessageCharacterisationTest, writesExpectedLogs)
         }
     }
 
-    lseek(tempFile.get(), 0, SEEK_SET);
+    ASSERT_TRUE(seek(tempFile.get(), 0, SEEK_SET));
 
     writeTest(testStem + ".log", [expected = readFile(tempFile.get())]() -> std::string { return expected; });
 }

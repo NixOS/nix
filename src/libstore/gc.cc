@@ -578,7 +578,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         if (baseName.find("tmp-", 0) == 0) {
             /* TODO Reconsider whether Follow is the right choice, here */
             auto tmpDirFd = openDirectory(realPath, FinalSymlink::Follow);
-            if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
+            if (!tmpDirFd || !lockFile(tmpDirFd.value().get(), ltWrite, false)) {
                 debug("skipping locked tempdir %s", PathFmt(realPath));
                 return;
             }

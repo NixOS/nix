@@ -113,9 +113,9 @@ std::tuple<StorePath, Hash> prefetchFile(
 
             auto fd = openNewFileForWrite(tmpFile, mode, {.truncateExisting = false});
             if (!fd)
-                throw SysError("creating temporary file %s", PathFmt(tmpFile));
+                throw NativeSysError(fd.error(), "creating temporary file %s", PathFmt(tmpFile));
 
-            FdSink sink(fd.get());
+            FdSink sink(fd.value().get());
 
             FileTransferRequest req(url);
             req.decompress = false;

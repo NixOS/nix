@@ -361,7 +361,9 @@ TEST_P(CopyFdRangeTest, regularToRegular)
     copyFdRange(source.get(), 0, input.size(), sink, tryCoW());
     sink.flush();
     ASSERT_EQ(sink.written, input.size());
-    ASSERT_EQ(lseek(dest.get(), 0, SEEK_SET), 0);
+    auto seeked = seek(dest.get(), 0, SEEK_SET);
+    ASSERT_TRUE(seeked);
+    ASSERT_EQ(seeked.value(), 0);
     ASSERT_EQ(readFile(dest.get()), input);
 }
 
@@ -378,7 +380,9 @@ TEST_P(CopyFdRangeTest, offsetWorks)
     copyFdRange(source.get(), offset, input.size() - offset, sink, tryCoW());
     sink.flush();
     ASSERT_EQ(sink.written, input.size() - offset);
-    ASSERT_EQ(lseek(dest.get(), 0, SEEK_SET), 0);
+    auto seeked = seek(dest.get(), 0, SEEK_SET);
+    ASSERT_TRUE(seeked);
+    ASSERT_EQ(seeked.value(), 0);
     ASSERT_EQ(readFile(dest.get()), input.substr(offset));
 }
 

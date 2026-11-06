@@ -30,7 +30,9 @@ TEST(fchmodatTryNoFollow, works)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        ASSERT_TRUE(dirFd);
+        sink.dirFd = std::move(dirFd).value();
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createDirectory(CanonPath("dir"));
         sink.createSymlink(CanonPath("filelink"), "file");
@@ -40,8 +42,9 @@ TEST(fchmodatTryNoFollow, works)
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
     ASSERT_NO_THROW(chmod(tmpDir / "dir", 0755));
 
-    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
-    ASSERT_TRUE(dirFd);
+    auto dirFdRes = openDirectory(tmpDir, FinalSymlink::Follow);
+    ASSERT_TRUE(dirFdRes);
+    auto dirFd = std::move(dirFdRes).value();
 
     using nix::testing::ThrowsSysError;
 
@@ -114,7 +117,9 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        ASSERT_TRUE(dirFd);
+        sink.dirFd = std::move(dirFd).value();
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createSymlink(CanonPath("link"), "file");
     }
@@ -132,9 +137,10 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
             if (mount("tmpfs", "/proc", "tmpfs", 0, 0) == -1)
                 _exit(2);
 
-            auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
-            if (!dirFd)
+            auto dirFdRes = openDirectory(tmpDir, FinalSymlink::Follow);
+            if (!dirFdRes)
                 _exit(3);
+            auto dirFd = std::move(dirFdRes).value();
 
             try {
                 fchmodatTryNoFollow(dirFd.get(), OsFilename::fromPathAsserting("file"), 0600);
