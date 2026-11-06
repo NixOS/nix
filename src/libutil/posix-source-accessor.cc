@@ -11,6 +11,8 @@
 
 #ifndef _WIN32
 #  include <sys/resource.h>
+
+#  include "unix/unix-modes.hh"
 #endif
 
 namespace nix {
@@ -386,15 +388,8 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
         AutoCloseFD parentFdOwning = openFileEnsureBeneathNoSymlinks(
             startFd,
             relPath,
-#  ifdef O_PATH
             /* As to not require read permissions on the directory. */
-            O_PATH |
-#  else
-            /* Sadly this will require read permissison for path resolution,
-               but without O_PATH that's unavoidable. */
-            O_RDONLY |
-#  endif
-                O_DIRECTORY | O_CLOEXEC,
+            unix::traversableDirAccessMode | O_DIRECTORY | O_CLOEXEC,
             0,
             std::move(cb));
         return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
@@ -813,6 +808,19 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
 #ifndef _WIN32
     assert(root.is_absolute());
     AutoCloseFD fd = openFileReadonly(root, finalSymlink);
+
+    if (unix::canTraverseWithoutRead && !fd && errno == EACCES) {
+        /* `root` may be a directory we can traverse but not list (e.g.
+           mode 0111). The directory accessor only uses its descriptor as
+           the base for `*at` calls and `fstat`, which a traversable
+           descriptor suffices for, so don't require read permission.
+           Listing `root` itself reopens it `O_RDONLY`, and so still fails
+           as it should. */
+        fd = openDirectoryTraversable(root, finalSymlink);
+        /* Not a directory after all: report the original error. */
+        if (!fd)
+            errno = EACCES;
+    }
 
     if (!fd) {
         if (finalSymlink == FinalSymlink::Follow || errno != NIX_ERR_OPEN_SYMLINK)
