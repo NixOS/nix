@@ -200,6 +200,20 @@ enum struct FinalSymlink : bool { DontFollow = false, Follow = true };
 AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 /**
+ * Open a `Descriptor` to the given directory only for traversing it:
+ * using it as the base of `*at` calls, or `fstat`ing it.
+ *
+ * Unlike @ref nix::openDirectory(), this needs only search (traverse)
+ * permission on the directory, not read (list) permission, where the OS
+ * allows asking for that. In exchange, the descriptor may not support
+ * listing the directory or `fsync`ing it.
+ *
+ * @param finalSymlink If `DontFollow`, fail if the path is a symlink.
+ */
+AutoCloseFD
+openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
+
+/**
  * Open a `Descriptor` with read-only access to the given file.
  *
  * @note For directories use @ref nix::openDirectory().

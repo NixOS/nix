@@ -6,6 +6,8 @@
 #ifdef _WIN32
 #  include "nix/util/tests/wine.hh"
 #  include "nix/util/windows-environment.hh"
+#else
+#  include <fcntl.h>
 #endif
 
 #include <gtest/gtest.h>
@@ -149,6 +151,43 @@ TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
     /* A genuine miss under a cached ancestor must stay a miss. */
     EXPECT_FALSE(accessor->pathExists(CanonPath("aaa/bbb/eee/f")));
     EXPECT_FALSE(accessor->pathExists(CanonPath("aaa/bbb/ccc/nope")));
+}
+
+/* Directories that are traversable but not listable (mode 0111) should
+   still be usable, both as the accessor's root and as intermediate
+   directories, since resolving paths through them only needs search
+   permission. See https://github.com/NixOS/nix/issues/16164. */
+TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
+{
+#if !defined(O_SEARCH) && !defined(O_PATH)
+    GTEST_SKIP() << "needs `O_SEARCH` or `O_PATH` to open directories without read permission";
+#else
+    if (geteuid() == 0)
+        GTEST_SKIP() << "root bypasses permission checks";
+
+    createDirs(tmpDir / "root" / "mid" / "sub");
+    writeFile(tmpDir / "root" / "mid" / "sub" / "f", "content");
+
+    chmod(tmpDir / "root", 0100);
+    chmod(tmpDir / "root" / "mid", 0100);
+
+    /* Search-only accessor root (#16164). */
+    auto accessor = makeFSSourceAccessor(tmpDir / "root");
+    /* Path resolution through a search-only intermediate directory (#16165). */
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("mid/sub/f"), "content"));
+    /* A readable directory can be listed even if its parent is search-only. */
+    EXPECT_THAT(accessor, testing::HasDirectory(CanonPath("mid/sub"), std::set<std::string>{"f"}));
+    /* `fstat` on the search-only root descriptor itself. */
+    EXPECT_EQ(accessor->lstat(CanonPath::root).type, SourceAccessor::tDirectory);
+    /* `fstatat` relative to the search-only root descriptor. */
+    EXPECT_EQ(accessor->lstat(CanonPath("mid")).type, SourceAccessor::tDirectory);
+
+    /* Listing them still requires read permission. */
+    EXPECT_THAT(
+        [&] { accessor->readDirectory(CanonPath::root); }, testing::ThrowsSystemError(std::errc::permission_denied));
+    EXPECT_THAT(
+        [&] { accessor->readDirectory(CanonPath("mid")); }, testing::ThrowsSystemError(std::errc::permission_denied));
+#endif
 }
 
 /* ----------------------------------------------------------------------------

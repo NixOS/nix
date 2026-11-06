@@ -96,5 +96,6 @@ CheckOptions:
   bugprone-unsafe-functions.CustomFunctions: >
     ::std::filesystem::create_directories, nix::createDirs, "Use nix::createDirs (it wraps exceptions)";
     ::std::filesystem::remove_all, nix::deletePath, "Use nix::deletePath (remove_all is not TOCTOU safe)";
+    ::std::filesystem::permissions, nix::chmod, "Use nix::chmod (it throws nix::SystemError)";
 
 ExtraArgs: ["-Werror=unnecessary-virtual-specifier"]

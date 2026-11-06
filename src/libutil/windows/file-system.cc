@@ -40,6 +40,25 @@ AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink final
         /*hTemplateFile=*/nullptr)};
 }
 
+AutoCloseFD openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink)
+{
+    /* `FILE_TRAVERSE | FILE_READ_ATTRIBUTES` rather than `GENERIC_READ`,
+       so as not to require `FILE_LIST_DIRECTORY`. `FILE_READ_ATTRIBUTES`
+       is for `fstat`. `FILE_TRAVERSE` is the analogue of Unix search
+       permission: traversal is normally not checked, because everyone
+       has `SeChangeNotifyPrivilege` ("Bypass traverse checking") by
+       default, but in case we lack it, relative opens with this handle
+       as their root directory need it to have been granted. */
+    return CreateFileW(
+        path.c_str(),
+        FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        /*lpSecurityAttributes=*/nullptr,
+        OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
+        /*hTemplateFile=*/nullptr);
+}
+
 AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
     return AutoCloseFD{CreateFileW(
