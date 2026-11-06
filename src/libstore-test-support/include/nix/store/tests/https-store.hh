@@ -10,6 +10,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/local-binary-cache-store.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 
 namespace nix::testing {
@@ -65,9 +66,7 @@ protected:
     std::filesystem::path tmpDir, cacheDir;
     std::filesystem::path caCert, caKey, serverCert, serverKey;
     std::filesystem::path clientCert, clientKey;
-#ifndef _WIN32 /* FIXME: Can't yet start background processes on windows */
     Pid serverPid;
-#endif
     uint16_t port = 8443;
     std::shared_ptr<Store> localCacheStore;
 
@@ -87,7 +86,7 @@ protected:
     void SetUp() override;
     void TearDown() override;
 
-    virtual std::vector<std::string> serverArgs();
+    virtual OsStrings serverArgs();
     ref<TestHttpBinaryCacheStoreConfig> makeConfig();
     ref<TestHttpBinaryCacheStore> openStore(ref<TestHttpBinaryCacheStoreConfig> config);
 };
@@ -95,7 +94,7 @@ protected:
 class HttpsBinaryCacheStoreMtlsTest : public HttpsBinaryCacheStoreTest
 {
 protected:
-    std::vector<std::string> serverArgs() override;
+    OsStrings serverArgs() override;
 };
 
 } // namespace nix::testing
