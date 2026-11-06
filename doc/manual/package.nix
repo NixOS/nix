@@ -143,14 +143,12 @@ mkMesonDerivation (finalAttrs: {
               ".*/protocols/json/.*\\.html"
               # Exclude undocumented builtins
               ".*/language/builtins\\.html#builtins-addErrorContext"
-              ".*/language/builtins\\.html#builtins-appendContext"
               # `print.html` aggregates content from all pages, including
               # the JSON schema pages and builtins pages excluded above,
               # so it inherits the same broken fragment links.
               ".*/print\\.html#algorithm"
               ".*/print\\.html#root"
               ".*/print\\.html#builtins-addErrorContext"
-              ".*/print\\.html#builtins-appendContext"
               ".*/print\\.html#derivations_pattern1_structuredAttrs_additionalProperties"
               ".*/print\\.html#structuredAttrs_additionalProperties"
             ];
