@@ -1,6 +1,8 @@
 #pragma once
 
-#include "nix/util/types.hh"
+#include <ostream>
+#include <string>
+#include <vector>
 
 namespace nix {
 

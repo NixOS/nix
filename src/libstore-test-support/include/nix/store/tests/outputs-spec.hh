@@ -6,8 +6,6 @@
 
 #include "nix/store/outputs-spec.hh"
 
-#include "nix/store/tests/path.hh"
-
 namespace rc {
 
 template<>

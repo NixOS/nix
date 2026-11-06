@@ -30,6 +30,15 @@
 
 #include <sys/types.h>
 #include <nlohmann/json.hpp>
+#include <array>
+#include <cassert>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #ifndef _WIN32
 #  include <sys/socket.h>
@@ -43,6 +52,21 @@
 #endif
 
 #include "nix/util/strings.hh"
+#include "nix/expr/eval-gc.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/args.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

@@ -5,6 +5,10 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/util/terminal.hh"
 #include <gmock/gmock.h>
+#include <ostream>
+#include <set>
+#include <string>
+#include <utility>
 
 namespace nix::testing {
 

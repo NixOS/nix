@@ -1,9 +1,16 @@
 #pragma once
 ///@file
 
-#include "nix/store/store-api.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace nix {
+
+class Store;
 
 enum struct UseLookupPath { Use, DontUse };
 

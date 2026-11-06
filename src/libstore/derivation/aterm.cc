@@ -10,6 +10,17 @@
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/util/strings-inline.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path-map.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/serialise.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
@@ -18,6 +29,16 @@
 #include <array>
 #include <optional>
 #include <ranges>
+#include <cassert>
+#include <cstddef>
+#include <cstdio>
+#include <functional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

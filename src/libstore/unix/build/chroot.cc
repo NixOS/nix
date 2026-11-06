@@ -6,6 +6,10 @@
 #include "nix/util/logging.hh"
 #include "nix/util/error.hh"
 #include "nix/store/user-lock.hh"
+#include "nix/util/fmt.hh"
+
+#include <filesystem>
+#include <utility>
 
 namespace nix {
 

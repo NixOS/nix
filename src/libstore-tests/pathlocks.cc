@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <memory>
 
 #include "nix/store/pathlocks.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-descriptor.hh"
 
 namespace nix {
 

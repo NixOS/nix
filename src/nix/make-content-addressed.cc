@@ -2,8 +2,15 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/make-content-addressed.hh"
 #include "nix/main/common-args.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
 
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <string>
 
 using nlohmann::json;
 

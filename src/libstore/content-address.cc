@@ -3,6 +3,19 @@
 #include "nix/util/file-content-address.hh"
 #include "nix/util/split.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <cstddef>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

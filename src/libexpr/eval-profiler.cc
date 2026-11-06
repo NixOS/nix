@@ -2,6 +2,27 @@
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
 #include "nix/util/lru-cache.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/position.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
+
+#include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <ostream>
+#include <ratio>
+#include <span>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

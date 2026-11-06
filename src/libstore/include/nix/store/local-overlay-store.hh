@@ -1,4 +1,23 @@
 #include "nix/store/local-store.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <atomic>
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
 
 namespace nix {
 

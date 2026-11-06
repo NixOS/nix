@@ -7,6 +7,10 @@
 #include <map>
 #include <variant>
 #include <vector>
+#include <cstddef>
+#include <functional>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

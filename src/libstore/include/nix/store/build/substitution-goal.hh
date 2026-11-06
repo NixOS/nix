@@ -4,9 +4,21 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build/goal.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/util.hh"
 #include <coroutine>
 #include <future>
 #include <source_location>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <thread>
+#include <utility>
 
 namespace nix {
 

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <string>
 
 #include "nix/store/filetransfer.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

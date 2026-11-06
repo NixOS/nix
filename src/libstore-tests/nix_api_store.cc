@@ -1,4 +1,12 @@
 #include <fstream>
+#include <cstddef>
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <set>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -11,6 +19,11 @@
 #include "nix/util/tests/string_callback.hh"
 #include "nix/util/tests/test-data.hh"
 #include "nix/util/url.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/tests/nix_api_util.hh"
+#include "nix/util/util.hh"
 
 #include "store-tests-config.hh"
 

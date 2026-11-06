@@ -2,6 +2,10 @@
 ///@file
 
 #include <memory>
+#include <compare>
+#include <list>
+#include <string>
+#include <string_view>
 
 #include "nix/util/types.hh"
 

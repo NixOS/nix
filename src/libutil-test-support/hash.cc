@@ -1,5 +1,9 @@
 #include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <rapidcheck.h>
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <vector>
 
 #include "nix/util/hash.hh"
 

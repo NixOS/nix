@@ -3,8 +3,17 @@
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
+#include "nix/cmd/built-path.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
 
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

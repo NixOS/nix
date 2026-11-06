@@ -3,6 +3,8 @@
 
 #include <limits>
 #include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/file-descriptor.hh"
 

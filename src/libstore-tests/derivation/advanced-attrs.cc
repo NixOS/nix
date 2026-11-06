@@ -1,4 +1,10 @@
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
+#include <string_view>
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
@@ -10,6 +16,11 @@
 
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

@@ -1,6 +1,20 @@
 #include "nix/cmd/installable-value.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

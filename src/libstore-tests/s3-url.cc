@@ -1,8 +1,11 @@
 #include "nix/store/s3-url.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/error.hh"
+#include "nix/util/url.hh"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <string>
 
 namespace nix {
 

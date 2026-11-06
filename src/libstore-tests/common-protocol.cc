@@ -1,11 +1,23 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <cstddef>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <vector>
 
 #include "nix/util/json-utils.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/tests/protocol.hh"
 #include "nix/util/tests/characterization.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

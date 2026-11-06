@@ -11,6 +11,9 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include <optional>
+#include <cstdint>
+#include <map>
+#include <string>
 
 namespace nix::fetchers {
 

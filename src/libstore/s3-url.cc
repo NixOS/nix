@@ -5,11 +5,22 @@
 #include "nix/util/logging.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/util/strings-inline.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/json-non-null.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>
 #include <ranges>
 #include <string_view>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

@@ -6,8 +6,31 @@
 #include "nix/store/worker-settings.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/util.hh"
 
 #include <array>
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <exception>
+#include <future>
+#include <memory>
+#include <optional>
+#include <string>
+#include <thread>
+#include <utility>
 
 namespace nix {
 

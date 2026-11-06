@@ -3,9 +3,16 @@
 #include "nix/util/error.hh"
 #include "nix_api_util_internal.h"
 #include "nix/util/util.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/logging.hh"
 
 #include <cxxabi.h>
 #include <typeinfo>
+#include <cstdlib>
+#include <exception>
+#include <map>
+#include <string>
+#include <string_view>
 
 #include "nix_api_util_config.h"
 

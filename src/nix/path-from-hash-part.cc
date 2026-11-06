@@ -1,5 +1,10 @@
 #include "nix/cmd/command.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
 
 namespace nix {
 

@@ -3,6 +3,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+
+#include <cerrno>
+#include <filesystem>
+#include <string>
 
 namespace nix {
 

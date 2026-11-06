@@ -2,9 +2,17 @@
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/base-nix-32.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <cstdlib>
 #include <algorithm>
+#include <cassert>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

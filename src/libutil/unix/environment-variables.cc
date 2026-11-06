@@ -1,7 +1,11 @@
 #include <cstdlib>
 #include <cstring>
+#include <optional>
+#include <string>
 
 #include "nix/util/environment-variables.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/types.hh"
 
 extern char ** environ __attribute__((weak));
 

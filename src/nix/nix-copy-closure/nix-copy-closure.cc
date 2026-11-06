@@ -4,6 +4,16 @@
 #include "nix/store/store-open.hh"
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+
+#include <string>
 
 namespace nix {
 

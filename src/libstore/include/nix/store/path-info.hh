@@ -1,15 +1,31 @@
 #pragma once
 ///@file
 
-#include "nix/util/signature/signer.hh"
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
+#include "nix/util/json-impls.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/types.hh"
 
 #include <string>
 #include <optional>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <limits>
+#include <map>
+#include <memory>
+#include <set>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace nix {
+
+struct Signer;
 
 class Store;
 struct StoreDirConfig;

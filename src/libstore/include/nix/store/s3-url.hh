@@ -4,6 +4,7 @@
 #include "nix/util/error.hh"
 #include "nix/util/url.hh"
 #include "nix/util/util.hh"
+#include "nix/util/configuration.hh"
 
 #include <optional>
 #include <string>

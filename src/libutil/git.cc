@@ -3,6 +3,14 @@
 #include <charconv>
 #include <regex>
 #include <strings.h> // for strcasecmp
+#include <cassert>
+#include <cstdint>
+#include <iterator>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
 
 #include "nix/util/signals.hh"
 #include "nix/util/configuration.hh"
@@ -11,6 +19,13 @@
 #include "nix/util/git.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/merkle-files.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
 
 namespace nix::git {
 

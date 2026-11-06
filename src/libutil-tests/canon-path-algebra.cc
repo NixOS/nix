@@ -1,10 +1,14 @@
 #include "nix/util/canon-path.hh"
 #include "nix/util/os-canon-path.hh"
+#include "nix/util/os-filename.hh"
 
 #include <gtest/gtest.h>
 
 #include <string>
 #include <vector>
+#include <cstddef>
+#include <optional>
+#include <string_view>
 
 namespace nix {
 

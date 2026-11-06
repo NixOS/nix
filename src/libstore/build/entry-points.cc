@@ -4,7 +4,20 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
 #include "nix/util/strings.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 #include <memory>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

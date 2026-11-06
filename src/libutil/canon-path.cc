@@ -4,6 +4,15 @@
 #include "nix/util/strings-inline.hh"
 
 #include <cstring>
+#include <algorithm>
+#include <cassert>
+#include <iterator>
+#include <optional>
+#include <ostream>
+#include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <filesystem>
 
 #include "nix/store/local-binary-cache-store.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

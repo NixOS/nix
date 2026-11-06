@@ -6,6 +6,12 @@
 
 #include <memory_resource>
 #include <numeric>
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <optional>
+#include <ranges>
+#include <vector>
 
 namespace nix {
 

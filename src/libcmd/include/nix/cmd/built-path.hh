@@ -3,6 +3,16 @@
 
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
+
+#include <compare>
+#include <map>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

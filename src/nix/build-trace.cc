@@ -2,9 +2,20 @@
 #include "nix/main/common-args.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/store-cast.hh"
+#include "nix/cmd/built-path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
 
 #include <nlohmann/json.hpp>
 #include <ranges>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

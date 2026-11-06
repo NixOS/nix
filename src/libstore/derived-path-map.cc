@@ -1,6 +1,12 @@
 #include "nix/store/derived-path-map.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/util.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/types.hh"
+
+#include <map>
+#include <memory>
 
 namespace nix {
 

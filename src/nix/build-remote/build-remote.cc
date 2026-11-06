@@ -5,6 +5,16 @@
 #include <set>
 #include <memory>
 #include <tuple>
+#include <cassert>
+#include <csignal>
+#include <cstdint>
+#include <exception>
+#include <iostream>
+#include <optional>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <variant>
 
 #ifdef __APPLE__
 #  include <sys/time.h>
@@ -26,7 +36,21 @@
 #include "nix/store/build.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/experimental-features.hh"
-#include "nix/store/globals.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

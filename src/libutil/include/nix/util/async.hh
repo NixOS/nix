@@ -2,7 +2,6 @@
 ///@file
 
 #include "nix/util/callback.hh"
-#include "nix/util/ref.hh"
 #include "nix/util/signals.hh"
 
 #include <boost/asio/co_spawn.hpp>
@@ -13,6 +12,11 @@
 #include <boost/asio/associated_cancellation_slot.hpp>
 
 #include <concepts>
+#include <atomic>
+#include <exception>
+#include <future>
+#include <memory>
+#include <ranges>
 
 namespace nix {
 

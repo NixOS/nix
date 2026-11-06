@@ -3,9 +3,13 @@
 #include "nix/util/util.hh"
 
 #include "nix/util/tests/test-data.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/error.hh"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>
+#include <filesystem>
+#include <optional>
 
 using ::testing::Contains;
 using ::testing::ElementsAre;

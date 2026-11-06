@@ -1,10 +1,10 @@
 #pragma once
 #include <optional>
+#include <filesystem>
 
 #include "nix/util/ref.hh"
 #include "nix/flake/flake.hh"
 #include "nix/flake/flakeref.hh"
-#include "nix/flake/settings.hh"
 
 struct nix_flake_settings
 {

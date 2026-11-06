@@ -1,4 +1,7 @@
 #include <string>
+#include <cstddef>
+#include <optional>
+#include <utility>
 
 #include "nix_api_flake.h"
 #include "nix_api_flake_internal.hh"
@@ -9,6 +12,13 @@
 #include "nix_api_fetchers.h"
 
 #include "nix/flake/flake.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
+#include "nix_api_expr.h"
+#include "nix_api_value.h"
+#include "nix/flake/settings.hh"
 
 extern "C" {
 

@@ -5,12 +5,20 @@
 #include "nix/util/canon-path.hh"
 #include "nix/main/common-args.hh"
 #include "nix/expr/search-path.hh"
-#include "nix/expr/eval-settings.hh"
 #include "nix/store/store-reference.hh"
 
 #include <filesystem>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
+
+struct SourcePath;
+
+struct EvalSettings;
 
 class Store;
 

@@ -6,6 +6,12 @@
 #include "nix/util/json-non-null.hh"
 
 #include <nlohmann/json_fwd.hpp>
+#include <optional>
+#include <ostream>
+#include <set>
+#include <string>
+#include <string_view>
+#include <type_traits>
 
 namespace nix {
 

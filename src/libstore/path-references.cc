@@ -3,9 +3,20 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/util/canon-path.hh"
 #include "nix/util/logging.hh"
+#include "nix/store/path.hh"
+#include "nix/store/references.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
 
 #include <map>
 #include <cstdlib>
+#include <cassert>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

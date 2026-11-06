@@ -1,4 +1,5 @@
 #include "nix/store/gc-store.hh"
+#include "nix/store/store-dir-config.hh"
 
 namespace nix {
 

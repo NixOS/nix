@@ -1,7 +1,22 @@
 #include "nix/store/tests/https-store.hh"
 #include "nix/util/os-string.hh"
+#include "nix/store/binary-cache-store.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/local-binary-cache-store.hh"
+#include "nix/store/tests/libstore-network.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
 
 #include <thread>
+#include <chrono>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix::testing {
 

@@ -1,8 +1,15 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/util/config-global.hh"
+#include "nix/util/args.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
 
 #include <nlohmann/json.hpp>
+#include <map>
+#include <optional>
+#include <string>
 
 namespace nix {
 

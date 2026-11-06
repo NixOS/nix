@@ -3,6 +3,14 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+
+#include <exception>
+#include <memory>
+#include <string>
 
 namespace nix {
 

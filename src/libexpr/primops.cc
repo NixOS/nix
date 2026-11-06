@@ -23,6 +23,38 @@
 #include "nix/expr/primops.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/sort.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/print-options.hh"
+#include "nix/expr/print.hh"
+#include "nix/expr/repl-exit-status.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/position.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/types.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
@@ -43,6 +75,23 @@
 #endif
 
 #include <cmath>
+#include <array>
+#include <bit>
+#include <cassert>
+#include <ctime>
+#include <functional>
+#include <iterator>
+#include <limits>
+#include <list>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

@@ -1,10 +1,12 @@
 #pragma once
 ///@file
 
-#include "nix/util/logging.hh"
+#include <memory>
 
 namespace nix {
 
+class Logger;
+
 std::unique_ptr<Logger> makeProgressBar();
 
-}
+} // namespace nix

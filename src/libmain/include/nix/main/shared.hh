@@ -8,8 +8,15 @@
 #include "nix/main/common-args.hh"
 #include "nix/store/path.hh"
 #include "nix/store/derived-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <signal.h>
+#include <string>
+#include <vector>
 
 namespace nix {
 

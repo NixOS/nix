@@ -1,6 +1,17 @@
 #include "nix/expr/tests/libexpr.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/expr/static-string-data.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <ostream>
+#include <sstream>
+#include <string>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 // Testing the conversion to JSON

@@ -1,9 +1,12 @@
 #include "nix/util/error.hh"
 #include "nix/main/shared.hh"
+#include "nix/util/fun.hh"
 
 #include <cstring>
 #include <cstddef>
 #include <cstdlib>
+#include <memory>
+#include <vector>
 
 #include <unistd.h>
 #include <signal.h>

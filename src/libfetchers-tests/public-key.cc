@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <string_view>
+#include <utility>
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

@@ -1,11 +1,17 @@
 #pragma once
 ///@file
 
-#include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
-#include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build/goal.hh"
+#include "nix/store/path.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace nix {
 

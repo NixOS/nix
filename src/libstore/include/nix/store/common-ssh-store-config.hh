@@ -3,6 +3,11 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/url.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/file-descriptor.hh"
+
+#include <optional>
+#include <string>
 
 namespace nix {
 

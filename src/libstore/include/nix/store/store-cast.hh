@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

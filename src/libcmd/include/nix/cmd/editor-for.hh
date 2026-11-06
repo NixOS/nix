@@ -1,12 +1,17 @@
 #pragma once
 ///@file
 
-#include "nix/util/source-path.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/file-descriptor.hh"
-#include "nix/util/file-system.hh"
+
+#include <cstdint>
+#include <tuple>
 
 namespace nix {
+
+class AutoDelete;
+
+struct SourcePath;
 
 /**
  * Helper function to generate args that invoke $EDITOR on

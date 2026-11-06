@@ -1,5 +1,8 @@
 #include "nix/util/english.hh"
 
+#include <ostream>
+#include <string_view>
+
 namespace nix {
 
 std::ostream &

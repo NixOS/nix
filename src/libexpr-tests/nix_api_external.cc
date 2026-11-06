@@ -4,8 +4,11 @@
 
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
+#include "nix/util/tests/nix_api_util.hh"
 
 #include <gtest/gtest.h>
+#include <cassert>
+#include <string>
 
 namespace nixC {
 

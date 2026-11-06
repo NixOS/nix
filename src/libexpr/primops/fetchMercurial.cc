@@ -3,6 +3,20 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/url-parts.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/error.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <optional>
+#include <regex>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

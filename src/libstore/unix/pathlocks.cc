@@ -1,9 +1,19 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include <cerrno>
 #include <cstdlib>
+#include <cassert>
+#include <filesystem>
+#include <set>
+#include <string>
+#include <string_view>
 
 #include <fcntl.h>
 #include <sys/types.h>

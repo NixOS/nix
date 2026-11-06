@@ -4,8 +4,27 @@
 #include "nix/store/store-open.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/args.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/signature/signer.hh"
 
 #include <atomic>
+#include <cassert>
+#include <cstddef>
+#include <filesystem>
+#include <functional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

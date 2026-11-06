@@ -2,6 +2,11 @@
 ///@file
 
 #include <nlohmann/json.hpp>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/types.hh"
 #include "nix/store/path.hh"

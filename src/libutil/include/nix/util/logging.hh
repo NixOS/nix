@@ -10,6 +10,16 @@
 #include <filesystem>
 #include <span>
 #include <type_traits>
+#include <array>
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include <nlohmann/json_fwd.hpp>
 

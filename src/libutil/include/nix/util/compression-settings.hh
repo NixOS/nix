@@ -3,6 +3,10 @@
 
 #include "nix/util/configuration.hh"
 #include "nix/util/compression-algo.hh"
+#include "nix/util/json-non-null.hh"
+
+#include <optional>
+#include <type_traits>
 
 namespace nix {
 

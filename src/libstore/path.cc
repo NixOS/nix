@@ -1,7 +1,13 @@
 #include <nlohmann/json.hpp>
+#include <string>
+#include <string_view>
 
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/store/path.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

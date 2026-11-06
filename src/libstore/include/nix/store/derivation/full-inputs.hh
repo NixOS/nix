@@ -3,8 +3,10 @@
 
 #include "nix/store/path.hh"
 #include "nix/store/derived-path-map.hh"
+#include "nix/store/outputs-spec.hh"
 
 #include <set>
+#include <functional>
 
 namespace nix {
 

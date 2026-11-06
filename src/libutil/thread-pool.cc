@@ -1,6 +1,14 @@
 #include "nix/util/thread-pool.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
+#include "nix/util/logging.hh"
+
+#include <cassert>
+#include <cstddef>
+#include <exception>
+#include <thread>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

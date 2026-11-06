@@ -1,14 +1,17 @@
 #pragma once
 
 #include <optional>
+#include <ctime>
+#include <string>
 
 #include "nix/util/hash.hh"
 #include "nix/store/path.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/types.hh"
-#include "nix/util/url.hh"
 
 namespace nix {
+
+struct VerbatimURL;
 class Store;
 struct SourceAccessor;
 } // namespace nix

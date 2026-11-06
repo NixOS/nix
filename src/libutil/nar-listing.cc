@@ -1,8 +1,22 @@
 #include "nix/util/nar-listing.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/error.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
 
 #include <stack>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

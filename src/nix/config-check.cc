@@ -1,4 +1,9 @@
 #include <sstream>
+#include <filesystem>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
 
 #include "nix/cmd/command.hh"
 #include "nix/util/exit.hh"
@@ -10,6 +15,12 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/executable-path.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

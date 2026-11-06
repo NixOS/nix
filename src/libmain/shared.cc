@@ -19,6 +19,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#include <cassert>
+#include <cstdint>
+#include <ranges>
+#include <string>
+#include <vector>
 
 #ifndef _WIN32
 #  include <sys/resource.h>
@@ -37,6 +42,23 @@
 
 #include "main-config-private.hh"
 #include "nix/expr/config.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/global-paths.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/args.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

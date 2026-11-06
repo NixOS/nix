@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <iterator>
+#include <cctype>
+#include <string>
+#include <utility>
 
 #include "nix/util/environment-variables.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

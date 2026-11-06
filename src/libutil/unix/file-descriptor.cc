@@ -2,6 +2,9 @@
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/error.hh"
 
 #ifdef __APPLE__
 #  include <libproc.h> /* For closeExtraFDs. */
@@ -14,6 +17,12 @@
 #include <algorithm>
 #include <atomic>
 #include <vector>
+#include <array>
+#include <cassert>
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
+#include <type_traits>
 
 #include "util-unix-config-private.hh"
 #include "../file-descriptor-private.hh"

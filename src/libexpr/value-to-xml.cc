@@ -2,8 +2,21 @@
 #include "nix/util/xml-writer.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/util/signals.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/position.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/types.hh"
 
 #include <cstdlib>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

@@ -6,6 +6,13 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <cstddef>
+#include <limits>
+#include <list>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -13,6 +20,7 @@
 #include "nix/util/experimental-features.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/ref.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

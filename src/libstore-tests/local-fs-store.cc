@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
+#include <filesystem>
 
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

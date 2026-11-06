@@ -3,10 +3,19 @@
 #endif
 
 #include <filesystem>
+#include <cassert>
+#include <list>
+#include <string>
+#include <system_error>
+#include <vector>
 
 #include "nix/util/config-global.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

@@ -4,6 +4,17 @@
 #include "nix/store/config.hh"
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/s3-url.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+
+#include <cstdint>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
 
 namespace nix {
 

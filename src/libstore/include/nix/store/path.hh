@@ -2,10 +2,17 @@
 ///@file
 
 #include <string_view>
+#include <cstddef>
+#include <functional>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 #include "nix/util/types.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/util/json-non-null.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

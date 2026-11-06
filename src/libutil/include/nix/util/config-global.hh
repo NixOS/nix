@@ -3,6 +3,10 @@
 
 #include "nix/util/configuration.hh"
 
+#include <map>
+#include <string>
+#include <vector>
+
 namespace nix {
 
 class GlobalConfig : public AbstractConfig

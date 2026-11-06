@@ -3,11 +3,11 @@
 
 #include <thread>
 #include <future>
+#include <memory>
+#include <string>
 
-#include "nix/store/store-api.hh"
 #include "nix/store/build/goal.hh"
 #include "nix/store/realisation.hh"
-#include "nix/util/muxable-pipe.hh"
 
 namespace nix {
 

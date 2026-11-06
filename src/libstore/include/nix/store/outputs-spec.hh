@@ -5,6 +5,10 @@
 #include <optional>
 #include <set>
 #include <variant>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/json-impls.hh"
 #include "nix/util/variant-wrapper.hh"

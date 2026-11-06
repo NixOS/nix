@@ -4,6 +4,13 @@
 #include "nix/util/configuration.hh"
 #include "nix/store/global-paths.hh"
 #include "nix/store/store-reference.hh"
+#include "nix/util/types.hh"
+
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <string>
+#include <vector>
 
 namespace nix {
 

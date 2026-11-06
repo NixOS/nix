@@ -1,4 +1,12 @@
 #include "nix/util/archive.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/serialise.hh"
+
+#include <cstddef>
+#include <string_view>
 
 namespace nix {
 

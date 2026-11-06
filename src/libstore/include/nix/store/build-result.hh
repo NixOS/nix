@@ -4,6 +4,11 @@
 #include <string>
 #include <chrono>
 #include <optional>
+#include <compare>
+#include <cstdint>
+#include <ctime>
+#include <utility>
+#include <variant>
 
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"

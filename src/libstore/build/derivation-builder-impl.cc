@@ -12,6 +12,43 @@
 #include "nix/util/processes.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/topo-sort.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/references.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <cassert>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

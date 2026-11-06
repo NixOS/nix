@@ -2,6 +2,12 @@
 ///@file
 
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+
+#include <cstdint>
+#include <optional>
 
 namespace nix {
 

@@ -3,9 +3,15 @@
 
 #include "nix/util/fun.hh"
 #include "nix/util/nar-listing.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
 
 #include <functional>
 #include <filesystem>
+#include <cstdint>
+#include <string>
 
 namespace nix {
 

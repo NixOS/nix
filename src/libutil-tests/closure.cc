@@ -1,5 +1,9 @@
 #include "nix/util/closure.hh"
 #include <gtest/gtest.h>
+#include <cstddef>
+#include <map>
+#include <set>
+#include <string>
 
 namespace nix {
 

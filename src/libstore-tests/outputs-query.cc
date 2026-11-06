@@ -3,12 +3,28 @@
 // See https://github.com/NixOS/nix/issues/15713
 
 #include <gtest/gtest.h>
+#include <cassert>
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "nix/store/outputs-query.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/tests/libstore.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/dummy-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

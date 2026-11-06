@@ -1,9 +1,28 @@
 #include "nix/store/build/derivation-trampoline-goal.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <ranges>
 #include <algorithm>
+#include <cassert>
+#include <iterator>
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

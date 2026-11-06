@@ -2,6 +2,21 @@
 ///@file
 
 #include "nix/cmd/installable-value.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

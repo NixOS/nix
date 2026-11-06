@@ -2,6 +2,10 @@
 
 #include "nix/util/strings.hh"
 
+#include <cstddef>
+#include <string>
+#include <string_view>
+
 namespace nix {
 
 template<class C, class CharT>

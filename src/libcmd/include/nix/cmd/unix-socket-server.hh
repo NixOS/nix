@@ -2,11 +2,14 @@
 ///@file
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fun.hh"
 
 #include <filesystem>
 #include <functional>
 #include <optional>
 #include <sys/types.h>
+#include <string>
 
 namespace nix::unix {
 

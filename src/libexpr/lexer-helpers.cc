@@ -1,4 +1,9 @@
 #include "lexer-helpers.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/parser-state.hh"
+#include "nix/util/pos-idx.hh"
+
+#include <cstddef>
 
 void nix::lexer::internal::initLoc(Parser::location_type * loc)
 {

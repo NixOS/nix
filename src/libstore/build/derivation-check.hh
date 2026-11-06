@@ -1,11 +1,16 @@
 #pragma once
 ///@file
 
-#include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
-#include "nix/store/path-info.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/path.hh"
+
+#include <map>
+#include <string>
 
 namespace nix {
+
+struct ValidPathInfo;
 
 /**
  * If outputSpec is a CAFixed or CAFloating output, check that the actual output described in

@@ -4,6 +4,13 @@
 #include "nix/util/ref.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/path-info.hh"
+
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
 

@@ -1,10 +1,19 @@
 #include <nlohmann/json.hpp>
 #include <string_view>
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "nix/store/path.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/util.hh"
 #include "nix/store/outputs-spec.hh"
+#include "nix/util/error.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+
 #include "nix/util/strings-inline.hh"
 
 namespace nix {

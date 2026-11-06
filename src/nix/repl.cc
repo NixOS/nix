@@ -7,6 +7,14 @@
 #include "nix/util/os-string.hh"
 #include "nix/util/environment-variables.hh"
 #include "self-exe.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace nix {
 

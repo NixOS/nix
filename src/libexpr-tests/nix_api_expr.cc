@@ -8,9 +8,22 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
 #include "nix/expr/tests/gc.hh"
+#include "nix/expr/config.hh"
+#include "nix/util/tests/nix_api_util.hh"
+#include "nix/expr/eval-gc.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "expr-tests-config.hh"
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "nix/util/file-descriptor.hh"
-
 namespace nix {
+
+class AutoCloseFD;
 
 extern AutoCloseFD fdSavedMountNamespace;
 extern AutoCloseFD fdSavedRoot;

@@ -17,8 +17,37 @@
 #include "nix/util/archive.hh"
 #include "nix/util/memo.hh"
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
 
 #include <sys/time.h>
+#include <cassert>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #ifndef _WIN32
 #  include <sys/wait.h>

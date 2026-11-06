@@ -1,10 +1,31 @@
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <ctime>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "nix/store/path-info.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/comparator.hh"
 #include "nix/util/strings.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/signature/signer.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

@@ -1,6 +1,16 @@
 #include "nix/util/source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
 

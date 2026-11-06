@@ -9,8 +9,25 @@
 #include "nix/util/config-impl.hh"
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cassert>
+#include <filesystem>
+#include <iterator>
+#include <list>
+#include <map>
+#include <numeric>
+#include <optional>
+#include <ranges>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "nix/util/strings.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

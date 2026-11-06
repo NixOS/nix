@@ -1,9 +1,18 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/store/tests/outputs-spec.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/test-data.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <span>
 #include <vector>
+#include <cstddef>
 
 #include <unistd.h>
 

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/util/executable-path.hh"
+#include "nix/util/os-string.hh"
 
 namespace nix {
 

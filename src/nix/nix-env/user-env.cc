@@ -10,8 +10,30 @@
 #include "nix/store/profiles.hh"
 #include "nix/expr/print-ambiguous.hh"
 #include "nix/expr/static-string-data.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <sstream>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace nix {
 

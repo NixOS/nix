@@ -1,10 +1,24 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <variant>
 
 #include "nix/store/derivations.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/dummy-store.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

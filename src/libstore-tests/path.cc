@@ -1,4 +1,8 @@
 #include <regex>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
@@ -10,6 +14,10 @@
 #include "nix/util/tests/json-characterization.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/store/tests/path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

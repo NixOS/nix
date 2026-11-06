@@ -1,11 +1,13 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/error.hh"
 
 #include "child-impl.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <string>
 
 namespace nix {
 

@@ -8,7 +8,11 @@
  * Used by both the Worker and Serve protocols.
  */
 
-#include "nix/util/types.hh"
+#include <cstddef>
+#include <map>
+#include <set>
+#include <tuple>
+#include <vector>
 
 namespace nix {
 

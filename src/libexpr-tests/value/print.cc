@@ -3,6 +3,21 @@
 
 #include "nix/expr/value.hh"
 #include "nix/expr/print.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/print-options.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/pos-table.hh"
+
+#include <exception>
+#include <ostream>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

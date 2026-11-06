@@ -17,6 +17,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <array>
 
 #include "nix/util/terminal.hh"
 #include "nix/util/ref.hh"

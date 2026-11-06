@@ -16,6 +16,39 @@
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
+
+#include <algorithm>
+#include <cassert>
+#include <list>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

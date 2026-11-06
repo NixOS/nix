@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
+#include <optional>
+#include <string>
 
 #include "nix/util/position.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

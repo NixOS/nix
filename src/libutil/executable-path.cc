@@ -1,5 +1,17 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/util/os-string.hh"
+
+#include <algorithm>
+#include <cassert>
+#include <filesystem>
+#include <functional>
+#include <iterator>
+#include <list>
+#include <optional>
+#include <utility>
+#include <vector>
+
 #include "nix/util/strings-inline.hh"
 #include "nix/util/file-path-impl.hh"
 

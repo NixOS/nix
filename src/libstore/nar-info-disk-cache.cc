@@ -6,8 +6,30 @@
 
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 #include "nix/util/strings.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

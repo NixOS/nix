@@ -2,8 +2,25 @@
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path-map.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nlohmann {
 

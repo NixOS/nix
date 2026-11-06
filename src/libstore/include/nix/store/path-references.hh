@@ -4,9 +4,15 @@
 #include "nix/store/references.hh"
 #include "nix/store/path.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/types.hh"
 
 #include <functional>
 #include <vector>
+#include <filesystem>
+#include <map>
+#include <string>
 
 namespace nix {
 

@@ -7,6 +7,26 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/util/os-filename.hh"
+#include "nix/store/config.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <atomic>
+#include <cassert>
+#include <chrono>
+#include <filesystem>
+#include <future>
+#include <list>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <thread>
 
 namespace nix {
 

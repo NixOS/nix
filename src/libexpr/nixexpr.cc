@@ -3,9 +3,27 @@
 #include "nix/expr/symbol-table.hh"
 #include "nix/util/util.hh"
 #include "nix/expr/print.hh"
+#include "nix/expr/counter.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include <cstdlib>
 #include <sstream>
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <limits>
+#include <map>
+#include <memory>
+#include <memory_resource>
+#include <ostream>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "nix/util/strings-inline.hh"
 

@@ -1,4 +1,19 @@
 #include "chroot-derivation-builder.hh"
+#include "chroot.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/types.hh"
+#include "unix-derivation-builder-impl.hh"
+
+#include <cassert>
+#include <filesystem>
+#include <utility>
 
 namespace nix {
 

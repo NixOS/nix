@@ -3,9 +3,23 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/socket.hh"
 
 #include <memory>
 #include <span>
+#include <cassert>
+#include <cerrno>
+#include <cstddef>
+#include <cstring>
+#include <filesystem>
+#include <new>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #ifdef _WIN32
 #  include <winsock2.h>

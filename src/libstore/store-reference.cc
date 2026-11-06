@@ -8,6 +8,12 @@
 
 #include <boost/url/ipv6_address.hpp>
 #include <nlohmann/json.hpp>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

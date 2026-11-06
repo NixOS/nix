@@ -2,10 +2,13 @@
 
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/types.hh"
+#include "nix/util/strings.hh"
 
 #include <boost/regex.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <functional>
+#include <string>
 
 namespace nix {
 

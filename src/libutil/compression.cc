@@ -3,6 +3,11 @@
 #include "nix/util/tarfile.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/current-process.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -14,6 +19,14 @@
 
 #include <zstd.h>
 #include <thread>
+#include <algorithm>
+#include <cstdint>
+#include <exception>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

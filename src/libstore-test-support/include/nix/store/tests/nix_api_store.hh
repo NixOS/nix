@@ -4,11 +4,14 @@
 
 #include "nix/util/file-system.hh"
 #include <filesystem>
+#include "nix/util/util.hh"
+#include <cassert>
+#include <string>
 
 #include "nix_api_store.h"
 #include "nix_api_store_internal.h"
+#include "nix_api_util.h"
 
-#include <filesystem>
 #include <gtest/gtest.h>
 
 namespace nixC {

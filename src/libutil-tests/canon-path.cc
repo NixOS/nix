@@ -1,6 +1,11 @@
 #include "nix/util/canon-path.hh"
 
 #include <gtest/gtest.h>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace nix {
 

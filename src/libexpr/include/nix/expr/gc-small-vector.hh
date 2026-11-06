@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/container/small_vector.hpp>
+#include <cstddef>
 
 #include "nix/expr/value.hh"
 

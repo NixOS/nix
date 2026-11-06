@@ -1,7 +1,13 @@
 #include "nix/expr/attr-set.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/util/error.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <algorithm>
+#include <cstddef>
+#include <limits>
+#include <string_view>
 
 namespace nix {
 

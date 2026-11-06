@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <new>
 
 namespace nix {
 

@@ -3,6 +3,12 @@
 
 #include "nix/util/ref.hh"
 #include "nix/store/store-reference.hh"
+#include "nix/util/types.hh"
+
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace nix {
 

@@ -2,6 +2,10 @@
 ///@file
 
 #include <sys/types.h>
+#include <cstdint>
+#include <filesystem>
+#include <set>
+#include <string>
 
 #include "nix/util/types.hh"
 #include "nix/util/configuration.hh"

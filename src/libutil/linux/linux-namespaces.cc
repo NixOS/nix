@@ -2,11 +2,18 @@
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include "linux-namespaces-private.hh"
 
 #include <mutex>
 #include <sys/resource.h>
+#include <cassert>
+#include <cerrno>
+#include <filesystem>
 
 #include <sys/mount.h>
 #include <sys/statvfs.h>

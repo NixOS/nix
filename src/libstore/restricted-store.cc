@@ -8,6 +8,36 @@
 #include "nix/store/local-store.hh"
 #include "nix/util/error.hh"
 #include "nix/util/repair-flag.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/store/indirect-root-store.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/util.hh"
+
+#include <chrono>
+#include <filesystem>
+#include <future>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

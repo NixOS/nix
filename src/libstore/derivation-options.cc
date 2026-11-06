@@ -6,12 +6,30 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/store/downstream-placeholder.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/worker-settings.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/strings.hh"
 
 #include <optional>
 #include <string>
 #include <variant>
 #include <regex>
 #include <ranges>
+#include <cassert>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <set>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

@@ -1,4 +1,9 @@
 #include "parser-scanner-decls.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/util/fmt.hh"
+
+#include <string>
+#include <string_view>
 
 void nix::parser::BisonParser::error(const location_type & loc_, const std::string & error)
 {

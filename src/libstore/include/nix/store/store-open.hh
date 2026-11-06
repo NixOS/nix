@@ -11,9 +11,16 @@
  * usages of a given `Store` which will be passed in.
  */
 
-#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/ref.hh"
+
+#include <list>
+#include <string>
 
 namespace nix {
+
+class Store;
+struct StoreConfig;
 
 /**
  * @return The store config denoted by `storeURI` (slight misnomer...).

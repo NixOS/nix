@@ -6,6 +6,10 @@
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
 
 #include <atomic>
 #include <random>
@@ -15,6 +19,15 @@
 #include <cstdlib>
 #include <deque>
 #include <filesystem>
+#include <array>
+#include <cassert>
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 #include <fcntl.h>
 #include <sys/types.h>

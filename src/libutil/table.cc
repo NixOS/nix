@@ -4,6 +4,8 @@
 #include <cassert>
 #include <iostream>
 #include <vector>
+#include <cstddef>
+#include <string>
 
 namespace nix {
 

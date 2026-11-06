@@ -2,6 +2,8 @@
 #include "nix/util/url.hh"
 
 #include <gtest/gtest.h>
+#include <string>
+#include <utility>
 
 namespace nix::lfs {
 

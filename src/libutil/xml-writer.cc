@@ -1,4 +1,8 @@
 #include <cassert>
+#include <cstddef>
+#include <ostream>
+#include <string>
+#include <string_view>
 
 #include "nix/util/xml-writer.hh"
 

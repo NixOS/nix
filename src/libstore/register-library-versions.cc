@@ -9,6 +9,7 @@
 
 #include <curl/curl.h>
 #include <sqlite3.h>
+#include <string>
 
 #if HAVE_SECCOMP
 #  include <seccomp.h>

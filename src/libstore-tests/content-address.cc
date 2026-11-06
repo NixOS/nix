@@ -1,7 +1,15 @@
 #include <gtest/gtest.h>
+#include <filesystem>
+#include <string_view>
+#include <utility>
 
 #include "nix/store/content-address.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

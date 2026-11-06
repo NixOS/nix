@@ -5,7 +5,12 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
 #include <nlohmann/json.hpp>
+#include <string>
 
 using json = nlohmann::json;
 

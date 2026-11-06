@@ -7,6 +7,8 @@
  */
 #include <string>
 #include <string_view>
+#include <algorithm>
+#include <cstddef>
 
 namespace nix {
 

@@ -5,11 +5,16 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/error.hh"
 
 #include <cstring>
 #include <random>
 #include <algorithm>
 #include <thread>
+#include <cstdio>
+#include <string>
+#include <string_view>
+#include <tuple>
 
 #ifndef _WIN32
 #  include <fcntl.h>

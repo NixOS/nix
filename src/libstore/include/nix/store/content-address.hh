@@ -2,11 +2,18 @@
 ///@file
 
 #include <variant>
+#include <cstddef>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 #include "nix/util/hash.hh"
 #include "nix/store/path.hh"
 #include "nix/util/file-content-address.hh"
 #include "nix/util/variant-wrapper.hh"
 #include "nix/util/json-impls.hh"
+#include "nix/util/json-non-null.hh"
 
 namespace nix {
 

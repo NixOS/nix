@@ -1,8 +1,16 @@
 #include <gtest/gtest.h>
 #include <regex>
+#include <string_view>
 
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/tests/https-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

@@ -2,6 +2,24 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/compression.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+
+#include <cstdint>
+#include <ctime>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 namespace nix {
 

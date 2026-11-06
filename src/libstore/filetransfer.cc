@@ -10,6 +10,19 @@
 #include "nix/util/socket.hh"
 
 #include "nix/store/s3-url.hh"
+#include "nix/store/config.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/url.hh"
 #include <optional>
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
@@ -32,6 +45,26 @@
 #include <thread>
 #include <utility>
 #include <regex>
+#include <cassert>
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <cstdio>
+#include <ctime>
+#include <exception>
+#include <filesystem>
+#include <functional>
+#include <future>
+#include <limits>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <new>
+#include <set>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <vector>
 
 namespace nix {
 

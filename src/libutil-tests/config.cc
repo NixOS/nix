@@ -1,7 +1,12 @@
 #include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/types.hh"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include <map>
+#include <string>
 
 namespace nix {
 

@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
+#include <cstdint>
+#include <string>
 
 #include "nix/expr/fetch-tree.hh"
 #include "nix/expr/tests/libexpr.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/path.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

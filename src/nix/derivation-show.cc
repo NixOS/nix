@@ -5,7 +5,12 @@
 #include "nix/main/common-args.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
 #include <nlohmann/json.hpp>
+#include <string>
+#include <utility>
 
 using json = nlohmann::json;
 

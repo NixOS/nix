@@ -4,6 +4,23 @@
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/file-system.hh"
+#include "nix/store/config.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/compression-algo.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
+
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

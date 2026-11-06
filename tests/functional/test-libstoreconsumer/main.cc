@@ -2,7 +2,13 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/build.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/store-api.hh"
 #include <iostream>
+#include <exception>
+#include <string>
+#include <vector>
 
 int main(int argc, char ** argv)
 {

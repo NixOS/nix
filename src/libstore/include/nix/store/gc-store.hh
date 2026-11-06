@@ -2,8 +2,17 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/store/path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <set>
+#include <string>
+#include <variant>
 
 namespace nix {
 

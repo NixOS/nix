@@ -6,6 +6,7 @@
 #include <sys/personality.h>
 
 #include <cstring>
+#include <string_view>
 
 namespace nix::linux {
 

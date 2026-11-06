@@ -2,10 +2,16 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/config.hh"
+#include "nix/util/error.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/fun.hh"
 
 #include <boost/context/detail/exception.hpp>
 
 #include <gtest/gtest.h>
+#include <exception>
+#include <string>
+#include <utility>
 
 namespace nix {
 

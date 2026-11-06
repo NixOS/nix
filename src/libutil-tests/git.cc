@@ -1,9 +1,26 @@
 #include <gtest/gtest.h>
+#include <cassert>
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/util/git.hh"
 #include "nix/util/memory-source-accessor.hh"
 
 #include "nix/util/tests/characterization.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/merkle-files.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
 

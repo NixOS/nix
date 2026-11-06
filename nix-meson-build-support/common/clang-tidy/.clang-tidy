@@ -80,6 +80,8 @@ Checks:
   - cppcoreguidelines-missing-std-forward
   - android-cloexec-open
   - android-cloexec-pipe2
+  # Include what is used. See the options below for what is not checked.
+  - misc-include-cleaner
   # Custom nix checks
   - nix-*
 
@@ -93,6 +95,16 @@ CheckOptions:
   bugprone-unused-return-value.AllowCastToVoid: true
   bugprone-unsafe-functions.ReportDefaultFunctions: false
   # Repurpose bugprone-unsafe-functions to lint functions that we'd want to wrap.
+  # Only check for missing includes. Linting only sees the code compiled
+  # on Linux, so includes only needed inside e.g. `#ifdef __APPLE__` would
+  # look unused.
+  misc-include-cleaner.UnusedIncludes: false
+  # Only require Nix's own headers and the C++ standard library headers:
+  # not C and POSIX headers, which are platform-specific, nor third-party
+  # headers, where it sometimes picks internal ones. Also not the generated
+  # parser headers, nor these platform-specific Nix headers, which may
+  # only be included under the right `#ifdef`.
+  misc-include-cleaner.IgnoreHeaders: '.*\.h;.*\.hpp;boost/.*;.*-tab\.hh;parser-scanner-decls\.hh;nix/util/signals-impl\.hh;nix/store/user-lock\.hh'
   bugprone-unsafe-functions.CustomFunctions: >
     ::std::filesystem::create_directories, nix::createDirs, "Use nix::createDirs (it wraps exceptions)";
     ::std::filesystem::remove_all, nix::deletePath, "Use nix::deletePath (remove_all is not TOCTOU safe)";

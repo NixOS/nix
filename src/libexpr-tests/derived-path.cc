@@ -1,10 +1,16 @@
+#include "nix/store/tests/derived-path.hh"
+#include "nix/expr/tests/libexpr.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/store/tests/path.hh"
+
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <rapidcheck/gtest.h>
-
-#include "nix/store/tests/derived-path.hh"
-#include "nix/expr/tests/libexpr.hh"
+#include <optional>
 
 namespace nix {
 

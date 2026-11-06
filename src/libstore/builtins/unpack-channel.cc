@@ -1,5 +1,12 @@
 #include "nix/store/builtins.hh"
 #include "nix/util/tarfile.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+
+#include <cstddef>
+#include <filesystem>
+#include <iterator>
+#include <string>
 
 namespace nix {
 

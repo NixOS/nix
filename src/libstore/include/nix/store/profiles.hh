@@ -10,11 +10,16 @@
 #include <filesystem>
 #include <optional>
 #include <time.h>
-
-#include "nix/util/types.hh"
-#include "nix/store/pathlocks.hh"
+#include <cstdint>
+#include <list>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
+
+class PathLocks;
 
 class StorePath;
 

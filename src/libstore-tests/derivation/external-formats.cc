@@ -1,5 +1,9 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
@@ -7,6 +11,17 @@
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/store/tests/libstore.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

@@ -3,6 +3,8 @@
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
+#include <string>
+#include <string_view>
 
 #include "nix/util/types.hh"
 #include "nix/util/ref.hh"

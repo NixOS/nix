@@ -2,10 +2,13 @@
 
 #include "nix/util/file-system.hh"
 #include "unix/file-system.hh"
+#include "nix/util/error.hh"
 
 #include <linux/capability.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <cerrno>
+#include <exception>
 
 namespace nix {
 

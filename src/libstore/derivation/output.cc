@@ -2,6 +2,13 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/util.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+
+#include <optional>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

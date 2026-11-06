@@ -15,7 +15,17 @@
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/store-reference.hh"
 #include "nix/store/substituter.hh"
-#include "nix/util/source-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/json-impls.hh"
+#include "nix/util/json-non-null.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
@@ -23,6 +33,15 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <istream>
+#include <optional>
+#include <set>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

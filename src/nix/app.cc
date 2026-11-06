@@ -8,6 +8,21 @@
 #include "nix/cmd/command.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
+#include "nix/cmd/built-path.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

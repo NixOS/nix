@@ -2,10 +2,14 @@
 #include "nix_api_util.h"
 #include "nix/util/tests/nix_api_util.hh"
 #include "nix/util/tests/string_callback.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
 
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <cstddef>
+#include <string>
 
 #include "util-tests-config.hh"
 

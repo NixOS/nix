@@ -1,10 +1,16 @@
 #include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
+#include <cassert>
+#include <cstdint>
+#include <ostream>
+#include <string>
 
 #include <rapidcheck/gen/Arbitrary.h>
 #include <rapidcheck.h>
 
 #include "nix/util/tests/hash.hh"
 #include "nix/store/tests/path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/hash.hh"
 
 namespace nix {
 

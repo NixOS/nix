@@ -3,6 +3,17 @@
 
 #include "nix/expr/eval.hh"
 #include "nix/util/os-string.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/repl-exit-status.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/expr/value.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

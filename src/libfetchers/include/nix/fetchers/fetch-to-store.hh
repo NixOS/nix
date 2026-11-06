@@ -1,11 +1,18 @@
 #pragma once
 
 #include "nix/util/source-path.hh"
-#include "nix/store/store-api.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/repair-flag.hh"
 #include "nix/util/file-content-address.hh"
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/hash.hh"
+
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

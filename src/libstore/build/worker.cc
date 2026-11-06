@@ -13,6 +13,40 @@
 #endif
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/build/derivation-building-misc.hh"
+#include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/store/build/goal.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/muxable-pipe.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/util.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/source-path.hh"
+
+#include <algorithm>
+#include <cassert>
+#include <chrono>
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <optional>
+#include <ratio>
+#include <set>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

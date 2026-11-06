@@ -4,8 +4,18 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/util/comparator.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <compare>
+#include <map>
+#include <string>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

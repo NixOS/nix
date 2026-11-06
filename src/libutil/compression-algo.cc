@@ -1,8 +1,13 @@
 #include "nix/util/compression-algo.hh"
 #include "nix/util/error.hh"
 #include "nix/util/types.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/suggestions.hh"
 
 #include <unordered_map>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

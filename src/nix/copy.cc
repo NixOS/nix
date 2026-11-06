@@ -2,6 +2,16 @@
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
+#include "nix/cmd/built-path.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/store/substituter.hh"
+#include "nix/util/error.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/repair-flag.hh"
+
+#include <filesystem>
+#include <optional>
+#include <string>
 
 namespace nix {
 

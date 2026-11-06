@@ -1,8 +1,3 @@
-#include <iostream>
-#include <cstdlib>
-#include <cstring>
-#include <memory>
-
 #include "nix/util/error.hh"
 #include "nix/cmd/repl-interacter.hh"
 #include "nix/cmd/repl.hh"
@@ -34,6 +29,43 @@
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/strings.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/print-options.hh"
+#include "nix/expr/repl-exit-status.hh"
+#include "nix/expr/search-path.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/pos-table.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
+
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <cassert>
+#include <cstdint>
+#include <filesystem>
+#include <limits>
+#include <list>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

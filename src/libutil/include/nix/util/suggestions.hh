@@ -3,6 +3,10 @@
 
 #include "nix/util/types.hh"
 #include <set>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <variant>
 
 namespace nix {
 

@@ -1,9 +1,16 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
+#include <string_view>
+#include <variant>
 
 #include "nix/expr/tests/value/context.hh"
 #include "nix/store/store-dir-config.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
 
 namespace nix {
 

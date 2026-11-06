@@ -1,5 +1,6 @@
 #include "nix/util/lru-cache.hh"
 #include <gtest/gtest.h>
+#include <string>
 
 namespace nix {
 

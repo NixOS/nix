@@ -1,6 +1,15 @@
 #include "nix/store/build-result.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/util.hh"
 #include <array>
+#include <chrono>
+#include <compare>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 namespace nix {
 

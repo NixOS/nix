@@ -3,6 +3,14 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/config.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/types.hh"
+
+#include <filesystem>
+#include <map>
+#include <optional>
+#include <string>
+#include <utility>
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"

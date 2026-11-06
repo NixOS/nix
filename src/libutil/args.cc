@@ -4,10 +4,30 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/users.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/suggestions.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <fstream>
 #include <string>
 #include <regex>
+#include <cassert>
+#include <cctype>
+#include <cstddef>
+#include <cstring>
+#include <filesystem>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <string_view>
+#include <utility>
+#include <vector>
 #ifndef _WIN32
 #  include <glob.h>
 #endif

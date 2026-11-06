@@ -1,6 +1,9 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/ref.hh"
+
+#include <string>
 
 namespace nix {
 

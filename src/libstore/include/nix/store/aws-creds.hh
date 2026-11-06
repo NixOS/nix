@@ -4,7 +4,6 @@
 
 #if NIX_WITH_AWS_AUTH
 
-#  include "nix/store/s3-url.hh"
 #  include "nix/util/ref.hh"
 #  include "nix/util/error.hh"
 
@@ -13,6 +12,8 @@
 #  include <string>
 
 namespace nix {
+
+struct ParsedS3URL;
 
 /**
  * AWS credentials obtained from credential providers

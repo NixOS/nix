@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
+#include <functional>
+#include <set>
 
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

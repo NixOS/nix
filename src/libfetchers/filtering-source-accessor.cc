@@ -1,9 +1,22 @@
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/util.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <boost/unordered/concurrent_flat_set.hpp>
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <set>
+#include <string>
+#include <unordered_set>
+#include <utility>
 
 namespace nix {
 

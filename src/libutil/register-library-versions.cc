@@ -13,6 +13,8 @@
 #include <zstd.h>
 #include <boost/version.hpp>
 #include <nlohmann/json.hpp>
+#include <cstdint>
+#include <string>
 
 #if HAVE_LIBCPUID
 #  include <libcpuid/libcpuid.h>

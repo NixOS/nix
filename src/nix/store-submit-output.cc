@@ -2,6 +2,13 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/submit-store.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/ref.hh"
+
+#include <optional>
+#include <string>
 
 namespace nix {
 

@@ -1,6 +1,8 @@
 #include "nix/util/os-canon-path.hh"
+#include "nix/util/os-filename.hh"
 
 #include <gtest/gtest.h>
+#include <filesystem>
 
 namespace nix {
 

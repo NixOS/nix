@@ -2,6 +2,10 @@
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
 
+#include <filesystem>
+#include <string>
+#include <vector>
+
 namespace nix::unix::xdg {
 
 std::filesystem::path getCacheHome()

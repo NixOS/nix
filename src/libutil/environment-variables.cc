@@ -1,4 +1,9 @@
 #include "nix/util/environment-variables.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/types.hh"
+
+#include <optional>
+#include <string>
 
 namespace nix {
 

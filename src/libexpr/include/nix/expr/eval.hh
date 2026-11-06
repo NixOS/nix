@@ -20,6 +20,18 @@
 
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
+#include "nix/expr/eval-gc.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/util.hh"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
@@ -28,6 +40,17 @@
 #include <optional>
 #include <functional>
 #include <span>
+#include <array>
+#include <cstddef>
+#include <list>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace nix {
 

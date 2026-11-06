@@ -5,6 +5,20 @@
 #include "nix/util/fs-sink.hh"
 #include "nix/util/variant-wrapper.hh"
 #include "nix/util/json-impls.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
+#include "nix/util/json-non-null.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+
+#include <compare>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <variant>
 
 namespace nix {
 

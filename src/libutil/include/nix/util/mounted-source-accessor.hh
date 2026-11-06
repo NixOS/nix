@@ -1,6 +1,11 @@
 #pragma once
 
 #include "source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/ref.hh"
+
+#include <map>
+#include <memory>
 
 namespace nix {
 

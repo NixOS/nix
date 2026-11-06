@@ -2,8 +2,11 @@
 #include "nix/main/shared.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/library-versions.hh"
+#include "nix/main/common-args.hh"
+#include "nix/util/args.hh"
 
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace nix {
 

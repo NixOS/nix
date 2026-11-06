@@ -1,4 +1,7 @@
 #include <queue>
+#include <functional>
+#include <string>
+#include <vector>
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -11,6 +14,13 @@
 #include "nix/util/executable-path.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

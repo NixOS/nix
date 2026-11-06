@@ -4,8 +4,17 @@
 #include "nix/expr/eval.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/store/globals.hh"
+#include "nix/main/common-args.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 #include "run.hh"
+
+#include <cassert>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace nix {
 

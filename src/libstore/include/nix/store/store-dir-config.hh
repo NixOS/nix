@@ -5,10 +5,16 @@
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
 #include "nix/util/configuration.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/types.hh"
 
 #include <map>
 #include <string>
 #include <variant>
+#include <cstddef>
+#include <optional>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 

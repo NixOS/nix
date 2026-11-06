@@ -13,10 +13,35 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/url.hh"
 #include "nix/store/path.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/store/content-address.hh"
+#include "nix/util/args.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include "man-pages.hh"
 
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <filesystem>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 namespace nix {
 

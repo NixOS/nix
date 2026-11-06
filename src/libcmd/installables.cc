@@ -21,8 +21,38 @@
 #include "nix/expr/eval-cache.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/store/build-result.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/value.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/store/derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/util/args.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 #include <nlohmann/json.hpp>
+#include <cassert>
+#include <cstddef>
+#include <exception>
+#include <filesystem>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "nix/util/strings-inline.hh"
 

@@ -3,8 +3,26 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/path-with-outputs.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/store/path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 #include <cstring>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace nix {
 
