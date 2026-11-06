@@ -37,6 +37,7 @@
 namespace nix {
 
 DirectoryIterator::DirectoryIterator(const std::filesystem::path & p)
+    : dir_(p)
 {
     try {
         // **Attempt to create the underlying directory_iterator**
@@ -53,16 +54,10 @@ DirectoryIterator & DirectoryIterator::operator++()
     // **Attempt to increment the underlying iterator**
     std::error_code ec;
     it_.increment(ec);
-    if (ec) {
-        // Try to get path info if possible, might fail if iterator is bad
-        try {
-            if (it_ != std::filesystem::directory_iterator{}) {
-                throw SysError("cannot read directory past %s: %s", PathFmt(it_->path()), ec.message());
-            }
-        } catch (...) {
-            throw SysError("cannot read directory");
-        }
-    }
+    // On error, it_ has already become the end iterator, so this is the
+    // only way to tell an error from the end of the directory.
+    if (ec)
+        throw SystemError(ec, "cannot read directory %s", PathFmt(dir_));
     return *this;
 }
 
