@@ -63,7 +63,7 @@ in
           in
           "127.0.0.1 vhost-test.${rootDomain} ${rootDomain}";
         environment.systemPackages = [
-          pkgs.minio-client
+          pkgs.awscli2
         ];
       };
 
@@ -78,7 +78,7 @@ in
         '';
         networking.extraHosts = "192.168.1.2 vhost-test.${rootDomain} ${rootDomain}";
         environment.systemPackages = [
-          pkgs.minio-client
+          pkgs.awscli2
         ];
       };
   };
@@ -178,7 +178,10 @@ in
       SECRET_KEY = s3_key.secret_key
       ENV_WITH_CREDS = f"AWS_ACCESS_KEY_ID={ACCESS_KEY} AWS_SECRET_ACCESS_KEY={SECRET_KEY}"
 
-      server.succeed(f"mc alias set garage http://localhost:9000 {ACCESS_KEY} {SECRET_KEY} --api s3v4")
+      server.succeed(f"aws configure set aws_access_key_id \"{ACCESS_KEY}\"")
+      server.succeed(f"aws configure set aws_secret_access_key \"{SECRET_KEY}\"")
+      server.succeed("aws configure set default.region \"eu-west-1\"")
+      server.succeed("aws configure set default.endpoint_url \"http://localhost:${toString s3EndpointPort}\"")
 
       # ============================================================================
       # Helper Functions
@@ -198,18 +201,18 @@ in
 
       def verify_content_encoding(machine, bucket, object_path, expected_encoding):
           """Verify S3 object has expected Content-Encoding header"""
-          stat = machine.succeed(f"mc stat garage/{bucket}/{object_path}")
-          if "Content-Encoding" not in stat or expected_encoding not in stat:
-              print(f"mc stat output for {object_path}:")
-              print(stat)
+          actual_encoding = machine.succeed(f"aws s3api head-object --bucket {bucket} --key {object_path} --query ContentEncoding --output text")
+          if expected_encoding not in actual_encoding:
+              print(f"aws s3api head-object output for {object_path}:")
+              print(actual_encoding)
               raise Exception(f"Expected Content-Encoding: {expected_encoding} header on {object_path}")
 
       def verify_no_compression(machine, bucket, object_path):
           """Verify S3 object has no compression headers"""
-          stat = machine.succeed(f"mc stat garage/{bucket}/{object_path}")
-          if "Content-Encoding" in stat and ("gzip" in stat or "br" in stat):
-              print(f"mc stat output for {object_path}:")
-              print(stat)
+          actual_encoding = machine.succeed(f"aws s3api head-object --bucket {bucket} --key {object_path} --query ContentEncoding --output text")
+          if actual_encoding.strip() != "None":
+              print(f"aws s3api head-object output for {object_path}:")
+              print(actual_encoding)
               raise Exception(f"Object {object_path} should not have compression Content-Encoding")
 
       def assert_count(output, pattern, expected, error_msg):
@@ -270,7 +273,7 @@ in
                               server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {pkg}")
                       test_func(bucket)
                   finally:
-                      server.succeed(f"mc rm --force --recursive garage/{bucket}")
+                      server.succeed(f"aws s3 rm --recursive s3://{bucket}")
                       server.succeed(f"garage bucket delete {bucket} --yes")
                       # Clean up AWS profiles if created
                       if profiles:
@@ -619,7 +622,7 @@ in
           server.succeed(f"echo -n '{test_content}' > /tmp/test-file.txt")
 
           # Upload to S3
-          server.succeed(f"mc cp /tmp/test-file.txt garage/{bucket}/test-file.txt")
+          server.succeed(f"aws s3 cp /tmp/test-file.txt s3://{bucket}/test-file.txt")
 
           # Calculate expected hash
           expected_hash = server.succeed(
@@ -922,7 +925,7 @@ in
 
               verify_packages_in_store(client, PKGS['A'])
           finally:
-              server.succeed(f"mc rm --force --recursive garage/{bucket}")
+              server.succeed(f"aws s3 rm --recursive s3://{bucket}")
               server.succeed(f"garage bucket delete {bucket} --yes")
               for pkg in PKGS.values():
                   client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
