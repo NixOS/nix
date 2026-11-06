@@ -282,7 +282,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
             createDirs(path);
         } else if (S_ISLNK(maybeSt->st_mode)) {
             createDirs(path.parent_path());
-            copyFile(chrootPath.source, path, /*andDelete=*/false, /*contents=*/false);
+            copyFile(chrootPath.source, path, /*contents=*/false);
             continue;
         } else {
             createDirs(path.parent_path());
@@ -342,7 +342,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
                 //
                 // I also just generally feel icky about modifying sandbox state under a build,
                 // even though it really shouldn't be a big deal. -K900
-                copyFile(path, chrootRootDir / path.relative_path(), false, true);
+                copyFile(path, chrootRootDir / path.relative_path(), true);
             }
         }
 
@@ -351,10 +351,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
             // It should be even less likely to change during the build than resolv.conf.
             createDirs(chrootRootDir / "etc/ssl/certs");
             copyFile(
-                fileTransferSettings.caFile.get().value(),
-                chrootRootDir / "etc/ssl/certs/ca-certificates.crt",
-                false,
-                true);
+                fileTransferSettings.caFile.get().value(), chrootRootDir / "etc/ssl/certs/ca-certificates.crt", true);
         }
     }
 }

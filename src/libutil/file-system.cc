@@ -593,18 +593,9 @@ void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
     setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
 }
 
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents)
+void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool contents)
 {
     auto fromStatus = std::filesystem::symlink_status(from);
-
-    // Mark the directory as writable so that we can delete its children
-    if (andDelete && std::filesystem::is_directory(fromStatus)) {
-        // NOLINTNEXTLINE(bugprone-unsafe-functions): `nix::chmod` can neither add bits nor not follow symlinks
-        std::filesystem::permissions(
-            from,
-            std::filesystem::perms::owner_write,
-            std::filesystem::perm_options::add | std::filesystem::perm_options::nofollow);
-    }
 
     if (std::filesystem::is_symlink(fromStatus) || std::filesystem::is_regular_file(fromStatus)) {
         if (contents) {
@@ -618,22 +609,13 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);
         for (auto & entry : DirectoryIterator(from)) {
-            copyFile(entry, to / entry.path().filename(), andDelete);
+            copyFile(entry, to / entry.path().filename(), /*contents=*/false);
         }
     } else {
         throw Error("file %s has an unsupported type", PathFmt(from));
     }
 
     setWriteTime(to, lstat(from));
-    if (andDelete) {
-        if (!std::filesystem::is_symlink(fromStatus))
-            // NOLINTNEXTLINE(bugprone-unsafe-functions): `nix::chmod` can neither add bits nor not follow symlinks
-            std::filesystem::permissions(
-                from,
-                std::filesystem::perms::owner_write,
-                std::filesystem::perm_options::add | std::filesystem::perm_options::nofollow);
-        std::filesystem::remove(from);
-    }
 }
 
 //////////////////////////////////////////////////////////////////////
