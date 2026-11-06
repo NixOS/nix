@@ -343,6 +343,14 @@ std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches)
 
 } // end namespace
 
+static DrvNames drvNamesFromArgs(const Strings & opArgs)
+{
+    DrvNames result;
+    for (auto & i : opArgs)
+        result.emplace_back(i);
+    return result;
+}
+
 static PackageInfos
 filterBySelector(EvalState & state, const PackageInfos & allElems, const Strings & args, bool newestOnly)
 {
