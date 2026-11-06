@@ -3,6 +3,8 @@
 
 #include "nix/util/types.hh"
 
+#include <filesystem>
+
 namespace nix {
 
 class AutoRemoveJail

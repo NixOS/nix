@@ -1,15 +1,15 @@
-#ifdef __FreeBSD__
-#  include "nix/util/freebsd-jail.hh"
-#  include "nix/util/system-error.hh"
+#include "nix/util/freebsd-jail.hh"
+#include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
+#include "nix/util/util.hh"
+#include "nix/util/logging.hh"
 
-#  include <sys/resource.h>
-#  include <sys/param.h>
-#  include <sys/jail.h>
-#  include <sys/mount.h>
+#include <filesystem>
 
-#  include "nix/util/error.hh"
-#  include "nix/util/util.hh"
-#  include "nix/util/logging.hh"
+#include <sys/resource.h>
+#include <sys/param.h>
+#include <sys/jail.h>
+#include <sys/mount.h>
 
 namespace nix {
 
@@ -63,4 +63,3 @@ void AutoRemoveJail::cancel() noexcept
 //////////////////////////////////////////////////////////////////////
 
 } // namespace nix
-#endif
