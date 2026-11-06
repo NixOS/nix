@@ -363,13 +363,14 @@ public:
     {
         auto state(state_.lock());
 
-        if (type == resFileLinked) {
+        switch (type) {
+        case resFileLinked: {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0).value_or(0);
-            update(*state);
+            break;
         }
-
-        else if (type == resBuildLogLine || type == resPostBuildLogLine) {
+        case resBuildLogLine:
+        case resPostBuildLogLine: {
             auto line = getS(fields, 0);
             if (!line)
                 return;
@@ -381,25 +382,21 @@ public:
             if (printBuildLogs) {
                 const char * suffix = (type == resPostBuildLogLine) ? " (post)> " : "> ";
                 log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                return; /* No need to update(). */
             } else {
                 /* Bump activity for round-robin. Modify the lastLine in-place without invalidating iterators. */
                 state->activities.splice(state->activities.end(), state->activities, i->second);
                 info.lastLine = lastLine;
-                update(*state);
             }
+            break;
         }
-
-        else if (type == resUntrustedPath) {
+        case resUntrustedPath:
             state->untrustedPaths++;
-            update(*state);
-        }
-
-        else if (type == resCorruptedPath) {
+            break;
+        case resCorruptedPath:
             state->corruptedPaths++;
-            update(*state);
-        }
-
-        else if (type == resSetPhase) {
+            break;
+        case resSetPhase: {
             auto phase = getS(fields, 0);
             if (!phase)
                 return;
@@ -407,10 +404,9 @@ public:
             if (i == state->its.end())
                 return;
             i->second->phase = *phase;
-            update(*state);
+            break;
         }
-
-        else if (type == resProgress) {
+        case resProgress: {
             auto done = getI(fields, 0);
             auto expected = getI(fields, 1);
             auto running = getI(fields, 2);
@@ -425,10 +421,9 @@ public:
             actInfo.expected = *expected;
             actInfo.running = *running;
             actInfo.failed = *failed;
-            update(*state);
+            break;
         }
-
-        else if (type == resSetExpected) {
+        case resSetExpected: {
             auto expectedType = getI(fields, 0);
             auto expected = getI(fields, 1);
             if (!expectedType || !expected)
@@ -442,10 +437,9 @@ public:
             state->activitiesByType[type].expected -= j;
             j = *expected;
             state->activitiesByType[type].expected += j;
-            update(*state);
+            break;
         }
-
-        else if (type == resFetchStatus) {
+        case resFetchStatus: {
             auto lastLine = getS(fields, 0);
             if (!lastLine)
                 return;
@@ -454,8 +448,18 @@ public:
                 return;
             ActInfo & actInfo = *i->second;
             actInfo.lastLine = *lastLine;
-            update(*state);
+            break;
         }
+        case resFetchToStore:
+            /* TODO: Do something to render this maybe? */
+            return;
+        default:
+            /* Everything else can't happen (almost) because ResultType is a plain
+               enum and it would be UB. */
+            return;
+        }
+
+        update(*state);
     }
 
     void update(State & state) noexcept
