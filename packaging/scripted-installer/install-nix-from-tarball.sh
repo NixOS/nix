@@ -171,8 +171,8 @@ fi
 # -p breaks NFS. On the other hand, --preserve breaks BSD/Darwin/BusyBox.
 nix_cp_test_flags_dir=$(mktemp -d -t nix-cp-test.XXXXXXXXXX)
 touch "$nix_cp_test_flags_dir/src"
-if cp --preserve=ownership,timestamps "$nix_cp_test_flags_dir/src" "$nix_cp_test_flags_dir/dst" >/dev/null 2>&1; then
-    cp_flags="-RP --preserve=ownership,timestamps"
+if cp --preserve=timestamps "$nix_cp_test_flags_dir/src" "$nix_cp_test_flags_dir/dst" >/dev/null 2>&1; then
+    cp_flags="-RP --preserve=timestamps"
 else
     cp_flags="-RPp"
 fi
