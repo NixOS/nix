@@ -113,19 +113,19 @@ getParentFdAndName(Descriptor dirFd, const std::filesystem::path & dstPath, cons
         auto name = OsFilename::fromPathThrowing(*path.baseName());
         if (parent->isRoot())
             return {AutoCloseFD{}, dirFd, std::move(name)};
-        auto parentFd = openFileEnsureBeneathNoSymlinks(
-            dirFd,
-            *parent,
+        auto parentFd = valueOr(
+            openFileEnsureBeneathNoSymlinks(
+                dirFd,
+                *parent,
 #ifdef _WIN32
-            FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-            FILE_DIRECTORY_FILE
+                FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+                FILE_DIRECTORY_FILE
 #else
-            O_RDONLY | O_DIRECTORY | O_CLOEXEC,
-            0
+                O_RDONLY | O_DIRECTORY | O_CLOEXEC,
+                0
 #endif
-        );
-        if (!parentFd)
-            throw SysError("opening parent directory of %s", PathFmt(append(dstPath, path)));
+                ),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(append(dstPath, path))));
         auto fd = parentFd.get();
         return {std::move(parentFd), fd, std::move(name)};
     }
@@ -153,9 +153,9 @@ getParentFdAndName(Descriptor dirFd, const std::filesystem::path & dstPath, cons
        changes the working directory mid-unpack. */
     if (parentPath.empty())
         parentPath = ".";
-    auto parentFd = openDirectory(parentPath, FinalSymlink::Follow);
-    if (!parentFd)
-        throw NativeSysError("opening parent directory of %s", PathFmt(p));
+    auto parentFd = valueOr(
+        openDirectory(parentPath, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(p)));
     auto fd = parentFd.get();
     return {std::move(parentFd), fd, std::move(name)};
 }
@@ -178,20 +178,19 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
 
     RestoreSink dirSink{startFsync, hooks};
     dirSink.dstPath = append(dstPath, path);
-    dirSink.dirFd = openFileEnsureBeneathNoSymlinks(
-        dirFd.get(),
-        path,
+    dirSink.dirFd = valueOr(
+        openFileEnsureBeneathNoSymlinks(
+            dirFd.get(),
+            path,
 #ifdef _WIN32
-        FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-        FILE_DIRECTORY_FILE
+            FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            FILE_DIRECTORY_FILE
 #else
-        O_RDONLY | O_DIRECTORY | O_CLOEXEC,
-        0
+            O_RDONLY | O_DIRECTORY | O_CLOEXEC,
+            0
 #endif
-    );
-
-    if (!dirSink.dirFd)
-        throw SysError("opening directory %s", PathFmt(dirSink.dstPath));
+            ),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dirSink.dstPath)));
 
     callback(dirSink, CanonPath::root);
     if (hooks)
@@ -209,7 +208,7 @@ void RestoreSink::createDirectory(const CanonPath & path)
     {
         auto result = createDirectoryAt(fd, name);
         if (!result)
-            throw SystemError(result.error(), "creating directory %s", PathFmt(append(dstPath, path)));
+            throw NativeSysError(result.error(), "creating directory %s", PathFmt(append(dstPath, path)));
 
         /* Creating it may have opened it too; see `createDirectoryAt`. */
         if (!dirFd)
@@ -219,19 +218,19 @@ void RestoreSink::createDirectory(const CanonPath & path)
     if (!dirFd) {
         /* Open directory for further *at operations relative to the sink root
            directory.  Unfortunately not atomic with creating it; see `createDirectoryAt`. */
-        dirFd = openFileEnsureBeneathNoSymlinks(
-            fd,
-            OsCanonPath{name},
+        dirFd = valueOr(
+            openFileEnsureBeneathNoSymlinks(
+                fd,
+                OsCanonPath{name},
 #ifdef _WIN32
-            FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-            FILE_DIRECTORY_FILE
+                FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+                FILE_DIRECTORY_FILE
 #else
-            O_RDONLY | O_DIRECTORY | O_CLOEXEC,
-            0
+                O_RDONLY | O_DIRECTORY | O_CLOEXEC,
+                0
 #endif
-        );
-        if (!dirFd)
-            throw NativeSysError("opening directory %s", PathFmt(append(dstPath, path)));
+                ),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(append(dstPath, path))));
     }
 };
 
@@ -281,8 +280,7 @@ void RestoreRegularFile::anchor() {}
 void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
 {
     auto [_parentFd, fd, name] = getParentFdAndName(dirFd.get(), dstPath, path);
-    auto crf = RestoreRegularFile(
-        startFsync,
+    auto fileFd = valueOr(
         openFileEnsureBeneathNoSymlinks(
             fd,
             OsCanonPath{name},
@@ -296,9 +294,9 @@ void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegul
             O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC,
             0666
 #endif
-            ));
-    if (!crf.fd)
-        throw NativeSysError("creating file %s", PathFmt(append(dstPath, path)));
+            ),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("creating file %s", PathFmt(append(dstPath, path))));
+    auto crf = RestoreRegularFile(startFsync, std::move(fileFd));
     func(crf);
     crf.flush();
     if (hooks)
@@ -327,13 +325,13 @@ void RestoreRegularFile::preallocateContents(uint64_t len)
         if (len > std::numeric_limits<off_t>::max())
             throw Error("cannot preallocate contents for a file because it's too large");
 
-        errno = posix_fallocate(fd.get(), 0, len);
+        int err = posix_fallocate(fd.get(), 0, len);
         /* Note that EINVAL may indicate that the underlying
            filesystem doesn't support preallocation (e.g. on
            OpenSolaris).  Since preallocation is just an
            optimisation, ignore it. */
-        if (errno && errno != EINVAL && errno != EOPNOTSUPP && errno != ENOSYS)
-            throw SysError("preallocating file of %1% bytes", len);
+        if (err && err != EINVAL && err != EOPNOTSUPP && err != ENOSYS)
+            throw SysError(err, "preallocating file of %1% bytes", len);
     }
 #endif
 }

@@ -86,17 +86,16 @@ void restorePath(
 {
     switch (method) {
     case FileSerialisationMethod::Flat: {
-        AutoCloseFD fd = openNewFileForWrite(
-            path,
-            0666,
-            {
-                .truncateExisting = false, /* Like RestoreSink, we can only create new files. */
-                .followSymlinksOnTruncate = false,
-                .writeOnly = true,
-            });
-
-        if (!fd)
-            throw NativeSysError("opening %1%", PathFmt(path));
+        auto fd = valueOr(
+            openNewFileForWrite(
+                path,
+                0666,
+                {
+                    .truncateExisting = false, /* Like RestoreSink, we can only create new files. */
+                    .followSymlinksOnTruncate = false,
+                    .writeOnly = true,
+                }),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening %1%", PathFmt(path)));
 
         writeFile(fd.get(), source, FsSync::No, &path);
 

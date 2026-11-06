@@ -2,15 +2,11 @@
 #include <cstring>
 
 #include "nix/util/environment-variables.hh"
+#include "nix/util/system-error.hh"
 
 extern char ** environ __attribute__((weak));
 
 namespace nix {
-
-int setEnv(const char * name, const char * value)
-{
-    return ::setenv(name, value, 1);
-}
 
 std::optional<std::string> getEnvOs(const std::string & key)
 {
@@ -34,24 +30,36 @@ OsStringMap getEnvOs()
     return env;
 }
 
+void setEnvOs(const OsString & name, const OsString & value)
+{
+    if (::setenv(name.c_str(), value.c_str(), 1) == -1)
+        throw SysError("setting environment variable '%s'", name);
+}
+
+void unsetEnvOs(const OsChar * name)
+{
+    if (::unsetenv(name) == -1)
+        throw SysError("unsetting environment variable '%s'", name);
+}
+
+//////////////////////////////////////////////////////////////////////
+
+/* The portable wrappers. `OsString` is `std::string` on Unix, so there is
+   nothing to convert. */
+
 StringMap getEnv()
 {
     return getEnvOs();
 }
 
-int setEnvOs(const OsString & name, const OsString & value)
+void setEnv(const char * name, const char * value)
 {
-    return setEnv(name.c_str(), value.c_str());
+    setEnvOs(name, value);
 }
 
-int unsetEnvOs(const OsChar * name)
+void unsetEnv(const char * name)
 {
-    return unsetenv(name);
-}
-
-int unsetEnv(const char * name)
-{
-    return unsetEnvOs(name);
+    unsetEnvOs(name);
 }
 
 } // namespace nix

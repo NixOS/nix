@@ -37,13 +37,12 @@ std::tuple<OsStrings, AutoCloseFD, AutoDelete> editorFor(const SourcePath & file
 
     /* Create the file with the same name, so editors that recognise file
        extensions spin up syntax highlighting and LSPs. */
-    auto tempFd = openNewFileForWrite(
-        tempPath,
-        readOnly ? 0400 : 0600,
-        {.truncateExisting = false, .followSymlinksOnTruncate = false, .writeOnly = false});
-
-    if (!tempFd)
-        throw NativeSysError("failed to create temporary file %s", PathFmt(tempPath));
+    auto tempFd = valueOr(
+        openNewFileForWrite(
+            tempPath,
+            readOnly ? 0400 : 0600,
+            {.truncateExisting = false, .followSymlinksOnTruncate = false, .writeOnly = false}),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("failed to create temporary file %s", PathFmt(tempPath)));
 
     /* Copy the contents into the created copy. */
     FdSink fileSink(tempFd.get());

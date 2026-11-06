@@ -46,15 +46,15 @@ static void readChannels()
 // Writes the list of channels.
 static void writeChannels()
 {
-    auto channelsFD = openNewFileForWrite(
-        channelsList,
-        0644,
-        {
-            .truncateExisting = true,
-            .followSymlinksOnTruncate = true, /* Back-compat. */
-        });
-    if (!channelsFD)
-        throw SysError("opening '%1%' for writing", channelsList.string());
+    auto channelsFD = valueOr(
+        openNewFileForWrite(
+            channelsList,
+            0644,
+            {
+                .truncateExisting = true,
+                .followSymlinksOnTruncate = true, /* Back-compat. */
+            }),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening '%1%' for writing", channelsList.string()));
     for (const auto & channel : channels)
         writeFull(channelsFD.get(), channel.second + " " + channel.first + "\n");
 }

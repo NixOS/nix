@@ -346,7 +346,7 @@ void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const Os
         createFileSymlinkAt(dirFd, path, target);
 }
 
-static Result<AutoCloseFD, std::error_code>
+static Result<AutoCloseFD, NativeError>
 openOrCreateDirectoryAt(Descriptor dirFd, const OsCanonPath & path, ULONG createDisposition)
 {
     using namespace nix::windows;
@@ -363,17 +363,17 @@ openOrCreateDirectoryAt(Descriptor dirFd, const OsCanonPath & path, ULONG create
         FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT,
         createDisposition);
     if (result)
-        return std::move(result.value());
+        return outcome::success(std::move(result.value()));
 
-    return outcome::failure(std::error_code(RtlNtStatusToDosError(result.error()), std::system_category()));
+    return outcome::failure(RtlNtStatusToDosError(result.error()));
 }
 
-Result<AutoCloseFD, std::error_code> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
+Result<AutoCloseFD, NativeError> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
 {
     return openOrCreateDirectoryAt(dirFd, path, FILE_OPEN);
 }
 
-Result<AutoCloseFD, std::error_code> createDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
+Result<AutoCloseFD, NativeError> createDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
 {
     return openOrCreateDirectoryAt(dirFd, path, FILE_CREATE);
 }
@@ -428,7 +428,7 @@ std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const OsCanonPath & path
     throw WinError(lastError, "getting status of %s", PathFmt(descriptorToPath(dirFd) / path.path()));
 }
 
-AutoCloseFD openFileEnsureBeneathNoSymlinks(
+Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd,
     const OsCanonPath & path,
     ACCESS_MASK desiredAccess,
@@ -487,15 +487,9 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
                 || lastError == ERROR_INVALID_NAME || lastError == ERROR_DIRECTORY) {
                 throwIfSymlink(wcomponent, pathUpTo(std::next(it)));
             }
-            /* ERROR_DIRECTORY means the component is not a directory (e.g., it's a file).
-               Return invalid handle to indicate the path doesn't exist.
-               Set the Win32 error so the caller can inspect it. */
-            if (lastError == ERROR_DIRECTORY || lastError == ERROR_FILE_NOT_FOUND
-                || lastError == ERROR_PATH_NOT_FOUND) {
-                SetLastError(lastError);
-                return AutoCloseFD{};
-            }
-            throw WinError(lastError, "opening directory component %s", PathFmt(pathUpTo(std::next(it)).path()));
+            /* `ERROR_DIRECTORY` means the component is not a directory (e.g.,
+               it's a file), so the caller sees that the path doesn't exist. */
+            return outcome::failure(lastError);
         }
 
         /* Check if what we opened is actually a symlink */
@@ -537,21 +531,14 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
         if (lastError == ERROR_DIRECTORY) {
             throwIfSymlink(finalComponent, path);
         }
-        /* Return invalid handle for ENOENT/EEXIST style errors, or when trying to
-           open a non-directory as a directory (ERROR_DIRECTORY).
-           Set the Win32 error so the caller can inspect it. */
-        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_FILE_EXISTS || lastError == ERROR_DIRECTORY) {
-            SetLastError(lastError);
-            return AutoCloseFD{};
-        }
-        throw WinError(lastError, "opening file %s", PathFmt(path.path()));
+        return outcome::failure(lastError);
     }
 
     /* Final check: did we accidentally open a symlink? */
     if (isReparsePoint(finalResult.value().get()))
         throw SymlinkNotAllowed(path);
 
-    return std::move(finalResult.value());
+    return outcome::success(std::move(finalResult.value()));
 }
 
 } // namespace nix

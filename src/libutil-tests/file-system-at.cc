@@ -5,6 +5,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/tests/result.hh"
 #include "nix/util/system-error.hh"
 
 #ifdef _WIN32
@@ -41,7 +42,7 @@ TEST(readLinkAt, works)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
         sink.createSymlink(CanonPath("link"), "target");
         sink.createSymlink(CanonPath("relative"), "../relative/path");
         sink.createSymlink(CanonPath("absolute"), "/absolute/path");
@@ -62,7 +63,7 @@ TEST(readLinkAt, works)
         sink.createDirectory(CanonPath("dir"));
     }
 
-    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
 
     EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("link")), OS_STR("target"));
     EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("relative")), OS_STR("../relative/path"));
@@ -73,7 +74,7 @@ TEST(readLinkAt, works)
     }
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
 
-    auto subDirFd = openDirectory(tmpDir / "a", FinalSymlink::Follow);
+    auto subDirFd = testing::valueOrFail(openDirectory(tmpDir / "a", FinalSymlink::Follow));
     EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
@@ -98,7 +99,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
         sink.createDirectory(CanonPath("a"));
         sink.createDirectory(CanonPath("c"));
         sink.createDirectory(CanonPath("c/d"));
@@ -122,18 +123,18 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             SymlinkNotAllowed);
     }
 
-    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
 
     /* Helpers that wrap `openFileEnsureBeneathNoSymlinks` to throw
-       `SysError` on null-fd failure. This way every failure is an
+       `NativeSysError` on failure. This way every failure is an
        exception and tests can use plain `EXPECT_THROW`/`EXPECT_TRUE`
-       without juggling errno-vs-throw state. Callers that want to
-       check a specific errno can catch `SysError` and inspect
+       without juggling results and throws. Callers that want to
+       check a specific error can catch `SysError` and inspect
        `.errNo`. */
-    auto check = [](std::string_view what, AutoCloseFD fd) {
+    auto check = [](std::string_view what, Result<AutoCloseFD, NativeError> fd) {
         if (!fd)
-            throw NativeSysError("openFileEnsureBeneathNoSymlinks: %s", what);
-        return fd;
+            throw NativeSysError(fd.error(), "openFileEnsureBeneathNoSymlinks: %s", what);
+        return std::move(fd).value();
     };
 
     auto openRead = [&](std::string_view path) -> AutoCloseFD {
@@ -297,28 +298,30 @@ TEST(openFileEnsureBeneathNoSymlinksDeathTest, rejectsONofollow)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
     }
 
-    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
 
     /* The function asserts that callers don't pass `O_NOFOLLOW` — it
        owns symlink policy. Verify the assert fires for every flag
        combination that includes `O_NOFOLLOW`. */
     EXPECT_DEATH(
-        openFileEnsureBeneathNoSymlinks(dirFd.get(), OsFilename::fromPathAsserting("file"), O_RDONLY | O_NOFOLLOW, 0),
+        (void) openFileEnsureBeneathNoSymlinks(
+            dirFd.get(), OsFilename::fromPathAsserting("file"), O_RDONLY | O_NOFOLLOW, 0),
         "O_NOFOLLOW");
     EXPECT_DEATH(
-        openFileEnsureBeneathNoSymlinks(
+        (void) openFileEnsureBeneathNoSymlinks(
             dirFd.get(), OsFilename::fromPathAsserting("file"), O_RDONLY | O_DIRECTORY | O_NOFOLLOW, 0),
         "O_NOFOLLOW");
 #  if defined(__linux__)
     EXPECT_DEATH(
-        openFileEnsureBeneathNoSymlinks(dirFd.get(), OsFilename::fromPathAsserting("file"), O_PATH | O_NOFOLLOW, 0),
+        (void) openFileEnsureBeneathNoSymlinks(
+            dirFd.get(), OsFilename::fromPathAsserting("file"), O_PATH | O_NOFOLLOW, 0),
         "O_NOFOLLOW");
     EXPECT_DEATH(
-        openFileEnsureBeneathNoSymlinks(
+        (void) openFileEnsureBeneathNoSymlinks(
             dirFd.get(), OsFilename::fromPathAsserting("file"), O_PATH | O_DIRECTORY | O_NOFOLLOW, 0),
         "O_NOFOLLOW");
 #  endif

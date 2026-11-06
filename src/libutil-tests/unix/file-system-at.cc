@@ -6,6 +6,7 @@
 #include "nix/util/fs-sink.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/tests/result.hh"
 #include "nix/util/system-error.hh"
 
 #ifdef __linux__
@@ -30,7 +31,7 @@ TEST(fchmodatTryNoFollow, works)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createDirectory(CanonPath("dir"));
         sink.createSymlink(CanonPath("filelink"), "file");
@@ -40,8 +41,7 @@ TEST(fchmodatTryNoFollow, works)
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
     ASSERT_NO_THROW(chmod(tmpDir / "dir", 0755));
 
-    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
-    ASSERT_TRUE(dirFd);
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
 
     using nix::testing::ThrowsSysError;
 
@@ -114,7 +114,7 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createSymlink(CanonPath("link"), "file");
     }
@@ -132,9 +132,10 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
             if (mount("tmpfs", "/proc", "tmpfs", 0, 0) == -1)
                 _exit(2);
 
-            auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
-            if (!dirFd)
+            auto dirFdOrError = openDirectory(tmpDir, FinalSymlink::Follow);
+            if (!dirFdOrError)
                 _exit(3);
+            auto dirFd = std::move(dirFdOrError).value();
 
             try {
                 fchmodatTryNoFollow(dirFd.get(), OsFilename::fromPathAsserting("file"), 0600);

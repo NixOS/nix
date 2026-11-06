@@ -3,6 +3,8 @@
 #include "nix/util/signals.hh"
 #include "nix/util/system-error.hh"
 
+#include "../file-descriptor-private.hh"
+
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
@@ -29,19 +31,20 @@ void setWriteTime(
     warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
 }
 
-AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
+Result<AutoCloseFD, NativeError> openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return ::CreateFileW(
-        path.c_str(),
-        GENERIC_READ,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        /*lpSecurityAttributes=*/nullptr,
-        OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
-        /*hTemplateFile=*/nullptr);
+    return openResult(
+        ::CreateFileW(
+            path.c_str(),
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            /*lpSecurityAttributes=*/nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
+            /*hTemplateFile=*/nullptr));
 }
 
-AutoCloseFD openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink)
+Result<AutoCloseFD, NativeError> openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
     /* `FILE_TRAVERSE | FILE_READ_ATTRIBUTES` rather than `GENERIC_READ`,
        so as not to require `FILE_LIST_DIRECTORY`. `FILE_READ_ATTRIBUTES`
@@ -50,39 +53,42 @@ AutoCloseFD openDirectoryTraversable(const std::filesystem::path & path, FinalSy
        has `SeChangeNotifyPrivilege` ("Bypass traverse checking") by
        default, but in case we lack it, relative opens with this handle
        as their root directory need it to have been granted. */
-    return ::CreateFileW(
-        path.c_str(),
-        FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        /*lpSecurityAttributes=*/nullptr,
-        OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
-        /*hTemplateFile=*/nullptr);
+    return openResult(
+        ::CreateFileW(
+            path.c_str(),
+            FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            /*lpSecurityAttributes=*/nullptr,
+            OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
+            /*hTemplateFile=*/nullptr));
 }
 
-AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink)
+Result<AutoCloseFD, NativeError> openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return ::CreateFileW(
-        path.c_str(),
-        GENERIC_READ,
-        FILE_SHARE_READ | FILE_SHARE_DELETE,
-        /*lpSecurityAttributes=*/nullptr,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
-        /*hTemplateFile=*/nullptr);
+    return openResult(
+        ::CreateFileW(
+            path.c_str(),
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_DELETE,
+            /*lpSecurityAttributes=*/nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
+            /*hTemplateFile=*/nullptr));
 }
 
-AutoCloseFD
+Result<AutoCloseFD, NativeError>
 openNewFileForWrite(const std::filesystem::path & path, [[maybe_unused]] mode_t mode, OpenNewFileForWriteParams params)
 {
-    return ::CreateFileW(
-        path.c_str(),
-        GENERIC_WRITE | (params.writeOnly ? 0 : GENERIC_READ),
-        FILE_SHARE_READ | FILE_SHARE_DELETE,
-        /*lpSecurityAttributes=*/nullptr,
-        params.truncateExisting ? CREATE_ALWAYS : CREATE_NEW, /* TODO: Reparse points. */
-        FILE_ATTRIBUTE_NORMAL,
-        /*hTemplateFile=*/nullptr);
+    return openResult(
+        ::CreateFileW(
+            path.c_str(),
+            GENERIC_WRITE | (params.writeOnly ? 0 : GENERIC_READ),
+            FILE_SHARE_READ | FILE_SHARE_DELETE,
+            /*lpSecurityAttributes=*/nullptr,
+            params.truncateExisting ? CREATE_ALWAYS : CREATE_NEW, /* TODO: Reparse points. */
+            FILE_ATTRIBUTE_NORMAL,
+            /*hTemplateFile=*/nullptr));
 }
 
 std::filesystem::path defaultTempDir()

@@ -2,6 +2,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/tests/result.hh"
 #include "nix/util/system-error.hh"
 
 #ifdef _WIN32
@@ -44,7 +45,7 @@ TEST_F(FSSourceAccessorTest, works)
         RestoreSink sink(false);
         sink.dstPath = tmpDir;
 #ifndef _WIN32
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
 #endif
         sink.createDirectory(CanonPath("subdir"));
         sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });

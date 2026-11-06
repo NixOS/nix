@@ -7,9 +7,9 @@ namespace nix::windows {
 
 bool wineSymlinksSupported(const std::filesystem::path & dir)
 {
-    auto dirFd = openDirectory(dir, FinalSymlink::Follow);
-    if (!dirFd)
-        throw NativeSysError("opening directory %s", PathFmt(dir));
+    auto dirFd = valueOr(
+        openDirectory(dir, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dir)));
 
     auto name = OsFilename::fromPathAsserting("wine-symlink-probe");
     bool supported = true;

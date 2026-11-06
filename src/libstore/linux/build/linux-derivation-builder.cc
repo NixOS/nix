@@ -826,9 +826,9 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     }
 
     /* We really do have to reopen the dirfd in the child, otherwise move_mount dies with EINVAL. */
-    AutoCloseFD chrootRootDirFd = openDirectory(chrootRootDir, FinalSymlink::DontFollow);
-    if (!chrootRootDirFd)
-        throw SysError("opening directory %s", PathFmt(chrootRootDir));
+    auto chrootRootDirFd = valueOr(
+        openDirectory(chrootRootDir, FinalSymlink::DontFollow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(chrootRootDir)));
 
     /* Bind-mount all the directories from the "host"
        filesystem that we want in the chroot
@@ -995,9 +995,9 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
             throw SysError("entering sandbox mount namespace");
 
         /* We really do have to reopen the dirfd in the child, otherwise move_mount dies with EINVAL. */
-        AutoCloseFD chrootRootDirFd = openDirectory(chrootRootDir, FinalSymlink::DontFollow);
-        if (!chrootRootDirFd)
-            throw SysError("opening directory %s", PathFmt(chrootRootDir));
+        auto chrootRootDirFd = valueOr(
+            openDirectory(chrootRootDir, FinalSymlink::DontFollow),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(chrootRootDir)));
         doBind(source, chrootRootDirFd.get(), targetRelPath, chrootRootDir);
 
         _exit(0);

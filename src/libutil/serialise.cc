@@ -313,8 +313,8 @@ void FdSource::restart()
         throw Error("can't seek to the start of a file");
     buffer.reset();
     read = bufPosIn = bufPosOut = 0;
-    if (lseek(fd, 0, SEEK_SET) == -1)
-        throw SysError("seeking to the start of a file");
+    if (auto res = seek(fd, 0, SEEK_SET); !res)
+        throw NativeSysError(res.error(), "seeking to the start of a file");
 }
 
 void FdSource::skip(size_t len)
@@ -335,11 +335,11 @@ void FdSource::skip(size_t len)
     if (isSeekable && len) {
         if (len > static_cast<size_t>(std::numeric_limits<off_t>::max()))
             throw Error("cannot skip %d bytes: exceeds maximum file offset", len);
-        if (lseek(fd, len, SEEK_CUR) == -1) {
-            if (errno == ESPIPE)
+        if (auto res = seek(fd, len, SEEK_CUR); !res) {
+            if (NativeSysError::toErrorCode(res.error()) == std::errc::invalid_seek)
                 isSeekable = false;
             else
-                throw SysError("seeking forward in file");
+                throw NativeSysError(res.error(), "seeking forward in file");
         } else {
             read += len;
             return;

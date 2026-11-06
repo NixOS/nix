@@ -50,23 +50,29 @@ StringMap getEnv();
  *
  * We don't need the non-overriding version, and this is easier to
  * reimplement on Windows.
+ *
+ * @throws SystemError on failure
  */
-int setEnv(const char * name, const char * value);
+void setEnv(const char * name, const char * value);
 
 /**
  * Like `setEnv`, but using `OsString` to avoid coercions.
  */
-int setEnvOs(const OsString & name, const OsString & value);
+void setEnvOs(const OsString & name, const OsString & value);
 
 /**
  * Like POSIX `unsetenv`, on every platform.
+ *
+ * Unsetting a variable that is not set succeeds.
+ *
+ * @throws SystemError on failure
  */
-int unsetEnv(const char * name);
+void unsetEnv(const char * name);
 
 /**
  * Like `unsetEnv`, but using `OsChar` to avoid coercions.
  */
-int unsetEnvOs(const OsChar * name);
+void unsetEnvOs(const OsChar * name);
 
 /**
  * Clear the environment.

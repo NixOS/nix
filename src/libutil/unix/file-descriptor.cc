@@ -232,6 +232,14 @@ void closeOnExec(Descriptor fd)
         throw SysError("setting close-on-exec flag");
 }
 
+Result<off_t, NativeError> seek(Descriptor fd, off_t offset, int whence)
+{
+    off_t res = ::lseek(fd, offset, whence);
+    if (res == -1)
+        return outcome::failure(errno);
+    return outcome::success(res);
+}
+
 void syncDescriptor(Descriptor fd)
 {
     int result =
