@@ -148,20 +148,7 @@ public:
         return ref<T2>(p);
     }
 
-    bool operator==(const ref<T> & other) const
-    {
-        return p == other.p;
-    }
-
-    bool operator!=(const ref<T> & other) const
-    {
-        return p != other.p;
-    }
-
-    auto operator<=>(const ref<T> & other) const
-    {
-        return p <=> other.p;
-    }
+    std::strong_ordering operator<=>(const ref<T> & other) const = default;
 
 private:
 
