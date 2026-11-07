@@ -87,9 +87,18 @@ static void printValueAsXML(
         doc.writeEmptyElement("string", singletonAttrs("value", v.string_view()));
         break;
 
-    case nPath:
-        doc.writeEmptyElement("path", singletonAttrs("value", v.path().to_string()));
+    case nPath: {
+        const auto & sourcePath = v.path();
+        doc.writeEmptyElement(
+            "path",
+            singletonAttrs(
+                "value",
+                /* When extending the amount of paths with separate root filesystems, figure out what to show here.
+                   We want to avoid leaking the impurities of "mounted" (on rootFS) source paths.
+                   corepkgsFS will be shown as <nix/…>. In older nix versions this was /__corepkgs__/… */
+                sourcePath.accessor == state.rootFS ? sourcePath.path.abs() : sourcePath.to_string()));
         break;
+    }
 
     case nNull:
         doc.writeEmptyElement("null");
