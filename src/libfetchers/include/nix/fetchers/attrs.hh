@@ -20,18 +20,45 @@ namespace nix::fetchers {
 using ResolvedAttr = std::variant<std::string, uint64_t, Explicit<bool>>;
 
 /**
- * A deferred attribute computation.  Wrapping in `ref<>` gives
- * pointer-identity equality/ordering, which is correct: two lazy
- * attrs are equal iff they are the same computation.
+ * A deferred attribute computation.
  */
 struct LazyAttrComputation
 {
     fun<ResolvedAttr()> compute;
 };
 
-using LazyAttr = ref<LazyAttrComputation>;
+class LazyAttr
+{
+    ref<LazyAttrComputation> inner;
 
-using Attr = std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>;
+public:
+    LazyAttr(ref<LazyAttrComputation> inner)
+        : inner(std::move(inner))
+    {
+    }
+
+    ResolvedAttr compute() const
+    {
+        return inner->compute();
+    }
+
+    bool operator==(const LazyAttr & other) const = delete;
+    std::strong_ordering operator<=>(const LazyAttr & other) const = delete;
+};
+
+/**
+ * An attribute value.
+ *
+ * Comparison forces lazy attributes and compares their values, so it
+ * can be expensive and can throw.
+ */
+struct Attr : std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>
+{
+    using variant::variant;
+
+    bool operator==(const Attr & other) const;
+    std::strong_ordering operator<=>(const Attr & other) const;
+};
 
 /**
  * An `Attrs` can be thought of a JSON object restricted or simplified

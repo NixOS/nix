@@ -272,3 +272,13 @@ printf '{ "version": 2, "elements": [ { "active": true, "attrPath": "legacyPacka
 nix build --profile "$TEST_HOME"/.nix-profile "$(nix store add-path "$TEST_ROOT"/import-profile)" --no-link
 nix profile list | grep -A4 'Name:.*hello' | grep "Store paths:.*$outPath"
 nix profile remove hello 2>&1 | grep 'removed 1 packages, kept 0 packages'
+
+# Upgrading a package from an unchanged Git flake does nothing.
+clearProfiles
+gitFlakeDir=$TEST_ROOT/git-flake
+createGitRepo "$gitFlakeDir"
+cp "$flake1Dir"/{flake.nix,who,version,ca.nix,config.nix} "$gitFlakeDir"/
+git -C "$gitFlakeDir" add .
+git -C "$gitFlakeDir" commit -m 'Add flake'
+nix profile add "git+file://$gitFlakeDir"
+nix profile upgrade --all 2>&1 | grepQuietInverse upgrading
