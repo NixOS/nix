@@ -346,18 +346,28 @@ static Flake readFlake(
     return flake;
 }
 
-static FlakeRef applySelfAttrs(const FlakeRef & ref, const Flake & flake)
+/**
+ * Return `ref` with the `self` attributes of `flake` applied, or
+ * `std::nullopt` if `ref` already has them.
+ */
+static std::optional<FlakeRef> applySelfAttrs(const FlakeRef & ref, const Flake & flake)
 {
     auto newRef(ref);
+    bool changed = false;
 
     StringSet allowedAttrs{"submodules", "lfs"};
 
     for (auto & attr : flake.selfAttrs) {
         if (!allowedAttrs.contains(attr.first))
             throw Error("flake 'self' attribute '%s' is not supported", attr.first);
+        if (auto old = get(newRef.input.attrs, attr.first); old && *old == attr.second)
+            continue;
         newRef.input.attrs.insert_or_assign(attr.first, attr.second);
+        changed = true;
     }
 
+    if (!changed)
+        return std::nullopt;
     return newRef;
 }
 
@@ -381,14 +391,14 @@ static Flake getFlake(
     // Re-fetch the tree if necessary.
     auto newLockedRef = applySelfAttrs(lockedRef, flake);
 
-    if (lockedRef != newLockedRef) {
-        debug("refetching input '%s' due to self attribute", newLockedRef);
+    if (newLockedRef) {
+        debug("refetching input '%s' due to self attribute", *newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
-        newLockedRef.input.attrs.erase("narHash");
+        newLockedRef->input.attrs.erase("narHash");
         auto cachedInput2 = state.inputCache->getAccessor(
-            state.fetchSettings, *state.store, newLockedRef.input, fetchers::UseRegistries::No);
+            state.fetchSettings, *state.store, newLockedRef->input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
-        lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
+        lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef->subdir);
     }
 
     auto rootDir = state.storePath(state.mountInput(lockedRef.input, originalRef.input, cachedInput.accessor));
