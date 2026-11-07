@@ -257,7 +257,11 @@ private:
     {
         if (options.ansiColors)
             output << ANSI_GREEN;
-        output << v.path().to_string(); // !!! escaping?
+        const auto & sourcePath = v.path();
+        output <<
+            /* See the comment in libexpr/value-to-xml.cc about separate roots.
+               TODO: Handle escaping. */
+            (sourcePath.accessor == state.rootFS ? sourcePath.path.abs() : sourcePath.to_string());
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
