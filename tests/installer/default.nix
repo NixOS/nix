@@ -26,7 +26,7 @@ let
     fi
   '';
 
-  installCases = {
+  installCases = rec {
     install-default = {
       install = ''
         tar -xf ./nix.tar.xz
@@ -68,13 +68,29 @@ let
           exit 1
         }
 
-        bad_ownership=$(find /nix/store/ -mindepth 1 ! \( -user root -group root \) -print -quit)
+        bad_ownership=$(find /nix/store/ -mindepth 1 ! \( -user root -group root ! -writable \) -print -quit)
         if [ -n "$bad_ownership" ]; then
           echo "bad store object ownership in the store after install:"
           stat "$bad_ownership"
           exit 1
         fi
       '';
+    };
+
+    install-force-daemon-corner-cases = {
+      install = ''
+        # To get some coverage on whether we preserve permissions when copying the bootstrap store.
+        sudo bash -c 'echo "Defaults umask=0023" >> /etc/sudoers'
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --daemon --no-channel-add
+        # Test the idempotency.
+        sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc || true
+        sudo mv /etc/bashrc.backup-before-nix /etc/bashrc || true
+        ./scripted-installer/install --daemon --no-channel-add
+      '';
+
+      check = install-force-daemon.check;
     };
   };
 
