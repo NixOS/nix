@@ -8,7 +8,7 @@ ResolvedAttr forceAttr(const Attr & attr)
 {
     return std::visit(
         overloaded{
-            [](const LazyAttr & lazy) -> ResolvedAttr { return lazy->compute(); },
+            [](const LazyAttr & lazy) -> ResolvedAttr { return lazy.compute(); },
             [](const std::string & v) -> ResolvedAttr { return v; },
             [](uint64_t v) -> ResolvedAttr { return v; },
             [](const Explicit<bool> & v) -> ResolvedAttr { return v; },
