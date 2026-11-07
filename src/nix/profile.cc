@@ -16,6 +16,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
 #include <regex>
 #include <iomanip>
 
@@ -394,23 +395,24 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
 
             element.updateStorePaths(getEvalStore(), store, res);
 
-            auto elementName = getNameFromElement(element);
-
-            // Check if the element already exists.
-            auto existingPair = manifest.elements.find(elementName);
-            if (existingPair != manifest.elements.end()) {
-                auto existingElement = existingPair->second;
-                auto existingSource = existingElement.source;
-                auto elementSource = element.source;
-                if (existingSource && elementSource && existingElement.priority == element.priority
-                    && existingSource->originalRef == elementSource->originalRef
-                    && existingSource->attrPath == elementSource->attrPath) {
-                    warn("'%s' is already added", elementName);
+            // Check if the element already exists. Match on the source rather
+            // than on the name: the name an element is stored under can differ
+            // from the one derived now (e.g. a collision-suffixed name, or a
+            // name derived by an older version of Nix).
+            if (element.source) {
+                auto existing = std::ranges::find_if(manifest.elements, [&](const auto & pair) {
+                    auto & existingElement = pair.second;
+                    return existingElement.source && existingElement.priority == element.priority
+                           && existingElement.source->originalRef == element.source->originalRef
+                           && existingElement.source->attrPath == element.source->attrPath;
+                });
+                if (existing != manifest.elements.end()) {
+                    warn("'%s' is already added", existing->first);
                     continue;
                 }
             }
 
-            manifest.addElement(elementName, std::move(element));
+            manifest.addElement(std::move(element));
         }
 
         try {
