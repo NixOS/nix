@@ -54,6 +54,8 @@ enum InternalType {
     /* layout: Pair of pointers payload */
     tFirstPairOfPointers,
     tListSmall = tFirstPairOfPointers,
+    tString,
+    tPath,
     tPrimOpApp,
     tApp,
     tThunk,
@@ -62,8 +64,7 @@ enum InternalType {
     /* layout: Single untaggable field */
     tFirstSingleUntaggable,
     tListN = tFirstSingleUntaggable,
-    tString,
-    tPath,
+    tSymbol,
     tNumberOfInternalTypes, // Must be last
 };
 
@@ -301,6 +302,12 @@ namespace detail {
  */
 struct ValueBase
 {
+    struct Symbol
+    {
+        size_t symbol;
+        const StringData * str;
+    };
+
     /**
      * Strings in the evaluator carry a so-called `context` which
      * is a list of strings representing store paths.  This is to
@@ -500,6 +507,7 @@ struct PayloadTypeToInternalType
     MACRO(ValueBase::Null, null_, tNull)                            \
     MACRO(const Bindings *, attrs, tAttrs)                          \
     MACRO(ValueBase::List, bigList, tListN)                         \
+    MACRO(ValueBase::Symbol, symbol, tSymbol)                       \
     MACRO(ValueBase::SmallList, smallList, tListSmall)              \
     MACRO(ValueBase::ClosureThunk, thunk, tThunk)                   \
     MACRO(ValueBase::FunctionApplicationThunk, app, tApp)           \
@@ -640,11 +648,10 @@ class alignas(16)
      * That leaves the first 8 bytes free for storing the InternalType in the upper
      * bits.
      *
-     * PrimaryDiscriminator::pdListN - pdPath - Only has 3 available padding bits
+     * PrimaryDiscriminator::pdListN - pdSymbol - Only has 3 available padding bits
      * because:
      * - tListN needs a size, whose lower bits we can't borrow.
-     * - tString and tPath have C-string fields, which don't necessarily need to
-     * be aligned.
+     * - tSymbol encodes the symbol value as 32 bit integer.
      *
      * In this case we reserve their discriminators directly in the PrimaryDiscriminator
      * bits stored in payload[0].
@@ -660,8 +667,7 @@ class alignas(16)
         pdSingleDWord, //< layout: Single/zero field payload
         /* The order of these enumerations must be the same as in InternalType. */
         pdListN, //< layout: Single untaggable field.
-        pdString,
-        pdPath,
+        pdSymbol,
         pdPairOfPointers, //< layout: Pair of pointers payload
     };
 
@@ -745,7 +751,7 @@ class alignas(16)
     void setUntaggablePayload(T * firstPtrField, U untaggableField) noexcept
     {
         Payload payload;
-        static_assert(discriminator >= pdListN && discriminator <= pdPath);
+        static_assert(discriminator >= pdListN && discriminator <= pdSymbol);
         auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
         assertAligned(firstFieldPayload);
         payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
@@ -763,6 +769,7 @@ class alignas(16)
             assertAligned(firstFieldPayload);
             payload[0] = static_cast<int>(pdPairOfPointers) | firstFieldPayload;
         }
+        static_assert(tLastPairOfPointers - tFirstPairOfPointers < (1 << discriminatorBits));
         {
             auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
             assertAligned(secondFieldPayload);
@@ -829,8 +836,7 @@ protected:
             return InternalType(payload[0] >> discriminatorBits);
         /* The order must match that of the enumerations defined in InternalType. */
         case pdListN:
-        case pdString:
-        case pdPath:
+        case pdSymbol:
             return static_cast<InternalType>(tFirstSingleUntaggable + (pd - pdListN));
         case pdPairOfPointers:
             return static_cast<InternalType>(tFirstPairOfPointers + (payload[1] & discriminatorMask));
@@ -852,6 +858,8 @@ protected:
     }
 
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(SmallList, [0], [1])
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(StringWithContext, .str, .context)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(Path, .accessor, .path)
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(PrimOpApplicationThunk, .left, .right)
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(FunctionApplicationThunk, .left, .right)
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(ClosureThunk, .env, .expr)
@@ -906,18 +914,11 @@ protected:
         list.size = payload[1];
     }
 
-    void getStorage(StringWithContext & string) const noexcept
+    void getStorage(Symbol & symbol) const noexcept
     {
         Payload payload = loadPayload();
-        string.context = untagPointer<decltype(string.context)>(payload[0]);
-        string.str = std::bit_cast<const StringData *>(payload[1]);
-    }
-
-    void getStorage(Path & path) const noexcept
-    {
-        Payload payload = loadPayload();
-        path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
-        path.path = std::bit_cast<const StringData *>(payload[1]);
+        symbol.str = untagPointer<decltype(symbol.str)>(payload[0]);
+        symbol.symbol = payload[1];
     }
 
     void getStorage(Failed *& failed) const noexcept
@@ -966,14 +967,9 @@ protected:
         setUntaggablePayload<pdListN>(list.elems, list.size);
     }
 
-    void setStorage(StringWithContext string) noexcept
+    void setStorage(Symbol symbol) noexcept
     {
-        setUntaggablePayload<pdString>(string.context, string.str);
-    }
-
-    void setStorage(Path path) noexcept
-    {
-        setUntaggablePayload<pdPath>(path.accessor, path.path);
+        setUntaggablePayload<pdSymbol>(symbol.str, symbol.symbol);
     }
 
     void setStorage(Failed * failed) noexcept
@@ -1168,6 +1164,8 @@ static_assert(std::random_access_iterator<ListView::iterator>);
 struct Value : public ValueStorage<sizeof(void *)>
 {
     friend std::string showType(const Value & v);
+    /* Only the symbol table creates `tSymbol` values. */
+    friend class SymbolStr;
 
     /**
      * Empty list constant.
@@ -1212,6 +1210,20 @@ private:
         T out;
         ValueStorage::getStorage(out);
         return out;
+    }
+
+    /**
+     * A string is stored either as `tString`, or as `tSymbol` if it comes
+     * from the symbol table. A symbol never has a context.
+     */
+    StringWithContext getStringStorage() const noexcept
+    {
+        if (isa<tSymbol>()) {
+            ValueBase::Symbol symbol;
+            ValueStorage::getStorage(symbol);
+            return {.str = symbol.str, .context = nullptr};
+        }
+        return getStorage<StringWithContext>();
     }
 
 public:
@@ -1289,9 +1301,10 @@ public:
             t[tApp] = nThunk;
             t[tThunk] = nThunk;
             t[tListSmall] = nList;
-            t[tListN] = nList;
             t[tString] = nString;
             t[tPath] = nPath;
+            t[tListN] = nList;
+            t[tSymbol] = nString;
             return t;
         }();
 
@@ -1338,11 +1351,12 @@ public:
         case tPrimOp:
         case tAttrs:
         case tListSmall:
+        case tString:
+        case tPath:
         case tPrimOpApp: // primop-app is known to be a function, which is WHNF
         case tLambda:
         case tListN:
-        case tString:
-        case tPath:
+        case tSymbol:
             return true;
         case tNumberOfInternalTypes:
             unreachable();
@@ -1489,12 +1503,12 @@ public:
 
     const StringData & string_data() const noexcept
     {
-        return *getStorage<StringWithContext>().str;
+        return *getStringStorage().str;
     }
 
     const char * c_str() const noexcept
     {
-        return getStorage<StringWithContext>().str->data();
+        return getStringStorage().str->data();
     }
 
     std::string_view string_view() const noexcept
@@ -1502,9 +1516,17 @@ public:
         return string_data().view();
     }
 
+    /**
+     * If this string comes from the symbol table, returns its symbol,
+     * otherwise the null symbol.
+     * @pre type() == nString
+     * @note Defined in symbol-table.hh, which defines `nix::Symbol`.
+     */
+    nix::Symbol symbol() const noexcept;
+
     const Value::StringWithContext::Context * context() const noexcept
     {
-        return getStorage<StringWithContext>().context;
+        return getStringStorage().context;
     }
 
     ExternalValueBase * external() const noexcept

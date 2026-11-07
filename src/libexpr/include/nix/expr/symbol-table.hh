@@ -13,22 +13,6 @@
 
 namespace nix {
 
-class SymbolValue : protected Value
-{
-    friend class SymbolStr;
-    friend class SymbolTable;
-
-    uint32_t idx;
-
-    SymbolValue() = default;
-
-public:
-    operator std::string_view() const noexcept
-    {
-        return string_view();
-    }
-};
-
 class StaticSymbolTable;
 
 /**
@@ -38,14 +22,20 @@ class StaticSymbolTable;
  */
 class Symbol
 {
-    friend class SymbolStr;
     friend class SymbolTable;
+    friend class SymbolStr;
     friend class StaticSymbolTable;
+    friend struct Value;
+
+public:
+    using value_type = uint32_t;
 
 private:
-    uint32_t id;
+    value_type id;
 
-    explicit constexpr Symbol(uint32_t id) noexcept
+    static_assert(sizeof(detail::ValueBase::Symbol::symbol) >= sizeof(id));
+
+    explicit constexpr Symbol(value_type id) noexcept
         : id(id)
     {
     }
@@ -66,7 +56,7 @@ public:
      * The ID is a private implementation detail that should generally not be observed. However, we expose here just for
      * sake of `switch...case`, which needs to dispatch on numbers. */
     [[gnu::always_inline]]
-    constexpr uint32_t getId() const noexcept
+    constexpr value_type getId() const noexcept
     {
         return id;
     }
@@ -75,6 +65,15 @@ public:
 
     friend class std::hash<Symbol>;
 };
+
+inline Symbol Value::symbol() const noexcept
+{
+    if (!isa<tSymbol>())
+        return {};
+    detail::ValueBase::Symbol payload;
+    ValueStorage::getStorage(payload);
+    return nix::Symbol(static_cast<nix::Symbol::value_type>(payload.symbol));
+}
 
 /**
  * This class mainly exists to give us an operator<< for ostreams. We could also
@@ -85,13 +84,18 @@ class SymbolStr
 {
     friend class SymbolTable;
 
-    constexpr static size_t chunkSize{65536};
+    constexpr static size_t chunkSize{131072};
+    /**
+     * Each symbol is stored as a string `Value` of internal type `tSymbol`,
+     * which carries the symbol id. `Value::toPtr` hands out pointers to these
+     * values, so that attribute names can be returned without allocation.
+     */
     using SymbolValueStore = ChunkedVector<
-        SymbolValue,
+        Value,
         chunkSize,
-        /*MaxChunks=*/std::numeric_limits<decltype(SymbolValue::idx)>::max() / chunkSize>;
+        /*MaxChunks=*/std::numeric_limits<Symbol::value_type>::max() / chunkSize>;
 
-    const SymbolValue * s;
+    const Value * s;
 
     struct Key
     {
@@ -112,31 +116,28 @@ class SymbolStr
     };
 
 public:
-    SymbolStr(const SymbolValue & s) noexcept
+    SymbolStr(const Value & s) noexcept
         : s(&s)
     {
     }
 
     SymbolStr(const Key & key)
     {
-        auto size = key.s.size();
-        if (size >= std::numeric_limits<uint32_t>::max()) {
-            throw Error("Size of symbol exceeds 4GiB and cannot be stored");
-        }
-        // for multi-threaded implementations: lock store and allocator here
-        const auto & [v, idx] = key.store.add(SymbolValue{});
-        if (size == 0) {
-            v.mkStringNoCopy(""_sds, nullptr);
+        const auto & [v, idx] = key.store.add(Value{});
+        detail::ValueBase::Symbol symbol;
+        symbol.symbol = idx + 1;
+        if (key.s.empty()) {
+            symbol.str = &""_sds;
         } else {
-            v.mkStringNoCopy(StringData::make(key.resource, key.s));
+            symbol.str = &StringData::make(key.resource, key.s);
         }
-        v.idx = idx;
+        v.setStorage(symbol);
         this->s = &v;
     }
 
     bool operator==(std::string_view s2) const noexcept
     {
-        return *s == s2;
+        return s->string_view() == s2;
     }
 
     [[gnu::always_inline]]
@@ -153,7 +154,7 @@ public:
 
     [[gnu::always_inline]] operator std::string_view() const noexcept
     {
-        return *s;
+        return s->string_view();
     }
 
     friend std::ostream & operator<<(std::ostream & os, const SymbolStr & symbol);
@@ -182,7 +183,7 @@ public:
 
     explicit operator Symbol() const noexcept
     {
-        return Symbol{s->idx + 1};
+        return s->symbol();
     }
 
     struct Hash
@@ -192,7 +193,7 @@ public:
 
         std::size_t operator()(SymbolStr str) const
         {
-            return Key::HashType{}(*str.s);
+            return Key::HashType{}(str.s->string_view());
         }
 
         std::size_t operator()(const Key & key) const noexcept
@@ -309,8 +310,8 @@ public:
 
     SymbolStr operator[](Symbol s) const
     {
-        uint32_t idx = s.id - uint32_t(1);
-        if (idx >= store.size())
+        auto idx = s.id;
+        if (--idx >= store.size())
             unreachable();
 
         /* Since ChunkedVector itself doesn't provide happens-before guarantees
@@ -336,7 +337,7 @@ public:
     template<typename T>
     void dump(T callback) const
     {
-        store.forEach(callback);
+        store.forEach([&](const Value & v) { callback(SymbolStr(v)); });
     }
 };
 
