@@ -45,13 +45,6 @@ std::optional<OsString> getEnvOsNonEmpty(const OsString & key);
  */
 StringMap getEnv();
 
-#ifdef _WIN32
-/**
- * Implementation of missing POSIX function.
- */
-int unsetenv(const char * name);
-#endif
-
 /**
  * Like POSIX `setenv`, but always overrides.
  *
@@ -66,7 +59,12 @@ int setEnv(const char * name, const char * value);
 int setEnvOs(const OsString & name, const OsString & value);
 
 /**
- * Like `unsetenv`, but using `OsChar` to avoid coercions.
+ * Like POSIX `unsetenv`, on every platform.
+ */
+int unsetEnv(const char * name);
+
+/**
+ * Like `unsetEnv`, but using `OsChar` to avoid coercions.
  */
 int unsetEnvOs(const OsChar * name);
 

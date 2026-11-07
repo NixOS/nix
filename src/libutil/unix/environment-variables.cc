@@ -49,4 +49,9 @@ int unsetEnvOs(const OsChar * name)
     return unsetenv(name);
 }
 
+int unsetEnv(const char * name)
+{
+    return unsetEnvOs(name);
+}
+
 } // namespace nix

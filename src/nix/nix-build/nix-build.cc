@@ -35,8 +35,6 @@
 #include "man-pages.hh"
 #include "nix/util/system-error.hh"
 
-extern char ** environ __attribute__((weak));
-
 namespace nix {
 
 /* Recreate the effect of the perl shellwords function, breaking up a
@@ -656,17 +654,9 @@ static void main_nix_build(int argc, char ** argv)
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);
 
-        Strings envStrs;
-        for (auto & i : env)
-            /* TODO: Check that `i.first` doesn't contain an `=` sign. Or maybe factor out the environment
-               strings preparation code. */
-            envStrs.push_back(i.first + "=" + i.second);
-
         auto args = interactive ? Strings{"bash", "--rcfile", rcfile} : Strings{"bash", rcfile};
 
-        auto envPtrs = stringsToCharPtrs(envStrs);
-
-        environ = envPtrs.data();
+        replaceEnv(env);
 
         auto argPtrs = stringsToCharPtrs(args);
 

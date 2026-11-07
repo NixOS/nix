@@ -66,7 +66,7 @@ StringMap getEnv()
     return env;
 }
 
-int unsetenv(const char * name)
+int unsetEnv(const char * name)
 {
     return SetEnvironmentVariableA(name, nullptr) ? 0 : -1;
 }
