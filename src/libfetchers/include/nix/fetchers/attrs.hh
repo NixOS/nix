@@ -27,7 +27,24 @@ struct LazyAttrComputation
     fun<ResolvedAttr()> compute;
 };
 
-using LazyAttr = ref<LazyAttrComputation>;
+class LazyAttr
+{
+    ref<LazyAttrComputation> inner;
+
+public:
+    LazyAttr(ref<LazyAttrComputation> inner)
+        : inner(std::move(inner))
+    {
+    }
+
+    ResolvedAttr compute() const
+    {
+        return inner->compute();
+    }
+
+    bool operator==(const LazyAttr & other) const = delete;
+    std::strong_ordering operator<=>(const LazyAttr & other) const = delete;
+};
 
 /**
  * An attribute value.
