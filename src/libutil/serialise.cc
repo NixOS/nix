@@ -607,17 +607,20 @@ std::string readString(Source & source, size_t max)
        as it costs us. */
     std::string res;
     while (res.size() < len) {
-        size_t filled = res.size();
-        size_t want = std::min(len, std::max<size_t>(2 * filled, 64 * 1024));
+        std::string::size_type filled = res.size();
+        std::string::size_type want = std::min(len, std::max<std::string::size_type>(2 * filled, 64 * 1024));
+        assert(want >= filled); /* No overflows expected. */
         std::exception_ptr ex;
-        res.resize_and_overwrite(want, [&](char * buf, size_t) -> size_t {
-            try {
-                return filled + source.read(buf + filled, want - filled);
-            } catch (...) {
-                ex = std::current_exception();
-                return filled;
-            }
-        });
+        res.resize_and_overwrite(
+            want, [filled, &ex, &source](char * buf, std::string::size_type bufSize) -> std::string::size_type {
+                try {
+                    const auto n = bufSize - filled;
+                    return filled + source.read(buf + filled, n);
+                } catch (...) {
+                    ex = std::current_exception();
+                    return filled;
+                }
+            });
         if (ex)
             std::rethrow_exception(ex);
     }
