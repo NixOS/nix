@@ -40,7 +40,7 @@ struct Attr : std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>
     using variant::variant;
 
     bool operator==(const Attr & other) const;
-    bool operator<(const Attr & other) const;
+    std::strong_ordering operator<=>(const Attr & other) const;
 };
 
 /**

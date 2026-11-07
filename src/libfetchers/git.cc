@@ -166,9 +166,7 @@ static const Hash nullRev{HashAlgorithm::SHA1};
 
 static LazyAttr makeLazyAttr(fun<ResolvedAttr()> compute)
 {
-    return make_ref<LazyAttrComputation>(LazyAttrComputation{
-        .compute = memo<ResolvedAttr>(std::move(compute)),
-    });
+    return make_ref<LazyAttrComputation>(memo<ResolvedAttr>(std::move(compute)));
 }
 
 struct GitInputScheme : InputScheme

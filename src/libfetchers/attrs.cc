@@ -21,9 +21,9 @@ bool Attr::operator==(const Attr & other) const
     return forceAttr(*this) == forceAttr(other);
 }
 
-bool Attr::operator<(const Attr & other) const
+std::strong_ordering Attr::operator<=>(const Attr & other) const
 {
-    return forceAttr(*this) < forceAttr(other);
+    return forceAttr(*this) <=> forceAttr(other);
 }
 
 Attrs jsonToAttrs(const nlohmann::json & json)
