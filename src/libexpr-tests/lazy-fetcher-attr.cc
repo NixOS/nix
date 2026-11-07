@@ -39,13 +39,10 @@ TEST_F(LazyFetcherAttrTest, lazyAttrProducesThunk)
     fetchers::Input input;
     input.attrs.insert_or_assign("type", std::string("git"));
     input.attrs.insert_or_assign(
-        "revCount",
-        fetchers::LazyAttr(
-            make_ref<fetchers::LazyAttrComputation>(
-                fetchers::LazyAttrComputation{.compute = [&calls]() -> fetchers::ResolvedAttr {
-                    calls++;
-                    return uint64_t(42);
-                }})));
+        "revCount", fetchers::LazyAttr(make_ref<fetchers::LazyAttrComputation>([&calls]() -> fetchers::ResolvedAttr {
+            calls++;
+            return uint64_t(42);
+        })));
 
     Value v;
     emitTreeAttrs(state, noPos, dummyPath(), input, v, false, false);
@@ -70,13 +67,10 @@ TEST_F(LazyFetcherAttrTest, lazyFunctionOnlyCalledOnAccess)
     input.attrs.insert_or_assign("type", std::string("git"));
     input.attrs.insert_or_assign("lastModified", uint64_t(1000));
     input.attrs.insert_or_assign(
-        "revCount",
-        fetchers::LazyAttr(
-            make_ref<fetchers::LazyAttrComputation>(
-                fetchers::LazyAttrComputation{.compute = [&calls]() -> fetchers::ResolvedAttr {
-                    calls++;
-                    return uint64_t(99);
-                }})));
+        "revCount", fetchers::LazyAttr(make_ref<fetchers::LazyAttrComputation>([&calls]() -> fetchers::ResolvedAttr {
+            calls++;
+            return uint64_t(99);
+        })));
 
     Value v;
     emitTreeAttrs(state, noPos, dummyPath(), input, v, false, false);
