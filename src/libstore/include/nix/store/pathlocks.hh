@@ -4,6 +4,7 @@
 #include <filesystem>
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/os-filename.hh"
 
 namespace nix {
 
@@ -13,6 +14,15 @@ namespace nix {
  * because it doesn't exist.  Any other error throws an exception.
  */
 AutoCloseFD openLockFile(const std::filesystem::path & path, bool create);
+
+/**
+ * Like `openLockFile`, but for @p name in the directory @p dirFd.
+ *
+ * A symlink there is not followed.
+ *
+ * @throws SymlinkNotAllowed if @p name is a symlink.
+ */
+AutoCloseFD openLockFileAt(Descriptor dirFd, const OsFilename & name, bool create);
 
 /**
  * Delete an open lock file.

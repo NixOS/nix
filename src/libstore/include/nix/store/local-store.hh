@@ -255,6 +255,16 @@ private:
      */
     AutoCloseFD linksDirFd;
 
+    /**
+     * Handle to `tempRootsDir`, opened by the constructor.
+     */
+    AutoCloseFD tempRootsDirFd;
+
+    /**
+     * The name of `fnTempRoots` in `tempRootsDir`.
+     */
+    const OsFilename tempRootsName;
+
     const PublicKeys & getPublicKeys();
 
 public:

@@ -136,6 +136,7 @@ LocalStore::LocalStore(ref<const Config> config)
     , schemaPath(dbDir / "schema")
     , tempRootsDir(config->stateDir.get() / "temproots")
     , fnTempRoots(tempRootsDir / std::to_string(getpid()))
+    , tempRootsName(OsFilename::fromPathAsserting(fnTempRoots.filename()))
 {
     auto state(_state->lock());
     state->stmts = std::make_unique<State::Stmts>();
@@ -169,6 +170,10 @@ LocalStore::LocalStore(ref<const Config> config)
     auto profilesDir = config->stateDir.get() / "profiles";
     createDirs(profilesDir);
     createDirs(tempRootsDir);
+    /* By path, following symlinks, since state directories may be
+       symlinks; only within it are symlinks not followed. */
+    tempRootsDirFd = valueOr(
+        openDirectory(tempRootsDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(tempRootsDir)));
     createDirs(dbDir);
     auto gcRootsDir = config->stateDir.get() / "gcroots";
     const auto & localSettings = config->getLocalSettings();
@@ -496,7 +501,11 @@ LocalStore::~LocalStore()
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
             fdTempRoots->close();
-            tryUnlink(fnTempRoots);
+            try {
+                unlinkAt(tempRootsDirFd.get(), tempRootsName);
+            } catch (SystemError &) {
+                /* Best effort. */
+            }
         }
     } catch (...) {
         ignoreExceptionInDestructor();

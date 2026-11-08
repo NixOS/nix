@@ -63,12 +63,14 @@ void LocalStore::createTempRootsFile()
         return;
 
     while (1) {
-        if (pathExists(fnTempRoots))
-            /* It *must* be stale, since there can be no two
-               processes with the same pid. */
-            tryUnlink(fnTempRoots);
+        /* If it exists, it *must* be stale, since there can be no two
+           processes with the same pid. Deleting it is best effort. */
+        try {
+            unlinkAt(tempRootsDirFd.get(), tempRootsName);
+        } catch (SystemError &) {
+        }
 
-        *fdTempRoots = openLockFile(fnTempRoots, true);
+        *fdTempRoots = openLockFileAt(tempRootsDirFd.get(), tempRootsName, true);
 
         debug("acquiring write lock on %s", PathFmt(fnTempRoots));
         lockFile(fdTempRoots->get(), ltWrite, true);
@@ -181,7 +183,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    for (const auto & i : DirectoryIterator{tempRootsDir}) {
+    for (const auto & i : DirectoryIterator{reopenDirectory(tempRootsDirFd.get())}) {
         checkInterrupt();
         auto name = i.name.path().string();
         if (name[0] == '.') {
@@ -192,26 +194,28 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         auto path = tempRootsDir / i.name.path();
 
         debug("reading temporary root file %1%", PathFmt(path));
-        AutoCloseFD fd(toDescriptor(open(
-            path.string().c_str(),
-#ifndef _WIN32
-            O_CLOEXEC |
-#endif
-                O_RDWR,
-            0666)));
-        if (!fd) {
-            /* It's okay if the file has disappeared. */
-            if (errno == ENOENT)
-                continue;
-            throw SysError("opening temporary roots file %1%", PathFmt(path));
+        AutoCloseFD fd;
+        try {
+            fd = openLockFileAt(tempRootsDirFd.get(), i.name, false);
+        } catch (SymlinkNotAllowed &) {
+            /* Not one of ours, which are never symlinks. */
+            warn("ignoring symlink %1% in the temporary roots directory", PathFmt(path));
+            continue;
         }
+        /* It's okay if the file has disappeared. */
+        if (!fd)
+            continue;
 
         /* Try to acquire a write lock without blocking.  This can
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
         if (lockFile(fd.get(), ltWrite, false)) {
             printInfo("removing stale temporary roots file %1%", PathFmt(path));
-            tryUnlink(path);
+            try {
+                unlinkAt(tempRootsDirFd.get(), i.name);
+            } catch (SystemError &) {
+                /* Best effort. */
+            }
             writeFull(fd.get(), "d");
             continue;
         }
