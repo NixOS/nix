@@ -177,12 +177,20 @@ LocalStore::LocalStore(ref<const Config> config)
 
     for (auto & perUserDir : {profilesDir / "per-user", gcRootsDir / "per-user"}) {
         createDirs(perUserDir);
+        /* On Windows, there are no such permissions to set. */
+#ifndef _WIN32
         if (!config->readOnly) {
+            auto perUserDirFd = valueOr(
+                openDirectory(perUserDir),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(perUserDir)));
             // Skip chmod call if the directory already has the correct permissions (0755).
             // This is to avoid failing when the executing user lacks permissions to change the directory's permissions
             // even if it would be no-op.
-            chmodIfNeeded(perUserDir, 0755, S_IRWXU | S_IRWXG | S_IRWXO);
+            if ((nix::fstat(perUserDirFd.get()).st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) != 0755
+                && ::fchmod(perUserDirFd.get(), 0755) == -1)
+                throw SysError("setting permissions on %s", PathFmt(perUserDir));
         }
+#endif
     }
 
 #ifndef _WIN32
