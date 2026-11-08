@@ -659,9 +659,20 @@ create_directories() {
         # knows what they are doing.
         # Note that setuid bits *are* cleared when chowning.
 
-        # Everything inside /nix is root-owned.
+        # Take root ownership of /nix itself and, recursively, of the
+        # Nix-owned subdirectories only. Unrelated top-level entries are
+        # deliberately not traversed: on macOS, volume-root artifacts such
+        # as .Trashes are TCC-protected and fail chown with EPERM even
+        # under sudo. Failures on the Nix-owned paths stay loud.
         _sudo "to take root ownership of existing Nix files" \
-              chown -R "0:0" "$NIX_ROOT"
+              chown "0:0" "$NIX_ROOT"
+
+        for nix_dir in "$NIX_ROOT/store" "$NIX_ROOT/var"; do
+            if [ -d "$nix_dir" ]; then
+                _sudo "to take root ownership of existing Nix files" \
+                      chown -R "0:0" "$nix_dir"
+            fi
+        done
 
         # But not the store directory itself.
         if [ -d "$NIX_ROOT/store" ]; then
