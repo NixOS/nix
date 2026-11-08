@@ -894,21 +894,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
         printInfo("deleting unused links...");
 
-        AutoCloseDir dir(opendir(linksDir.string().c_str()));
-        if (!dir)
-            throw SysError("opening directory %1%", PathFmt(linksDir));
-
         int64_t actualSize = 0, unsharedSize = 0;
 
-        struct dirent * dirent;
-        while (errno = 0, dirent = readdir(dir.get())) {
+        for (const auto & entry : DirectoryIterator{reopenDirectory(linksDirFd.get())}) {
             checkInterrupt();
-            std::string name = dirent->d_name;
-            if (name == "." || name == "..")
-                continue;
-            auto path = linksDir / name;
+            auto path = linksDir / entry.name.path();
 
-            auto st = lstat(path);
+            auto st = fstatat(linksDirFd.get(), entry.name);
 
             if (st.st_nlink != 1) {
                 actualSize += st.st_size;
@@ -918,7 +910,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             printMsg(lvlTalkative, "deleting unused link %1%", PathFmt(path));
 
-            unlink(path);
+            unlinkAt(linksDirFd.get(), entry.name);
 
             /* Do not account for deleted file here. Rely on deletePath()
                accounting.  */
@@ -929,7 +921,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             0
 #else
             [&] {
-                auto st = stat(linksDir);
+                auto st = nix::fstat(linksDirFd.get());
                 return st.st_blocks * 512ULL;
             }()
 #endif

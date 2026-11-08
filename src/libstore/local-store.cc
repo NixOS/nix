@@ -152,7 +152,20 @@ LocalStore::LocalStore(ref<const Config> config)
        opened before that would still refer to the old mount. Not
        virtual, since we are still constructing. */
     LocalFSStore::init();
-    createDirs(linksDir);
+    {
+        /* Without following symlinks, like the store objects beside
+           it. */
+        auto linksName = OsFilename::fromPathAsserting(linksDir.filename());
+        auto createdOrError = createDirectoryAt(getRealStoreDirFd(), linksName);
+        if (!createdOrError && NativeSysError::toErrorCode(createdOrError.error()) != std::errc::file_exists)
+            throw NativeSysError(createdOrError.error(), "creating directory %s", PathFmt(linksDir));
+        if (createdOrError && createdOrError.value())
+            linksDirFd = std::move(createdOrError).value();
+        else
+            linksDirFd = valueOr(
+                openDirectoryAt(getRealStoreDirFd(), linksName),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(linksDir)));
+    }
     auto profilesDir = config->stateDir.get() / "profiles";
     createDirs(profilesDir);
     createDirs(tempRootsDir);
@@ -1526,18 +1539,18 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking link hashes...");
 
-        for (const auto & link : DirectoryIterator{linksDir}) {
+        for (const auto & link : DirectoryIterator{reopenDirectory(linksDirFd.get())}) {
             checkInterrupt();
             auto & name = link.name.path();
             auto linkPath = linksDir / name;
             printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
-            std::string hash =
-                hashPath(makeFSSourceAccessor(linkPath), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
-                    .first.to_string(HashFormat::Nix32, false);
+            auto accessor = makeFSSourceAccessor(linksDirFd.get(), link.name, linkPath);
+            std::string hash = hashPath(accessor, FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
+                                   .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link %s was modified! expected hash %s, got '%s'", PathFmt(linkPath), name.string(), hash);
                 if (repair) {
-                    unlinkIfExists(linkPath);
+                    unlinkAt(linksDirFd.get(), link.name);
                     printInfo("removed link %s", PathFmt(linkPath));
                 } else {
                     errors = true;
