@@ -3,6 +3,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/users.hh"
+#include "nix/util/file-system-at.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -34,18 +35,25 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
 
     std::filesystem::path profileDir = profile.parent_path();
     auto profileName = profile.filename().string();
+    auto profileDirFd = valueOr(
+        openDirectory(profileDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(profileDir)));
 
-    for (const auto & i : DirectoryIterator{profileDir}) {
+    for (const auto & i : DirectoryIterator{reopenDirectory(profileDirFd.get())}) {
         checkInterrupt();
         if (auto n = parseName(profileName, i.name.path().string())) {
             auto path = (profileDir / i.name.path()).string();
-            gens.push_back({.number = *n, .path = path, .creationTime = lstat(path).st_mtime});
+            gens.push_back({.number = *n, .path = path, .creationTime = fstatat(profileDirFd.get(), i.name).st_mtime});
         }
     }
 
     gens.sort([](const Generation & a, const Generation & b) { return a.number < b.number; });
 
-    return {gens, pathExists(profile) ? parseName(profileName, readLink(profile).string()) : std::nullopt};
+    auto profileFilename = OsFilename::fromPathThrowing(profile.filename());
+    return {
+        gens,
+        maybeFstatat(profileDirFd.get(), profileFilename)
+            ? parseName(profileName, std::filesystem::path{readLinkAt(profileDirFd.get(), profileFilename)}.string())
+            : std::nullopt};
 }
 
 /**
