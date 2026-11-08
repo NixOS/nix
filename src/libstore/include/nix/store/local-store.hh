@@ -261,6 +261,11 @@ private:
     AutoCloseFD tempRootsDirFd;
 
     /**
+     * Handle to `dbDir`, opened by the constructor.
+     */
+    AutoCloseFD dbDirFd;
+
+    /**
      * The name of `fnTempRoots` in `tempRootsDir`.
      */
     const OsFilename tempRootsName;
