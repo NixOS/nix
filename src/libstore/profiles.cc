@@ -30,21 +30,39 @@ static std::optional<GenerationNumber> parseName(const std::string & profileName
         return {};
 }
 
-std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::filesystem::path profile)
+/**
+ * Open the directory containing @p profile.
+ *
+ * The path to it is followed, symlinks and all, so it may be a symlink
+ * itself; only the generations in it are not followed.
+ */
+static AutoCloseFD openProfileDir(const std::filesystem::path & profile)
+{
+    auto profileDir = profile.parent_path();
+    return valueOr(
+        openDirectory(profileDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(profileDir)));
+}
+
+/**
+ * Like `findGenerations(std::filesystem::path)`, with the directory
+ * containing @p profile already open as @p profileDirFd.
+ */
+static std::pair<Generations, std::optional<GenerationNumber>>
+findGenerations(Descriptor profileDirFd, const std::filesystem::path & profile)
 {
     Generations gens;
 
     std::filesystem::path profileDir = profile.parent_path();
     auto profileName = profile.filename().string();
-    auto profileDirFd = valueOr(
-        openDirectory(profileDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(profileDir)));
 
-    for (const auto & i : DirectoryIterator{reopenDirectory(profileDirFd.get())}) {
+    for (const auto & i : DirectoryIterator{valueOr(
+             reopenDirectory(profileDirFd),
+             NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening directory %s", PathFmt(descriptorToPath(profileDirFd))))}) {
         checkInterrupt();
         if (auto n = parseName(profileName, os_string_to_string(i.name.native()))) {
             auto path = (profileDir / i.name.mkPath()).string();
             gens.push_back(
-                {.number = *n, .path = path, .creationTime = fstatat(profileDirFd.get(), OsFilename{i.name}).st_mtime});
+                {.number = *n, .path = path, .creationTime = fstatat(profileDirFd, OsFilename{i.name}).st_mtime});
         }
     }
 
@@ -53,9 +71,25 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
     auto profileFilename = OsFilename::fromPathThrowing(profile.filename());
     return {
         gens,
-        maybeFstatat(profileDirFd.get(), profileFilename)
-            ? parseName(profileName, std::filesystem::path{readLinkAt(profileDirFd.get(), profileFilename)}.string())
+        maybeFstatat(profileDirFd, profileFilename)
+            ? parseName(profileName, std::filesystem::path{readLinkAt(profileDirFd, profileFilename)}.string())
             : std::nullopt};
+}
+
+std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::filesystem::path profile)
+{
+    return findGenerations(openProfileDir(profile).get(), profile);
+}
+
+/**
+ * Create the file name, in the profile's directory, of a generation of
+ * @p profile, that can be parsed by `parseName()`.
+ */
+static OsFilename makeGenerationFilename(const std::filesystem::path & profile, GenerationNumber num)
+{
+    /* NB std::filesystem::path when put in format strings is
+       quoted automatically. */
+    return OsFilename::fromPathThrowing(fmt("%s-%s-link", profile.filename().string(), num));
 }
 
 /**
@@ -63,9 +97,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
  */
 static std::filesystem::path makeName(const std::filesystem::path & profile, GenerationNumber num)
 {
-    /* NB std::filesystem::path when put in format strings is
-       quoted automatically. */
-    return fmt("%s-%s-link", profile.string(), num);
+    return profile.parent_path() / makeGenerationFilename(profile, num).path();
 }
 
 std::filesystem::path createGeneration(LocalFSStore & store, std::filesystem::path profile, StorePath outPath)
@@ -107,8 +139,9 @@ std::filesystem::path createGeneration(LocalFSStore & store, std::filesystem::pa
 
 void deleteGeneration(const std::filesystem::path & profile, GenerationNumber gen)
 {
-    std::filesystem::path generation = makeName(profile, gen);
-    unlinkIfExists(generation);
+    /* Generations are always symlinks, so there is nothing to delete
+       recursively. */
+    unlinkAt(openProfileDir(profile).get(), makeGenerationFilename(profile, gen));
 }
 
 /**
@@ -119,14 +152,18 @@ void deleteGeneration(const std::filesystem::path & profile, GenerationNumber ge
  *  - We log what we are going to do.
  *
  *  - We only actually delete if `dryRun` is false.
+ *
+ *  - The directory containing @p profile is already open as
+ *    @p profileDirFd.
  */
-static void deleteGeneration2(const std::filesystem::path & profile, GenerationNumber gen, bool dryRun)
+static void
+deleteGeneration2(Descriptor profileDirFd, const std::filesystem::path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
         notice("would remove profile version %1%", gen);
     else {
         notice("removing profile version %1%", gen);
-        deleteGeneration(profile, gen);
+        unlinkAt(profileDirFd, makeGenerationFilename(profile, gen));
     }
 }
 
@@ -136,7 +173,8 @@ void deleteGenerations(
     PathLocks lock;
     lockProfile(lock, profile);
 
-    auto [gens, curGen] = findGenerations(profile);
+    auto profileDirFd = openProfileDir(profile);
+    auto [gens, curGen] = findGenerations(profileDirFd.get(), profile);
 
     if (curGen && gensToDelete.contains(*curGen))
         throw Error("cannot delete current version of profile %1%", PathFmt(profile));
@@ -144,7 +182,7 @@ void deleteGenerations(
     for (auto & i : gens) {
         if (!gensToDelete.count(i.number))
             continue;
-        deleteGeneration2(profile, i.number, dryRun);
+        deleteGeneration2(profileDirFd.get(), profile, i.number, dryRun);
     }
 }
 
@@ -165,7 +203,8 @@ void deleteGenerationsGreaterThan(const std::filesystem::path & profile, Generat
     PathLocks lock;
     lockProfile(lock, profile);
 
-    auto [gens, _curGen] = findGenerations(profile);
+    auto profileDirFd = openProfileDir(profile);
+    auto [gens, _curGen] = findGenerations(profileDirFd.get(), profile);
     auto curGen = _curGen;
 
     auto i = gens.rbegin();
@@ -179,7 +218,7 @@ void deleteGenerationsGreaterThan(const std::filesystem::path & profile, Generat
 
     // Delete the rest
     for (; i != gens.rend(); ++i)
-        deleteGeneration2(profile, i->number, dryRun);
+        deleteGeneration2(profileDirFd.get(), profile, i->number, dryRun);
 }
 
 void deleteOldGenerations(const std::filesystem::path & profile, bool dryRun)
@@ -187,11 +226,12 @@ void deleteOldGenerations(const std::filesystem::path & profile, bool dryRun)
     PathLocks lock;
     lockProfile(lock, profile);
 
-    auto [gens, curGen] = findGenerations(profile);
+    auto profileDirFd = openProfileDir(profile);
+    auto [gens, curGen] = findGenerations(profileDirFd.get(), profile);
 
     for (auto & i : gens)
         if (i.number != curGen)
-            deleteGeneration2(profile, i.number, dryRun);
+            deleteGeneration2(profileDirFd.get(), profile, i.number, dryRun);
 }
 
 void deleteGenerationsOlderThan(const std::filesystem::path & profile, time_t t, bool dryRun)
@@ -199,7 +239,8 @@ void deleteGenerationsOlderThan(const std::filesystem::path & profile, time_t t,
     PathLocks lock;
     lockProfile(lock, profile);
 
-    auto [gens, curGen] = findGenerations(profile);
+    auto profileDirFd = openProfileDir(profile);
+    auto [gens, curGen] = findGenerations(profileDirFd.get(), profile);
 
     auto i = gens.rbegin();
 
@@ -231,7 +272,7 @@ void deleteGenerationsOlderThan(const std::filesystem::path & profile, time_t t,
             continue;
         }
         if (i->number != curGen)
-            deleteGeneration2(profile, i->number, dryRun);
+            deleteGeneration2(profileDirFd.get(), profile, i->number, dryRun);
     }
 }
 
