@@ -286,6 +286,12 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode, std::move(dirFdCallback));
 }
 
+void unlinkAt(Descriptor dirFd, const OsFilename & name)
+{
+    if (::unlinkat(dirFd, name.path().c_str(), 0) == -1 && errno != ENOENT)
+        throw SysError([&] { return HintFmt("deleting %1%", PathFmt(descriptorToPath(dirFd) / name.path())); });
+}
+
 OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
     /* No emptiness assertion, unlike the other operations here: since Linux
