@@ -99,6 +99,7 @@ DirectoryIterator & DirectoryIterator::operator++()
         entry = DirectoryEntry{
             .name = OsFilenameView::fromNativeUnchecked(name),
             .type = fileTypeFromDirent(dirent->d_type),
+            .ino = dirent->d_ino,
         };
         return *this;
     }
