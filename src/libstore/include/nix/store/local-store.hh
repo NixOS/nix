@@ -250,6 +250,11 @@ public:
 
 private:
 
+    /**
+     * Handle to `linksDir`, opened by the constructor.
+     */
+    AutoCloseFD linksDirFd;
+
     const PublicKeys & getPublicKeys();
 
 public:
