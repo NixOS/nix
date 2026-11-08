@@ -24,6 +24,7 @@
 
 #include <optional>
 #include <system_error>
+#include <utility>
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -273,6 +274,58 @@ void deletePathAt(Descriptor dirFd, const OsCanonPath & path);
  * directory.
  */
 void unlinkAt(Descriptor dirFd, const OsFilename & name);
+
+/**
+ * Deletes @p path in the directory @p dirFd with `deletePathAt` when
+ * destroyed, unless that has already been done.
+ *
+ * The caller must ensure that @p dirFd remains valid for the lifetime
+ * of this object.
+ */
+class AutoDeleteAt
+{
+    Descriptor dirFd = INVALID_DESCRIPTOR;
+
+    /**
+     * `std::nullopt` once there is nothing left to delete.
+     */
+    std::optional<OsCanonPath> path;
+
+public:
+    AutoDeleteAt() = default;
+
+    AutoDeleteAt(Descriptor dirFd, OsCanonPath path)
+        : dirFd{dirFd}
+        , path{std::move(path)}
+    {
+    }
+
+    AutoDeleteAt(AutoDeleteAt && x) noexcept
+        : dirFd{x.dirFd}
+        , path{std::exchange(x.path, std::nullopt)}
+    {
+    }
+
+    AutoDeleteAt & operator=(AutoDeleteAt && x) noexcept
+    {
+        std::swap(dirFd, x.dirFd);
+        std::swap(path, x.path);
+        return *this;
+    }
+
+    AutoDeleteAt(const AutoDeleteAt &) = delete;
+    AutoDeleteAt & operator=(const AutoDeleteAt &) = delete;
+
+    ~AutoDeleteAt();
+
+    /**
+     * Delete the path now, so that the destructor does not try to
+     * again.
+     *
+     * The destructor calls this, but ignoring any exception.
+     */
+    void deletePath();
+};
 
 /**
  * Move @p src, relative to the directory @p srcDirFd, to @p dst,

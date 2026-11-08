@@ -1130,7 +1130,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                    the expected location. */
                 auto [tempDirName, tempDirFd] = createTempDirInStore();
                 auto tempDir = config->realStoreDir.get() / tempDirName.path();
-                AutoDelete delTempDir(tempDir);
+                AutoDeleteAt delTempDir{getRealStoreDirFd(), tempDirName};
                 auto tempName = OsFilename::fromPathAsserting("x");
                 std::filesystem::path tempPath = tempDir / tempName.path();
 
@@ -1323,7 +1323,7 @@ StorePath LocalStore::addToStoreFromDump(
             break;
     }
 
-    std::unique_ptr<AutoDelete> delTempDir;
+    std::unique_ptr<AutoDeleteAt> delTempDir;
     const auto tempName = OsFilename::fromPathAsserting("x");
     std::filesystem::path tempPath;
     std::filesystem::path tempDir;
@@ -1346,7 +1346,7 @@ StorePath LocalStore::addToStoreFromDump(
         auto [tempDirName, newTempDirFd] = createTempDirInStore();
         tempDir = config->realStoreDir.get() / tempDirName.path();
         tempDirFd = std::move(newTempDirFd);
-        delTempDir = std::make_unique<AutoDelete>(tempDir);
+        delTempDir = std::make_unique<AutoDeleteAt>(getRealStoreDirFd(), tempDirName);
         tempPath = tempDir / tempName.path();
 
         RestoreSink restoreSink{

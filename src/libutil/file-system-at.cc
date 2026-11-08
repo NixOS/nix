@@ -79,4 +79,21 @@ void recursiveSyncAt(Descriptor dirFd, const OsFilename & name)
     recursiveSyncAt(dirFd, name, std::filesystem::file_type::none);
 }
 
+AutoDeleteAt::~AutoDeleteAt()
+{
+    try {
+        deletePath();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+}
+
+void AutoDeleteAt::deletePath()
+{
+    if (path) {
+        deletePathAt(dirFd, *path);
+        path.reset();
+    }
+}
+
 } // namespace nix
