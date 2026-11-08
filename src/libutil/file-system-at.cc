@@ -2,7 +2,9 @@
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
-#ifndef _WIN32
+#ifdef _WIN32
+#  include <winternl.h>
+#else
 #  include <fcntl.h>
 #endif
 
@@ -77,6 +79,38 @@ static void recursiveSyncAt(Descriptor dirFd, const OsFilename & name, std::file
 void recursiveSyncAt(Descriptor dirFd, const OsFilename & name)
 {
     recursiveSyncAt(dirFd, name, std::filesystem::file_type::none);
+}
+
+Result<AutoCloseFD, NativeError> openFileReadonlyAt(Descriptor dirFd, const OsCanonPath & path)
+{
+    return openFileEnsureBeneathNoSymlinks(
+        dirFd,
+        path,
+#ifdef _WIN32
+        GENERIC_READ | SYNCHRONIZE,
+        FILE_NON_DIRECTORY_FILE
+#else
+        O_RDONLY | O_CLOEXEC
+#endif
+    );
+}
+
+Result<AutoCloseFD, NativeError> openNewFileForWriteAt(
+    Descriptor dirFd, const OsCanonPath & path, [[maybe_unused]] mode_t mode, OpenNewFileForWriteParams params)
+{
+    assert(!params.followSymlinksOnTruncate);
+    return openFileEnsureBeneathNoSymlinks(
+        dirFd,
+        path,
+#ifdef _WIN32
+        GENERIC_WRITE | (params.writeOnly ? 0 : GENERIC_READ) | SYNCHRONIZE,
+        FILE_NON_DIRECTORY_FILE,
+        params.truncateExisting ? FILE_OVERWRITE_IF : FILE_CREATE
+#else
+        (params.writeOnly ? O_WRONLY : O_RDWR) | O_CREAT | O_CLOEXEC | (params.truncateExisting ? O_TRUNC : O_EXCL),
+        mode
+#endif
+    );
 }
 
 AutoDeleteAt::~AutoDeleteAt()

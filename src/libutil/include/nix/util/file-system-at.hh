@@ -225,6 +225,29 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     std::function<void(AutoCloseFD dirFd, OsCanonPath relPath)> dirFdCallback = nullptr);
 
 /**
+ * Like `openFileReadonly`, but for @p path relative to the directory
+ * @p dirFd, without following symlinks anywhere in @p path.
+ *
+ * @return The descriptor, or on failure the native error code.
+ * @throws SymlinkNotAllowed if @p path, or a directory in it, is a
+ * symlink.
+ */
+Result<AutoCloseFD, NativeError> openFileReadonlyAt(Descriptor dirFd, const OsCanonPath & path);
+
+/**
+ * Like `openNewFileForWrite`, but for @p path relative to the directory
+ * @p dirFd, without following symlinks anywhere in @p path.
+ *
+ * @pre `params.followSymlinksOnTruncate` is false.
+ *
+ * @return The descriptor, or on failure the native error code.
+ * @throws SymlinkNotAllowed if @p path, or a directory in it, is a
+ * symlink.
+ */
+Result<AutoCloseFD, NativeError>
+openNewFileForWriteAt(Descriptor dirFd, const OsCanonPath & path, mode_t mode, OpenNewFileForWriteParams params);
+
+/**
  * Set the access and modification time of a file relative to a directory file descriptor.
  *
  * @pre path.isRoot() is false

@@ -125,6 +125,23 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryValidPaths;
 };
 
+/**
+ * Durably write @p schema to the schema file, which is at @p schemaPath,
+ * in the database directory @p dbDirFd.
+ */
+static void writeSchema(Descriptor dbDirFd, const std::filesystem::path & schemaPath, int schema)
+{
+    auto fd = valueOr(
+        openNewFileForWriteAt(
+            dbDirFd, OsFilename::fromPathAsserting(schemaPath.filename()), 0666, {.truncateExisting = true}),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(schemaPath)));
+    writeFile(fd.get(), fmt("%1%", schema), FsSync::Yes, &schemaPath);
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    /* So that the new directory entry is durable too. */
+    syncDescriptor(dbDirFd);
+}
+
 LocalStore::LocalStore(ref<const Config> config)
     : Store{*config}
     , LocalFSStore{*config}
@@ -175,6 +192,8 @@ LocalStore::LocalStore(ref<const Config> config)
     tempRootsDirFd = valueOr(
         openDirectory(tempRootsDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(tempRootsDir)));
     createDirs(dbDir);
+    /* Likewise. */
+    dbDirFd = valueOr(openDirectory(dbDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dbDir)));
     auto gcRootsDir = config->stateDir.get() / "gcroots";
     const auto & localSettings = config->getLocalSettings();
     const auto & gcSettings = localSettings.getGCSettings();
@@ -241,16 +260,12 @@ LocalStore::LocalStore(ref<const Config> config)
        needed, we reserve some dummy space that we can free just
        before doing a garbage collection. */
     try {
-        auto st = maybeStat(reservedPath);
+        auto reservedName = OsFilename::fromPathAsserting(reservedPath.filename());
+        auto st = maybeFstatat(dbDirFd.get(), reservedName);
         if (!st || st->st_size != gcSettings.reservedSize) {
-            AutoCloseFD fd = toDescriptor(open(
-                reservedPath.string().c_str(),
-                O_WRONLY | O_CREAT
-#ifndef _WIN32
-                    | O_CLOEXEC
-#endif
-                ,
-                0600));
+            auto fd = valueOr(
+                openNewFileForWriteAt(dbDirFd.get(), reservedName, 0600, {.truncateExisting = true}),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening %s", PathFmt(reservedPath)));
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
             res = posix_fallocate(fd.get(), 0, gcSettings.reservedSize);
@@ -267,15 +282,15 @@ LocalStore::LocalStore(ref<const Config> config)
                     ;
             }
         }
-    } catch (SystemError & e) { /* don't care about errors */
+    } catch (SystemError & e) {       /* don't care about errors */
+    } catch (SymlinkNotAllowed & e) { /* likewise */
     }
 
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
     if (!config->readOnly) {
-        auto globalLockPath = dbDir / "big-lock";
         try {
-            globalLock = openLockFile(globalLockPath, true);
+            globalLock = openLockFileAt(dbDirFd.get(), OsFilename::fromPathAsserting("big-lock"), true);
         } catch (SystemError & e) {
             if (e.is(std::errc::permission_denied) || e.is(std::errc::operation_not_permitted)) {
                 e.addTrace(
@@ -320,7 +335,7 @@ LocalStore::LocalStore(ref<const Config> config)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, fmt("%1%", curSchema), 0666, FsSync::Yes);
+        writeSchema(dbDirFd.get(), schemaPath, curSchema);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -367,7 +382,7 @@ LocalStore::LocalStore(ref<const Config> config)
             txn.commit();
         }
 
-        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, FsSync::Yes);
+        writeSchema(dbDirFd.get(), schemaPath, nixSchemaVersion);
 
         // Downgrade to a read lock and hold to prevent other processes from
         // upgrading the schema while we're using the store
@@ -543,13 +558,16 @@ bool LocalStoreConfig::getReadOnly() const
 int LocalStore::getSchema()
 {
     int curSchema = 0;
-    if (pathExists(schemaPath)) {
-        auto s = readFile(schemaPath);
+    auto fdOrError = openFileReadonlyAt(dbDirFd.get(), OsFilename::fromPathAsserting(schemaPath.filename()));
+    if (fdOrError) {
+        auto & fd = fdOrError.value();
+        auto s = readFile(fd.get());
         auto n = string2Int<int>(s);
         if (!n)
             throw Error("%1% is corrupt", PathFmt(schemaPath));
         curSchema = *n;
-    }
+    } else if (NativeSysError::toErrorCode(fdOrError.error()) != std::errc::no_such_file_or_directory)
+        throw NativeSysError(fdOrError.error(), "opening file %s", PathFmt(schemaPath));
     return curSchema;
 }
 

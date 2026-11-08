@@ -452,7 +452,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     std::condition_variable wakeup;
 
     if (shouldDelete)
-        deletePath(reservedPath);
+        unlinkAt(dbDirFd.get(), OsFilename::fromPathAsserting(reservedPath.filename()));
 
     /* Acquire the global GC root. Note: we don't use fdGCLock
        here because then in auto-gc mode, another thread could
