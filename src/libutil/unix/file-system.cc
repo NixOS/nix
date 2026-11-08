@@ -403,7 +403,7 @@ void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
 
 /**
  * Move @p srcName in @p srcParent to @p dstName in @p dstParent, like
- * `movePath`. @p srcPath and @p dstPath are only used for messages.
+ * `movePathAt`. @p srcPath and @p dstPath are only used for messages.
  */
 static void movePathIn(
     Descriptor srcParent,
@@ -481,28 +481,6 @@ static void movePathIn(
 }
 
 /**
- * Open the parent directory of @p path, following symlinks, and
- * return it with the final component of @p path.
- */
-static std::pair<AutoCloseFD, OsFilename> openParentOf(const std::filesystem::path & path)
-{
-    auto parentPath = path.parent_path();
-    if (parentPath.empty())
-        parentPath = ".";
-    auto parentFd = valueOr(
-        openDirectory(parentPath, FinalSymlink::Follow),
-        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(parentPath)));
-    return {std::move(parentFd), OsFilename::fromPathThrowing(path.filename())};
-}
-
-void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
-{
-    auto [srcParent, srcName] = openParentOf(src);
-    auto [dstParent, dstName] = openParentOf(dst);
-    movePathIn(srcParent.get(), srcName, src, dstParent.get(), dstName, dst);
-}
-
-/**
  * Open the parent directory of @p path beneath @p dirFd, without
  * following symlinks, for `*At` functions that operate on the final
  * component of @p path.
@@ -536,12 +514,6 @@ void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirF
         dstParent,
         dstName,
         descriptorToPath(dstDirFd) / dst.path());
-}
-
-void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
-{
-    if (::rename(src.c_str(), dst.c_str()) == -1)
-        throw SysError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
 }
 
 void createDir(const std::filesystem::path & path, mode_t mode)
