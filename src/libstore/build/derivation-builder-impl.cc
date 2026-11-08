@@ -339,8 +339,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 /* Put the temporary copy in a directory inaccessible to the builder.
                    actualPath might point inside the build chroot, which is controlled
                    by the derivation builder. */
-                auto [rewriteTempDir, rewriteTempDirFd] = localStore.createTempDirInStore();
-                AutoDelete delRewriteTempDir(rewriteTempDir);
+                auto [rewriteTempDirName, rewriteTempDirFd] = localStore.createTempDirInStore();
+                AutoDelete delRewriteTempDir(localStore.config->realStoreDir.get() / rewriteTempDirName.path());
                 auto tmpName = OsFilename::fromPathAsserting("x");
                 RestoreSink restoreSink{rewriteTempDirFd.get(), tmpName};
                 parseDump(restoreSink, *source);
@@ -457,8 +457,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         };
 
         auto moveOutputToTempDir = [&]() -> void {
-            std::filesystem::path tempDir;
-            std::tie(tempDir, tempDirFd) = localStore.createTempDirInStore();
+            auto [tempDirName, newTempDirFd] = localStore.createTempDirInStore();
+            auto tempDir = localStore.config->realStoreDir.get() / tempDirName.path();
+            tempDirFd = std::move(newTempDirFd);
             delTempDir = AutoDelete(tempDir);
 
             auto tmpName = OsFilename::fromPathAsserting("x");

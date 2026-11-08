@@ -554,7 +554,12 @@ private:
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
+    /**
+     * @return The name of the temporary directory in the store
+     * directory, and a handle to it, which holds the lock that keeps
+     * the garbage collector from deleting it.
+     */
+    std::pair<OsFilename, AutoCloseFD> createTempDirInStore();
 
     typedef boost::unordered_flat_set<ino_t> InodeHash;
 
