@@ -299,6 +299,18 @@ public:
         return res;
     }
 
+    /**
+     * Converts a forced string value without context into a symbol. A string
+     * that comes from the symbol table carries the id of its symbol, so it
+     * needs no lookup.
+     */
+    Symbol create(const Value & v)
+    {
+        if (auto symbol = v.symbol())
+            return symbol;
+        return create(v.string_view());
+    }
+
     std::vector<SymbolStr> resolve(const std::span<const Symbol> & symbols) const
     {
         std::vector<SymbolStr> result;

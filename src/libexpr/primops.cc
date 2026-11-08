@@ -3206,10 +3206,10 @@ static RegisterPrimOp primop_attrValues({
 /* Dynamic version of the `.' operator. */
 void prim_getAttr(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    auto attr =
-        state.forceStringNoCtx(*args[0], noPos, "while evaluating the first argument passed to builtins.getAttr");
+    state.forceStringNoCtx(*args[0], noPos, "while evaluating the first argument passed to builtins.getAttr");
     state.forceAttrs(*args[1], noPos, "while evaluating the second argument passed to builtins.getAttr");
-    auto i = state.getAttr(state.symbols.create(attr), args[1]->attrs(), "in the attribute set under consideration");
+    auto i =
+        state.getAttr(state.symbols.create(*args[0]), args[1]->attrs(), "in the attribute set under consideration");
     // !!! add to stack trace?
     if (state.countCalls && i->pos)
         state.attrSelects->try_emplace_or_visit(i->pos, 1, [](auto & j) { j.second++; });
@@ -3234,10 +3234,9 @@ static RegisterPrimOp primop_getAttr({
 /* Return position information of the specified attribute. */
 static void prim_unsafeGetAttrPos(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    auto attr = state.forceStringNoCtx(
-        *args[0], noPos, "while evaluating the first argument passed to builtins.unsafeGetAttrPos");
+    state.forceStringNoCtx(*args[0], noPos, "while evaluating the first argument passed to builtins.unsafeGetAttrPos");
     state.forceAttrs(*args[1], noPos, "while evaluating the second argument passed to builtins.unsafeGetAttrPos");
-    auto i = args[1]->attrs()->get(state.symbols.create(attr));
+    auto i = args[1]->attrs()->get(state.symbols.create(*args[0]));
     if (!i)
         v.mkNull();
     else
@@ -3305,10 +3304,9 @@ void makePositionThunks(EvalState & state, const PosIdx pos, Value & line, Value
 /* Dynamic version of the `?' operator. */
 static void prim_hasAttr(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    auto attr =
-        state.forceStringNoCtx(*args[0], noPos, "while evaluating the first argument passed to builtins.hasAttr");
+    state.forceStringNoCtx(*args[0], noPos, "while evaluating the first argument passed to builtins.hasAttr");
     state.forceAttrs(*args[1], noPos, "while evaluating the second argument passed to builtins.hasAttr");
-    v.mkBool(args[1]->attrs()->get(state.symbols.create(attr)));
+    v.mkBool(args[1]->attrs()->get(state.symbols.create(*args[0])));
 }
 
 static RegisterPrimOp primop_hasAttr({
@@ -3356,7 +3354,7 @@ static void prim_removeAttrs(EvalState & state, CallSite callSite, Value * const
     for (auto elem : args[1]->listView()) {
         state.forceStringNoCtx(
             *elem, noPos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
-        names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
+        names.emplace_back(state.symbols.create(*elem), nullptr);
     }
     std::sort(names.begin(), names.end());
 
@@ -3407,11 +3405,11 @@ static void prim_listToAttrs(EvalState & state, CallSite callSite, Value * const
 
         auto j = state.getAttr(state.s.name, v2->attrs(), "in a {name=...; value=...;} pair");
 
-        auto name = state.forceStringNoCtx(
+        state.forceStringNoCtx(
             *j->value,
             j->pos,
             "while evaluating the `name` attribute of an element of the list passed to builtins.listToAttrs");
-        auto sym = state.symbols.create(name);
+        auto sym = state.symbols.create(*j->value);
 
         // (ab)use Attr to store a Value * * instead of a Value *, so that we can stabilize the sort using the Value * *
         bindings[n] = Attr(sym, std::bit_cast<Value *>(&v2));
@@ -3555,8 +3553,8 @@ static RegisterPrimOp primop_intersectAttrs({
 
 static void prim_catAttrs(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    auto attrName = state.symbols.create(
-        state.forceStringNoCtx(*args[0], noPos, "while evaluating the first argument passed to builtins.catAttrs"));
+    state.forceStringNoCtx(*args[0], noPos, "while evaluating the first argument passed to builtins.catAttrs");
+    auto attrName = state.symbols.create(*args[0]);
     state.forceList(*args[1], noPos, "while evaluating the second argument passed to builtins.catAttrs");
 
     SmallValueVector<nonRecursiveStackReservation> res(args[1]->listSize());
@@ -4360,9 +4358,9 @@ static void prim_groupBy(EvalState & state, CallSite callSite, Value * const * a
     for (auto vElem : args[1]->listView()) {
         Value res;
         state.callFunction(*args[0], *vElem, res, noPos);
-        auto name = state.forceStringNoCtx(
+        state.forceStringNoCtx(
             res, noPos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
-        auto sym = state.symbols.create(name);
+        auto sym = state.symbols.create(res);
         auto vector = attrs.try_emplace<ValueVector>(sym, {}).first;
         vector->second.push_back(vElem);
     }
