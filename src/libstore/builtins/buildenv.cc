@@ -3,6 +3,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/file-system-at.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -29,9 +30,37 @@ struct State
 
 } // namespace
 
-/* For each activated package, create symlinks */
-static void
-createLinks(State & state, const std::filesystem::path & srcDir, const std::filesystem::path & dstDir, int priority)
+/**
+ * Create the directory @p name in @p dirFd, which is at @p path, and
+ * open it.
+ */
+static AutoCloseFD createDirectory(Descriptor dirFd, const OsFilename & name, const std::filesystem::path & path)
+{
+    auto fdOrError = createDirectoryAt(
+        dirFd,
+        name
+#ifndef _WIN32 // TODO abstract mkdir perms for Windows
+        ,
+        0755
+#endif
+    );
+    if (!fdOrError)
+        throw NativeSysError(fdOrError.error(), "creating directory %s", PathFmt(path));
+    auto & fd = fdOrError.value();
+    if (fd)
+        return std::move(fd);
+    return valueOr(
+        openDirectoryAt(dirFd, name), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(path)));
+}
+
+/* For each activated package, create symlinks in @p dstDirFd, which is
+   at @p dstDir. */
+static void createLinks(
+    State & state,
+    const std::filesystem::path & srcDir,
+    Descriptor dstDirFd,
+    const std::filesystem::path & dstDir,
+    int priority)
 {
     DirectoryIterator srcFiles;
 
@@ -47,7 +76,8 @@ createLinks(State & state, const std::filesystem::path & srcDir, const std::file
 
     for (const auto & ent : srcFiles) {
         checkInterrupt();
-        auto & name = ent.name.path();
+        auto & dstName = ent.name;
+        auto & name = dstName.path();
         if (name.string()[0] == '.')
             /* not matched by glob */
             continue;
@@ -73,56 +103,59 @@ createLinks(State & state, const std::filesystem::path & srcDir, const std::file
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
-            auto dstStOpt = maybeLstat(dstFile.c_str());
+            auto dstStOpt = maybeFstatat(dstDirFd, dstName);
             if (dstStOpt) {
                 auto & dstSt = *dstStOpt;
                 if (S_ISDIR(dstSt.st_mode)) {
-                    createLinks(state, srcFile, dstFile, priority);
+                    auto childDirFd = valueOr(
+                        openDirectoryAt(dstDirFd, dstName),
+                        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dstFile)));
+                    createLinks(state, srcFile, childDirFd.get(), dstFile, priority);
                     continue;
                 } else if (S_ISLNK(dstSt.st_mode)) {
-                    auto target = canonPath(dstFile, true);
+                    std::filesystem::path linkTarget = readLinkAt(dstDirFd, dstName);
+                    auto target = canonPath(absPath(linkTarget, &dstDir), true);
                     if (!S_ISDIR(lstat(target).st_mode))
                         throw Error("collision between %1% and non-directory %2%", PathFmt(srcFile), PathFmt(target));
-                    unlink(dstFile);
-                    if (mkdir(
-                            dstFile.c_str()
-#ifndef _WIN32 // TODO abstract mkdir perms for Windows
-                                ,
-                            0755
-#endif
-                            )
-                        == -1)
-                        throw SysError("creating directory '%1%'", dstFile);
-                    createLinks(state, target, dstFile, state.priorities[dstFile]);
-                    createLinks(state, srcFile, dstFile, priority);
+                    unlinkAt(dstDirFd, dstName);
+                    auto childDirFd = createDirectory(dstDirFd, dstName, dstFile);
+                    createLinks(state, target, childDirFd.get(), dstFile, state.priorities[dstFile]);
+                    createLinks(state, srcFile, childDirFd.get(), dstFile, priority);
                     continue;
                 }
             }
         }
 
         else {
-            auto dstStOpt = maybeLstat(dstFile.c_str());
+            auto dstStOpt = maybeFstatat(dstDirFd, dstName);
             if (dstStOpt) {
                 auto & dstSt = *dstStOpt;
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw BuildEnvFileConflictError(readLink(dstFile), srcFile, priority);
+                        throw BuildEnvFileConflictError(
+                            std::filesystem::path{readLinkAt(dstDirFd, dstName)}, srcFile, priority);
                     if (prevPriority < priority)
                         continue;
-                    unlink(dstFile);
+                    unlinkAt(dstDirFd, dstName);
                 } else if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             }
         }
 
-        createSymlink(srcFile, dstFile);
+        /* `srcSt` is the status of what the symlink will point to, which
+           tells Windows which kind of symlink to create. */
+        OsString target = std::filesystem::path{srcFile}.native();
+        if (S_ISDIR(srcSt.st_mode))
+            createDirectorySymlinkAt(dstDirFd, dstName, target);
+        else
+            createFileSymlinkAt(dstDirFd, dstName, target);
         state.priorities[dstFile] = priority;
         state.symlinks++;
     }
 }
 
-void buildProfile(const std::filesystem::path & out, Packages && pkgs)
+void buildProfile(Descriptor outFd, const std::filesystem::path & out, Packages && pkgs)
 {
     State state;
 
@@ -131,7 +164,7 @@ void buildProfile(const std::filesystem::path & out, Packages && pkgs)
     auto addPkg = [&](const std::filesystem::path & pkgDir, int priority) {
         if (!done.insert(pkgDir).second)
             return;
-        createLinks(state, pkgDir, out, priority);
+        createLinks(state, pkgDir, outFd, out, priority);
 
         try {
             for (const auto & p : tokenizeString<std::vector<std::string>>(
@@ -182,6 +215,7 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
 
     auto out = ctx.outputs.at("out");
     createDirs(out);
+    auto outFd = valueOr(openDirectory(out), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(out)));
 
     /* Convert the stuff we get from the environment back into a
      * coherent data type. */
@@ -202,9 +236,12 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
         }
     }
 
-    buildProfile(out, std::move(pkgs));
+    buildProfile(outFd.get(), out, std::move(pkgs));
 
-    createSymlink(getAttr("manifest"), out + "/manifest.nix");
+    createFileSymlinkAt(
+        outFd.get(),
+        OsFilename::fromPathAsserting("manifest.nix"),
+        std::filesystem::path{getAttr("manifest")}.native());
 }
 
 static RegisterBuiltinBuilder registerBuildenv("buildenv", builtinBuildenv);
