@@ -1128,7 +1128,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 /* We'll restore to a temporary location accessible only to us first, confirm that
                    the narHash/narSize/ca match after restoration and only then move the path into
                    the expected location. */
-                auto [tempDir, tempDirFd] = createTempDirInStore();
+                auto [tempDirName, tempDirFd] = createTempDirInStore();
+                auto tempDir = config->realStoreDir.get() / tempDirName.path();
                 AutoDelete delTempDir(tempDir);
                 auto tempName = OsFilename::fromPathAsserting("x");
                 std::filesystem::path tempPath = tempDir / tempName.path();
@@ -1342,7 +1343,9 @@ StorePath LocalStore::addToStoreFromDump(
         StringSource dumpSource{dump};
         ChainSource bothSource{dumpSource, source};
 
-        std::tie(tempDir, tempDirFd) = createTempDirInStore();
+        auto [tempDirName, newTempDirFd] = createTempDirInStore();
+        tempDir = config->realStoreDir.get() / tempDirName.path();
+        tempDirFd = std::move(newTempDirFd);
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / tempName.path();
 
@@ -1477,25 +1480,51 @@ StorePath LocalStore::addToStoreFromDump(
 
 /* Create a temporary directory in the store that won't be
    garbage-collected until the returned FD is closed. */
-std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
+std::pair<OsFilename, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    std::filesystem::path tmpDirFn;
-    AutoCloseFD tmpDirFd;
-    bool lockedByUs = false;
-    do {
-        /* There is a slight possibility that `tmpDir' gets deleted by
-           the GC between createTempDir() and when we acquire a lock on it.
-           We'll repeat until 'tmpDir' exists and we've locked it.
-           Make the directory accessible only to the current user. */
-        tmpDirFn = createTempDir(config->realStoreDir.get(), "tmp", /*mode=*/0700);
-        auto tmpDirFdOrError = openDirectory(tmpDirFn, FinalSymlink::DontFollow);
-        if (!tmpDirFdOrError) {
-            continue;
+    while (true) {
+        checkInterrupt();
+
+        /* There is a slight possibility that the directory gets deleted
+           by the GC between creating it and when we acquire a lock on
+           it. We'll repeat until it exists and we've locked it. Make the
+           directory accessible only to the current user. */
+        auto name = makeTempName("tmp");
+        auto fdOrError = createDirectoryAt(
+            getRealStoreDirFd(),
+            name
+#ifndef _WIN32
+            ,
+            0700
+#endif
+        );
+        if (!fdOrError) {
+            if (NativeSysError::toErrorCode(fdOrError.error()) == std::errc::file_exists)
+                continue;
+            throw NativeSysError(
+                fdOrError.error(), "creating directory %s", PathFmt(config->realStoreDir.get() / name.path()));
         }
-        tmpDirFd = std::move(tmpDirFdOrError).value();
-        lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
-    } while (!pathExists(tmpDirFn) || !lockedByUs);
-    return {tmpDirFn, std::move(tmpDirFd)};
+        auto fd = std::move(fdOrError).value();
+        if (!fd) {
+            /* Without following symlinks, like the garbage collector
+               when it locks these. */
+            auto openedOrError = openDirectoryAt(getRealStoreDirFd(), name);
+            if (!openedOrError)
+                continue;
+            fd = std::move(openedOrError).value();
+        }
+
+#ifdef __FreeBSD__
+        /* Explicitly set the group of the directory, like
+           `createTempDir` does, since on BSD directories inherit the
+           group of their parent. */
+        if (::fchown(fd.get(), (uid_t) -1, getegid()) != 0)
+            throw SysError("setting group of directory %1%", PathFmt(config->realStoreDir.get() / name.path()));
+#endif
+
+        if (lockFile(fd.get(), ltWrite, true) && maybeFstatat(getRealStoreDirFd(), name))
+            return {std::move(name), std::move(fd)};
+    }
 }
 
 void PathInUse::anchor() {}
