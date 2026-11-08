@@ -604,11 +604,16 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
 }
 
 /**
- * Delete @p name in the directory @p parentFd, like
- * `deletePathAt`. @p path is only used for messages.
+ * Delete @p name in the directory @p parentFd, like `deletePathAt`,
+ * or, if not @p recursive, like `unlinkAt`. @p path is only used for
+ * messages.
  */
-static void
-deletePathIn(Descriptor parentFd, const OsFilename & name, const std::filesystem::path & path, uint64_t & bytesFreed)
+static void deletePathIn(
+    Descriptor parentFd,
+    const OsFilename & name,
+    const std::filesystem::path & path,
+    uint64_t & bytesFreed,
+    bool recursive = true)
 {
     using namespace nix::windows;
 
@@ -636,6 +641,9 @@ deletePathIn(Descriptor parentFd, const OsFilename & name, const std::filesystem
 
     if ((basicInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         && !(basicInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+        /* Like `DeleteFileW` does for a directory. */
+        if (!recursive)
+            throw WinError(DWORD{ERROR_ACCESS_DENIED}, "deleting directory %s", PathFmt(path));
         for (const auto & entry : DirectoryIterator{valueOr(
                  reopenDirectory(handle.get()),
                  NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening directory %s", PathFmt(path)))})
@@ -699,6 +707,12 @@ void deletePathAt(Descriptor dirFd, const OsCanonPath & path)
 {
     uint64_t dummy;
     deletePathAt(dirFd, path, dummy);
+}
+
+void unlinkAt(Descriptor dirFd, const OsFilename & name)
+{
+    uint64_t dummy;
+    deletePathIn(dirFd, name, descriptorToPath(dirFd) / name.path(), dummy, /*recursive=*/false);
 }
 
 /**
