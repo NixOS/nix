@@ -453,15 +453,7 @@ std::filesystem::path defaultTempDir();
 bool isExecutableFileAmbient(const std::filesystem::path & exe);
 
 /**
- * Return a temporary path in the directory @p root.
- *
- * The constructed path looks like `<root>/<suffix>-<pid>-<unique>`.
- */
-std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix = ".tmp");
-
-/**
- * Return a temporary file name, like the final component of
- * `makeTempPath`, for use with `*At` functions.
+ * Return a temporary file name, for use with `*At` functions.
  *
  * The constructed name looks like `<prefix>-<pid>-<unique>`.
  *

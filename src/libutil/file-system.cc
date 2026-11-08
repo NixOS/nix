@@ -374,9 +374,10 @@ void AutoDelete::cancel() noexcept
 
 std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const std::string & prefix, mode_t mode)
 {
+    auto root = canonPath(tmpRoot.empty() ? defaultTempDir() : tmpRoot, true);
     while (1) {
         checkInterrupt();
-        std::filesystem::path tmpDir = makeTempPath(tmpRoot, prefix);
+        auto tmpDir = root / makeTempName(prefix).path();
         if (mkdir(
                 tmpDir.string().c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -409,7 +410,7 @@ AutoCloseFD createAnonymousTempFile()
     AutoCloseFD fd;
 
 #ifdef _WIN32
-    auto path = makeTempPath(defaultTempDir(), "nix-anonymous");
+    auto path = canonPath(defaultTempDir(), true) / makeTempName("nix-anonymous").path();
     fd = CreateFileW(
         path.c_str(),
         GENERIC_READ | GENERIC_WRITE,
@@ -472,13 +473,6 @@ static uint32_t nextTempCounter()
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic<uint32_t> counter(std::random_device{}());
     return counter.fetch_add(1, std::memory_order_relaxed);
-}
-
-std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)
-{
-    assert(!std::filesystem::path(suffix).is_absolute());
-    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
-    return tmpRoot / fmt("%s-%s-%s", suffix, getpid(), nextTempCounter());
 }
 
 OsFilename makeTempName(std::string_view prefix)
