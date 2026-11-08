@@ -272,6 +272,19 @@ void writeFile(Descriptor fd, std::string_view s, FsSync sync, const std::filesy
     }
 }
 
+/**
+ * Flush a path's parent directory to disk.
+ */
+static void syncParent(const std::filesystem::path & path)
+{
+    assert(path.has_parent_path());
+    auto fd = valueOr(
+        openDirectory(path.parent_path(), FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
+    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
+    fd.fsync();
+}
+
 void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
     auto fd = valueOr(
@@ -311,16 +324,6 @@ void writeFile(Descriptor fd, Source & source, FsSync sync, const std::filesyste
     }
     if (sync == FsSync::Yes)
         syncDescriptor(fd);
-}
-
-void syncParent(const std::filesystem::path & path)
-{
-    assert(path.has_parent_path());
-    auto fd = valueOr(
-        openDirectory(path.parent_path(), FinalSymlink::Follow),
-        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
-    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
-    fd.fsync();
 }
 
 void createDirs(const std::filesystem::path & path)
