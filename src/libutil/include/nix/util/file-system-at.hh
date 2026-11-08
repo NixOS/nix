@@ -275,8 +275,14 @@ void deletePathAt(Descriptor dirFd, const OsCanonPath & path);
 void unlinkAt(Descriptor dirFd, const OsFilename & name);
 
 /**
- * Like `movePath`, but with @p src relative to the directory
- * @p srcDirFd and @p dst relative to the directory @p dstDirFd.
+ * Move @p src, relative to the directory @p srcDirFd, to @p dst,
+ * relative to the directory @p dstDirFd.
+ *
+ * On Unix, temporarily makes @p src writable if it is a directory and
+ * we are not root (to be able to update the directory's parent link
+ * `..`).
+ *
+ * Atomically replaces @p dst if it exists.
  *
  * No symlinks are followed in the parent directories of @p src or
  * @p dst. If @p src is a symlink, the symlink itself is moved, and if

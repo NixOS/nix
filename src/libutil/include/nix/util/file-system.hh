@@ -539,25 +539,6 @@ void unlinkIfExists(const std::filesystem::path & path);
 void tryUnlink(const std::filesystem::path & path);
 
 /**
- * @brief Move/rename path 'src' to 'dst'.
- *
- * Temporarily makes 'src' writable if it's a directory and we're not root (to
- * be able to update the directory's parent link "..").
- *
- * Atomically replaces the destination if it exists. Does not follow symlinks if
- * dst is a symlink.
- */
-void movePath(const std::filesystem::path & src, const std::filesystem::path & dst);
-
-/**
- * @brief Thin wrapper around ::rename that throws SystemError on errors.
- *
- * Unlike @ref nix::movePath(), doesn't attempt to make the source writable if
- * it's a directory.
- */
-void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst);
-
-/**
  * An entry read by @ref DirectoryIterator.
  */
 struct DirectoryEntry

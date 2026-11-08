@@ -745,6 +745,8 @@ void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirF
     /* Not following symlinks, so that they are moved themselves. */
     auto handle = ntOpenAt(srcParent, srcName.path().native(), DELETE | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
 
+    /* TODO: FileRenameInformationEx with FILE_RENAME_POSIX_SEMANTICS? */
+
     /* `FILE_RENAME_INFO` ends in the variable-length new name, which is
        relative to `RootDirectory`. */
     const auto & newName = dstName.path().native();

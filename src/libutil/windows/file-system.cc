@@ -305,20 +305,6 @@ std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
     return statFromFileInfo(attrData);
 }
 
-void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
-{
-    renameFile(src, dst);
-}
-
-void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
-{
-    using namespace nix::windows;
-
-    /* TODO: FileRenameInformationEx with FILE_RENAME_POSIX_SEMANTICS? */
-    if (!::MoveFileExW(src.c_str(), dst.c_str(), MOVEFILE_REPLACE_EXISTING))
-        throw WinError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
-}
-
 void createDir(const std::filesystem::path & path, [[maybe_unused]] mode_t mode)
 {
     using namespace nix::windows;
