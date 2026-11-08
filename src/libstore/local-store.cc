@@ -1864,20 +1864,30 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto baseName = drvPath.to_string();
 
-    auto logPath =
-        config->logDir.get() / drvsLogDir / baseName.substr(0, 2) / (std::string(baseName.substr(2)) + ".bz2");
+    auto dir = config->logDir.get() / drvsLogDir / baseName.substr(0, 2);
+    auto name = OsFilename::fromPathThrowing(std::string(baseName.substr(2)) + ".bz2");
 
-    if (pathExists(logPath))
+    createDirs(dir);
+    /* By path, following symlinks; only the log file in it is not
+       followed. */
+    auto dirFd = valueOr(openDirectory(dir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dir)));
+
+    if (maybeFstatat(dirFd.get(), name))
         return;
 
-    createDirs(logPath.parent_path());
+    auto tmpName = OsFilename::fromPathThrowing(name.path().string() + ".tmp." + std::to_string(getpid()));
+    auto tmpFile = dir / tmpName.path();
 
-    auto tmpFile = logPath;
-    tmpFile += ".tmp." + std::to_string(getpid());
+    {
+        auto fd = valueOr(
+            openNewFileForWriteAt(dirFd.get(), tmpName, 0666, {.truncateExisting = true}),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(tmpFile)));
+        writeFile(fd.get(), compress(CompressionAlgo::bzip2, log), FsSync::No, &tmpFile);
+        // Explicitly close to make sure exceptions are propagated.
+        fd.close();
+    }
 
-    writeFile(tmpFile, compress(CompressionAlgo::bzip2, log));
-
-    std::filesystem::rename(tmpFile, logPath);
+    movePathAt(dirFd.get(), tmpName, dirFd.get(), name);
 }
 
 std::optional<std::string> LocalStore::getVersion()
