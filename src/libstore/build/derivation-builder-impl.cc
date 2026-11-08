@@ -296,7 +296,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         AutoCloseFD tempDirFd;
         /* RAII cleanup of a temporary directory inside the store that is used
            for intermediate operations. */
-        AutoDelete delTempDir;
+        AutoDeleteAt delTempDir;
 
         auto finish = [&](StorePath finalStorePath) {
             /* Store the final path */
@@ -340,7 +340,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                    actualPath might point inside the build chroot, which is controlled
                    by the derivation builder. */
                 auto [rewriteTempDirName, rewriteTempDirFd] = localStore.createTempDirInStore();
-                AutoDelete delRewriteTempDir(localStore.config->realStoreDir.get() / rewriteTempDirName.path());
+                AutoDeleteAt delRewriteTempDir{localStore.getRealStoreDirFd(), rewriteTempDirName};
                 auto tmpName = OsFilename::fromPathAsserting("x");
                 RestoreSink restoreSink{rewriteTempDirFd.get(), tmpName};
                 parseDump(restoreSink, *source);
@@ -460,7 +460,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             auto [tempDirName, newTempDirFd] = localStore.createTempDirInStore();
             auto tempDir = localStore.config->realStoreDir.get() / tempDirName.path();
             tempDirFd = std::move(newTempDirFd);
-            delTempDir = AutoDelete(tempDir);
+            delTempDir = AutoDeleteAt{localStore.getRealStoreDirFd(), tempDirName};
 
             auto tmpName = OsFilename::fromPathAsserting("x");
             auto tmpOutput = tempDir / tmpName.path();
