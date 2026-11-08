@@ -1280,22 +1280,19 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
     if (!logSettings.keepLog)
         return;
 
-    auto baseName = std::string(baseNameOf(store.printStorePath(drvPath)));
+    auto baseName = std::string(drvPath.to_string());
 
     auto dir = store.config.getLogDir() / LocalFSStore::drvsLogDir / baseName.substr(0, 2);
     createDirs(dir);
+    /* By path, following symlinks; only the log file in it is not
+       followed. */
+    auto dirFd = valueOr(openDirectory(dir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dir)));
 
-    auto logFileName = dir / (baseName.substr(2) + (logSettings.compressLog ? ".bz2" : ""));
+    auto logFileName = OsFilename::fromPathThrowing(baseName.substr(2) + (logSettings.compressLog ? ".bz2" : ""));
 
     fd = valueOr(
-        openNewFileForWrite(
-            logFileName,
-            0666,
-            {
-                .truncateExisting = true,
-                .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
-            }),
-        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("creating log file %1%", PathFmt(logFileName)));
+        openNewFileForWriteAt(dirFd.get(), logFileName, 0666, {.truncateExisting = true}),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("creating log file %1%", PathFmt(dir / logFileName.path())));
 
     fileSink = std::make_shared<FdSink>(fd.get());
 
