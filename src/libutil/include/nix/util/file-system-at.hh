@@ -265,6 +265,16 @@ void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFr
 void deletePathAt(Descriptor dirFd, const OsCanonPath & path);
 
 /**
+ * Delete @p name in the directory @p dirFd, which must not be a
+ * directory, like `unlink`. If it is a symlink, the symlink itself is
+ * deleted. It is not an error if @p name does not exist.
+ *
+ * @throws SystemError on I/O errors, including if @p name is a
+ * directory.
+ */
+void unlinkAt(Descriptor dirFd, const OsFilename & name);
+
+/**
  * Like `movePath`, but with @p src relative to the directory
  * @p srcDirFd and @p dst relative to the directory @p dstDirFd.
  *
