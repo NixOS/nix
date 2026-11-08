@@ -231,7 +231,12 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     }
 }
 
-void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::file_type type, Roots & roots)
+void LocalStore::findRoots(
+    Descriptor dirFd,
+    const OsFilename & name,
+    const std::filesystem::path & path,
+    std::filesystem::file_type type,
+    Roots & roots)
 {
     auto foundRoot = [&](const std::filesystem::path & path, const std::filesystem::path & target) {
         try {
@@ -246,20 +251,29 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
 
     try {
 
-        if (type == std::filesystem::file_type::none || type == std::filesystem::file_type::unknown)
-            type = std::filesystem::symlink_status(path).type();
+        if (type == std::filesystem::file_type::none || type == std::filesystem::file_type::unknown) {
+            auto st = fstatat(dirFd, name);
+            type = S_ISDIR(st.st_mode)   ? std::filesystem::file_type::directory
+                   : S_ISLNK(st.st_mode) ? std::filesystem::file_type::symlink
+                   : S_ISREG(st.st_mode) ? std::filesystem::file_type::regular
+                                         : std::filesystem::file_type::unknown;
+        }
 
         NIX_INCOMPLETE_SWITCH_BEGIN
         switch (type) {
-        case std::filesystem::file_type::directory:
-            for (const auto & i : DirectoryIterator{path}) {
+        case std::filesystem::file_type::directory: {
+            auto childDirFd = valueOr(
+                openDirectoryAt(dirFd, name),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(path)));
+            for (const auto & i : DirectoryIterator{reopenDirectory(childDirFd.get())}) {
                 checkInterrupt();
-                findRoots(path / i.name.path(), i.type, roots);
+                findRoots(childDirFd.get(), i.name, path / i.name.path(), i.type, roots);
             }
             break;
+        }
 
         case std::filesystem::file_type::symlink: {
-            auto target = readLink(path);
+            std::filesystem::path target = readLinkAt(dirFd, name);
             if (isInStore(target.string()))
                 foundRoot(path, target);
 
@@ -270,7 +284,11 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                 if (!pathExists(target)) {
                     if (isInDir(path, config->stateDir.get() / gcRootsDir / "auto")) {
                         printInfo("removing stale link from %1% to %2%", PathFmt(path), PathFmt(target));
-                        tryUnlink(path);
+                        try {
+                            unlinkAt(dirFd, name);
+                        } catch (SystemError &) {
+                            /* Best effort: the root is stale either way. */
+                        }
                     }
                 } else {
                     if (!std::filesystem::is_symlink(target))
@@ -284,7 +302,7 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
         }
 
         case std::filesystem::file_type::regular: {
-            auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path.string())));
+            auto storePath = maybeParseStorePath(storeDir + "/" + name.path().string());
             if (storePath && isValidPath(*storePath))
                 roots[std::move(*storePath)].emplace(path.string());
             break;
@@ -318,9 +336,27 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
 
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
-    /* Process direct roots in {gcroots,profiles}. */
-    findRoots(config->stateDir.get() / gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(config->stateDir.get() / "profiles", std::filesystem::file_type::unknown, roots);
+    /* Process direct roots in {gcroots,profiles}. These directories
+       may be symlinks themselves, so they are opened by path, following
+       symlinks; only within them are symlinks not followed. */
+    for (auto & dir : {config->stateDir.get() / gcRootsDir, config->stateDir.get() / "profiles"}) {
+        auto dirFdOrError = openDirectory(dir);
+        if (!dirFdOrError) {
+            /* We only ignore permanent failures, like `findRoots`. */
+            auto ec = NativeSysError::toErrorCode(dirFdOrError.error());
+            if (ec == std::errc::permission_denied || ec == std::errc::no_such_file_or_directory
+                || ec == std::errc::not_a_directory) {
+                printInfo("cannot read potential root %1%", PathFmt(dir));
+                continue;
+            }
+            throw NativeSysError(dirFdOrError.error(), "opening directory %s", PathFmt(dir));
+        }
+        auto & dirFd = dirFdOrError.value();
+        for (const auto & i : DirectoryIterator{reopenDirectory(dirFd.get())}) {
+            checkInterrupt();
+            findRoots(dirFd.get(), i.name, dir / i.name.path(), i.type, roots);
+        }
+    }
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
