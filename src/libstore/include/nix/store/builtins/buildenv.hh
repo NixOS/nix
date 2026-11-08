@@ -3,6 +3,7 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/file-descriptor.hh"
 
 namespace nix {
 
@@ -50,6 +51,9 @@ public:
 
 typedef std::vector<Package> Packages;
 
-void buildProfile(const std::filesystem::path & out, Packages && pkgs);
+/**
+ * Build a profile in the directory @p outFd, which is at @p out.
+ */
+void buildProfile(Descriptor outFd, const std::filesystem::path & out, Packages && pkgs);
 
 } // namespace nix

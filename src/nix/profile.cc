@@ -249,7 +249,11 @@ struct ProfileManifest
             }
         }
 
-        buildProfile(tempDir, std::move(pkgs));
+        {
+            auto tempDirFd = valueOr(
+                openDirectory(tempDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(tempDir)));
+            buildProfile(tempDirFd.get(), tempDir, std::move(pkgs));
+        }
 
         writeFile(tempDir / "manifest.json", toJSON(*store).dump());
 
