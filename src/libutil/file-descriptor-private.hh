@@ -1,6 +1,8 @@
 #pragma once
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/result.hh"
+#include "nix/util/system-error.hh"
 
 namespace nix {
 
@@ -19,5 +21,17 @@ struct FdSink;
  * @pre written should be set to 0 before calling this function.
  */
 bool tryCopyFdRangeFast(Descriptor from, Descriptor to, off_t offset, size_t nbytes, size_t & written);
+
+/**
+ * Wrap a descriptor that has just been opened, which is
+ * `INVALID_DESCRIPTOR` on failure with the ambient error (`errno`, or
+ * `GetLastError()` on Windows) set, as by `open` or `CreateFileW`.
+ */
+inline Result<AutoCloseFD, NativeError> openResult(Descriptor fd)
+{
+    if (fd == INVALID_DESCRIPTOR)
+        return outcome::failure(NativeSysError::ambientError());
+    return outcome::success(AutoCloseFD{fd});
+}
 
 } // namespace nix

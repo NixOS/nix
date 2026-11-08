@@ -573,7 +573,7 @@ static void runDaemon(
 #ifdef __linux__
                 if (auto rootCgroup = getEnv("_NIX_DAEMON_ROOT_CGROUP")) {
                     linux::setRootCgroup(CanonPath(*rootCgroup));
-                    unsetenv("_NIX_DAEMON_ROOT_CGROUP");
+                    unsetEnv("_NIX_DAEMON_ROOT_CGROUP");
                 }
 #endif
 

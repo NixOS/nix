@@ -310,8 +310,9 @@ void Fetch::fetch(
     std::string key = hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false)
                       + "/" + pointer->oid;
     auto cachePath = cacheDir / key;
-    AutoCloseFD cacheFile(openFileReadonly(cachePath, FinalSymlink::DontFollow));
-    if (cacheFile) {
+    auto cacheFileOrError = openFileReadonly(cachePath, FinalSymlink::DontFollow);
+    if (cacheFileOrError) {
+        auto & cacheFile = cacheFileOrError.value();
         debug("using cache entry %s -> %s", key, PathFmt(cachePath));
         FdSource cacheSource(cacheFile.get());
         auto size = getFileSize(cacheFile.get());

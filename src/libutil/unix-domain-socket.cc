@@ -171,10 +171,8 @@ static void bindConnectProcHelper(
         auto errNo = string2Int<int>(chomp(drainFD(pipe.readSide.get())));
         if (!errNo || *errNo == -1)
             throw Error("cannot %s to socket at %s", operationName, PathFmt(path));
-        else if (*errNo > 0) {
-            errno = *errNo;
-            throw SysError("cannot %s to socket at %s", operationName, PathFmt(path));
-        }
+        else if (*errNo > 0)
+            throw SysError(*errNo, "cannot %s to socket at %s", operationName, PathFmt(path));
 #endif
     } else {
         memcpy(addr.sun_path, pathStr.c_str(), pathStr.size() + 1);

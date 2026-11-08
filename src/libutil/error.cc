@@ -452,6 +452,20 @@ static void writeErr(std::string_view buf)
     }
 }
 
+void rethrowExceptionCopy(std::exception_ptr ex)
+{
+    try {
+        std::rethrow_exception(ex);
+    } catch (BaseError & e) {
+        /* `throwClone` is the only way to copy a `BaseError` without
+           slicing it. Anything else propagates from here as it is. */
+        e.throwClone();
+    }
+    /* Not reached, since both of the above throw, but GCC cannot tell, and
+       warns that this `[[noreturn]]` function returns. */
+    unreachable();
+}
+
 void panic(std::string_view msg)
 {
     writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL);

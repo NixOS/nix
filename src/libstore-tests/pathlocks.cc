@@ -2,6 +2,7 @@
 
 #include "nix/store/pathlocks.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/tests/result.hh"
 
 namespace nix {
 
@@ -115,9 +116,8 @@ TEST_F(LockFileTest, directory)
 #endif
     auto dir = tmpDir / "dir";
     createDir(dir);
-    auto a = openDirectory(dir, FinalSymlink::DontFollow);
-    auto b = openDirectory(dir, FinalSymlink::DontFollow);
-    ASSERT_TRUE(a && b);
+    auto a = testing::valueOrFail(openDirectory(dir, FinalSymlink::DontFollow));
+    auto b = testing::valueOrFail(openDirectory(dir, FinalSymlink::DontFollow));
     ASSERT_TRUE(lockFile(a.get(), ltWrite, false));
     ASSERT_FALSE(lockFile(b.get(), ltWrite, false));
 }

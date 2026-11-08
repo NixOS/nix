@@ -20,6 +20,7 @@
 #include "nix/store/store-open.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/util.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/local-store.hh"
@@ -77,8 +78,8 @@ static int main_build_remote(int argc, char ** argv)
         logger = makeJSONLogger(getStandardError()).release();
 
         /* Ensure we don't get any SSH passphrase or host key popups. */
-        unsetenv("DISPLAY");
-        unsetenv("SSH_ASKPASS");
+        unsetEnv("DISPLAY");
+        unsetEnv("SSH_ASKPASS");
 
         /* If we ever use the common args framework, make sure to
            remove initPlugins below and initialize settings first.

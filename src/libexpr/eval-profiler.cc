@@ -142,16 +142,15 @@ public:
         : state(state)
         , sampleInterval(period)
         , profileFd([&]() {
-            auto fd = openNewFileForWrite(
-                profileFile,
-                0660,
-                {
-                    .truncateExisting = true,
-                    .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
-                });
-            if (!fd)
-                throw SysError("opening file %s", PathFmt(profileFile));
-            return fd;
+            return valueOr(
+                openNewFileForWrite(
+                    profileFile,
+                    0660,
+                    {
+                        .truncateExisting = true,
+                        .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
+                    }),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(profileFile)));
         }())
         , posCache(state)
     {

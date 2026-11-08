@@ -220,9 +220,9 @@ std::filesystem::path readLink(const std::filesystem::path & path)
     checkInterrupt();
 #ifdef _WIN32
     // libstdc++ doesn't implement std::filesystem::read_symlink on Windows yet
-    auto parentDir = openDirectory(path.parent_path(), FinalSymlink::Follow);
-    if (!parentDir)
-        throw NativeSysError("opening parent directory of %s", PathFmt(path));
+    auto parentDir = valueOr(
+        openDirectory(path.parent_path(), FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(path)));
     return readLinkAt(parentDir.get(), OsFilename::fromPathThrowing(path.filename()));
 #else
     try {
@@ -235,9 +235,7 @@ std::filesystem::path readLink(const std::filesystem::path & path)
 
 std::string readFile(const std::filesystem::path & path)
 {
-    auto fd = openFileReadonly(path);
-    if (!fd)
-        throw NativeSysError("opening file %s", PathFmt(path));
+    auto fd = valueOr(openFileReadonly(path), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
     return readFile(fd.get());
 }
 
@@ -258,24 +256,24 @@ void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
     }
 
     // Stream the file instead if memory-mapping fails or is disabled.
-    auto fd = openFileReadonly(std::filesystem::path(path));
-    if (!fd)
-        throw NativeSysError("opening file %s", PathFmt(path));
+    auto fd = valueOr(
+        openFileReadonly(std::filesystem::path(path)),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
     drainFD(fd.get(), sink);
 }
 
 void writeFile(
     const std::filesystem::path & path, std::string_view s, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
-    AutoCloseFD fd = openNewFileForWrite(
-        path,
-        mode,
-        {
-            .truncateExisting = true,
-            .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
-        });
-    if (!fd)
-        throw NativeSysError("opening file %s", PathFmt(path));
+    auto fd = valueOr(
+        openNewFileForWrite(
+            path,
+            mode,
+            {
+                .truncateExisting = true,
+                .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
+            }),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
 
     writeFile(fd.get(), s, sync, &path);
 
@@ -300,15 +298,15 @@ void writeFile(Descriptor fd, std::string_view s, FsSync sync, const std::filesy
 
 void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
-    AutoCloseFD fd = openNewFileForWrite(
-        path,
-        mode,
-        {
-            .truncateExisting = true,
-            .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
-        });
-    if (!fd)
-        throw NativeSysError("opening file %s", PathFmt(path));
+    auto fd = valueOr(
+        openNewFileForWrite(
+            path,
+            mode,
+            {
+                .truncateExisting = true,
+                .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
+            }),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
 
     writeFile(fd.get(), source, sync, &path);
     // Explicitly close to make sure exceptions are propagated.
@@ -342,9 +340,9 @@ void writeFile(Descriptor fd, Source & source, FsSync sync, const std::filesyste
 void syncParent(const std::filesystem::path & path)
 {
     assert(path.has_parent_path());
-    AutoCloseFD fd = openDirectory(path.parent_path(), FinalSymlink::Follow);
-    if (!fd)
-        throw NativeSysError("opening file %s", PathFmt(path));
+    auto fd = valueOr(
+        openDirectory(path.parent_path(), FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
     /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
     fd.fsync();
 }
@@ -355,9 +353,9 @@ void recursiveSync(const std::filesystem::path & path)
     /* If it's a file or symlink, just fsync and return. */
     auto st = lstat(path);
     if (S_ISREG(st.st_mode)) {
-        AutoCloseFD fd = openFileReadonly(path, FinalSymlink::DontFollow);
-        if (!fd)
-            throw NativeSysError("opening file %s", PathFmt(path));
+        auto fd = valueOr(
+            openFileReadonly(path, FinalSymlink::DontFollow),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
         fd.fsync();
         return;
     } else if (S_ISLNK(st.st_mode))
@@ -376,9 +374,9 @@ void recursiveSync(const std::filesystem::path & path)
             if (std::filesystem::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
             } else if (std::filesystem::is_regular_file(st)) {
-                AutoCloseFD fd = openFileReadonly(entry.path(), FinalSymlink::DontFollow);
-                if (!fd)
-                    throw NativeSysError("opening file %1%", PathFmt(entry.path()));
+                auto fd = valueOr(
+                    openFileReadonly(entry.path(), FinalSymlink::DontFollow),
+                    NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %1%", PathFmt(entry.path())));
                 fd.fsync();
             }
         }
@@ -387,9 +385,9 @@ void recursiveSync(const std::filesystem::path & path)
 
     /* Fsync all the directories. */
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = openDirectory(*dir, FinalSymlink::DontFollow);
-        if (!fd)
-            throw NativeSysError("opening directory %1%", PathFmt(*dir));
+        auto fd = valueOr(
+            openDirectory(*dir, FinalSymlink::DontFollow),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %1%", PathFmt(*dir)));
         fd.fsync();
     }
 }
@@ -551,9 +549,9 @@ void createSymlink(const std::filesystem::path & target, const std::filesystem::
 {
 #ifdef _WIN32
     // libstdc++ doesn't implement std::filesystem::create_symlink on Windows yet
-    auto parentDir = openDirectory(link.parent_path(), FinalSymlink::Follow);
-    if (!parentDir)
-        throw NativeSysError("opening parent directory of %s", PathFmt(link));
+    auto parentDir = valueOr(
+        openDirectory(link.parent_path(), FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(link)));
     createUnknownSymlinkAt(parentDir.get(), OsFilename::fromPathThrowing(link.filename()), target.native());
 #else
     std::error_code ec;

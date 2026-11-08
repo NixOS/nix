@@ -475,17 +475,10 @@ struct ValueBase
 
         [[noreturn]] void rethrow() const
         {
-            try {
-                std::rethrow_exception(exRef->ex);
-            } catch (BaseError & e) {
-                /* Rethrow the copy of the exception - not the original one.
-                   Stack tracing mechanisms rely on being able to modify the exceptions
-                   they catch by reference. */
-                e.throwClone();
-            } catch (...) {
-                throw;
-            }
-            unreachable();
+            /* Rethrow the copy of the exception - not the original one.
+               Stack tracing mechanisms rely on being able to modify the exceptions
+               they catch by reference. */
+            rethrowExceptionCopy(exRef->ex);
         }
     };
 };

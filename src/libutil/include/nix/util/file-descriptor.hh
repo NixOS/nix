@@ -10,6 +10,8 @@
  */
 
 #include "nix/util/error.hh"
+#include "nix/util/result.hh"
+#include "nix/util/system-error.hh"
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -388,14 +390,16 @@ void setHandleInheritability(Descriptor fd, bool inherit);
 
 MakeError(EndOfFile, Error);
 
-#ifdef _WIN32
-
 /**
- * Windows specific replacement for POSIX `lseek` that operates on a `HANDLE` and not
- * a file descriptor.
+ * Like POSIX `lseek`, on every platform.
+ *
+ * @param whence Whence [from where] to apply the offset. This
+ * position plus the offset is where to seek in the file. Must be one of
+ * `SEEK_SET`, `SEEK_CUR` or `SEEK_END`.
+ *
+ * @return The new offset, or on failure the native error code, which
+ * `NativeSysError` can be constructed from.
  */
-off_t lseek(Descriptor fd, off_t offset, int whence);
-
-#endif
+Result<off_t, NativeError> seek(Descriptor fd, off_t offset, int whence);
 
 } // namespace nix

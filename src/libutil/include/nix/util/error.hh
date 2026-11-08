@@ -21,6 +21,7 @@
 #include "nix/util/config.hh"
 
 #include <concepts>
+#include <exception>
 #include <list>
 #include <memory>
 #include <optional>
@@ -294,6 +295,13 @@ public:
         throw Derived(static_cast<const Derived &>(*this));
     }
 };
+
+/**
+ * Like `std::rethrow_exception`, but if @p ex is a `BaseError`, throw a
+ * copy of it rather than the original, so that handlers which modify what
+ * they catch (e.g. by adding traces) leave the stored exception alone.
+ */
+[[noreturn]] void rethrowExceptionCopy(std::exception_ptr ex);
 
 #define MakeError(newClass, superClass)                             \
     class newClass : public CloneableError<newClass, superClass>    \

@@ -196,8 +196,11 @@ enum struct FinalSymlink : bool { DontFollow = false, Follow = true };
  * Open a `Descriptor` with read-only access to the given directory.
  *
  * @param finalSymlink If `DontFollow`, fail if the path is a symlink.
+ *
+ * @return The descriptor, or on failure the native error code.
  */
-AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
+Result<AutoCloseFD, NativeError>
+openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 /**
  * Open a `Descriptor` to the given directory only for traversing it:
@@ -209,16 +212,21 @@ AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink final
  * listing the directory or `fsync`ing it.
  *
  * @param finalSymlink If `DontFollow`, fail if the path is a symlink.
+ *
+ * @return The descriptor, or on failure the native error code.
  */
-AutoCloseFD
+Result<AutoCloseFD, NativeError>
 openDirectoryTraversable(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 /**
  * Open a `Descriptor` with read-only access to the given file.
  *
  * @note For directories use @ref nix::openDirectory().
+ *
+ * @return The descriptor, or on failure the native error code.
  */
-AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
+Result<AutoCloseFD, NativeError>
+openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 struct OpenNewFileForWriteParams
 {
@@ -241,11 +249,12 @@ struct OpenNewFileForWriteParams
  * @ref nix::OpenNewFileForWriteParams::truncateExisting.
  *
  * @param mode POSIX permission bits. Ignored on Windows.
- * @throws Nothing.
+ * @return The descriptor, or on failure the native error code.
  *
  * @todo Reparse points on Windows.
  */
-AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params);
+Result<AutoCloseFD, NativeError>
+openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params);
 
 /**
  * Read the contents of a file into a string.

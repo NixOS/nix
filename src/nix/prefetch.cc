@@ -111,9 +111,9 @@ std::tuple<StorePath, Hash> prefetchFile(
             if (executable)
                 mode = 0700;
 
-            auto fd = openNewFileForWrite(tmpFile, mode, {.truncateExisting = false});
-            if (!fd)
-                throw SysError("creating temporary file %s", PathFmt(tmpFile));
+            auto fd = valueOr(
+                openNewFileForWrite(tmpFile, mode, {.truncateExisting = false}),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("creating temporary file %s", PathFmt(tmpFile)));
 
             FdSink sink(fd.get());
 

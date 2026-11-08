@@ -9,7 +9,7 @@ namespace nix::windows {
 
 void windows::WinError::anchor() {}
 
-std::string WinError::renderError(DWORD lastError)
+std::string WinErrorFields::renderError(DWORD lastError)
 {
     LPSTR errorText = NULL;
 

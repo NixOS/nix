@@ -101,7 +101,10 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
                          ++i)
                         unchecked[i->str()].emplace(envFile);
                 } catch (SystemError & e) {
-                    if (errno == ENOENT || errno == EACCES || errno == ESRCH)
+                    /* The process may have exited, or not be ours to look
+                       at, since we listed `/proc`. */
+                    if (e.is(std::errc::no_such_file_or_directory) || e.is(std::errc::permission_denied)
+                        || e.is(std::errc::no_such_process))
                         continue;
                     throw;
                 }

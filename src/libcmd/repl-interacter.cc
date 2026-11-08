@@ -140,12 +140,12 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
 
     auto fd = openFileReadonly(historyFile);
     if (!fd) {
-        NativeSysError err("opening file %s", PathFmt(historyFile));
-        if (!err.is(std::errc::no_such_file_or_directory) && !err.is(std::errc::not_a_directory))
-            logWarning(err.info());
+        auto ec = NativeSysError::toErrorCode(fd.error());
+        if (ec != std::errc::no_such_file_or_directory && ec != std::errc::not_a_directory)
+            logWarning(NativeSysError(fd.error(), "opening file %s", PathFmt(historyFile)).info());
     } else {
         try {
-            FdSource source(fd.get());
+            FdSource source(fd.value().get());
             while (true)
                 add_history(source.readLine().c_str());
         } catch (EndOfFile &) {
