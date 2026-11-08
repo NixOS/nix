@@ -290,11 +290,6 @@ void writeFile(
     Descriptor fd, std::string_view s, FsSync sync = FsSync::No, const std::filesystem::path * origPath = nullptr);
 
 /**
- * Flush a path's parent directory to disk.
- */
-void syncParent(const std::filesystem::path & path);
-
-/**
  * Delete a path; i.e., in the case of a directory, it is deleted
  * recursively. It's not an error if the path does not exist. The
  * second variant returns the number of bytes and blocks freed.
