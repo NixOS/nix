@@ -288,6 +288,17 @@ void unlinkAt(Descriptor dirFd, const OsFilename & name);
 void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst);
 
 /**
+ * Create a hard link @p dst in the directory @p dstDirFd to @p src in
+ * the directory @p srcDirFd.
+ *
+ * If @p src is a symlink, the link is to the symlink itself.
+ *
+ * @throws SystemError on failure, e.g. `std::errc::file_exists` if
+ * @p dst already exists.
+ */
+void createHardLinkAt(Descriptor srcDirFd, const OsFilename & src, Descriptor dstDirFd, const OsFilename & dst);
+
+/**
  * Like `makeFSSourceAccessor(std::filesystem::path, bool, FinalSymlink)`
  * with `FinalSymlink::DontFollow`, but for @p name in the directory
  * @p dirFd.

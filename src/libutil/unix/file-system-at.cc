@@ -294,6 +294,18 @@ AutoCloseFD reopenDirectory(Descriptor dirFd)
     return fd;
 }
 
+void createHardLinkAt(Descriptor srcDirFd, const OsFilename & src, Descriptor dstDirFd, const OsFilename & dst)
+{
+    /* Without `AT_SYMLINK_FOLLOW`, so that a symlink is linked itself. */
+    if (::linkat(srcDirFd, src.path().c_str(), dstDirFd, dst.path().c_str(), 0) == -1)
+        throw SysError([&] {
+            return HintFmt(
+                "creating hard link %1% to %2%",
+                PathFmt(descriptorToPath(dstDirFd) / dst.path()),
+                PathFmt(descriptorToPath(srcDirFd) / src.path()));
+        });
+}
+
 void unlinkAt(Descriptor dirFd, const OsFilename & name)
 {
     if (::unlinkat(dirFd, name.path().c_str(), 0) == -1 && errno != ENOENT)

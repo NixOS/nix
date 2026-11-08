@@ -22,34 +22,26 @@
 
 namespace nix {
 
-static void makeWritable(const std::filesystem::path & path)
+static void makeWritable(const LocalStore::DirectoryInParent & dir)
 {
-    auto st = lstat(path);
-    chmod(path, st.st_mode | S_IWUSR);
+#ifndef _WIN32
+    auto st = fstatat(dir.parentFd, dir.name);
+    unix::fchmodatTryNoFollow(dir.parentFd, dir.name, (st.st_mode & ~S_IFMT) | S_IWUSR);
+#else
+    // TODO: implement fchmodatTryNoFollow for Windows
+#endif
 }
 
 struct MakeReadOnly
 {
-    std::filesystem::path path;
-
-    MakeReadOnly(std::filesystem::path path)
-        : path(std::move(path))
-    {
-    }
+    const std::optional<LocalStore::DirectoryInParent> & dir;
 
     ~MakeReadOnly()
     {
         try {
-            /* This will make the path read-only. */
-            if (!path.empty()) {
-                auto parent = path.parent_path();
-                if (parent.empty())
-                    parent = ".";
-                auto dirFd = valueOr(
-                    openDirectory(parent),
-                    NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(path)));
-                canonicaliseTimestampAndPermissions(dirFd.get(), OsFilename::fromPathAsserting(path.filename()));
-            }
+            /* This will make the directory read-only. */
+            if (dir)
+                canonicaliseTimestampAndPermissions(dir->parentFd, dir->name);
         } catch (...) {
             ignoreExceptionInDestructor();
         }
@@ -76,12 +68,11 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     return inodeHash;
 }
 
-std::list<OsFilename>
-LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash)
+std::list<OsFilename> LocalStore::readDirectoryIgnoringInodes(Descriptor dirFd, const InodeHash & inodeHash)
 {
     std::list<OsFilename> names;
 
-    for (const auto & entry : DirectoryIterator{path}) {
+    for (const auto & entry : DirectoryIterator{reopenDirectory(dirFd)}) {
         checkInterrupt();
 
 #ifndef _WIN32
@@ -99,11 +90,18 @@ LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, cons
 }
 
 void LocalStore::optimisePath_(
-    Activity * act, OptimiseStats & stats, const std::filesystem::path & path, InodeHash & inodeHash, RepairFlag repair)
+    Activity * act,
+    OptimiseStats & stats,
+    Descriptor dirFd,
+    const OsFilename & name,
+    const std::filesystem::path & path,
+    const std::optional<DirectoryInParent> & dir,
+    InodeHash & inodeHash,
+    RepairFlag repair)
 {
     checkInterrupt();
 
-    auto st = lstat(path);
+    auto st = fstatat(dirFd, name);
 
 #ifdef __APPLE__
     /* HFS/macOS has some undocumented security feature disabling hardlinking for
@@ -119,9 +117,12 @@ void LocalStore::optimisePath_(
 #endif
 
     if (S_ISDIR(st.st_mode)) {
-        auto names = readDirectoryIgnoringInodes(path, inodeHash);
+        auto childDirFd = valueOr(
+            openDirectoryAt(dirFd, name), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(path)));
+        auto names = readDirectoryIgnoringInodes(childDirFd.get(), inodeHash);
+        std::optional<DirectoryInParent> childDir = DirectoryInParent{dirFd, name};
         for (const auto & i : names)
-            optimisePath_(act, stats, path / i.path(), inodeHash, repair);
+            optimisePath_(act, stats, childDirFd.get(), i, path / i.path(), childDir, inodeHash, repair);
         return;
     }
 
@@ -157,60 +158,65 @@ void LocalStore::optimisePath_(
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = hashPath(makeFSSourceAccessor(path), FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).hash;
+    Hash hash =
+        hashPath(makeFSSourceAccessor(dirFd, name, path), FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256)
+            .hash;
     debug("%s has hash '%s'", PathFmt(path), hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
-    std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
+    auto linkName = OsFilename::fromPathAsserting(hash.to_string(HashFormat::Nix32, false));
+    std::filesystem::path linkPath = linksDir / linkName.path();
 
     /* Maybe delete the link, if it has been corrupted. */
-    if (pathExists(linkPath)) {
-        auto stLink = lstat(linkPath);
-        if (st.st_size != stLink.st_size || (repair && hash != ({
-                                                           hashPath(
-                                                               makeFSSourceAccessor(linkPath),
-                                                               FileSerialisationMethod::NixArchive,
-                                                               HashAlgorithm::SHA256)
-                                                               .hash;
-                                                       }))) {
+    auto stLink = maybeFstatat(linksDirFd.get(), linkName);
+    if (stLink) {
+        if (st.st_size != stLink->st_size
+            || (repair && hash != ({
+                              hashPath(
+                                  makeFSSourceAccessor(linksDirFd.get(), linkName, linkPath),
+                                  FileSerialisationMethod::NixArchive,
+                                  HashAlgorithm::SHA256)
+                                  .hash;
+                          }))) {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link %s", PathFmt(linkPath));
             warn(
                 "There may be more corrupted paths."
                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
-            unlinkIfExists(linkPath);
+            unlinkAt(linksDirFd.get(), linkName);
+            stLink.reset();
         }
     }
 
-    if (!pathExists(linkPath)) {
+    if (!stLink) {
         /* Nope, create a hard link in the links directory. */
         try {
-            std::filesystem::create_hard_link(path, linkPath);
+            createHardLinkAt(dirFd, name, linksDirFd.get(), linkName);
             inodeHash.insert(st.st_ino);
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() == std::errc::file_exists) {
+        } catch (SystemError & e) {
+            if (e.is(std::errc::file_exists)) {
                 /* Fall through if another process created ‘linkPath’ before
                    we did. */
             }
 
-            else if (e.code() == std::errc::no_space_on_device) {
+            else if (e.is(std::errc::no_space_on_device)) {
                 /* On ext4, that probably means the directory index is
                    full.  When that happens, it's fine to ignore it: we
                    just effectively disable deduplication of this
                    file.
                    */
-                printInfo("cannot link %s to '%s': %s", PathFmt(linkPath), PathFmt(path), e.code().message());
+                printInfo("cannot link %s to %s: %s", PathFmt(linkPath), PathFmt(path), e.ec().message());
                 return;
             }
 
             else
-                throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), PathFmt(path));
+                throw;
         }
     }
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    auto stLink = maybeLstat(linkPath);
+    stLink = maybeFstatat(linksDirFd.get(), linkName);
 
     /* A concurrent garbage collection may have removed the link in the
        links directory between the existence check above and now. Skip
@@ -227,23 +233,21 @@ void LocalStore::optimisePath_(
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
-       permissions). */
-    const auto dirOfPath = path.parent_path();
-    bool mustToggle = dirOfPath != config->realStoreDir.get();
-    if (mustToggle)
-        makeWritable(dirOfPath);
+       permissions), which is when `dir` is absent. */
+    if (dir)
+        makeWritable(*dir);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : std::filesystem::path{});
+    MakeReadOnly makeReadOnly{dir};
 
-    std::filesystem::path tempLink = makeTempPath(config->realStoreDir.get(), ".tmp-link");
+    auto tempName = makeTempName(".tmp-link");
 
     try {
-        std::filesystem::create_hard_link(linkPath, tempLink);
+        createHardLinkAt(linksDirFd.get(), linkName, getRealStoreDirFd(), tempName);
         inodeHash.insert(st.st_ino);
-    } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::too_many_links) {
+    } catch (SystemError & e) {
+        if (e.is(std::errc::too_many_links)) {
             /* Too many links to the same file (>= 32000 on most file
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
@@ -251,26 +255,26 @@ void LocalStore::optimisePath_(
                 printInfo("%1% has maximum number of links", PathFmt(linkPath));
             return;
         }
-        if (e.code() == std::errc::no_such_file_or_directory) {
+        if (e.is(std::errc::no_such_file_or_directory)) {
             /* A concurrent garbage collection removed the link in the
                links directory. Skip optimising this path; a later pass
                will dedup it. */
             return;
         }
-        throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), PathFmt(tempLink));
+        throw;
     }
 
     /* Atomically replace the old file with the new hard link. */
     try {
-        std::filesystem::rename(tempLink, path);
-    } catch (std::filesystem::filesystem_error & e) {
-        {
-            std::error_code ec;
-            remove(tempLink, ec); /* Clean up after ourselves. */
-            if (ec)
-                printError("unable to unlink %1%: %2%", PathFmt(tempLink), ec.message());
+        movePathAt(getRealStoreDirFd(), tempName, dirFd, name);
+    } catch (SystemError & e) {
+        try {
+            unlinkAt(getRealStoreDirFd(), tempName); /* Clean up after ourselves. */
+        } catch (Error & e2) {
+            printError(
+                "unable to unlink %1%: %2%", PathFmt(config->realStoreDir.get() / tempName.path()), e2.info().msg);
         }
-        if (e.code() == std::errc::too_many_links) {
+        if (e.is(std::errc::too_many_links)) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
                temporarily increases the st_nlink field before
@@ -278,7 +282,7 @@ void LocalStore::optimisePath_(
             debug("%s has reached maximum number of links", PathFmt(linkPath));
             return;
         }
-        throw SystemError(e.code(), "renaming %1% to %2%", PathFmt(tempLink), PathFmt(path));
+        throw;
     }
 
     stats.filesLinked++;
@@ -312,7 +316,15 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
             continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);
+            optimisePath_(
+                &act,
+                stats,
+                getRealStoreDirFd(),
+                OsFilename{i.filename()},
+                config->realStoreDir.get() / i.to_string(),
+                std::nullopt,
+                inodeHash,
+                NoRepair);
         }
         done++;
         act.progress(done, paths.size());
@@ -328,13 +340,21 @@ void LocalStore::optimiseStore()
     printInfo("%s freed by hard-linking %d files", renderSize(stats.bytesFreed), stats.filesLinked);
 }
 
-void LocalStore::optimisePath(const std::filesystem::path & path, RepairFlag repair)
+void LocalStore::optimisePath(const StorePath & path, RepairFlag repair)
 {
     OptimiseStats stats;
     InodeHash inodeHash;
 
     if (config->getLocalSettings().autoOptimiseStore)
-        optimisePath_(nullptr, stats, path, inodeHash, repair);
+        optimisePath_(
+            nullptr,
+            stats,
+            getRealStoreDirFd(),
+            OsFilename{path.filename()},
+            toRealPath(path),
+            std::nullopt,
+            inodeHash,
+            repair);
 }
 
 } // namespace nix

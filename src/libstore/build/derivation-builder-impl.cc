@@ -657,8 +657,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             }
 
             if (!localStore.isValidPath(newInfo.path))
-                localStore.optimisePath(
-                    store->toRealPath(newInfo.path), NoRepair); // FIXME: combine with scanForReferences()
+                localStore.optimisePath(newInfo.path, NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;

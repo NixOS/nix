@@ -1232,7 +1232,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 autoGC();
 
-                optimisePath(realPath, repair); // FIXME: combine with hashPath()
+                optimisePath(info.path, repair); // FIXME: combine with hashPath()
 
                 if (config->getLocalSettings().fsyncStorePaths) {
                     recursiveSyncAt(getRealStoreDirFd(), OsFilename{info.path.filename()});
@@ -1455,7 +1455,7 @@ StorePath LocalStore::addToStoreFromDump(
                 narHash = narSink.finish();
             }
 
-            optimisePath(realPath, repair);
+            optimisePath(dstPath, repair);
 
             if (localSettings.fsyncStorePaths) {
                 recursiveSyncAt(getRealStoreDirFd(), OsFilename{dstPath.filename()});

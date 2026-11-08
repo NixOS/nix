@@ -763,4 +763,35 @@ void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirF
             PathFmt(descriptorToPath(dstDirFd) / dst.path()));
 }
 
+void createHardLinkAt(Descriptor srcDirFd, const OsFilename & src, Descriptor dstDirFd, const OsFilename & dst)
+{
+    using namespace nix::windows;
+
+    /* Not following symlinks, so that a symlink is linked itself.
+       `FILE_WRITE_ATTRIBUTES`, as `CreateHardLinkW` uses too. */
+    auto handle = ntOpenAt(srcDirFd, src.path().native(), FILE_WRITE_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+
+    /* `FILE_LINK_INFORMATION` ends in the variable-length new name,
+       which is relative to `RootDirectory`. */
+    const auto & newName = dst.path().native();
+    auto nameBytes = newName.size() * sizeof(wchar_t);
+    std::vector<std::byte> buf(
+        std::max(sizeof(FILE_LINK_INFORMATION), offsetof(FILE_LINK_INFORMATION, FileName) + nameBytes));
+    auto * info = reinterpret_cast<FILE_LINK_INFORMATION *>(buf.data());
+    info->ReplaceIfExists = FALSE;
+    info->RootDirectory = dstDirFd;
+    info->FileNameLength = static_cast<ULONG>(nameBytes);
+    std::memcpy(info->FileName, newName.data(), nameBytes);
+
+    IO_STATUS_BLOCK ioStatus;
+    NTSTATUS status =
+        NtSetInformationFile(handle.get(), &ioStatus, info, static_cast<ULONG>(buf.size()), FileLinkInformation);
+    if (status != 0)
+        throw WinError(
+            RtlNtStatusToDosError(status),
+            "creating hard link %1% to %2%",
+            PathFmt(descriptorToPath(dstDirFd) / dst.path()),
+            PathFmt(descriptorToPath(srcDirFd) / src.path()));
+}
+
 } // namespace nix
