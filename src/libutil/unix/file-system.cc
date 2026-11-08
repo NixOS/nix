@@ -99,6 +99,7 @@ DirectoryIterator & DirectoryIterator::operator++()
         entry = DirectoryEntry{
             .name = OsFilename::fromPathAsserting(name),
             .type = fileTypeFromDirent(dirent->d_type),
+            .ino = dirent->d_ino,
         };
         return *this;
     }

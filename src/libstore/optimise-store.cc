@@ -4,6 +4,7 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/system-error.hh"
 
 #include <cstdlib>
@@ -60,18 +61,15 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     debug("loading hash inodes in memory");
     InodeHash inodeHash;
 
-    AutoCloseDir dir(opendir(linksDir.string().c_str()));
-    if (!dir)
-        throw SysError("opening directory %1%", PathFmt(linksDir));
-
-    struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
+    /* On Windows, directory reads report no inode numbers (and `fstat`
+       sets no `st_ino` either), so there is nothing to load. */
+#ifndef _WIN32
+    for (const auto & entry : DirectoryIterator{reopenDirectory(linksDirFd.get())}) {
         checkInterrupt();
         // We don't care if we hit non-hash files, anything goes
-        inodeHash.insert(dirent->d_ino);
+        inodeHash.insert(entry.ino);
     }
-    if (errno)
-        throw SysError("reading directory %1%", PathFmt(linksDir));
+#endif
 
     printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
@@ -83,28 +81,19 @@ LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, cons
 {
     std::list<OsFilename> names;
 
-    AutoCloseDir dir(opendir(path.string().c_str()));
-    if (!dir)
-        throw SysError("opening directory %s", PathFmt(path));
-
-    struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
+    for (const auto & entry : DirectoryIterator{path}) {
         checkInterrupt();
 
-        if (inodeHash.count(dirent->d_ino)) {
-            debug("'%1%' is already linked", dirent->d_name);
+#ifndef _WIN32
+        if (inodeHash.count(entry.ino)) {
+            debug("%1% is already linked", PathFmt(entry.name.path()));
             continue;
         }
+#endif
 
-        std::string name = dirent->d_name;
-        if (name == "." || name == "..")
-            continue;
-        /* Having just filtered out `.` and `..`, the `OsFilename` invariants
-           hold, so the return type can carry them to callers. */
-        names.push_back(OsFilename::fromPathAsserting(std::move(name)));
+        /* `DirectoryIterator` has already filtered out `.` and `..`. */
+        names.push_back(entry.name);
     }
-    if (errno)
-        throw SysError("reading directory %s", PathFmt(path));
 
     return names;
 }

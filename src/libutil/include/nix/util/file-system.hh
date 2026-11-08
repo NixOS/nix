@@ -571,6 +571,14 @@ struct DirectoryEntry
      * `lstat` the entry themselves.
      */
     std::filesystem::file_type type;
+
+#ifndef _WIN32
+    /**
+     * The entry's inode number, as reported by the directory read
+     * itself.
+     */
+    ino_t ino;
+#endif
 };
 
 /**
