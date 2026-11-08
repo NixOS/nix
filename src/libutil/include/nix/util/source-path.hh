@@ -86,9 +86,16 @@ struct SourcePath
     /**
      * Return the location of this path in the "real" filesystem, if
      * it has a physical location.
+     *
+     * @note The path need not exist.
      */
     std::optional<std::filesystem::path> getPhysicalPath() const;
 
+    /**
+     * @brief Render a human-readable representation of the accessor + path beneath it.
+     *
+     * Refer to SourceAccessor::showPath.
+     */
     std::string to_string() const;
 
     /**

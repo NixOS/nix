@@ -31,9 +31,13 @@ void printAmbiguous(
         if (context)
             copyContext(v, *context);
         break;
-    case nPath:
-        str << v.path().to_string(); // !!! escaping?
+    case nPath: {
+        const auto sourcePath = v.path();
+        /* See the comment in libexpr/value-to-xml.cc about separate roots.
+           TODO: Handle escaping. */
+        str << (sourcePath.accessor == state.rootFS ? sourcePath.path.abs() : sourcePath.to_string());
         break;
+    }
     case nNull:
         str << "null";
         break;

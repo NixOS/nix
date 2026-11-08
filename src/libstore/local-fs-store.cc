@@ -35,7 +35,7 @@ namespace {
 struct LocalStoreAccessor : SourceAccessor
 {
 private:
-    void anchor() override {};
+    void anchor() override {}
 
 public:
     ref<SourceAccessor> accessor;
@@ -106,6 +106,19 @@ public:
 
     DirEntries readDirectory(const CanonPath & path) override
     {
+        /* Trying to list the whole store directory. */
+        if (path.isRoot()) {
+            DirEntries entries;
+            if (!requireValidPath) /* Don't go through the store. */
+                return accessor->readDirectory(CanonPath::root);
+            auto paths = store->queryAllValidPaths();
+            for (const auto & path : paths)
+                /* Don't know the type, so nullopt to query lazily. */
+                entries.emplace(path.to_string(), std::nullopt);
+            return entries;
+        }
+
+        /* Otherwise, just a single store object. */
         requireStoreObject(path);
         return accessor->readDirectory(path);
     }
@@ -114,18 +127,27 @@ public:
         const CanonPath & dirPath,
         std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback) override
     {
+        /* Delegate to the base implementation if reading the root directory. */
+        if (dirPath.isRoot())
+            return SourceAccessor::readDirectory(dirPath, std::move(callback));
+
+        /* Otherwise, delegate to the fs accessor for the particular directory. */
         requireStoreObject(dirPath);
         return accessor->readDirectory(dirPath, std::move(callback));
     }
 
     void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
+        if (path.isRoot())
+            throw NotARegularFile("'%1%' is a directory", accessor->showPath(path));
         requireStoreObject(path);
         return accessor->readFile(path, sink, sizeCallback);
     }
 
     std::string readLink(const CanonPath & path) override
     {
+        if (path.isRoot())
+            throw NotASymlink("'%1%' is a directory", accessor->showPath(path));
         requireStoreObject(path);
         return accessor->readLink(path);
     }

@@ -1,3 +1,4 @@
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/util/users.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/store/sqlite.hh"
@@ -592,12 +593,19 @@ std::string AttrCursor::getString()
         }
     }
 
-    auto & v = forceValue();
+    const Value & v = forceValue();
+    const ValueType type = v.type();
 
-    if (v.type() != nString && v.type() != nPath)
-        root->state.error<TypeError>("'%s' is not a string but %s", getAttrPathStr(), showType(v)).debugThrow();
+    if (type == nString)
+        return std::string(v.string_view());
 
-    return v.type() == nString ? std::string(v.string_view()) : v.path().to_string();
+    if (type == nPath) {
+        const SourcePath sourcePath = v.path();
+        /* See the comment in libexpr/value-to-xml.cc about separate roots. */
+        return sourcePath.accessor == root->state.rootFS ? sourcePath.path.abs() : sourcePath.to_string();
+    }
+
+    root->state.error<TypeError>("'%s' is not a string but %s", getAttrPathStr(), showType(v)).debugThrow();
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -632,16 +640,41 @@ string_t AttrCursor::getStringWithContext()
         }
     }
 
-    auto & v = forceValue();
+    const Value & v = forceValue();
+    const ValueType type = v.type();
 
-    if (v.type() == nString) {
+    if (type == nString) {
         NixStringContext context;
         copyContext(v, context);
         return {std::string{v.string_view()}, std::move(context)};
-    } else if (v.type() == nPath)
-        return {v.path().to_string(), {}};
-    else
-        root->state.error<TypeError>("'%s' is not a string but %s", getAttrPathStr(), showType(v)).debugThrow();
+    }
+
+    if (type == nPath) {
+        const SourcePath sourcePath = v.path();
+        const EvalState & state = root->state;
+
+        if (sourcePath.accessor == state.rootFS) {
+            if (!state.store->isInStore(sourcePath.path.abs()))
+                return {sourcePath.path.abs(), NixStringContext{}};
+
+            /* Admittedly, a bit of a hack. Since flakes used to be eagerly copied to the store, the caller could
+               rely on the fact that anything from flake trees was already in the store and didn't need to care about
+               context.
+               At the time of writing this hack, InstallableValue::toApp is the only caller and it uses
+               string context to figure out what "lazy" paths to fetch to the store. Paths by themselves don't have
+               context, but we can guess by looking up the "mount". */
+            auto [sp, _] = state.store->toStorePath(sourcePath.path.abs());
+            NixStringContext context;
+            if (state.storeFS->getMount(CanonPath(state.store->printStorePath(sp))))
+                context.insert(NixStringContextElem::Opaque{std::move(sp)});
+            return {sourcePath.path.abs(), context};
+        }
+
+        /* Only corepkgsFS paths will end up here for now. */
+        return {sourcePath.to_string(), {}};
+    }
+
+    root->state.error<TypeError>("'%s' is not a string but %s", getAttrPathStr(), showType(v)).debugThrow();
 }
 
 bool AttrCursor::getBool()
