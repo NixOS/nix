@@ -409,7 +409,17 @@ public:
      * Optimise a single store path. Optionally, test the encountered
      * symlinks for corruption.
      */
-    void optimisePath(const std::filesystem::path & path, RepairFlag repair);
+    void optimisePath(const StorePath & path, RepairFlag repair);
+
+    /**
+     * A directory, as a handle to its parent directory and its name in
+     * that.
+     */
+    struct DirectoryInParent
+    {
+        Descriptor parentFd;
+        OsFilename name;
+    };
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -536,11 +546,24 @@ private:
     typedef boost::unordered_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
-    std::list<OsFilename> readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
+    std::list<OsFilename> readDirectoryIgnoringInodes(Descriptor dirFd, const InodeHash & inodeHash);
+
+    /**
+     * Optimise @p name in the directory @p dirFd.
+     *
+     * @param path The path of @p name, for messages.
+     *
+     * @param dir Where @p dirFd is, so that it can be made writable
+     * while @p name is replaced. `std::nullopt` if @p dirFd is the
+     * store directory, whose permissions are left alone.
+     */
     void optimisePath_(
         Activity * act,
         OptimiseStats & stats,
+        Descriptor dirFd,
+        const OsFilename & name,
         const std::filesystem::path & path,
+        const std::optional<DirectoryInParent> & dir,
         InodeHash & inodeHash,
         RepairFlag repair);
 
