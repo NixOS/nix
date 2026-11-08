@@ -23,6 +23,9 @@ nix eval --expr 'assert 1 + 2 == 3; true'
 
 # Check if toFile can be utilized during restricted eval
 [[ $(nix eval --restrict-eval --expr 'import (builtins.toFile "source" "42")') == 42 ]]
+# Listing the store should work.
+expect 0 nix-instantiate --eval --expr 'builtins.readDir builtins.storeDir'
+expect 0 nix eval --impure --expr 'builtins.readDir builtins.storeDir'
 
 nix-instantiate --eval -E 'assert 1 + 2 == 3; true'
 [[ $(nix-instantiate -A int --eval "./eval.nix") == 123 ]]
