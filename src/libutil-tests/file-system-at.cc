@@ -538,6 +538,73 @@ TEST(movePathAt, works)
     }
 }
 
+#ifndef _WIN32
+
+TEST(movePathAt, restoresPermissionsOnError)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("src"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+        });
+        top.createChild("dst"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & dst) {
+                dst.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
+                });
+            });
+        });
+    }
+    nix::chmod(tmpDir / "src", 0500);
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A non-empty directory cannot be replaced, which is only found out
+       after making the source directory writable to move it. */
+    EXPECT_THROW(
+        movePathAt(
+            dirFd.get(), OsFilename::fromPathAsserting("src"), dirFd.get(), OsFilename::fromPathAsserting("dst")),
+        SysError);
+    EXPECT_EQ(nix::lstat(tmpDir / "src").st_mode & 0777, 0500);
+    nix::chmod(tmpDir / "src", 0755);
+}
+
+TEST(movePathAt, symlinkReplaces)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("dangling"); });
+        top.createChild("other-link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("other"); });
+        top.createChild("regular"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("test"); });
+        });
+        top.createChild("another-link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("hello"); });
+    }
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A symlink replaces a symlink. */
+    movePathAt(
+        dirFd.get(), OsFilename::fromPathAsserting("link"), dirFd.get(), OsFilename::fromPathAsserting("other-link"));
+    EXPECT_EQ(readLink(tmpDir / "other-link"), "dangling");
+
+    /* A symlink replaces a regular file. */
+    movePathAt(
+        dirFd.get(),
+        OsFilename::fromPathAsserting("another-link"),
+        dirFd.get(),
+        OsFilename::fromPathAsserting("regular"));
+    EXPECT_EQ(readLink(tmpDir / "regular"), "hello");
+}
+
+#endif
+
 /* ----------------------------------------------------------------------------
  * openFileEnsureBeneathNoSymlinks — O_NOFOLLOW is forbidden
  * --------------------------------------------------------------------------*/
