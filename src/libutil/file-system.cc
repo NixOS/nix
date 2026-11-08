@@ -618,15 +618,4 @@ void tryUnlink(const std::filesystem::path & path)
 
 #undef UNLINK_PROC
 
-bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask)
-{
-    auto prevMode = lstat(path).st_mode;
-
-    if (((prevMode ^ mode) & mask) == 0)
-        return false;
-
-    chmod(path, mode);
-    return true;
-}
-
 } // namespace nix

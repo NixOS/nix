@@ -262,36 +262,6 @@ TEST(pathExists, bogusPathDoesNotExist)
 }
 
 /* ----------------------------------------------------------------------------
- * chmodIfNeeded
- * --------------------------------------------------------------------------*/
-
-TEST(chmodIfNeeded, works)
-{
-#ifdef _WIN32
-    // Windows doesn't support Unix-style permission bits - lstat always
-    // returns the same mode regardless of what chmod sets.
-    GTEST_SKIP() << "chmod on Windows not expected to work";
-#endif
-    auto [autoClose_, tmpFile] = nix::createTempFile();
-    auto deleteTmpFile = AutoDelete(tmpFile);
-
-    auto modes = std::vector<mode_t>{0755, 0644, 0422, 0600, 0777};
-    for (mode_t oldMode : modes) {
-        for (mode_t newMode : modes) {
-            chmod(tmpFile.c_str(), oldMode);
-            bool permissionsChanged = false;
-            ASSERT_NO_THROW(permissionsChanged = chmodIfNeeded(tmpFile, newMode));
-            ASSERT_EQ(permissionsChanged, oldMode != newMode);
-        }
-    }
-}
-
-TEST(chmodIfNeeded, nonexistent)
-{
-    ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SystemError);
-}
-
-/* ----------------------------------------------------------------------------
  * DirectoryIterator
  * --------------------------------------------------------------------------*/
 
