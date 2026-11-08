@@ -535,7 +535,20 @@ private:
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
-    void findRoots(const std::filesystem::path & path, std::filesystem::file_type type, Roots & roots);
+    /**
+     * Find the GC roots at @p name in the directory @p dirFd, which is
+     * at @p path, without following symlinks to it.
+     *
+     * @param type The type of @p name, if already known, or
+     * `std::filesystem::file_type::none` or
+     * `std::filesystem::file_type::unknown` if not.
+     */
+    void findRoots(
+        Descriptor dirFd,
+        const OsFilename & name,
+        const std::filesystem::path & path,
+        std::filesystem::file_type type,
+        Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 
