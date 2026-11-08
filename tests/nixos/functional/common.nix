@@ -15,6 +15,13 @@
       ];
 
       nix.settings.substituters = lib.mkForce [ ];
+      systemd.services.nix-daemon = {
+        serviceConfig = {
+          # Functional tests connect to the daemon a bunch of times.
+          # Silence those messages as they only pollute the test logs.
+          StandardError = "null";
+        };
+      };
 
       environment.systemPackages =
         let
