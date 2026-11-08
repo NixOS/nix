@@ -113,12 +113,4 @@ std::strong_ordering compareVersions(const std::string_view v1, const std::strin
     return std::strong_ordering::equal;
 }
 
-DrvNames drvNamesFromArgs(const Strings & opArgs)
-{
-    DrvNames result;
-    for (auto & i : opArgs)
-        result.emplace_back(i);
-    return result;
-}
-
 } // namespace nix
