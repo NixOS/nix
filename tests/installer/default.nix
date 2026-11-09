@@ -95,6 +95,28 @@ let
       check = install-force-daemon.check;
     };
 
+    install-force-daemon-protected-store-path = {
+      install = ''
+        # Stand-in for a store path that even root can't modify, like an app
+        # bundle protected by App Management on macOS. The installer must only
+        # fix up ownership and modes of the paths it copies in itself.
+        protected=/nix/store/00000000000000000000000000000000-protected
+        sudo mkdir -p "$protected"
+        echo hello | sudo tee "$protected/file" > /dev/null
+        sudo chmod 0755 "$protected"
+        sudo chmod 0644 "$protected/file"
+        # commonCheck expects every store object to have mtime 1.
+        sudo touch -h -d @1 "$protected/file" "$protected"
+        sudo chattr +i "$protected/file" "$protected"
+
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --daemon --no-channel-add
+      '';
+
+      check = install-force-daemon.check;
+    };
+
     nix-installer-default = {
       install = ''
         chmod u+x ./nix-installer
