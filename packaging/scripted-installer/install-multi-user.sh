@@ -653,21 +653,40 @@ create_directories() {
     # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
     task "Setting up the basic directory structure"
     if [ -d "$NIX_ROOT" ]; then
-        if is_os_darwin; then
-            # Certain files cannot be listed / chowned even by root on macOS.
-            set +e
-        fi
-
         # Everything inside /nix is root-owned.
         # (modulo https://github.com/NixOS/nix/issues/13719, but that's a bug).
-        _sudo "to take root ownership of existing Nix files" \
-            find "$NIX_ROOT" \( \
+        #
+        # Hidden entries directly under $NIX_ROOT are volume metadata, not Nix
+        # files (.Trashes, .Spotlight-V100, .fseventsd, ... on the macOS APFS
+        # volume). SIP prevents even root from listing or chowning them, so
+        # don't descend into them at all.
+        if ! _sudo "to take root ownership of existing Nix files" \
+            find "$NIX_ROOT" \
+                -path "$NIX_ROOT/.*" -prune -or \
+                \( \
                 \( \( -path "/nix" -or -path "/nix/var" -or -path "/nix/var/*" ! -path "/nix/var/nix/builds/*" \) ! \( -uid 0 -gid 0 \) \) \
                 -or \( -path "/nix/store/*" ! \( -uid 0 \( -gid 0 -or -group "$NIX_BUILD_GROUP_NAME" \) \) \) \
                 \) \
-                -exec chown -h 0:0 {} +
-
-        set -e
+                -exec chown -h 0:0 {} +; then
+            if is_os_darwin; then
+                # App Management can prevent even root from changing app
+                # bundles that are already in the store. That's not fatal for
+                # the installation itself, so don't abort over it.
+                reminder <<EOF
+I couldn't take root ownership of some existing files in $NIX_ROOT
+(see the errors printed while setting up the directory structure).
+This usually means macOS App Management protected app bundles that
+were already in the store. To fix it, allow your terminal under
+System Settings > Privacy & Security > App Management and run:
+    sudo chown -R 0:0 '$NIX_ROOT/store/<path>'
+for each of the affected store paths.
+EOF
+            else
+                failure <<EOF
+I couldn't take root ownership of existing files in $NIX_ROOT.
+EOF
+            fi
+        fi
 
         # But not the store directory itself.
         if [ -d "$NIX_ROOT/store" ]; then
@@ -832,9 +851,15 @@ install_from_extracted_nix() {
         # when everything is skipped. So we first remove the bootstrap closure to
         # avoid collisions.
         local colliding_files=()
+        # The store paths this installer places. Ownership and mode fixups
+        # below are limited to these: anything else already in the store was
+        # dealt with in create_directories, and on macOS App Management can
+        # prevent even root from modifying app bundles that are already there.
+        local new_paths=()
 
         for src in ./store/*; do
             dst="$NIX_ROOT/store/${src##*/}"
+            new_paths+=("$dst")
             if [ -L "$dst" ] || [ -e "$dst" ]; then
                 colliding_files+=("$dst")
             fi
@@ -849,35 +874,17 @@ install_from_extracted_nix() {
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
                   cp -RPp ./store/* "$NIX_ROOT/store/"
 
-            # Certain files cannot be listed / chowned even by root on macOS.
-            if is_os_darwin; then
-                set +e
-            fi
-
-            # Everything inside the store directory is root-owned.
-            _sudo "to chown the $NIX_ROOT/store contents" \
-                  chown -R 0:0 "$NIX_ROOT"/store
-
-            set -e
-
-            # But not the store directory itself.
-            _sudo "to chown the $NIX_ROOT/store directory" \
-                  chown "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT"/store
+            # The new store paths are root-owned.
+            _sudo "to chown the new store paths in $NIX_ROOT/store" \
+                  chown -R 0:0 "${new_paths[@]}"
         else
             # The files will be owned to root by the copy.
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
                   cp -RP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
         fi
 
-        # Certain files cannot be chmod-ed even by root on macOS.
-        if is_os_darwin; then
-            set +e
-        fi
-
-        _sudo "to make the new store non-writable at $NIX_ROOT/store" \
-              chmod -R ugo-w "$NIX_ROOT/store/"
-
-        set -e
+        _sudo "to make the new store paths in $NIX_ROOT/store non-writable" \
+              chmod -R ugo-w "${new_paths[@]}"
 
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
