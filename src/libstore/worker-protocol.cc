@@ -28,6 +28,7 @@ const WorkerProto::Version WorkerProto::latest = {
             std::string{WorkerProto::featureRealisationWithPath},
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
             std::string{WorkerProto::featureAddTempRoots},
+            std::string{WorkerProto::featureBuildResourceUsage},
         },
 };
 
@@ -205,6 +206,17 @@ void WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::write(
     }
 }
 
+uint64_t WorkerProto::Serialise<uint64_t>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    return readNum<uint64_t>(conn.from);
+}
+
+void WorkerProto::Serialise<uint64_t>::write(
+    const StoreDirConfig & store, WorkerProto::WriteConn conn, const uint64_t & value)
+{
+    conn.to << value;
+}
+
 DerivedPath WorkerProto::Serialise<DerivedPath>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto s = readString(conn.from);
@@ -317,6 +329,10 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
         res.cpuSystem = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
     }
+    if (conn.version.features.contains(WorkerProto::featureBuildResourceUsage)) {
+        res.resourceUsageByStatisticName =
+            WorkerProto::Serialise<decltype(res.resourceUsageByStatisticName)>::read(store, conn);
+    }
 
     if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
         success.builtOutputs = WorkerProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
@@ -367,6 +383,9 @@ void WorkerProto::Serialise<BuildResult>::write(
         if (conn.version >= WorkerProto::Version{.number = {1, 37}}) {
             WorkerProto::write(store, conn, res.cpuUser);
             WorkerProto::write(store, conn, res.cpuSystem);
+        }
+        if (conn.version.features.contains(WorkerProto::featureBuildResourceUsage)) {
+            WorkerProto::write(store, conn, res.resourceUsageByStatisticName);
         }
 
         if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
