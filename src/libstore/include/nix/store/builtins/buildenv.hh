@@ -3,6 +3,7 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/memory-source-accessor.hh"
 
 namespace nix {
 
@@ -50,6 +51,9 @@ public:
 
 typedef std::vector<Package> Packages;
 
-void buildProfile(const std::filesystem::path & out, Packages && pkgs);
+/**
+ * Build the symlink tree of a profile in memory.
+ */
+ref<MemorySourceAccessor> buildProfile(Packages && pkgs);
 
 } // namespace nix
