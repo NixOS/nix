@@ -971,6 +971,7 @@ void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
             buildResult.cpuSystem = stats.cpuSystem;
+            buildResult.resourceUsageByStatisticName = std::move(stats.resourceUsageByStatisticName);
         }
         return;
     }

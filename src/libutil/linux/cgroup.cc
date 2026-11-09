@@ -50,29 +50,66 @@ StringMap getCgroups(const std::filesystem::path & cgroupFile)
     return cgroups;
 }
 
+static std::optional<std::string> readCgroupFile(const std::filesystem::path & path)
+{
+    if (!pathExists(path))
+        return std::nullopt;
+    try {
+        return readFile(path);
+    } catch (SystemError & e) {
+        debug("Can't read file %s in cgroup: %s", PathFmt(path), e.what());
+        return std::nullopt;
+    }
+}
+
+/* See the `Format` section in the kernel documentation for cgroup v2 for `flat keyed` files and
+   `nested keyed` files. */
+static std::optional<uint64_t> getFlatKeyedValue(std::string_view contents, std::string_view key)
+{
+    for (auto & line : tokenizeString<std::vector<std::string>>(contents, "\n")) {
+        auto fields = tokenizeString<std::vector<std::string>>(line);
+        if (fields.size() == 2 && fields[0] == key)
+            return string2Int<uint64_t>(fields[1]);
+    }
+    return std::nullopt;
+}
+
+static uint64_t sumNestedKeyedValues(std::string_view contents, std::string_view key)
+{
+    auto prefix = std::string(key) + "=";
+    uint64_t sum = 0;
+    for (auto & field : tokenizeString<std::vector<std::string>>(contents))
+        if (hasPrefix(field, prefix))
+            if (auto n = string2Int<uint64_t>(field.substr(prefix.size())))
+                sum += *n;
+    return sum;
+}
+
 CgroupStats getCgroupStats(const std::filesystem::path & cgroup)
 {
     CgroupStats stats;
 
-    auto cpustatPath = cgroup / "cpu.stat";
-
-    if (pathExists(cpustatPath)) {
-        for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
-            std::string_view userPrefix = "user_usec ";
-            if (hasPrefix(line, userPrefix)) {
-                auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
-                if (n)
-                    stats.cpuUser = std::chrono::microseconds(*n);
-            }
-
-            std::string_view systemPrefix = "system_usec ";
-            if (hasPrefix(line, systemPrefix)) {
-                auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
-                if (n)
-                    stats.cpuSystem = std::chrono::microseconds(*n);
-            }
-        }
+    if (auto cpuStat = readCgroupFile(cgroup / "cpu.stat")) {
+        auto toMicroseconds = [](uint64_t n) { return std::chrono::microseconds(n); };
+        stats.cpuUser = getFlatKeyedValue(*cpuStat, "user_usec").transform(toMicroseconds);
+        stats.cpuSystem = getFlatKeyedValue(*cpuStat, "system_usec").transform(toMicroseconds);
     }
+
+    auto & usage = stats.resourceUsageByStatisticName;
+
+    for (auto [file, name] : {std::pair{"memory.peak", "memoryPeak"}, std::pair{"memory.swap.peak", "memorySwapPeak"}})
+        if (auto contents = readCgroupFile(cgroup / file))
+            if (auto value = string2Int<uint64_t>(trim(*contents)))
+                usage.insert_or_assign(name, *value);
+
+    if (auto ioStat = readCgroupFile(cgroup / "io.stat")) {
+        usage.insert_or_assign("ioReadBytes", sumNestedKeyedValues(*ioStat, "rbytes"));
+        usage.insert_or_assign("ioWriteBytes", sumNestedKeyedValues(*ioStat, "wbytes"));
+    }
+
+    if (auto memoryEvents = readCgroupFile(cgroup / "memory.events"))
+        if (auto value = getFlatKeyedValue(*memoryEvents, "oom_kill"))
+            usage.insert_or_assign("oomKilledProcessCount", *value);
 
     return stats;
 }
