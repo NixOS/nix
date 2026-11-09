@@ -95,6 +95,41 @@ let
       check = install-force-daemon.check;
     };
 
+    install-force-daemon-unrelated-root-entries = {
+      install = ''
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --daemon --no-channel-add
+        sudo mkdir -p /nix/.Trashes
+        sudo chown user /nix/.Trashes
+        sudo chown user /nix
+        sudo install -o user -m 0644 /dev/null /nix/receipt.json
+        sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc || true
+        sudo mv /etc/bashrc.backup-before-nix /etc/bashrc || true
+        ./scripted-installer/install --daemon --no-channel-add
+      '';
+
+      check = install-force-daemon.check + ''
+        [ "$(stat -c '%U:%G' /nix)" = "root:root" ] || {
+          echo "/nix itself was not taken over:"
+          stat /nix
+          exit 1
+        }
+
+        [ "$(stat -c '%U' /nix/.Trashes)" = "user" ] || {
+          echo "installer took ownership of an unrelated entry at the /nix root:"
+          stat /nix/.Trashes
+          exit 1
+        }
+
+        [ "$(stat -c '%U' /nix/receipt.json)" = "user" ] || {
+          echo "installer took ownership of an unrelated file at the /nix root:"
+          stat /nix/receipt.json
+          exit 1
+        }
+      '';
+    };
+
     nix-installer-default = {
       install = ''
         chmod u+x ./nix-installer
