@@ -653,15 +653,21 @@ create_directories() {
     # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
     task "Setting up the basic directory structure"
     if [ -d "$NIX_ROOT" ]; then
-        # if /nix already exists, take ownership.
-        # Note that if the old installation has broken permissions, this won't fix it and
-        # can leave the set up less secure than a fresh installation. Assume that the user
-        # knows what they are doing.
-        # Note that setuid bits *are* cleared when chowning.
+        if is_os_darwin; then
+            # Certain files cannot be listed / chowned even by root on macOS.
+            set +e
+        fi
 
         # Everything inside /nix is root-owned.
+        # (modulo https://github.com/NixOS/nix/issues/13719, but that's a bug).
         _sudo "to take root ownership of existing Nix files" \
-              chown -R "0:0" "$NIX_ROOT"
+            find "$NIX_ROOT" \( \
+                \( \( -path "/nix" -or -path "/nix/var" -or -path "/nix/var/*" ! -path "/nix/var/nix/builds/*" \) ! \( -uid 0 -gid 0 \) \) \
+                -or \( -path "/nix/store/*" ! \( -uid 0 \( -gid 0 -or -group "$NIX_BUILD_GROUP_NAME" \) \) \) \
+                \) \
+                -exec chown -h 0:0 {} +
+
+        set -e
 
         # But not the store directory itself.
         if [ -d "$NIX_ROOT/store" ]; then
@@ -823,12 +829,21 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         if is_os_darwin || is_os_freebsd; then
+            # TODO: -n exits with an error on macOS when skipping. What to do?
+
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
                   cp -nRPp ./store/* "$NIX_ROOT/store/"
+
+            # Certain files cannot be listed / chowned even by root on macOS.
+            if is_os_darwin; then
+                set +e
+            fi
 
             # Everything inside the store directory is root-owned.
             _sudo "to chown the $NIX_ROOT/store contents" \
                   chown -R 0:0 "$NIX_ROOT"/store
+
+            set -e
 
             # But not the store directory itself.
             _sudo "to chown the $NIX_ROOT/store directory" \
@@ -1033,6 +1048,10 @@ main() {
 
     create_build_group
     create_build_users
+    if is_os_darwin; then
+        # Inexplicably, certain macOS setups seem to be missing chown from PATH.
+        export PATH="${PATH:+$PATH:}/usr/sbin"
+    fi
     create_directories
     place_channel_configuration
     install_from_extracted_nix
