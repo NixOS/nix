@@ -44,6 +44,9 @@ deps_private += gmock
 libgit2 = dependency('libgit2')
 deps_private += libgit2
 
+zlib = dependency('zlib')
+deps_private += zlib
+
 subdir('nix-meson-build-support/common')
 
 sources = files(

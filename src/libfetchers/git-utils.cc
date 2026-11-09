@@ -1098,7 +1098,7 @@ public:
             if (entryName == name) {
                 /* Shouldn't happen, but let's double-check. */
                 if (res)
-                    throw Error("duplicate tree entry '%1%'", path2);
+                    throw Error("duplicate tree entry '%1%'", showPath(path2));
                 res = it->second.get();
             }
             path2.pop();
