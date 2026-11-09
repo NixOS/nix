@@ -236,8 +236,6 @@ struct ProfileManifest
 
     StorePath build(ref<Store> store)
     {
-        auto tempDir = createTempDir();
-
         StorePathSet references;
 
         Packages pkgs;
@@ -249,36 +247,13 @@ struct ProfileManifest
             }
         }
 
-        buildProfile(tempDir, std::move(pkgs));
+        auto profile = buildProfile(std::move(pkgs));
 
-        writeFile(tempDir / "manifest.json", toJSON(*store).dump());
+        profile->addFile(CanonPath("manifest.json"), toJSON(*store).dump());
 
         /* Add the symlink tree to the store. */
-        StringSink sink;
-        dumpPath(tempDir, sink);
-
-        auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
-
-        auto info = ValidPathInfo::makeFromCA(
-            *store,
-            "profile",
-            FixedOutputInfo{
-                .method = FileIngestionMethod::NixArchive,
-                .hash = narHash,
-                .references =
-                    {
-                        .others = std::move(references),
-                        // profiles never refer to themselves
-                        .self = false,
-                    },
-            },
-            narHash);
-        info.narSize = sink.s.size();
-
-        StringSource source(sink.s);
-        store->addToStore(info, source);
-
-        return std::move(info.path);
+        return store->addToStore(
+            "profile", SourcePath{profile}, ContentAddressMethod::Raw::NixArchive, HashAlgorithm::SHA256, references);
     }
 
     static void printDiff(const ProfileManifest & prev, const ProfileManifest & cur, std::string_view indent)
