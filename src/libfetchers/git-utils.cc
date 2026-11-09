@@ -1024,7 +1024,9 @@ public:
                     for (size_t n = 0; n < count; ++n) {
                         auto entry = git_tree_entry_byindex(tree.get(), n);
                         // FIXME: add to cache
-                        res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
+                        auto [it, inserted] = res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
+                        if (!inserted)
+                            throw Error("duplicate tree entry '%1%'", showPath(CanonPath(git_tree_entry_name(entry))));
                     }
 
                     return res;

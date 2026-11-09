@@ -316,8 +316,10 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
 
     auto repo = openRepo();
     auto accessor = repo->getAccessor(tree1, {}, getRepoName());
-    /* FIXME: Reject such trees too. */
-    ASSERT_THAT(accessor, testing::HasDirectory(CanonPath::root, std::set<std::string>{"a.txt"}));
+    ASSERT_THAT(
+        [&] { accessor->readDirectory(CanonPath::root); },
+        ::testing::ThrowsMessage<Error>(
+            testing::HasSubstrIgnoreANSIMatcher("duplicate tree entry 'test-git-repo/a.txt'")));
     ASSERT_THAT(
         [&] { accessor->readFile(CanonPath("a.txt")); },
         ::testing::ThrowsMessage<Error>(
