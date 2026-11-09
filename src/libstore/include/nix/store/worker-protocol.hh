@@ -157,6 +157,13 @@ struct WorkerProto
     static constexpr std::string_view featureAddTempRoots = "addTempRoots";
 
     /**
+     * A feature for sending the resource usage of a build as a length-prefixed list of pairs of names and values
+     * (`BuildResult::resourceUsageByStatisticName`). Readers keep unknown names, so new statistics need no new
+     * feature.
+     */
+    static constexpr std::string_view featureBuildResourceUsage = "build-resource-usage";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
@@ -376,6 +383,8 @@ template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
 template<>
 DECLARE_WORKER_SERIALISER(std::optional<std::chrono::microseconds>);
+template<>
+DECLARE_WORKER_SERIALISER(uint64_t);
 template<>
 DECLARE_WORKER_SERIALISER(WorkerProto::ClientHandshakeInfo);
 
