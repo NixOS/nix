@@ -653,15 +653,21 @@ create_directories() {
     # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
     task "Setting up the basic directory structure"
     if [ -d "$NIX_ROOT" ]; then
-        # if /nix already exists, take ownership.
-        # Note that if the old installation has broken permissions, this won't fix it and
-        # can leave the set up less secure than a fresh installation. Assume that the user
-        # knows what they are doing.
-        # Note that setuid bits *are* cleared when chowning.
+        if is_os_darwin; then
+            # Certain files cannot be listed / chowned even by root on macOS.
+            set +e
+        fi
 
         # Everything inside /nix is root-owned.
+        # (modulo https://github.com/NixOS/nix/issues/13719, but that's a bug).
         _sudo "to take root ownership of existing Nix files" \
-              chown -R "0:0" "$NIX_ROOT"
+            find "$NIX_ROOT" \( \
+                \( \( -path "/nix" -or -path "/nix/var" -or -path "/nix/var/*" ! -path "/nix/var/nix/builds/*" \) ! \( -uid 0 -gid 0 \) \) \
+                -or \( -path "/nix/store/*" ! \( -uid 0 \( -gid 0 -or -group "$NIX_BUILD_GROUP_NAME" \) \) \) \
+                \) \
+                -exec chown -h 0:0 {} +
+
+        set -e
 
         # But not the store directory itself.
         if [ -d "$NIX_ROOT/store" ]; then
@@ -822,13 +828,37 @@ install_from_extracted_nix() {
     (
         cd "$EXTRACTED_NIX_PATH"
 
+        # cp -n is not very portable and on macOS it exists with failure status
+        # when everything is skipped. So we first remove the bootstrap closure to
+        # avoid collisions.
+        local colliding_files=()
+
+        for src in ./store/*; do
+            dst="$NIX_ROOT/store/${src##*/}"
+            if [ -L "$dst" ] || [ -e "$dst" ]; then
+                colliding_files+=("$dst")
+            fi
+        done
+
+        if [ "${#colliding_files[@]}" -gt 0 ]; then
+            _sudo "to remove colliding closure files in $NIX_ROOT/store before copying" \
+                  rm -rf "${colliding_files[@]}"
+        fi
+
         if is_os_darwin || is_os_freebsd; then
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-                  cp -nRPp ./store/* "$NIX_ROOT/store/"
+                  cp -RPp ./store/* "$NIX_ROOT/store/"
+
+            # Certain files cannot be listed / chowned even by root on macOS.
+            if is_os_darwin; then
+                set +e
+            fi
 
             # Everything inside the store directory is root-owned.
             _sudo "to chown the $NIX_ROOT/store contents" \
                   chown -R 0:0 "$NIX_ROOT"/store
+
+            set -e
 
             # But not the store directory itself.
             _sudo "to chown the $NIX_ROOT/store directory" \
@@ -836,11 +866,18 @@ install_from_extracted_nix() {
         else
             # The files will be owned to root by the copy.
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-                  cp -nRP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
+                  cp -RP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
+        fi
+
+        # Certain files cannot be chmod-ed even by root on macOS.
+        if is_os_darwin; then
+            set +e
         fi
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
+
+        set -e
 
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
@@ -1033,6 +1070,10 @@ main() {
 
     create_build_group
     create_build_users
+    if is_os_darwin; then
+        # Inexplicably, certain macOS setups seem to be missing chown from PATH.
+        export PATH="${PATH:+$PATH:}/usr/sbin"
+    fi
     create_directories
     place_channel_configuration
     install_from_extracted_nix
