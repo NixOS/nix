@@ -100,6 +100,8 @@ builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult> & buildables, 
                 j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
             if (b.result->cpuSystem)
                 j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
+            if (!b.result->resourceUsageByStatisticName.empty())
+                j["resourceUsage"] = b.result->resourceUsageByStatisticName;
         }
         res.push_back(j);
     }
