@@ -869,8 +869,15 @@ install_from_extracted_nix() {
                   cp -RP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
         fi
 
+        # Certain files cannot be chmod-ed even by root on macOS.
+        if is_os_darwin; then
+            set +e
+        fi
+
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
+
+        set -e
 
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
