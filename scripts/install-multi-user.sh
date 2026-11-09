@@ -828,11 +828,26 @@ install_from_extracted_nix() {
     (
         cd "$EXTRACTED_NIX_PATH"
 
-        if is_os_darwin || is_os_freebsd; then
-            # TODO: -n exits with an error on macOS when skipping. What to do?
+        # cp -n is not very portable and on macOS it exists with failure status
+        # when everything is skipped. So we first remove the bootstrap closure to
+        # avoid collisions.
+        local colliding_files=()
 
+        for src in ./store/*; do
+            dst="$NIX_ROOT/store/${src##*/}"
+            if [ -L "$dst" ] || [ -e "$dst" ]; then
+                colliding_files+=("$dst")
+            fi
+        done
+
+        if [ "${#colliding_files[@]}" -gt 0 ]; then
+            _sudo "to remove colliding closure files in $NIX_ROOT/store before copying" \
+                  rm -rf "${colliding_files[@]}"
+        fi
+
+        if is_os_darwin || is_os_freebsd; then
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-                  cp -nRPp ./store/* "$NIX_ROOT/store/"
+                  cp -RPp ./store/* "$NIX_ROOT/store/"
 
             # Certain files cannot be listed / chowned even by root on macOS.
             if is_os_darwin; then
@@ -851,7 +866,7 @@ install_from_extracted_nix() {
         else
             # The files will be owned to root by the copy.
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-                  cp -nRP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
+                  cp -RP --preserve=mode,timestamps ./store/* "$NIX_ROOT/store/"
         fi
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
