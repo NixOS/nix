@@ -788,9 +788,7 @@ struct curlFileTransfer : public FileTransfer
          */
         static Error classifyError(CURLcode code, long httpStatus, std::string_view responseBody)
         {
-// Allow selecting a subset of enum values
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch-enum"
+            NIX_INCOMPLETE_SWITCH_BEGIN
             switch (code) {
             case CURLE_FILE_COULDNT_READ_FILE:
                 // The file is definitely not there
@@ -815,7 +813,7 @@ struct curlFileTransfer : public FileTransfer
             default: // Shut up warnings
                 break;
             }
-#pragma GCC diagnostic pop
+            NIX_INCOMPLETE_SWITCH_END
 
             // S3 returns certain retryable errors as HTTP 400/500/503 with XML error codes.
             // These take precedence over the generic HTTP status handling below.

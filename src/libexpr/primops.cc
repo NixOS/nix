@@ -741,9 +741,8 @@ struct CompareValues
                         ValuePrinter(state, *v1, errorPrintOptions),
                         ValuePrinter(state, *v2, errorPrintOptions))
                     .debugThrow();
-// Allow selecting a subset of enum values
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch-enum"
+
+            NIX_INCOMPLETE_SWITCH_BEGIN
             switch (v1->type()) {
             case nInt:
                 return v1->integer() < v2->integer();
@@ -776,8 +775,8 @@ struct CompareValues
                         ValuePrinter(state, *v1, errorPrintOptions),
                         ValuePrinter(state, *v2, errorPrintOptions))
                     .debugThrow();
-#pragma GCC diagnostic pop
             }
+            NIX_INCOMPLETE_SWITCH_END
         } catch (Error & e) {
             if (!errorCtx.empty())
                 e.addTrace(nullptr, errorCtx);
@@ -2467,8 +2466,7 @@ static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type ty
         return res;
     }();
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch-enum"
+    NIX_INCOMPLETE_SWITCH_BEGIN
     using enum SourceAccessor::Type;
     switch (type) {
     case tRegular:
@@ -2480,6 +2478,7 @@ static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type ty
     default:
         return stringValues.unknown;
     }
+    NIX_INCOMPLETE_SWITCH_END
 }
 
 static void prim_readFileType(EvalState & state, CallSite callSite, Value * const * args, Value & v)

@@ -500,4 +500,10 @@ inline std::string operator+(std::string_view s1, const char * s2)
     return s;
 }
 
+/**
+ * Allow selecting a subset of enum values.
+ */
+#define NIX_INCOMPLETE_SWITCH_BEGIN _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wswitch-enum\"")
+#define NIX_INCOMPLETE_SWITCH_END _Pragma("GCC diagnostic pop")
+
 } // namespace nix

@@ -194,8 +194,7 @@ static git_oid hashToOID(const Hash & hash)
     git_oid oid;
 #if LIBGIT2_VERSION_CHECK(2, 0, 0)
     git_oid_t t;
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wswitch-enum"
+    NIX_INCOMPLETE_SWITCH_BEGIN
     switch (hash.algo) {
     case HashAlgorithm::SHA1:
         t = GIT_OID_SHA1;
@@ -206,7 +205,7 @@ static git_oid hashToOID(const Hash & hash)
     default:
         throw Error("unsupported hash algorithm for Git: %s", printHashAlgo(hash.algo));
     }
-#  pragma GCC diagnostic pop
+    NIX_INCOMPLETE_SWITCH_END
     if (git_oid_from_raw(&oid, hash.hash, t))
         /* This can really never happen, since libgit2 just reads out our raw bytes.
            The only failure mode is us specifying an invalid `type` parameter. */

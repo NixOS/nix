@@ -8,9 +8,7 @@ void BuildError::anchor() {}
 
 void ExitStatusFlags::updateFromStatus(BuildResult::Failure::Status status)
 {
-// Allow selecting a subset of enum values
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch-enum"
+    NIX_INCOMPLETE_SWITCH_BEGIN
     switch (status) {
     case BuildResult::Failure::TimedOut:
         timedOut = true;
@@ -29,7 +27,7 @@ void ExitStatusFlags::updateFromStatus(BuildResult::Failure::Status status)
     default:
         break;
     }
-#pragma GCC diagnostic pop
+    NIX_INCOMPLETE_SWITCH_END
 }
 
 unsigned int ExitStatusFlags::failingExitStatus() const
