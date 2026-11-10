@@ -1011,7 +1011,7 @@ public:
     }
 
     DirEntries readDirectory(const CanonPath & path) override
-    {
+    try {
         auto state(state_.lock());
 
         return std::visit(
@@ -1022,17 +1022,22 @@ public:
                     auto count = git_tree_entrycount(tree.get());
 
                     for (size_t n = 0; n < count; ++n) {
-                        auto entry = git_tree_entry_byindex(tree.get(), n);
+                        const auto * entry = git_tree_entry_byindex(tree.get(), n);
                         // FIXME: add to cache
-                        auto [it, inserted] = res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
+                        /* Must be a file name without `/` or `..`, `.` components. */
+                        const auto name = CanonPath::fromFilename(std::string_view(git_tree_entry_name(entry)));
+                        auto [it, inserted] = res.emplace(name.rel(), DirEntry{});
                         if (!inserted)
-                            throw Error("duplicate tree entry '%1%'", showPath(CanonPath(git_tree_entry_name(entry))));
+                            throw Error("duplicate tree entry '%1%'", showPath(path / name));
                     }
 
                     return res;
                 },
                 [&](Submodule) { return DirEntries(); }},
             getTree(*state, path));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading git tree '%s'", showPath(path));
+        throw;
     }
 
     std::string readLink(const CanonPath & path) override
@@ -1090,14 +1095,15 @@ public:
             if (git_tree_entry_dup(Setter(copy), entry))
                 throw GitError("dupping tree entry");
 
-            auto entryName = std::string_view(git_tree_entry_name(entry));
+            /* Must be a file name without `/` or `..`, `.` components. */
+            const auto entryName = CanonPath::fromFilename(git_tree_entry_name(entry));
 
             /* Use the parent as the working copy to save on copies. */
             auto & path2 = *parent;
-            path2.push(entryName);
+            path2.extend(entryName);
             const auto [it, inserted] = state.lookupCache.emplace(path2, std::move(copy));
             /* Found what we were looking for? */
-            if (entryName == name) {
+            if (entryName.rel() == name) {
                 /* Shouldn't happen, but let's double-check. */
                 if (res)
                     throw Error("duplicate tree entry '%1%'", showPath(path2));
