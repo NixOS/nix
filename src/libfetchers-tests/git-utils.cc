@@ -243,7 +243,7 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
     /* https://git-scm.com/docs/pack-format */
     packSink("PACK");
     serialiseBigEndian(/*version=*/2u, packSink);
-    serialiseBigEndian(/*numObjects=*/3u, packSink);
+    serialiseBigEndian(/*numObjects=*/4u, packSink);
 
     auto writeBlobToPackfile = [&](std::string_view data) -> Hash {
         HashSink hashSink(HashAlgorithm::SHA1);
@@ -282,6 +282,11 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
             {"a.txt", git::Mode::Executable, blob2},
         }));
     ASSERT_EQ(tree1.gitRev(), "164e45a3d3f73578e4d4f83651b5d0edc4564ba0");
+    auto tree2 = writeTreeToPackfile(
+        std::to_array<std::tuple<std::string, git::Mode, Hash>>({
+            /* Fake blob that actually points to a tree. */
+            {"a.txt", git::Mode::Regular, tree1},
+        }));
 
     auto packHash = hashString(HashAlgorithm::SHA1, packSink.s);
     packSink(std::string_view(reinterpret_cast<const char *>(packHash.hash), packHash.hashSize));
@@ -315,15 +320,21 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
     ASSERT_EQ(::git_indexer_commit(indexer, &progress), 0);
 
     auto repo = openRepo();
-    auto accessor = repo->getAccessor(tree1, {}, getRepoName());
+    auto accessor1 = repo->getAccessor(tree1, {}, getRepoName());
     ASSERT_THAT(
-        [&] { accessor->readDirectory(CanonPath::root); },
+        [&] { accessor1->readDirectory(CanonPath::root); },
         ::testing::ThrowsMessage<Error>(
             testing::HasSubstrIgnoreANSIMatcher("duplicate tree entry 'test-git-repo/a.txt'")));
     ASSERT_THAT(
-        [&] { accessor->readFile(CanonPath("a.txt")); },
+        [&] { accessor1->readFile(CanonPath("a.txt")); },
         ::testing::ThrowsMessage<Error>(
             testing::HasSubstrIgnoreANSIMatcher("duplicate tree entry 'test-git-repo/a.txt'")));
+
+    auto accessor2 = repo->getAccessor(tree2, {}, getRepoName());
+    ASSERT_THAT(
+        [&] { accessor2->readFile(CanonPath("a.txt")); },
+        ::testing::ThrowsMessage<Error>(
+            testing::HasSubstrIgnoreANSIMatcher("'test-git-repo/a.txt' is not a regular file")));
 }
 
 TEST(GitUtils, isLegalRefName)

@@ -1172,6 +1172,7 @@ public:
 
     Blob getBlob(State & state, const CanonPath & path, bool expectSymlink)
     {
+        /* TODO: What is this for? Why are we ignoring `path` entirely? */
         if (!expectSymlink && git_object_type(state.root.get()) == GIT_OBJECT_BLOB)
             return dupObject<Blob>((git_blob *) &*state.root);
 
@@ -1188,6 +1189,15 @@ public:
             notExpected();
 
         auto mode = git_tree_entry_filemode(entry);
+        Object object;
+        if (git_tree_entry_to_object(Setter(object), *state.repo, entry))
+            throw GitError("looking up file '%s'", showPath(path));
+        const git_object_t objectType = git_object_type(object.get());
+
+        /* Must be a blob object. Handcrafted pack files might have wonky mode bits. */
+        if (objectType != GIT_OBJECT_BLOB)
+            notExpected();
+
         if (expectSymlink) {
             if (mode != GIT_FILEMODE_LINK)
                 notExpected();
@@ -1196,11 +1206,7 @@ public:
                 notExpected();
         }
 
-        Blob blob;
-        if (git_tree_entry_to_object((git_object **) (git_blob **) Setter(blob), *state.repo, entry))
-            throw GitError("looking up file '%s'", showPath(path));
-
-        return blob;
+        return Blob(reinterpret_cast<git_blob *>(object.release()));
     }
 };
 
