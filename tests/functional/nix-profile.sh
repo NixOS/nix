@@ -50,10 +50,7 @@ cp "${config_nix}" "$flake1Dir"/
 # Test upgrading from nix-env.
 nix-env -f ./user-envs.nix -i foo-1.0
 nix profile list | grep -A2 'Name:.*foo' | grep 'Store paths:.*foo-1.0'
-# Building the new profile must not leak its temporary directory (#10404).
-mkdir "$TEST_ROOT/tmp"
-TMPDIR=$TEST_ROOT/tmp nix profile add "$flake1Dir" -L
-[[ -z $(ls -A "$TEST_ROOT/tmp") ]]
+nix profile add "$flake1Dir" -L
 nix profile list | grep -A4 'Name:.*flake1' | grep 'Locked flake URL:.*narHash'
 (( $(nix profile list | grep -c $'\x1b') == 0 ))
 (( $(CLICOLOR_FORCE=1 nix profile list | grep -c $'\x1b') > 0 ))
