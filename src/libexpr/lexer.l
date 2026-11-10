@@ -17,7 +17,10 @@
 %x REPL_BINDINGS_MODE
 
 %top {
+#include "nix/util/util.hh"
+NIX_INCOMPLETE_SWITCH_BEGIN
 #include "parser-tab.hh" // YYSTYPE
+NIX_INCOMPLETE_SWITCH_END
 #include "nix/expr/parser-state.hh"
 }
 
