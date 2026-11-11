@@ -37,12 +37,30 @@ TEST(readString, roundTrip)
     }
 }
 
+TEST(readString, veryLargeString)
+{
+    const std::string::size_type expectedSize = 1024u * 1024u * 1024u;
+
+    auto source = sinkToSource([size = expectedSize](Sink & sink) mutable {
+        sink << size;
+        std::array<char, 1024 * 64> data{};
+        std::memset(data.data(), 'a', data.size());
+        while (size != 0) {
+            auto n = std::min(data.size(), size);
+            sink(std::string_view(data.data(), n));
+            size -= n;
+        }
+    });
+
+    EXPECT_EQ(readString(*source).size(), expectedSize);
+}
+
 TEST(readString, bogusLengthDoesNotPreallocate)
 {
     // Overly large string reads must not allocate up-front. We send the length-prefix
     // that's larger than available address space.
     StringSink sink;
-    sink << (sizeof(void *) == 8 ? uint64_t(1) << 40 : (uint64_t(1) << 32) - 1);
+    sink << (sizeof(void *) == 8 ? uint64_t(1) << 40 : (uint64_t(1) << 31) - 2);
     StringSource source(sink.s);
     EXPECT_THROW(readString(source), EndOfFile);
 }

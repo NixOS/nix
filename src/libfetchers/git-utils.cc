@@ -11,7 +11,6 @@
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/users.hh"
-#include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/util.hh"
@@ -52,7 +51,6 @@
 #include <iostream>
 #include <regex>
 #include <ranges>
-#include <future>
 
 namespace std {
 
@@ -924,6 +922,8 @@ public:
         Object root;
         std::optional<lfs::Fetch> lfsFetch = std::nullopt;
         GitAccessorOptions options;
+        /* TODO: LRUCache to keep the memory bounded maybe? */
+        boost::unordered_flat_map<CanonPath, TreeEntry> lookupCache;
     };
 
     Sync<State> state_;
@@ -1011,7 +1011,7 @@ public:
     }
 
     DirEntries readDirectory(const CanonPath & path) override
-    {
+    try {
         auto state(state_.lock());
 
         return std::visit(
@@ -1020,17 +1020,59 @@ public:
                     DirEntries res;
 
                     auto count = git_tree_entrycount(tree.get());
+                    /* For checking the order of tree entries. */
+                    const git_tree_entry * prev = nullptr;
 
                     for (size_t n = 0; n < count; ++n) {
-                        auto entry = git_tree_entry_byindex(tree.get(), n);
+                        const auto * entry = git_tree_entry_byindex(tree.get(), n);
+                        assert(entry);
+
+                        /* Tree entries must appear in a canonical order. */
+                        if (prev && git_tree_entry_cmp(entry, prev) <= 0)
+                            throw Error(
+                                "corrupted git tree '%1%' (%2%): duplicated or incorrectly ordered tree entries",
+                                showPath(path),
+                                *git_tree_id(tree.get()));
+
                         // FIXME: add to cache
-                        res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
+                        /* Must be a file name without `/` or `..`, `.` components. */
+                        const auto name = CanonPath::fromFilename(std::string_view(git_tree_entry_name(entry)));
+                        const auto mode = git_tree_entry_filemode(entry);
+
+                        DirEntry type = std::nullopt;
+                        NIX_INCOMPLETE_SWITCH_BEGIN
+                        switch (mode) {
+                        case GIT_FILEMODE_BLOB:
+                        case GIT_FILEMODE_BLOB_EXECUTABLE:
+                            type = Type::tRegular;
+                            break;
+                        case GIT_FILEMODE_TREE:
+                            type = Type::tDirectory;
+                            break;
+                        case GIT_FILEMODE_LINK:
+                            type = Type::tSymlink;
+                            break;
+                        default:
+                            /* leave as std::nullopt to signal that the caller should query it. */
+                            break;
+                        }
+                        NIX_INCOMPLETE_SWITCH_END
+
+                        auto [it, inserted] = res.emplace(name.rel(), type);
+                        /* Should be structurally unreachable combined with the comparison above. */
+                        if (!inserted)
+                            throw Error("duplicate tree entry '%1%'", showPath(path / name));
+
+                        prev = entry;
                     }
 
                     return res;
                 },
                 [&](Submodule) { return DirEntries(); }},
             getTree(*state, path));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading git tree '%s'", showPath(path));
+        throw;
     }
 
     std::string readLink(const CanonPath & path) override
@@ -1056,63 +1098,88 @@ public:
         return toHash(*git_tree_entry_id(entry));
     }
 
-    boost::unordered_flat_map<CanonPath, TreeEntry> lookupCache;
-
-    /* Recursively look up 'path' relative to the root. */
+    /**
+     * Recursively look up 'path' relative to the root.
+     *
+     * Also adds all tree siblings (if the parent itself exists) to the lookupCache.
+     * @return Non-owning handle of the entry. It lives as long as *this.
+     */
     git_tree_entry * lookup(State & state, const CanonPath & path)
     {
-        auto i = lookupCache.find(path);
-        if (i != lookupCache.end())
+        if (const auto i = state.lookupCache.find(path); i != state.lookupCache.end())
             return i->second.get();
 
         auto parent = path.parent();
         if (!parent)
             return nullptr;
 
-        auto name = path.baseName().value();
-
-        auto parentTree = lookupTree(state, *parent);
+        const auto parentTree = lookupTree(state, *parent);
         if (!parentTree)
             return nullptr;
 
-        auto count = git_tree_entrycount(parentTree->get());
+        const auto count = git_tree_entrycount(parentTree.get());
+        const auto name = *path.baseName();
 
         git_tree_entry * res = nullptr;
+        /* For checking the order of tree entries. */
+        const git_tree_entry * prev = nullptr;
 
-        /* Add all the tree entries to the cache to speed up
-           subsequent lookups. */
+        /* Add all the tree entries to the cache to speed up subsequent lookups. */
         for (size_t n = 0; n < count; ++n) {
-            auto entry = git_tree_entry_byindex(parentTree->get(), n);
+            const auto * entry = git_tree_entry_byindex(parentTree.get(), n);
+            assert(entry);
+
+            /* Tree entries must appear in a canonical order. */
+            if (prev && git_tree_entry_cmp(entry, prev) <= 0) {
+                /* Nuke the cache if we run into this error as we might have already cached some entries.
+                   TODO: This is ugly but this is already a fatal error that renders the accessor untrustwortly. */
+                state.lookupCache.clear();
+                throw Error(
+                    "corrupted git tree '%1%' (%2%): duplicated or incorrectly ordered tree entries",
+                    showPath(path),
+                    *git_tree_id(parentTree.get()));
+            }
 
             TreeEntry copy;
             if (git_tree_entry_dup(Setter(copy), entry))
                 throw GitError("dupping tree entry");
 
-            auto entryName = std::string_view(git_tree_entry_name(entry));
+            /* Must be a file name without `/` or `..`, `.` components. */
+            const auto entryName = CanonPath::fromFilename(git_tree_entry_name(entry));
 
-            if (entryName == name)
-                res = copy.get();
-
-            auto path2 = *parent;
-            path2.push(entryName);
-            lookupCache.emplace(path2, std::move(copy));
+            /* Use the parent as the working copy to save on copies. */
+            auto & path2 = *parent;
+            path2.extend(entryName);
+            const auto [it, inserted] = state.lookupCache.emplace(path2, std::move(copy));
+            /* Found what we were looking for? */
+            if (entryName.rel() == name) {
+                /* Should be structurally unreachable due to canonical order requirements,
+                   but let's be safe. */
+                if (res) {
+                    state.lookupCache.clear();
+                    throw Error("duplicate tree entry '%1%'", showPath(path2));
+                }
+                res = it->second.get();
+            }
+            path2.pop();
+            prev = entry;
         }
 
         return res;
     }
 
-    std::optional<Tree> lookupTree(State & state, const CanonPath & path)
+    Tree lookupTree(State & state, const CanonPath & path)
     {
         if (path.isRoot()) {
             if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
                 return dupObject<Tree>((git_tree *) &*state.root);
             else
-                return std::nullopt;
+                return nullptr;
         }
 
         auto entry = lookup(state, path);
         if (!entry || git_tree_entry_type(entry) != GIT_OBJECT_TREE)
-            return std::nullopt;
+            return nullptr;
 
         Tree tree;
         if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(tree), *state.repo, entry))
@@ -1138,7 +1205,7 @@ public:
             if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
                 return dupObject<Tree>((git_tree *) &*state.root);
             else
-                throw Error("Git root object '%s' is not a directory", *git_object_id(state.root.get()));
+                throw NotADirectory("git root object '%s' is not a directory", *git_object_id(state.root.get()));
         }
 
         auto entry = need(state, path);
@@ -1147,22 +1214,31 @@ public:
             return Submodule();
 
         if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
-            throw Error("'%s' is not a directory", showPath(path));
+            throw NotADirectory("'%s' is not a directory", showPath(path));
 
-        Tree tree;
-        if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(tree), *state.repo, entry))
+        Object object;
+        if (git_tree_entry_to_object(Setter(object), *state.repo, entry))
             throw GitError("looking up directory '%s'", showPath(path));
 
-        return tree;
+        /* git_tree_entry_type check above is not enough to guarantee that the
+           object is actually a tree, since the parent tree might be handcrafted
+           to report the wrong type. */
+        if (git_object_type(object.get()) != GIT_OBJECT_TREE)
+            throw NotADirectory("'%s' is not a directory", showPath(path));
+
+        return Tree(reinterpret_cast<git_tree *>(object.release()));
     }
 
     Blob getBlob(State & state, const CanonPath & path, bool expectSymlink)
     {
+        /* TODO: What is this for? Why are we ignoring `path` entirely? */
         if (!expectSymlink && git_object_type(state.root.get()) == GIT_OBJECT_BLOB)
             return dupObject<Blob>((git_blob *) &*state.root);
 
-        auto notExpected = [&]() {
-            throw Error(expectSymlink ? "'%s' is not a symlink" : "'%s' is not a regular file", showPath(path));
+        auto notExpected = [&] [[noreturn]] () {
+            if (expectSymlink)
+                throw NotASymlink("'%s' is not a symlink", showPath(path));
+            throw NotARegularFile("'%s' is not a regular file", showPath(path));
         };
 
         if (path.isRoot())
@@ -1174,6 +1250,15 @@ public:
             notExpected();
 
         auto mode = git_tree_entry_filemode(entry);
+        Object object;
+        if (git_tree_entry_to_object(Setter(object), *state.repo, entry))
+            throw GitError("looking up file '%s'", showPath(path));
+        const git_object_t objectType = git_object_type(object.get());
+
+        /* Must be a blob object. Handcrafted pack files might have wonky mode bits. */
+        if (objectType != GIT_OBJECT_BLOB)
+            notExpected();
+
         if (expectSymlink) {
             if (mode != GIT_FILEMODE_LINK)
                 notExpected();
@@ -1182,11 +1267,7 @@ public:
                 notExpected();
         }
 
-        Blob blob;
-        if (git_tree_entry_to_object((git_object **) (git_blob **) Setter(blob), *state.repo, entry))
-            throw GitError("looking up file '%s'", showPath(path));
-
-        return blob;
+        return Blob(reinterpret_cast<git_blob *>(object.release()));
     }
 };
 
