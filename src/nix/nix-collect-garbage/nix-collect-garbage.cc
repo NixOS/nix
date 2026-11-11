@@ -9,6 +9,7 @@
 #include "nix/main/shared.hh"
 #include "nix/store/globals.hh"
 #include "nix/cmd/legacy.hh"
+#include "nix/util/util.hh"
 #include "man-pages.hh"
 
 #include <cerrno>
@@ -29,13 +30,17 @@ void removeOldGenerations(std::filesystem::path dir)
 
     bool canWrite = access(dir.string().c_str(), W_OK) == 0;
 
-    for (auto & i : DirectoryIterator{dir}) {
+    for (const auto & i : DirectoryIterator{dir}) {
         checkInterrupt();
 
-        auto path = i.path().string();
-        auto type = i.symlink_status().type();
+        auto path = (dir / i.name.path()).string();
+        auto type = i.type != std::filesystem::file_type::none ? i.type : std::filesystem::symlink_status(path).type();
 
-        if (type == std::filesystem::file_type::symlink && canWrite) {
+        NIX_INCOMPLETE_SWITCH_BEGIN
+        switch (type) {
+        case std::filesystem::file_type::symlink: {
+            if (!canWrite)
+                break;
             std::string link;
             try {
                 link = readLink(path).string();
@@ -52,9 +57,15 @@ void removeOldGenerations(std::filesystem::path dir)
                 } else
                     deleteOldGenerations(path, dryRun);
             }
-        } else if (type == std::filesystem::file_type::directory) {
-            removeOldGenerations(path);
+            break;
         }
+        case std::filesystem::file_type::directory:
+            removeOldGenerations(path);
+            break;
+        default:
+            break;
+        }
+        NIX_INCOMPLETE_SWITCH_END
     }
 }
 

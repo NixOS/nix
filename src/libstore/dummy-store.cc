@@ -80,8 +80,7 @@ class WholeStoreViewAccessor : public SourceAccessor
 public:
     WholeStoreViewAccessor()
     {
-        MemorySink sink{rootPathAccessor};
-        sink.createDirectory(CanonPath::root);
+        MemorySink{rootPathAccessor}.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
     }
 
     void addObject(std::string_view baseName, ref<MemorySourceAccessor> accessor)
@@ -266,18 +265,7 @@ public:
         {
             MemorySink tempSink{*temp};
 
-            // TODO factor this out into `restorePath`, same todo on it.
-            switch (dumpMethod) {
-            case FileSerialisationMethod::NixArchive:
-                parseDump(tempSink, source);
-                break;
-            case FileSerialisationMethod::Flat: {
-                // Replace root dir with file so next part succeeds.
-                temp->root = MemorySourceAccessor::File::Regular{};
-                tempSink.createRegularFile(CanonPath::root, [&](auto & sink) { source.drainInto(sink); });
-                break;
-            }
-            }
+            restorePath(tempSink, source, dumpMethod);
         }
 
         auto hash = hashPath({temp, CanonPath::root}, hashMethod.getFileIngestionMethod(), hashAlgo).first;

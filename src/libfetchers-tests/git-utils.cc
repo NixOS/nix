@@ -92,25 +92,25 @@ TEST_F(GitUtilsTest, sink_basic)
     // links directory
     auto links = [&] {
         auto linksDir = pool->makeDirectorySink();
-        linksDir->insertChild("foo", linksFoo);
+        linksDir->insertChild("foo"_filename, linksFoo);
         return merkle::TreeEntry{merkle::Mode::Directory, std::move(*linksDir).finalize()};
     }();
 
     // foo-1.1 directory (contains hello, bye, bye-link, empty, links)
     auto foo = [&] {
         auto fooDir = pool->makeDirectorySink();
-        fooDir->insertChild("hello", hello);
-        fooDir->insertChild("bye", bye);
-        fooDir->insertChild("bye-link", byeLink);
-        fooDir->insertChild("empty", empty);
-        fooDir->insertChild("links", links);
+        fooDir->insertChild("hello"_filename, hello);
+        fooDir->insertChild("bye"_filename, bye);
+        fooDir->insertChild("bye-link"_filename, byeLink);
+        fooDir->insertChild("empty"_filename, empty);
+        fooDir->insertChild("links"_filename, links);
         return merkle::TreeEntry{merkle::Mode::Directory, std::move(*fooDir).finalize()};
     }();
 
     // root directory (contains foo-1.1)
     auto rootHash = [&] {
         auto rootDir = pool->makeDirectorySink();
-        rootDir->insertChild("foo-1.1", foo);
+        rootDir->insertChild("foo-1.1"_filename, foo);
         return std::move(*rootDir).finalize();
     }();
 

@@ -1,30 +1,12 @@
 #include "nix/util/error.hh"
 #include "nix/util/os-filename.hh"
 
-#include <type_traits>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace nix {
 
-TEST(OsFilename, validFilenames)
-{
-    // Simple filename
-    auto f1 = OsFilename::fromPathAsserting("foo");
-    ASSERT_EQ(f1.path(), "foo");
-
-    // Filename with extension
-    auto f2 = OsFilename::fromPathAsserting("bar.txt");
-    ASSERT_EQ(f2.path(), "bar.txt");
-
-    // Filename with multiple dots
-    auto f3 = OsFilename::fromPathAsserting("file.tar.gz");
-    ASSERT_EQ(f3.path(), "file.tar.gz");
-
-    // Filename starting with dot (hidden file)
-    auto f4 = OsFilename::fromPathAsserting(".hidden");
-    ASSERT_EQ(f4.path(), ".hidden");
-}
+/* The cases shared with `Filename` are tested in `filename-shared.cc`. */
 
 TEST(OsFilename, validUnicode)
 {
@@ -50,39 +32,34 @@ TEST(OsFilename, invalidUnicode)
     ASSERT_EQ(OsFilename::fromPathThrowing(p), f);
 }
 
-TEST(OsFilename, equality)
+TEST(OsFilename, nulFails)
 {
-    auto a = OsFilename::fromPathAsserting("foo");
-    auto b = OsFilename::fromPathAsserting("foo");
-    auto c = OsFilename::fromPathAsserting("bar");
-
-    ASSERT_EQ(a, b);
-    ASSERT_NE(a, c);
+    using ::testing::HasSubstr;
+    using ::testing::ThrowsMessage;
+    std::filesystem::path p{std::string{"a\0b", 3}};
+    EXPECT_THAT([&] { OsFilename::fromPathThrowing(p); }, ThrowsMessage<Error>(HasSubstr("cannot contain a NUL byte")));
+    ASSERT_DEATH(OsFilename::fromPathAsserting(p), "cannot contain a NUL byte");
 }
 
-TEST(OsFilename, noConversionToPath)
+TEST(OsFilename, toPortable)
 {
-    /* The newtype would be pointless if an `OsFilename` could decay into
-       a `std::filesystem::path`; use `path()` instead. */
-    static_assert(!std::is_convertible_v<OsFilename, const std::filesystem::path &>);
-
-    auto f = OsFilename::fromPathAsserting("test.txt");
-    ASSERT_EQ(f.path(), "test.txt");
+    EXPECT_EQ(OsFilename::fromPathAsserting("foo.txt").toPortable(), "foo.txt"_filename);
+    /* `char8_t` sources are decoded as UTF-8 on every platform, and
+       `Filename` is UTF-8 too. */
+    std::filesystem::path p{u8"héllo-日本-\U0001F600"};
+    EXPECT_EQ(OsFilename::fromPathAsserting(p).toPortable().str(), p.string());
 }
 
-TEST(OsFilename, emptyFails)
+TEST(OsFilename, fromPortable)
 {
-    ASSERT_DEATH(OsFilename::fromPathAsserting(""), "cannot be empty");
-}
-
-TEST(OsFilename, dotFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting("."), "cannot be '\\.'");
-}
-
-TEST(OsFilename, dotDotFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting(".."), "cannot be '\\.\\.'");
+    EXPECT_EQ(OsFilename{"foo.txt"_filename}.path(), std::filesystem::path{"foo.txt"});
+    EXPECT_EQ(OsFilename::fromPortableThrowing("foo.txt"_filename), OsFilename{"foo.txt"_filename});
+    EXPECT_EQ(OsFilename{"foo.txt"_filename}.toPortable(), "foo.txt"_filename);
+#ifdef _WIN32
+    /* Valid portable names that are not single file names on Windows. */
+    EXPECT_THROW(OsFilename::fromPortableThrowing("a\\b"_filename), Error);
+    EXPECT_THROW(OsFilename::fromPortableThrowing("C:"_filename), Error);
+#endif
 }
 
 TEST(OsFilename, absolutePathFails)
@@ -90,22 +67,12 @@ TEST(OsFilename, absolutePathFails)
     ASSERT_DEATH(OsFilename::fromPathAsserting("/foo"), "cannot have a root path");
 }
 
-TEST(OsFilename, relativePathWithDirFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting("foo/bar"), "cannot have a parent path");
-}
-
-TEST(OsFilename, fromPathThrowingRejects)
+TEST(OsFilename, fromPathThrowingRejectsRootPath)
 {
     using ::testing::HasSubstr;
     using ::testing::ThrowsMessage;
-    EXPECT_THAT([] { OsFilename::fromPathThrowing(""); }, ThrowsMessage<Error>(HasSubstr("cannot be empty")));
-    EXPECT_THAT([] { OsFilename::fromPathThrowing("."); }, ThrowsMessage<Error>(HasSubstr("cannot be '.'")));
-    EXPECT_THAT([] { OsFilename::fromPathThrowing(".."); }, ThrowsMessage<Error>(HasSubstr("cannot be '..'")));
     EXPECT_THAT(
         [] { OsFilename::fromPathThrowing("/foo"); }, ThrowsMessage<Error>(HasSubstr("cannot have a root path")));
-    EXPECT_THAT(
-        [] { OsFilename::fromPathThrowing("foo/bar"); }, ThrowsMessage<Error>(HasSubstr("cannot have a parent path")));
 }
 
 #ifdef _WIN32

@@ -3,6 +3,7 @@
 #include "nix/store/local-overlay-store.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/os-string.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/store-open.hh"
@@ -268,7 +269,7 @@ LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag
     StorePathSet done;
 
     auto existsInStoreDir = [&](const StorePath & storePath) {
-        return pathExists(config->realStoreDir.get() / storePath.to_string());
+        return maybeFstatat(getRealStoreDirFd(), OsFilename{storePath.filename()}).has_value();
     };
 
     bool errors = false;

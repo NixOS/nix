@@ -33,7 +33,7 @@ std::tuple<OsStrings, AutoCloseFD, AutoDelete> editorFor(const SourcePath & file
 
     auto tempDir = createTempDir(defaultTempDir(), "nix-edit", 0700);
     AutoDelete autoDel(tempDir, /*recursive=*/true);
-    auto tempPath = tempDir / file2.path.baseName().value_or("nix-edit");
+    auto tempPath = tempDir / file2.path.baseName().transform(&FilenameView::str).value_or("nix-edit");
 
     /* Create the file with the same name, so editors that recognise file
        extensions spin up syntax highlighting and LSPs. */

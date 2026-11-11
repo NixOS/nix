@@ -71,14 +71,18 @@ struct MixLs : virtual Args, MixJSON
             if (st.type == SourceAccessor::Type::tDirectory && !showDirectory) {
                 auto names = accessor->readDirectory(curPath);
                 for (auto & [name, type] : names)
-                    showFile(curPath / name, relPath + "/" + name);
+                    showFile(curPath / name, relPath + "/" + name.str());
             } else
                 showFile(curPath, relPath);
         };
 
         auto st = accessor->lstat(path);
         doPath(
-            st, path, st.type == SourceAccessor::Type::tDirectory ? "." : path.baseName().value_or(""), showDirectory);
+            st,
+            path,
+            st.type == SourceAccessor::Type::tDirectory ? "."
+                                                        : path.baseName().transform(&FilenameView::str).value_or(""),
+            showDirectory);
     }
 
     void list(ref<SourceAccessor> accessor, CanonPath path)
