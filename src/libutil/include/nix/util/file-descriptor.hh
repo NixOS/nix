@@ -264,8 +264,16 @@ class AutoCloseFD
 {
     Descriptor fd;
 public:
-    AutoCloseFD();
-    AutoCloseFD(Descriptor fd);
+    AutoCloseFD() noexcept
+        : fd(INVALID_DESCRIPTOR)
+    {
+    }
+
+    AutoCloseFD(Descriptor fd) noexcept
+        : fd(fd)
+    {
+    }
+
     AutoCloseFD(const AutoCloseFD & fd) = delete;
     AutoCloseFD(AutoCloseFD && fd) noexcept;
     ~AutoCloseFD();
@@ -278,7 +286,11 @@ public:
         return fd;
     }
 
-    explicit operator bool() const noexcept;
+    explicit operator bool() const noexcept
+    {
+        return fd != INVALID_DESCRIPTOR;
+    }
+
     Descriptor release() noexcept;
     void close();
 
