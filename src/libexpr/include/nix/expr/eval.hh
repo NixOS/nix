@@ -372,6 +372,20 @@ public:
     template<typename T, std::size_t N = 0>
     inline void * allocBytes(size_t count);
 
+    /**
+     * Allocates @p n bytes that the garbage collector does not scan for
+     * pointers. Unlike allocBytes(), the memory is not zeroed.
+     */
+    inline void * allocBytesAtomic(size_t n);
+
+    /**
+     * Allocates @p count * sizeof(T) + N contiguous bytes that the garbage
+     * collector does not scan for pointers. The memory is not zeroed.
+     * @throws bad_alloc if the computation would overflow.
+     */
+    template<typename T, std::size_t N = 0>
+    inline void * allocBytesAtomic(size_t count);
+
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 

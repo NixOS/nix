@@ -26,9 +26,15 @@ inline void * EvalMemory::allocBytes(size_t n)
     return p;
 }
 
+namespace detail {
+
+/**
+ * @return count * sizeof(T) + N
+ * @throws bad_alloc if the computation would overflow.
+ */
 template<typename T, std::size_t N>
 [[gnu::always_inline]]
-inline void * EvalMemory::allocBytes(size_t count)
+inline size_t checkedAllocSize(size_t count)
 {
     size_t res = 0;
 
@@ -38,7 +44,32 @@ inline void * EvalMemory::allocBytes(size_t count)
     if (__builtin_add_overflow(res, N, &res)) [[unlikely]]
         throw std::bad_alloc();
 
-    return allocBytes(res);
+    return res;
+}
+
+} // namespace detail
+
+template<typename T, std::size_t N>
+[[gnu::always_inline]]
+inline void * EvalMemory::allocBytes(size_t count)
+{
+    return allocBytes(detail::checkedAllocSize<T, N>(count));
+}
+
+[[gnu::always_inline]]
+inline void * EvalMemory::allocBytesAtomic(size_t n)
+{
+    void * p = GC_MALLOC_ATOMIC(n);
+    if (!p)
+        throw std::bad_alloc();
+    return p;
+}
+
+template<typename T, std::size_t N>
+[[gnu::always_inline]]
+inline void * EvalMemory::allocBytesAtomic(size_t count)
+{
+    return allocBytesAtomic(detail::checkedAllocSize<T, N>(count));
 }
 
 [[gnu::always_inline]]
