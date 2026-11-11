@@ -10,6 +10,7 @@
 #include "file-descriptor-private.hh"
 
 #include <atomic>
+#include <list>
 
 #ifndef _WIN32
 #  include <sys/resource.h>
@@ -104,7 +105,9 @@ class PosixFileSourceAccessor : public PosixSourceAccessorBase
     friend class PosixDirectorySourceAccessor;
 
     AutoCloseFD fd;
-    std::filesystem::path fsPath;
+    OsString fsPath;
+    const PosixDirectorySourceAccessor * parent = nullptr;
+
     /**
      * Stat is memoised once opened. This does mean that modifying the same file
      * while we are reading is busted, but caching it might be considered an
@@ -117,16 +120,23 @@ class PosixFileSourceAccessor : public PosixSourceAccessorBase
      */
     PosixStat st;
 
+    std::filesystem::path getAbsPath() const;
+
 public:
-    PosixFileSourceAccessor(AutoCloseFD fd, std::filesystem::path path, bool trackLastModified, const PosixStat & st_)
+    PosixFileSourceAccessor(
+        AutoCloseFD fd,
+        std::filesystem::path path,
+        bool trackLastModified,
+        const PosixStat & st_,
+        const PosixDirectorySourceAccessor * parent = nullptr)
         : PosixSourceAccessorBase(trackLastModified)
         , fd(std::move(fd))
         , fsPath(std::move(path))
+        , parent(parent)
         , st(st_)
     {
+        displayPrefix.clear(); /* Isn't used. */
         assert(S_ISREG(st.st_mode));
-        assert(fsPath.is_absolute()); /* Only used for error messages, but still nice to enforce this invariant. */
-        setPathDisplay(fsPath.generic_string());
         maybeUpdateMtime(st.st_mtime);
     }
 
@@ -143,15 +153,16 @@ public:
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
     {
         if (path.isRoot())
-            return fsPath;
+            return getAbsPath();
         return std::nullopt; /* Definitely doesn't exist. */
     }
 
     std::string showPath(const CanonPath & path) override
     {
+        const std::filesystem::path absPath = getAbsPath();
         if (path.isRoot())
-            return displayPrefix; /* No trailing slash. */
-        return displayPrefix + path.abs();
+            return absPath.generic_string();
+        return (absPath / path.rel()).generic_string();
     }
 };
 
@@ -223,9 +234,34 @@ public:
         reg->push_back(accessor.get_ptr());
     }
 
+    /**
+     * Rendering the path is a seldom needed operation.
+     */
+    std::filesystem::path getAbsPath() const
+    {
+        const PosixDirectorySourceAccessor * next = this;
+        std::list<const PosixDirectorySourceAccessor *> dirAccessors;
+        while (next) {
+            dirAccessors.push_front(next);
+            next = next->parent;
+        }
+
+        OsString path;
+        bool first = true;
+        for (const auto & pathComponent : dirAccessors) {
+            if (!first)
+                path += std::filesystem::path::preferred_separator;
+            path += pathComponent->fsPath;
+            first = false;
+        }
+
+        return std::filesystem::path(std::move(path));
+    }
+
 private:
     AutoCloseFD dirFd;
-    std::filesystem::path fsPath;
+    OsString fsPath;
+    const PosixDirectorySourceAccessor * parent = nullptr;
 
     std::shared_ptr<Sync<LRUCache<OsCanonPath, ref<AutoCloseFD>>>> dirFdCache;
 
@@ -316,14 +352,17 @@ private:
 
 public:
     PosixDirectorySourceAccessor(
-        AutoCloseFD fd, std::filesystem::path path, bool trackLastModified, unsigned dirFdCacheSize)
+        AutoCloseFD fd,
+        OsString path,
+        bool trackLastModified,
+        unsigned dirFdCacheSize,
+        const PosixDirectorySourceAccessor * parent = nullptr)
         : PosixSourceAccessorBase(trackLastModified)
         , dirFd(std::move(fd))
         , fsPath(std::move(path))
+        , parent(parent)
     {
-        assert(fsPath.is_absolute()); /* Only used for error messages, but still nice to enforce this invariant. */
-        setPathDisplay(fsPath.generic_string());
-
+        displayPrefix.clear(); /* Isn't used. */
         if (dirFdCacheSize)
             dirFdCache = std::make_shared<Sync<LRUCache<OsCanonPath, ref<AutoCloseFD>>>>(dirFdCacheSize);
     }
@@ -361,20 +400,27 @@ public:
 
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
     {
+        const std::filesystem::path absPath = getAbsPath();
         if (path.isRoot())
-            return fsPath;
-        return std::filesystem::path(fsPath) / path.rel(); /* RHS *must* be a relative path. */
+            return absPath;
+        return absPath / path.rel(); /* RHS *must* be a relative path. */
     }
 
     std::string showPath(const CanonPath & path) override
     {
+        const std::filesystem::path absPath = getAbsPath();
         if (path.isRoot())
-            return displayPrefix; /* No trailing slash. */
-        if (displayPrefix.ends_with('/'))
-            return displayPrefix + path.rel();
-        return displayPrefix + path.abs();
+            return absPath.generic_string(); /* No trailing slash. */
+        return (absPath / path.rel()).generic_string();
     }
 };
+
+std::filesystem::path PosixFileSourceAccessor::getAbsPath() const
+{
+    if (!parent)
+        return fsPath;
+    return parent->getAbsPath() / fsPath;
+}
 
 /**
  * The path carried by a `SymlinkNotAllowed` from `file-system-at.hh`, as a
@@ -396,7 +442,7 @@ static CanonPath portablePathOf(const SymlinkNotAllowed & e)
  */
 static OsFilename osBaseNameOf(const CanonPath & path)
 {
-    return OsFilename::fromPathAsserting(path.baseName().value());
+    return OsFilename::fromPathAsserting(*path.baseName());
 }
 
 std::function<void(AutoCloseFD, OsCanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
@@ -417,7 +463,7 @@ PosixDirectorySourceAccessor::openParent(const CanonPath & path)
     /* Everything below is in OS-native terms: these are keys for a cache of
        real directory handles, not positions in the accessor's virtual
        namespace. `path` is the last portable thing we see. */
-    OsCanonPath parent = path.parent().value();
+    OsCanonPath parent = *path.parent();
     if (parent.empty())
         return outcome::success(OpenedParent{dirFd.get(), nullptr, std::move(parent)});
 
@@ -439,8 +485,8 @@ PosixDirectorySourceAccessor::openParent(const CanonPath & path)
                             .parent = std::move(parent),
                             .fromCache = true,
                         });
-                intermediateParentFd = intermediateDirFdHit->get_ptr();
-                anchor = p;
+                intermediateParentFd = std::move(intermediateDirFdHit)->get_ptr();
+                anchor = std::move(p);
                 break;
             }
             if (p.empty())
@@ -574,7 +620,8 @@ void PosixDirectorySourceAccessor::readFile(const CanonPath & path, Sink & sink,
     auto st = nix::fstat(fileFd.get());
     if (!S_ISREG(st.st_mode))
         throw NotARegularFile("file '%s' is not a regular file", showPath(path));
-    PosixFileSourceAccessor fileAccessor(std::move(fileFd), fsPath / path.rel(), trackLastModified, st);
+    PosixFileSourceAccessor fileAccessor(
+        std::move(fileFd), string_to_os_string(path.rel()), trackLastModified, st, this);
     maybeUpdateMtime(st.st_mtime);
     fileAccessor.readFile(CanonPath::root, sink, sizeCallback);
 }
@@ -723,7 +770,7 @@ void PosixDirectorySourceAccessor::readDirectory(
 {
     auto fd = openSubdirectory(dirPath);
     PosixDirectorySourceAccessor accessor{
-        std::move(fd), fsPath / dirPath.rel(), trackLastModified, /*dirFdCacheSize=*/0};
+        std::move(fd), string_to_os_string(dirPath.rel()), trackLastModified, /*dirFdCacheSize=*/0, this};
     callback(accessor, CanonPath::root);
     PosixSourceAccessorBase::maybeUpdateMtime(accessor.mtime);
 }
@@ -811,7 +858,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
             {
                 MemorySink sink{*this};
                 sink.createSymlink(CanonPath::root, target);
-                displayPrefix = fsPath.string();
+                displayPrefix = fsPath.generic_string();
             }
 
             std::optional<std::time_t> getLastModified() override

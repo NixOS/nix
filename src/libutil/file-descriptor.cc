@@ -280,11 +280,6 @@ AutoCloseFD::~AutoCloseFD()
     }
 }
 
-Descriptor AutoCloseFD::get() const noexcept
-{
-    return fd;
-}
-
 void AutoCloseFD::close()
 {
     if (fd != INVALID_DESCRIPTOR) {

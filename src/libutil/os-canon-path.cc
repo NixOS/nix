@@ -22,29 +22,38 @@ static_assert(std::ranges::common_range<OsCanonPath>);
 
 OsCanonPath::OsCanonPath(const CanonPath & canonPath)
 {
-    for (const auto & component : canonPath) {
 #ifdef _WIN32
-        assert(component.find('\\') == component.npos && "CanonPath component cannot contain backslash");
-#endif
-        p /= component;
+    OsString res;
+    res.reserve(canonPath.rel().size());
+    bool first = true;
+    for (const auto & component : canonPath) {
+        /* TODO: Maybe don't fail with an assert here? */
+        assert(!component.contains('\\'));
+        if (!first)
+            res += std::filesystem::path::preferred_separator;
+        res += string_to_os_string(component);
+        first = false;
     }
-    // No need to further validate — CanonPath guarantees no empty/dot/dotdot components,
-    // and operator/ produces preferred separators.
+    p = res;
+#else
+    /* Everything is already as we expect it. */
+    p = canonPath.rel();
+#endif
 }
 
 void OsCanonPath::validate() const
 {
-    assert(!p.has_root_path() && "OsCanonPath cannot have a root path");
 #ifdef _WIN32
-    assert(
-        p.native().find(L'/') == std::wstring::npos
-        && "OsCanonPath must use preferred (backslash) separators on Windows");
+    assert(!p.has_root_path());
+    assert(p.native().find(L'/') == std::wstring::npos);
+#else
+    assert(!p.native().starts_with('/'));
 #endif
     for (const auto & component : p) {
         const auto & s = component.native();
-        assert(!s.empty() && "OsCanonPath cannot have empty components");
-        assert(s != OS_STR(".") && "OsCanonPath cannot have '.' components");
-        assert(s != OS_STR("..") && "OsCanonPath cannot have '..' components");
+        assert(!s.empty());
+        assert(s != OS_STR("."));
+        assert(s != OS_STR(".."));
     }
 }
 
@@ -100,9 +109,8 @@ std::optional<OsCanonPath> OsCanonPath::parent() const
 {
     if (p.empty())
         return std::nullopt;
-    auto res = *this;
-    res.pop();
-    return res;
+    auto p2 = p.parent_path();
+    return OsCanonPath(std::move(p2));
 }
 
 bool OsCanonPath::isWithin(const OsCanonPath & prefix) const
@@ -112,19 +120,23 @@ bool OsCanonPath::isWithin(const OsCanonPath & prefix) const
 
 OsCanonPath OsCanonPath::removePrefix(const OsCanonPath & prefix) const
 {
+    if (prefix.empty())
+        return *this;
     assert(isWithin(prefix));
-    OsCanonPath res;
-    auto it = begin();
-    std::advance(it, std::ranges::distance(prefix));
-    for (; it != end(); ++it)
-        res = res / *it;
-    return res;
+    OsStringView prefix2 = prefix.p.native();
+    OsStringView p2 = p.native();
+    assert(prefix2.size() <= p2.size());
+    if (prefix2.size() == p2.size())
+        return OsCanonPath();
+    OsStringView res = OsStringView(p2).substr(prefix2.size() + 1);
+    return OsCanonPath(std::filesystem::path(res));
 }
 
 CanonPath OsCanonPath::toPortable() const
 {
     CanonPath res = CanonPath::root;
     for (const auto & component : *this)
+        /* FIXME: Lossy conversion. */
         res.push(component.path().string());
     return res;
 }
