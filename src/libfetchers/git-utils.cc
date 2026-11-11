@@ -1176,8 +1176,10 @@ public:
         if (!expectSymlink && git_object_type(state.root.get()) == GIT_OBJECT_BLOB)
             return dupObject<Blob>((git_blob *) &*state.root);
 
-        auto notExpected = [&]() {
-            throw Error(expectSymlink ? "'%s' is not a symlink" : "'%s' is not a regular file", showPath(path));
+        auto notExpected = [&] [[noreturn]] () {
+            if (expectSymlink)
+                throw NotASymlink("'%s' is not a symlink", showPath(path));
+            throw NotARegularFile("'%s' is not a regular file", showPath(path));
         };
 
         if (path.isRoot())
