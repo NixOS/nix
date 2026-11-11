@@ -1020,15 +1020,29 @@ public:
                     DirEntries res;
 
                     auto count = git_tree_entrycount(tree.get());
+                    /* For checking the order of tree entries. */
+                    const git_tree_entry * prev = nullptr;
 
                     for (size_t n = 0; n < count; ++n) {
                         const auto * entry = git_tree_entry_byindex(tree.get(), n);
+                        assert(entry);
+
+                        /* Tree entries must appear in a canonical order. */
+                        if (prev && git_tree_entry_cmp(entry, prev) <= 0)
+                            throw Error(
+                                "corrupted git tree '%1%' (%2%): duplicated or incorrectly ordered tree entries",
+                                showPath(path),
+                                *git_tree_id(tree.get()));
+
                         // FIXME: add to cache
                         /* Must be a file name without `/` or `..`, `.` components. */
                         const auto name = CanonPath::fromFilename(std::string_view(git_tree_entry_name(entry)));
                         auto [it, inserted] = res.emplace(name.rel(), DirEntry{});
+                        /* Should be structurally unreachable combined with the comparison above. */
                         if (!inserted)
                             throw Error("duplicate tree entry '%1%'", showPath(path / name));
+
+                        prev = entry;
                     }
 
                     return res;
@@ -1086,10 +1100,24 @@ public:
         const auto name = *path.baseName();
 
         git_tree_entry * res = nullptr;
+        /* For checking the order of tree entries. */
+        const git_tree_entry * prev = nullptr;
 
         /* Add all the tree entries to the cache to speed up subsequent lookups. */
         for (size_t n = 0; n < count; ++n) {
             const auto * entry = git_tree_entry_byindex(parentTree.get(), n);
+            assert(entry);
+
+            /* Tree entries must appear in a canonical order. */
+            if (prev && git_tree_entry_cmp(entry, prev) <= 0) {
+                /* Nuke the cache if we run into this error as we might have already cached some entries.
+                   TODO: This is ugly but this is already a fatal error that renders the accessor untrustwortly. */
+                state.lookupCache.clear();
+                throw Error(
+                    "corrupted git tree '%1%' (%2%): duplicated or incorrectly ordered tree entries",
+                    showPath(path),
+                    *git_tree_id(parentTree.get()));
+            }
 
             TreeEntry copy;
             if (git_tree_entry_dup(Setter(copy), entry))
@@ -1104,12 +1132,16 @@ public:
             const auto [it, inserted] = state.lookupCache.emplace(path2, std::move(copy));
             /* Found what we were looking for? */
             if (entryName.rel() == name) {
-                /* Shouldn't happen, but let's double-check. */
-                if (res)
+                /* Should be structurally unreachable due to canonical order requirements,
+                   but let's be safe. */
+                if (res) {
+                    state.lookupCache.clear();
                     throw Error("duplicate tree entry '%1%'", showPath(path2));
+                }
                 res = it->second.get();
             }
             path2.pop();
+            prev = entry;
         }
 
         return res;

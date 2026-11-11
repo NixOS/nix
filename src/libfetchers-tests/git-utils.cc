@@ -321,14 +321,13 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
 
     auto repo = openRepo();
     auto accessor1 = repo->getAccessor(tree1, {}, getRepoName());
-    ASSERT_THAT(
-        [&] { accessor1->readDirectory(CanonPath::root); },
-        ::testing::ThrowsMessage<Error>(
-            testing::HasSubstrIgnoreANSIMatcher("duplicate tree entry 'test-git-repo/a.txt'")));
-    ASSERT_THAT(
-        [&] { accessor1->readFile(CanonPath("a.txt")); },
-        ::testing::ThrowsMessage<Error>(
-            testing::HasSubstrIgnoreANSIMatcher("duplicate tree entry 'test-git-repo/a.txt'")));
+
+    auto throwCorruptedTree = ::testing::ThrowsMessage<Error>(
+        testing::HasSubstrIgnoreANSIMatcher("duplicated or incorrectly ordered tree entries"));
+    ASSERT_THAT([&] { accessor1->readDirectory(CanonPath::root); }, throwCorruptedTree);
+    ASSERT_THAT([&] { accessor1->readFile(CanonPath("a.txt")); }, throwCorruptedTree);
+    /* The cache should be nuked on corrupted tree errors. */
+    ASSERT_THAT([&] { accessor1->readFile(CanonPath("a.txt")); }, throwCorruptedTree);
 
     auto accessor2 = repo->getAccessor(tree2, {}, getRepoName());
     ASSERT_THAT(
