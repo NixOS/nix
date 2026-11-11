@@ -5,6 +5,9 @@ source common.sh
 TODO_NixOS
 
 RESULT=$TEST_ROOT/result
+RESULT13out=$TEST_ROOT/result13out
+RESULT13aux=$TEST_ROOT/result13aux
+RESULT14aux=$TEST_ROOT/result14aux
 
 dep=$(nix-build -o "$RESULT" check-refs.nix -A dep)
 
@@ -70,5 +73,75 @@ if isDaemonNewer "2.28pre20241225"; then
         grepQuiet -F \
             "output check for 'lib' contains an illegal reference specifier 'dev', expected store path or output name (one of [lib, out])" \
             < "$TEST_ROOT/test12.stderr"
+    fi
+fi
+
+if ! isTestOnNixOS; then
+    # test13 and test14: a sibling output referenced by symbolic name in
+    # outputChecks must remain resolvable, for the purpose of *this*
+    # output's own checks, even when that sibling was already valid
+    # before this build and therefore is not being (re-)registered here.
+    # https://github.com/NixOS/nix/issues/16485
+
+    # First build: both outputs are fresh, nothing pre-existing.
+    clearStore
+    outPath13=$(nix-build -o "$RESULT13out" check-refs.nix -A test13.out)
+    auxPath13=$(nix-build -o "$RESULT13aux" check-refs.nix -A test13.aux)
+    # nix-build suffixes a non-"out" output onto the given -o base, so the
+    # symlink for the aux output above actually landed at "$RESULT13aux-aux".
+    rm -f "$RESULT13out" "$RESULT13aux-aux"
+
+    # Invalidate only aux. keep-outputs defaults to false in the test
+    # sandbox, so this is enough to make aux (and only aux) invalid while
+    # out remains a valid, unrooted path in the store.
+    nix store delete "$auxPath13"
+    [[ -e "$outPath13" ]] || fail "test13: out should still be valid after deleting aux"
+    [[ ! -e "$auxPath13" ]] || fail "test13: aux should have been deleted"
+
+    # Rebuilding aux reruns the builder for the whole derivation (as
+    # always for a multi-output derivation), so out is rebuilt into a
+    # scratch copy too -- but since the previously-registered out is
+    # still valid, it takes the "already registered" path and is not
+    # re-registered. aux's own disallowedReferences=["out"] check must
+    # still be able to resolve "out" as a reference target in that case.
+    nix-build -o "$RESULT13aux" check-refs.nix -A test13.aux
+    rm -f "$RESULT13aux-aux"
+
+    # test14 is the same shape, but aux genuinely references out, to
+    # confirm this is still rejected -- i.e. that making "out" resolvable
+    # as a symbolic reference target does not also disable enforcement of
+    # the check against it. Unlike test13, this derivation's builder
+    # *always* produces a real violation, so a normal first build of the
+    # whole derivation can never succeed and can therefore never be the
+    # source of an already-valid "out" (the build would fail before
+    # registering anything, out included). To still reach the
+    # asymmetric-validity condition -- out already valid, aux not --
+    # register out's (statically known, input-addressed) path valid
+    # out-of-band, the same way an unrelated closure GC-rooting it would,
+    # without ever running this derivation's own builder for it.
+    #
+    # That out-of-band registration is why this half is local-store only:
+    # `nix-store --register-validity` goes through ensureLocalStore() and
+    # fails against a daemon store. Guarded inline rather than with
+    # needLocalStore, which exits the whole file and would take test1-13
+    # out of the daemon run with it.
+    if [[ "$NIX_REMOTE" != "daemon" ]]; then
+        clearStore
+        drvPath14=$(nix-instantiate check-refs.nix -A test14)
+        outPath14=$(nix-store -q --outputs "$drvPath14" | grep -v -- '-aux$')
+        auxPath14=$(nix-store -q --outputs "$drvPath14" | grep -- '-aux$')
+        [[ ! -e "$outPath14" ]] || fail "test14: out should not exist yet"
+
+        mkdir -p "$outPath14"
+        echo out > "$outPath14/x"
+        printf '%s\n\n0\n' "$outPath14" | nix-store --register-validity
+        [[ -e "$outPath14" ]] || fail "test14: out should be valid after manual registration"
+        [[ ! -e "$auxPath14" ]] || fail "test14: aux should not exist yet"
+
+        (! nix-build -o "$RESULT14aux" check-refs.nix -A test14.aux 2> "$TEST_ROOT/test14.stderr")
+        grepQuiet -F \
+            "is not allowed to refer to the following paths" \
+            < "$TEST_ROOT/test14.stderr"
+        rm -f "$RESULT14aux"
     fi
 fi
