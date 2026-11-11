@@ -29,13 +29,15 @@ TEST(fchmodatTryNoFollow, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
-        sink.createDirectory(CanonPath("dir"));
-        sink.createSymlink(CanonPath("filelink"), "file");
-        sink.createSymlink(CanonPath("dirlink"), "dir");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("file"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) {});
+        });
+        root.createChild("dir"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+        });
+        root.createChild("filelink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("file"); });
+        root.createChild("dirlink"_filename, [](FileSystemObjectSink & s) { s.createSymlink("dir"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
@@ -112,11 +114,11 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
-        sink.createSymlink(CanonPath("link"), "file");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("file"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) {});
+        });
+        root.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("file"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));

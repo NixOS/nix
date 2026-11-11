@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/util/file-system.hh"
+#include "nix/util/fs-sink.hh"
 #include "unix/file-system.hh"
 
 #include <unistd.h>
@@ -29,8 +30,11 @@ TEST_F(RootDeletePath, modeChangesDenied)
     auto tmpDir = createTempDir();
     AutoDelete cleanup(tmpDir);
     auto directory = tmpDir / "directory";
-    createDirs(directory);
-    writeFile(directory / "file", "contents");
+    RestoreSink::forPath(directory, /*startFsync=*/false).createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("contents"); });
+        });
+    });
     chmod(directory, 0555);
 
     /* Restrict only the child so the parent can clean up after a failed test.

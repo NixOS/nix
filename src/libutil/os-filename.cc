@@ -16,6 +16,8 @@ void OsFilename::validateThrow(const std::filesystem::path & p)
 {
     if (p.empty())
         throw Error("filename cannot be empty");
+    if (p.native().find(OS_STR('\0')) != p.native().npos)
+        throw Error("filename cannot contain a NUL byte");
     if (p.has_root_path())
         throw Error("filename cannot have a root path: %s", PathFmt(p));
     if (p.has_parent_path())
@@ -32,6 +34,22 @@ OsFilename OsFilename::fromPathThrowing(std::filesystem::path p)
 {
     validateThrow(p);
     return OsFilename{std::move(p)};
+}
+
+OsFilename::OsFilename(FilenameView portable)
+    : name(std::string{portable.str()})
+{
+    validateAssert();
+}
+
+OsFilename OsFilename::fromPortableThrowing(FilenameView portable)
+{
+    return fromPathThrowing(std::string{portable.str()});
+}
+
+Filename OsFilename::toPortable() const
+{
+    return Filename::fromStringAsserting(name.string());
 }
 
 } // namespace nix

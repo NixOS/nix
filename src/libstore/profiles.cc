@@ -35,10 +35,10 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
     std::filesystem::path profileDir = profile.parent_path();
     auto profileName = profile.filename().string();
 
-    for (auto & i : DirectoryIterator{profileDir}) {
+    for (const auto & i : DirectoryIterator{profileDir}) {
         checkInterrupt();
-        if (auto n = parseName(profileName, i.path().filename().string())) {
-            auto path = i.path().string();
+        if (auto n = parseName(profileName, i.name.path().string())) {
+            auto path = (profileDir / i.name.path()).string();
             gens.push_back({.number = *n, .path = path, .creationTime = lstat(path).st_mtime});
         }
     }

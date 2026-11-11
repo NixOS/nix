@@ -66,6 +66,7 @@ TEST_DONT_PARSE(slash, "a/b")
         auto p = store->parseStorePath(str);                \
         std::string name{p.name()};                         \
         EXPECT_EQ(p.name(), STR);                           \
+        EXPECT_EQ(p.filename().str(), p.to_string());       \
         EXPECT_EQ(store->parseStorePathCanonical(str), p);  \
         EXPECT_TRUE(std::regex_match(name, nameRegex));     \
     }
