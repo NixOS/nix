@@ -354,7 +354,7 @@
         system:
         let
           pkgs = nixpkgsFor.${system}.native;
-          opener = if pkgs.stdenv.isDarwin then "open" else "xdg-open";
+          opener = if pkgs.stdenv.hostPlatform.isDarwin then "open" else "xdg-open";
         in
         {
           open-manual = {
@@ -391,7 +391,7 @@
           prefixAttrs "native" (
             forAllStdenvs (stdenvName: makeShell' nixComponentsFor.${system}.nativeForStdenv.${stdenvName})
           )
-          // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
+          // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) (
             prefixAttrs "static" (
               forAllStdenvs (
                 stdenvName: makeShell' nixComponentsFor.${system}.nativeStaticForStdenv.${stdenvName}
