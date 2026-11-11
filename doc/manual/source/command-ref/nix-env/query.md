@@ -30,6 +30,88 @@ about derivations whose symbolic name matches one of *names*.
 
 The derivations are sorted by their `name` attributes.
 
+# Examples
+
+To show installed packages:
+
+```console
+$ nix-env --query
+bison-1.875c
+docbook-xml-4.2
+firefox-1.0.4
+MPlayer-1.0pre7
+ORBit2-2.8.3
+…
+```
+
+To show available packages:
+
+```console
+$ nix-env --query --available
+firefox-1.0.7
+GConf-2.4.0.1
+MPlayer-1.0pre7
+ORBit2-2.8.3
+…
+```
+
+To show the status of available packages:
+
+```console
+$ nix-env --query --available --status
+-P- firefox-1.0.7   (not installed but present)
+--S GConf-2.4.0.1   (not present, but there is a substitute for fast installation)
+--S MPlayer-1.0pre3 (i.e., this is not the installed MPlayer, even though the version is the same!)
+IP- ORBit2-2.8.3    (installed and by definition present)
+…
+```
+
+To show available packages in the Nix expression `foo.nix`:
+
+```console
+$ nix-env --file ./foo.nix --query --available
+foo-1.2.3
+```
+
+To compare installed versions to what’s available:
+
+```console
+$ nix-env --query --compare-versions
+...
+acrobat-reader-7.0 - ?      (package is not available at all)
+autoconf-2.59      = 2.59   (same version)
+firefox-1.0.4      < 1.0.7  (a more recent version is available)
+...
+```
+
+To show all packages with “`zip`” in the name:
+
+```console
+$ nix-env --query --available '.*zip.*'
+bzip2-1.0.6
+gzip-1.6
+zip-3.0
+…
+```
+
+To show all packages with “`firefox`” or “`chromium`” in the name:
+
+```console
+$ nix-env --query --available '.*(firefox|chromium).*'
+chromium-37.0.2062.94
+chromium-beta-38.0.2125.24
+firefox-32.0.3
+firefox-with-plugins-13.0.1
+…
+```
+
+To show all packages in the latest revision of the Nixpkgs repository:
+
+```console
+$ nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --query --available
+```
+
+
 # Source selection
 
 The following flags specify the set of things on which the query
@@ -152,85 +234,3 @@ derivation is shown unless `--no-name` is specified.
 {{#include ./env-common.md}}
 
 {{#include ../env-common.md}}
-
-# Examples
-
-To show installed packages:
-
-```console
-$ nix-env --query
-bison-1.875c
-docbook-xml-4.2
-firefox-1.0.4
-MPlayer-1.0pre7
-ORBit2-2.8.3
-…
-```
-
-To show available packages:
-
-```console
-$ nix-env --query --available
-firefox-1.0.7
-GConf-2.4.0.1
-MPlayer-1.0pre7
-ORBit2-2.8.3
-…
-```
-
-To show the status of available packages:
-
-```console
-$ nix-env --query --available --status
--P- firefox-1.0.7   (not installed but present)
---S GConf-2.4.0.1   (not present, but there is a substitute for fast installation)
---S MPlayer-1.0pre3 (i.e., this is not the installed MPlayer, even though the version is the same!)
-IP- ORBit2-2.8.3    (installed and by definition present)
-…
-```
-
-To show available packages in the Nix expression `foo.nix`:
-
-```console
-$ nix-env --file ./foo.nix --query --available
-foo-1.2.3
-```
-
-To compare installed versions to what’s available:
-
-```console
-$ nix-env --query --compare-versions
-...
-acrobat-reader-7.0 - ?      (package is not available at all)
-autoconf-2.59      = 2.59   (same version)
-firefox-1.0.4      < 1.0.7  (a more recent version is available)
-...
-```
-
-To show all packages with “`zip`” in the name:
-
-```console
-$ nix-env --query --available '.*zip.*'
-bzip2-1.0.6
-gzip-1.6
-zip-3.0
-…
-```
-
-To show all packages with “`firefox`” or “`chromium`” in the name:
-
-```console
-$ nix-env --query --available '.*(firefox|chromium).*'
-chromium-37.0.2062.94
-chromium-beta-38.0.2125.24
-firefox-32.0.3
-firefox-with-plugins-13.0.1
-…
-```
-
-To show all packages in the latest revision of the Nixpkgs repository:
-
-```console
-$ nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --query --available
-```
-

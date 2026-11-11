@@ -54,6 +54,71 @@ shellHook =
 will cause `nix-shell` to print `Hello shell` and set the `SOME_API_TOKEN`
 environment variable to a user-configured value.
 
+# Examples
+
+To build the dependencies of the package Pan, and start an interactive
+shell in which to build it:
+
+```console
+$ nix-shell '<nixpkgs>' --attr pan
+[nix-shell]$ eval ${unpackPhase:-unpackPhase}
+[nix-shell]$ cd $sourceRoot
+[nix-shell]$ eval ${patchPhase:-patchPhase}
+[nix-shell]$ eval ${configurePhase:-configurePhase}
+[nix-shell]$ eval ${buildPhase:-buildPhase}
+[nix-shell]$ ./pan/gui/pan
+```
+
+The reason we use form `eval ${configurePhase:-configurePhase}` here is because
+those packages that override these phases do so by exporting the overridden
+values in the environment variable of the same name.
+Here bash is being told to either evaluate the contents of 'configurePhase',
+if it exists as a variable, otherwise evaluate the configurePhase function.
+
+To clear the environment first, and do some additional automatic
+initialisation of the interactive shell:
+
+```console
+$ nix-shell '<nixpkgs>' --attr pan --pure \
+    --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
+```
+
+Nix expressions can also be given on the command line using the `-E` and
+`-p` flags. For instance, the following starts a shell containing the
+packages `sqlite` and `libX11`:
+
+```console
+$ nix-shell --expr 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
+```
+
+A shorter way to do the same is:
+
+```console
+$ nix-shell --packages sqlite xorg.libX11
+[nix-shell]$ echo $NIX_LDFLAGS
+… -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
+```
+
+Note that `-p` accepts multiple full nix expressions that are valid in
+the `buildInputs = [ ... ]` shown above, not only package names. So the
+following is also legal:
+
+```console
+$ nix-shell --packages sqlite 'git.override { withManual = false; }'
+```
+
+The `-p` flag looks up Nixpkgs in the Nix search path. You can override
+it by passing `-I` or setting `NIX_PATH`. For example, the following
+gives you a shell containing the Pan package from a specific revision of
+Nixpkgs:
+
+```console
+$ nix-shell --packages pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+
+[nix-shell:~]$ pan --version
+Pan 0.139
+```
+
 # Options
 
 All options not listed here are passed to `nix-store
@@ -140,71 +205,6 @@ All options not listed here are passed to `nix-store
   > ```
 
 {{#include ./env-common.md}}
-
-# Examples
-
-To build the dependencies of the package Pan, and start an interactive
-shell in which to build it:
-
-```console
-$ nix-shell '<nixpkgs>' --attr pan
-[nix-shell]$ eval ${unpackPhase:-unpackPhase}
-[nix-shell]$ cd $sourceRoot
-[nix-shell]$ eval ${patchPhase:-patchPhase}
-[nix-shell]$ eval ${configurePhase:-configurePhase}
-[nix-shell]$ eval ${buildPhase:-buildPhase}
-[nix-shell]$ ./pan/gui/pan
-```
-
-The reason we use form `eval ${configurePhase:-configurePhase}` here is because
-those packages that override these phases do so by exporting the overridden
-values in the environment variable of the same name.
-Here bash is being told to either evaluate the contents of 'configurePhase',
-if it exists as a variable, otherwise evaluate the configurePhase function.
-
-To clear the environment first, and do some additional automatic
-initialisation of the interactive shell:
-
-```console
-$ nix-shell '<nixpkgs>' --attr pan --pure \
-    --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
-```
-
-Nix expressions can also be given on the command line using the `-E` and
-`-p` flags. For instance, the following starts a shell containing the
-packages `sqlite` and `libX11`:
-
-```console
-$ nix-shell --expr 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
-```
-
-A shorter way to do the same is:
-
-```console
-$ nix-shell --packages sqlite xorg.libX11
-[nix-shell]$ echo $NIX_LDFLAGS
-… -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
-```
-
-Note that `-p` accepts multiple full nix expressions that are valid in
-the `buildInputs = [ ... ]` shown above, not only package names. So the
-following is also legal:
-
-```console
-$ nix-shell --packages sqlite 'git.override { withManual = false; }'
-```
-
-The `-p` flag looks up Nixpkgs in the Nix search path. You can override
-it by passing `-I` or setting `NIX_PATH`. For example, the following
-gives you a shell containing the Pan package from a specific revision of
-Nixpkgs:
-
-```console
-$ nix-shell --packages pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
-
-[nix-shell:~]$ pan --version
-Pan 0.139
-```
 
 # Use as a `#!`-interpreter
 
