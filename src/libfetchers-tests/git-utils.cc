@@ -243,7 +243,7 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
     /* https://git-scm.com/docs/pack-format */
     packSink("PACK");
     serialiseBigEndian(/*version=*/2u, packSink);
-    serialiseBigEndian(/*numObjects=*/4u, packSink);
+    serialiseBigEndian(/*numObjects=*/5u, packSink);
 
     auto writeBlobToPackfile = [&](std::string_view data) -> Hash {
         HashSink hashSink(HashAlgorithm::SHA1);
@@ -286,6 +286,11 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
         std::to_array<std::tuple<std::string, git::Mode, Hash>>({
             /* Fake blob that actually points to a tree. */
             {"a.txt", git::Mode::Regular, tree1},
+        }));
+    auto tree3 = writeTreeToPackfile(
+        std::to_array<std::tuple<std::string, git::Mode, Hash>>({
+            /* Fake tree that actually points to a blob. */
+            {"fake-dir", git::Mode::Directory, blob1},
         }));
 
     auto packHash = hashString(HashAlgorithm::SHA1, packSink.s);
@@ -334,6 +339,12 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
         [&] { accessor2->readFile(CanonPath("a.txt")); },
         ::testing::ThrowsMessage<Error>(
             testing::HasSubstrIgnoreANSIMatcher("'test-git-repo/a.txt' is not a regular file")));
+
+    auto accessor3 = repo->getAccessor(tree3, {}, getRepoName());
+    ASSERT_THAT(
+        [&] { accessor3->readDirectory(CanonPath("fake-dir")); },
+        ::testing::ThrowsMessage<Error>(
+            testing::HasSubstrIgnoreANSIMatcher("'test-git-repo/fake-dir' is not a directory")));
 }
 
 TEST(GitUtils, isLegalRefName)

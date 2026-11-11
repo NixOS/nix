@@ -1205,7 +1205,7 @@ public:
             if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
                 return dupObject<Tree>((git_tree *) &*state.root);
             else
-                throw Error("Git root object '%s' is not a directory", *git_object_id(state.root.get()));
+                throw NotADirectory("git root object '%s' is not a directory", *git_object_id(state.root.get()));
         }
 
         auto entry = need(state, path);
@@ -1214,13 +1214,19 @@ public:
             return Submodule();
 
         if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
-            throw Error("'%s' is not a directory", showPath(path));
+            throw NotADirectory("'%s' is not a directory", showPath(path));
 
-        Tree tree;
-        if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(tree), *state.repo, entry))
+        Object object;
+        if (git_tree_entry_to_object(Setter(object), *state.repo, entry))
             throw GitError("looking up directory '%s'", showPath(path));
 
-        return tree;
+        /* git_tree_entry_type check above is not enough to guarantee that the
+           object is actually a tree, since the parent tree might be handcrafted
+           to report the wrong type. */
+        if (git_object_type(object.get()) != GIT_OBJECT_TREE)
+            throw NotADirectory("'%s' is not a directory", showPath(path));
+
+        return Tree(reinterpret_cast<git_tree *>(object.release()));
     }
 
     Blob getBlob(State & state, const CanonPath & path, bool expectSymlink)
