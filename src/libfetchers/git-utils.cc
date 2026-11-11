@@ -1037,7 +1037,28 @@ public:
                         // FIXME: add to cache
                         /* Must be a file name without `/` or `..`, `.` components. */
                         const auto name = CanonPath::fromFilename(std::string_view(git_tree_entry_name(entry)));
-                        auto [it, inserted] = res.emplace(name.rel(), DirEntry{});
+                        const auto mode = git_tree_entry_filemode(entry);
+
+                        DirEntry type = std::nullopt;
+                        NIX_INCOMPLETE_SWITCH_BEGIN
+                        switch (mode) {
+                        case GIT_FILEMODE_BLOB:
+                        case GIT_FILEMODE_BLOB_EXECUTABLE:
+                            type = Type::tRegular;
+                            break;
+                        case GIT_FILEMODE_TREE:
+                            type = Type::tDirectory;
+                            break;
+                        case GIT_FILEMODE_LINK:
+                            type = Type::tSymlink;
+                            break;
+                        default:
+                            /* leave as std::nullopt to signal that the caller should query it. */
+                            break;
+                        }
+                        NIX_INCOMPLETE_SWITCH_END
+
+                        auto [it, inserted] = res.emplace(name.rel(), type);
                         /* Should be structurally unreachable combined with the comparison above. */
                         if (!inserted)
                             throw Error("duplicate tree entry '%1%'", showPath(path / name));
