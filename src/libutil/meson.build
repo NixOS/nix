@@ -224,6 +224,7 @@ sources = [ config_priv_h ] + files(
   'url.cc',
   'users.cc',
   'util.cc',
+  'wtf8.cc',
   'xml-writer.cc',
 )
 
