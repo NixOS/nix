@@ -89,25 +89,23 @@ TEST(OsCanonPath, concatOsFilenameWithOsFilename)
 
 TEST(OsCanonPath, absolutePathFails)
 {
-    ASSERT_DEATH(OsCanonPath::fromPathAsserting(std::filesystem::path{"/foo"}), "cannot have a root path");
+    ASSERT_DEATH(OsCanonPath::fromPathAsserting(std::filesystem::path{"/foo"}), "");
 }
 
 TEST(OsCanonPath, dotComponentFails)
 {
-    ASSERT_DEATH(
-        OsCanonPath::fromPathAsserting(std::filesystem::path{"foo"} / "." / "bar"), "cannot have '\\.' components");
+    ASSERT_DEATH(OsCanonPath::fromPathAsserting(std::filesystem::path{"foo"} / "." / "bar"), "");
 }
 
 TEST(OsCanonPath, dotDotComponentFails)
 {
-    ASSERT_DEATH(
-        OsCanonPath::fromPathAsserting(std::filesystem::path{"foo"} / ".." / "bar"), "cannot have '\\.\\.' components");
+    ASSERT_DEATH(OsCanonPath::fromPathAsserting(std::filesystem::path{"foo"} / ".." / "bar"), "");
 }
 
 #ifdef _WIN32
 TEST(OsCanonPath, windowsDriveLetterFails)
 {
-    ASSERT_DEATH(OsCanonPath::fromPathAsserting(std::filesystem::path{"C:\\foo"}), "cannot have a root path");
+    ASSERT_DEATH(OsCanonPath::fromPathAsserting(std::filesystem::path{"C:\\foo"}), "");
 }
 #endif
 

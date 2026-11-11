@@ -244,16 +244,6 @@ void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink, bool t
 
 //////////////////////////////////////////////////////////////////////
 
-AutoCloseFD::AutoCloseFD()
-    : fd{INVALID_DESCRIPTOR}
-{
-}
-
-AutoCloseFD::AutoCloseFD(Descriptor fd)
-    : fd{fd}
-{
-}
-
 // NOTE: This can be noexcept since we are just copying a value and resetting
 // the file descriptor in the rhs.
 AutoCloseFD::AutoCloseFD(AutoCloseFD && that) noexcept
@@ -280,11 +270,6 @@ AutoCloseFD::~AutoCloseFD()
     }
 }
 
-Descriptor AutoCloseFD::get() const noexcept
-{
-    return fd;
-}
-
 void AutoCloseFD::close()
 {
     if (fd != INVALID_DESCRIPTOR) {
@@ -309,11 +294,6 @@ void AutoCloseFD::startFsync() const
         ::sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
     }
 #endif
-}
-
-AutoCloseFD::operator bool() const noexcept
-{
-    return fd != INVALID_DESCRIPTOR;
 }
 
 Descriptor AutoCloseFD::release() noexcept

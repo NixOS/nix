@@ -130,8 +130,9 @@ public:
 
     /**
      * Reinterpret this path as relative to `prefix` rather than to
-     * whatever it was relative to before. Panics unless
-     * `isWithin(prefix)`.
+     * whatever it was relative to before.
+     *
+     * @pre `isWithin(prefix)` is true.
      */
     OsCanonPath removePrefix(const OsCanonPath & prefix) const;
 

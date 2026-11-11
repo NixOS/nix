@@ -70,72 +70,24 @@ TEST(OsFilename, noConversionToPath)
     ASSERT_EQ(f.path(), "test.txt");
 }
 
-TEST(OsFilename, emptyFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting(""), "cannot be empty");
-}
-
-TEST(OsFilename, dotFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting("."), "cannot be '\\.'");
-}
-
-TEST(OsFilename, dotDotFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting(".."), "cannot be '\\.\\.'");
-}
-
-TEST(OsFilename, absolutePathFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting("/foo"), "cannot have a root path");
-}
-
-TEST(OsFilename, relativePathWithDirFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting("foo/bar"), "cannot have a parent path");
-}
-
 TEST(OsFilename, fromPathThrowingRejects)
 {
-    using ::testing::HasSubstr;
-    using ::testing::ThrowsMessage;
-    EXPECT_THAT([] { OsFilename::fromPathThrowing(""); }, ThrowsMessage<Error>(HasSubstr("cannot be empty")));
-    EXPECT_THAT([] { OsFilename::fromPathThrowing("."); }, ThrowsMessage<Error>(HasSubstr("cannot be '.'")));
-    EXPECT_THAT([] { OsFilename::fromPathThrowing(".."); }, ThrowsMessage<Error>(HasSubstr("cannot be '..'")));
-    EXPECT_THAT(
-        [] { OsFilename::fromPathThrowing("/foo"); }, ThrowsMessage<Error>(HasSubstr("cannot have a root path")));
-    EXPECT_THAT(
-        [] { OsFilename::fromPathThrowing("foo/bar"); }, ThrowsMessage<Error>(HasSubstr("cannot have a parent path")));
-}
-
+    auto throwsInvalid = ::testing::ThrowsMessage<Error>(::testing::HasSubstr("invalid filename"));
+    for (const auto * p : {
+             "",
+             ".",
+             "..",
+             "/foo",
+             "foo/bar",
 #ifdef _WIN32
-TEST(OsFilename, windowsDriveLetterFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting("C:\\foo"), "cannot have a root path");
-}
-
-TEST(OsFilename, windowsDriveRelativeFails)
-{
-    /* No separator at all: only the root-name check catches this. */
-    ASSERT_DEATH(OsFilename::fromPathAsserting("C:foo"), "cannot have a root path");
-}
-
-TEST(OsFilename, windowsBackslashFails)
-{
-    ASSERT_DEATH(OsFilename::fromPathAsserting("foo\\bar"), "cannot have a parent path");
-}
-
-TEST(OsFilename, windowsFromPathThrowingRejects)
-{
-    using ::testing::HasSubstr;
-    using ::testing::ThrowsMessage;
-    EXPECT_THAT(
-        [] { OsFilename::fromPathThrowing("C:foo"); }, ThrowsMessage<Error>(HasSubstr("cannot have a root path")));
-    EXPECT_THAT(
-        [] { OsFilename::fromPathThrowing("foo\\bar"); }, ThrowsMessage<Error>(HasSubstr("cannot have a parent path")));
-    EXPECT_THAT(
-        [] { OsFilename::fromPathThrowing("..\\evil"); }, ThrowsMessage<Error>(HasSubstr("cannot have a parent path")));
-}
+             "C:foo",
+             "foo\\bar",
+             "..\\evil",
 #endif
+         }) {
+        EXPECT_THAT([&] { OsFilename::fromPathThrowing(p); }, throwsInvalid);
+        ASSERT_DEATH(OsFilename::fromPathAsserting(p), "invalid filename");
+    }
+}
 
 } // namespace nix

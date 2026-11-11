@@ -14,18 +14,15 @@ void OsFilename::validateAssert() const noexcept
 
 void OsFilename::validateThrow(const std::filesystem::path & p)
 {
-    if (p.empty())
-        throw Error("filename cannot be empty");
-    if (p.has_root_path())
-        throw Error("filename cannot have a root path: %s", PathFmt(p));
-    if (p.has_parent_path())
-        throw Error("filename cannot have a parent path: %s", PathFmt(p));
-    if (p.filename() != p)
-        throw Error("not a single filename: %s", PathFmt(p));
-    if (p.native() == OS_STR("."))
-        throw Error("filename cannot be '.'");
-    if (p.native() == OS_STR(".."))
-        throw Error("filename cannot be '..'");
+    const OsString & native = p.native();
+    bool invalid = p.empty() || native == OS_STR(".") || native == OS_STR("..");
+#ifndef _WIN32
+    invalid |= native.contains('/');
+#else
+    invalid |= p.has_root_path() || p.has_parent_path() || (p.filename() != p);
+#endif
+    if (invalid) [[unlikely]]
+        throw Error("invalid filename %1%", PathFmt(p));
 }
 
 OsFilename OsFilename::fromPathThrowing(std::filesystem::path p)

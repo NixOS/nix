@@ -264,16 +264,33 @@ class AutoCloseFD
 {
     Descriptor fd;
 public:
-    AutoCloseFD();
-    AutoCloseFD(Descriptor fd);
+    AutoCloseFD() noexcept
+        : fd(INVALID_DESCRIPTOR)
+    {
+    }
+
+    AutoCloseFD(Descriptor fd) noexcept
+        : fd(fd)
+    {
+    }
+
     AutoCloseFD(const AutoCloseFD & fd) = delete;
     AutoCloseFD(AutoCloseFD && fd) noexcept;
     ~AutoCloseFD();
     AutoCloseFD & operator=(const AutoCloseFD & fd) = delete;
     // NOLINTNEXTLINE(performance-noexcept-move-constructor) - technically can throw because of close()
     AutoCloseFD & operator=(AutoCloseFD && fd);
-    Descriptor get() const noexcept;
-    explicit operator bool() const noexcept;
+
+    Descriptor get() const noexcept
+    {
+        return fd;
+    }
+
+    explicit operator bool() const noexcept
+    {
+        return fd != INVALID_DESCRIPTOR;
+    }
+
     Descriptor release() noexcept;
     void close();
 

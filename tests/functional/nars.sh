@@ -51,11 +51,11 @@ rm -rf "$TEST_ROOT/out"
 # must already exist, which conflicts with --restore creating
 # something new.
 rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "filename cannot be '\.'"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "invalid filename \"\.\""
 
 # Destination with trailing `/..` should fail.
 rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out/.." < "$TEST_ROOT/tmp.nar" | grepQuiet "filename cannot be '\.\.'"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/.." < "$TEST_ROOT/tmp.nar" | grepQuiet "invalid filename \"\.\.\""
 
 # Empty destination should fail.
 expectStderr 1 nix-store --restore "" < "$TEST_ROOT/tmp.nar" | grepQuiet 'destination path is empty'
@@ -88,7 +88,7 @@ rm -rf "$TEST_ROOT/out"
 
 # Trailing `/.` — same baseline as above (currently fails).
 rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "filename cannot be '\.'"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "invalid filename \"\.\""
 
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
@@ -117,7 +117,7 @@ expectStderr 1 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > /dev/null
 
 # Trailing `/.` — same baseline as above (currently fails).
 rm -rf "$TEST_ROOT/case"
-expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case/." < case.nar | grepQuiet "filename cannot be '\.'"
+expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case/." < case.nar | grepQuiet "invalid filename \"\.\""
 
 # Detect NARs that have a directory entry that after case-hacking
 # collides with another entry (e.g. a directory containing 'Test',
