@@ -39,14 +39,13 @@ protected:
 TEST_F(FSSourceAccessorTest, works)
 {
 #ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
 #endif
     {
         RestoreSink sink(false);
         sink.dstPath = tmpDir;
-#ifndef _WIN32
         sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-#endif
         sink.createDirectory(CanonPath("subdir"));
         sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });
         sink.createRegularFile(CanonPath("subdir/file2"), [](CreateRegularFileSink & crf) { crf("content2"); });
@@ -93,7 +92,8 @@ TEST_F(FSSourceAccessorTest, works)
 TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
 {
 #ifdef _WIN32
-    GTEST_SKIP() << "fd-based accessor is Unix-only";
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
 #endif
     auto accessor = makeFSSourceAccessor(tmpDir);
 
@@ -121,8 +121,8 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
    exercises that: the tests above only ever read a single branch, so the
    lookup either hits exactly or starts from the root.
 
-   Only uses the `SourceAccessor` interface, so this runs on Windows too, where
-   it degenerates to a plain nested-read check (that accessor has no cache). */
+   Only uses the `SourceAccessor` interface, so this runs on Windows too, which
+   uses the same accessor. */
 TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
 {
     /* Siblings deliberately share a length, so that a component comparison

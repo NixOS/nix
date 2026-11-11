@@ -373,6 +373,27 @@ Result<AutoCloseFD, NativeError> openDirectoryAt(Descriptor dirFd, const OsCanon
     return openOrCreateDirectoryAt(dirFd, path, FILE_OPEN);
 }
 
+Result<AutoCloseFD, NativeError> reopenDirectory(Descriptor dirFd)
+{
+    using namespace nix::windows;
+
+    /* `NtCreateFile` relative to the directory, with an empty name, opens
+       the directory itself, the same way subdirectories are opened
+       relative to their parents.
+
+       We would like to instead use `ReOpenFile`, which is meant for reopening
+       handles. However, under Wine at least, it fails with "Access denied" for
+       a directory handle. We haven't yet tested whether `ReOpenFile` is
+       supposed to work for directories on real Windows either, so for now we
+       avoid relying on it. */
+    auto result = maybeNtOpenAt(
+        dirFd, L"", FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_DIRECTORY_FILE);
+    if (result)
+        return outcome::success(std::move(result.value()));
+
+    return outcome::failure(RtlNtStatusToDosError(result.error()));
+}
+
 Result<AutoCloseFD, NativeError> createDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
 {
     return openOrCreateDirectoryAt(dirFd, path, FILE_CREATE);
