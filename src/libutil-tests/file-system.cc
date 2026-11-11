@@ -1,11 +1,13 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/tests/result.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
+#include <map>
 #include <ranges>
 
 #ifdef _WIN32
@@ -300,14 +302,74 @@ TEST(DirectoryIterator, works)
 
     nix::writeFile(tmpDir / "somefile", "");
 
-    for (auto path : DirectoryIterator(tmpDir)) {
-        ASSERT_EQ(path.path(), tmpDir / "somefile");
+    for (const auto & entry : DirectoryIterator(tmpDir)) {
+        ASSERT_EQ(entry.name.path(), "somefile");
     }
+}
+
+TEST(DirectoryIterator, namesAndTypes)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir / "file", "");
+    nix::createDir(tmpDir / "dir");
+
+    std::map<std::filesystem::path, std::filesystem::file_type> entries;
+    for (const auto & entry : DirectoryIterator(tmpDir))
+        entries.emplace(entry.name.path(), entry.type);
+
+    /* No `.` or `..`. */
+    ASSERT_EQ(entries.size(), 2);
+    /* `none` means the directory read didn't say, which is allowed. */
+    auto typeIs = [&](const std::filesystem::path & name, std::filesystem::file_type type) {
+        auto t = entries.at(name);
+        return t == type || t == std::filesystem::file_type::none;
+    };
+    ASSERT_TRUE(typeIs("file", std::filesystem::file_type::regular));
+    ASSERT_TRUE(typeIs("dir", std::filesystem::file_type::directory));
+}
+
+TEST(DirectoryIterator, fromDescriptor)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir / "somefile", "");
+
+    auto fd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+    std::vector<std::filesystem::path> names;
+    for (const auto & entry : DirectoryIterator(std::move(fd)))
+        names.push_back(entry.name.path());
+    ASSERT_EQ(names, std::vector<std::filesystem::path>{"somefile"});
+}
+
+TEST(DirectoryIterator, empty)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    ASSERT_TRUE(DirectoryIterator(tmpDir) == std::default_sentinel);
 }
 
 TEST(DirectoryIterator, nonexistent)
 {
     ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
+}
+
+TEST(DirectoryIterator, notADirectory)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir / "file", "");
+
+    try {
+        DirectoryIterator{tmpDir / "file"};
+        FAIL() << "expected an error";
+    } catch (SystemError & e) {
+        ASSERT_TRUE(e.is(std::errc::not_a_directory));
+    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -393,7 +455,9 @@ TEST_F(MovePathTest, works)
     // Non-empty directory can't replace a regular file.
     unlink(dst);
     movePath(dirSrc, dst);
-    auto files = std::ranges::to<std::vector<std::filesystem::path>>(DirectoryIterator{dst});
+    std::vector<std::filesystem::path> files;
+    for (const auto & entry : DirectoryIterator{dst})
+        files.push_back(dst / entry.name.path());
     ASSERT_EQ(files, std::vector{dst / OS_STR("reg")});
 }
 

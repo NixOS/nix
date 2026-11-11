@@ -266,9 +266,41 @@ bool isReparsePoint(HANDLE handle)
     return (basicInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
+/**
+ * Convert Unix time_t to Windows FILETIME.
+ *
+ * FILETIME epoch is January 1, 1601 00:00:00 UTC.
+ * Unix epoch is January 1, 1970 00:00:00 UTC.
+ * Difference is 11644473600 seconds.
+ * FILETIME is in 100-nanosecond intervals.
+ */
+FILETIME timeToFileTime(time_t t)
+{
+    constexpr uint64_t EPOCH_DIFF = 11644473600ULL;
+    uint64_t intervals = (static_cast<uint64_t>(t) + EPOCH_DIFF) * 10000000ULL;
+    FILETIME ft;
+    ft.dwLowDateTime = static_cast<DWORD>(intervals);
+    ft.dwHighDateTime = static_cast<DWORD>(intervals >> 32);
+    return ft;
+}
+
 } // anonymous namespace
 
 } // namespace windows
+
+AutoCloseFD reopenDirectory(Descriptor dirFd)
+{
+    using namespace nix::windows;
+
+    AutoCloseFD fd{ReOpenFile(
+        dirFd,
+        FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        FILE_FLAG_BACKUP_SEMANTICS)};
+    if (!fd)
+        throw WinError("reopening directory %s", PathFmt(descriptorToPath(dirFd)));
+    return fd;
+}
 
 OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
@@ -410,6 +442,24 @@ PosixStat fstatat(Descriptor dirFd, const OsCanonPath & path)
     auto handle = ntOpenAt(dirFd, path.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
 
     return fstat(handle.get());
+}
+
+void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTime, time_t modificationTime)
+{
+    using namespace nix::windows;
+
+    assert(!path.empty());
+
+    /* Open the file with write attributes permission, not following symlinks */
+    AutoCloseFD handle(ntOpenAt(
+        dirFd, path.c_str(), FILE_WRITE_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT /* Don't follow symlinks */
+        ));
+
+    FILETIME atime = timeToFileTime(accessedTime);
+    FILETIME mtime = timeToFileTime(modificationTime);
+
+    if (!SetFileTime(handle.get(), nullptr /* creation time */, &atime, &mtime))
+        throw WinError("changing modification time of %s", PathFmt(path.path()));
 }
 
 std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const OsCanonPath & path)

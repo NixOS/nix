@@ -47,7 +47,7 @@ createLinks(State & state, const std::filesystem::path & srcDir, const std::file
 
     for (const auto & ent : srcFiles) {
         checkInterrupt();
-        auto name = ent.path().filename();
+        auto & name = ent.name.path();
         if (name.string()[0] == '.')
             /* not matched by glob */
             continue;

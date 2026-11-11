@@ -286,6 +286,14 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode, std::move(dirFdCallback));
 }
 
+AutoCloseFD reopenDirectory(Descriptor dirFd)
+{
+    AutoCloseFD fd = ::openat(dirFd, ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (!fd)
+        throw SysError([&] { return HintFmt("reopening directory %s", PathFmt(descriptorToPath(dirFd))); });
+    return fd;
+}
+
 OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
     /* No emptiness assertion, unlike the other operations here: since Linux
@@ -381,6 +389,33 @@ std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const OsCanonPath & path
         throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(dirFd) / path.path())); });
     }
     return st;
+}
+
+void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTime, time_t modificationTime)
+{
+    struct timespec times[2] = {
+        {
+            .tv_sec = accessedTime,
+            .tv_nsec = 0,
+        },
+        {
+            .tv_sec = modificationTime,
+            .tv_nsec = 0,
+        },
+    };
+
+#if HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
+    if (utimensat(dirFd, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
+        throw SysError("changing modification time of %s (using `utimensat`)", PathFmt(path.path()));
+#else
+    // Fallback: open the file and use futimens
+    AutoCloseFD fd = openat(dirFd, path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (!fd)
+        throw SysError("opening %s to change modification time", PathFmt(path.path()));
+
+    if (futimens(fd.get(), times) == -1)
+        throw SysError("changing modification time of %s (using `futimens`)", PathFmt(path.path()));
+#endif
 }
 
 } // namespace nix

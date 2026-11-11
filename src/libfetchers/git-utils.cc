@@ -1024,7 +1024,9 @@ public:
                     for (size_t n = 0; n < count; ++n) {
                         auto entry = git_tree_entry_byindex(tree.get(), n);
                         // FIXME: add to cache
-                        res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
+                        /* Checked, since a crafted repository could have
+                           tree entries Git itself would reject. */
+                        res.emplace(Filename::fromStringThrowing(git_tree_entry_name(entry)), DirEntry{});
                     }
 
                     return res;
@@ -1094,7 +1096,9 @@ public:
                 res = copy.get();
 
             auto path2 = *parent;
-            path2.push(entryName);
+            /* Checked, since a crafted repository could have tree
+               entries Git itself would reject. */
+            path2.push(FilenameView::fromStringThrowing(entryName));
             lookupCache.emplace(path2, std::move(copy));
         }
 
@@ -1392,13 +1396,13 @@ struct GitDirectorySinkImpl : merkle::DirectorySinkWithFinalize
             throw GitError("creating a tree builder");
     }
 
-    void insertChild(std::string_view name, merkle::TreeEntry entry) override
+    void insertChild(FilenameView name, merkle::TreeEntry entry) override
     {
         auto oid = hashToOID(entry.hash);
         if (git_treebuilder_insert(
                 nullptr,
                 builder.get(),
-                requireCString(std::string(name)),
+                requireCString(std::string(name.str())),
                 &oid,
                 static_cast<git_filemode_t>(entry.mode)))
             throw GitError("adding '%s' to a tree builder", name);

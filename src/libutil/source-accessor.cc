@@ -116,7 +116,8 @@ CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolut
             if (!res.isRoot())
                 res.pop();
         } else {
-            res.push(c);
+            /* Checked, since `c` may come from a symlink target. */
+            res.push(FilenameView::fromStringThrowing(c));
             if (mode == SymlinkResolution::Full || !todo.empty()) {
                 if (auto st = maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
                     if (!linksAllowed--)

@@ -244,7 +244,7 @@ static Flake readFlake(
     const InputAttrPath & lockRootAttrPath)
 {
     auto flakeDir = rootDir / CanonPath(resolvedRef.subdir);
-    auto flakePath = flakeDir / "flake.nix";
+    auto flakePath = flakeDir / "flake.nix"_filename;
 
     // NOTE evalFile forces vInfo to be an attrset because mustBeTrivial is true.
     Value vInfo;

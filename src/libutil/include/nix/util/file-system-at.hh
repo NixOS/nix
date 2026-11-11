@@ -136,6 +136,17 @@ Result<AutoCloseFD, NativeError> createDirectoryAt(
 );
 
 /**
+ * Open a fresh handle to the directory @p dirFd refers to.
+ *
+ * Unlike `dupDescriptor`, the new handle has its own read position, so
+ * it can be given to a `DirectoryIterator` without disturbing anyone
+ * else using @p dirFd.
+ *
+ * @throws SystemError on failure.
+ */
+AutoCloseFD reopenDirectory(Descriptor dirFd);
+
+/**
  * Get status of an open file/directory handle.
  *
  * @param fd File descriptor/handle
@@ -211,6 +222,14 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     mode_t mode = 0, /** Mode for `O_{CREAT,TMPFILE}` */
 #endif
     std::function<void(AutoCloseFD dirFd, OsCanonPath relPath)> dirFdCallback = nullptr);
+
+/**
+ * Set the access and modification time of a file relative to a directory file descriptor.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTime, time_t modificationTime);
 
 #ifdef __linux__
 namespace linux {

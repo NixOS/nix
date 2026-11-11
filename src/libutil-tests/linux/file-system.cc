@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/util/file-system.hh"
+#include "nix/util/fs-sink.hh"
 #include "unix/file-system.hh"
 #include "nix/util/system-error.hh"
 
@@ -50,8 +51,11 @@ TEST_F(RootDeletePath, modeChangesDenied)
     auto tmpDir = createTempDir();
     AutoDelete cleanup(tmpDir);
     auto directory = tmpDir / "directory";
-    createDirs(directory);
-    writeFile(directory / "file", "contents");
+    RestoreSink::forPath(directory, /*startFsync=*/false).createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("file"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("contents"); });
+        });
+    });
     chmod(directory, 0000);
     ASSERT_EQ(::chown(directory.c_str(), 1, 1), 0);
 

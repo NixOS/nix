@@ -590,7 +590,8 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             /* !!! races */
             if (canonicalise)
                 canonicalisePathMetaData(
-                    localStore->toRealPath(info->path),
+                    localStore->getRealStoreDirFd(),
+                    OsFilename{info->path.filename()},
                     {NIX_WHEN_SUPPORT_ACLS(settings.getLocalSettings().ignoredAcls)});
             if (!hashGiven) {
                 HashResult hash = hashPath(
@@ -761,7 +762,10 @@ static void opRestore(Strings opFlags, Strings opArgs)
         throw UsageError("only one argument allowed");
 
     FdSource source(STDIN_FILENO);
-    restorePath(*opArgs.begin(), source);
+    /* `forPath` rather than `restorePath`, since it validates the
+       user-given destination. */
+    auto sink = RestoreSink::forPath(*opArgs.begin(), /*startFsync=*/false);
+    parseDump(sink, source);
 }
 
 static void opExport(Strings opFlags, Strings opArgs)

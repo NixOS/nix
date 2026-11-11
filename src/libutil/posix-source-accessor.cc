@@ -53,6 +53,34 @@ static SourceAccessor::Stat sourceAccessorStatFromPosixStat(const PosixStat & st
     };
 }
 
+static std::optional<SourceAccessor::Type> sourceAccessorTypeFromFileType(std::filesystem::file_type type)
+{
+    using enum SourceAccessor::Type;
+    using T = std::filesystem::file_type;
+    switch (type) {
+    case T::regular:
+        return tRegular;
+    case T::directory:
+        return tDirectory;
+    case T::symlink:
+        return tSymlink;
+    case T::character:
+        return tChar;
+    case T::block:
+        return tBlock;
+    case T::fifo:
+        return tFifo;
+    case T::socket:
+        return tSocket;
+    case T::none:
+        return std::nullopt;
+    case T::not_found:
+    case T::unknown:
+        return tUnknown;
+    }
+    unreachable();
+}
+
 namespace {
 
 /**
@@ -396,7 +424,7 @@ static CanonPath portablePathOf(const SymlinkNotAllowed & e)
  */
 static OsFilename osBaseNameOf(const CanonPath & path)
 {
-    return OsFilename::fromPathAsserting(path.baseName().value());
+    return OsFilename::fromPathAsserting(path.baseName().value().str());
 }
 
 std::function<void(AutoCloseFD, OsCanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
@@ -585,19 +613,7 @@ AutoCloseFD PosixDirectorySourceAccessor::openSubdirectory(const CanonPath & pat
 
     if (path.isRoot()) {
         /* Get a fresh file descriptor for thread-safety. */
-        dirFdOwning = valueOr(
-            openResult(
-#ifdef _WIN32
-                ReOpenFile(
-                    dirFd.get(),
-                    FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    FILE_FLAG_BACKUP_SEMANTICS)
-#else
-                ::openat(dirFd.get(), ".", O_DIRECTORY | O_RDONLY | O_CLOEXEC)
-#endif
-                    ),
-            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory '%s'", showPath(path)));
+        dirFdOwning = reopenDirectory(dirFd.get());
     } else {
         /* TODO: We can do better when we have openat2. */
         auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
@@ -631,86 +647,17 @@ AutoCloseFD PosixDirectorySourceAccessor::openSubdirectory(const CanonPath & pat
 
 SourceAccessor::DirEntries PosixDirectorySourceAccessor::readDirectory(const CanonPath & path)
 try {
-    AutoCloseFD dirFdOwning = openSubdirectory(path);
     DirEntries entries;
-
-    // TODO: Make DirectoryIterator work from descriptors so we can
-    // deduplicate the below logic with it.
-#ifdef _WIN32
-    /* The enumeration position lives in the handle, which is fine
-       because `openSubdirectory()` always gives us a fresh one. */
-    alignas(LONGLONG) std::array<std::byte, 64 * 1024> buf;
-    for (auto infoClass = FileIdBothDirectoryRestartInfo;; infoClass = FileIdBothDirectoryInfo) {
+    /* The read position lives in the handle, which is fine because
+       `openSubdirectory()` always gives us a fresh one. */
+    for (const auto & entry : DirectoryIterator{openSubdirectory(path)}) {
         checkInterrupt();
-        if (!GetFileInformationByHandleEx(dirFdOwning.get(), infoClass, buf.data(), buf.size())) {
-            if (GetLastError() == ERROR_NO_MORE_FILES)
-                break;
-            throw windows::WinError("reading directory '%s'", showPath(path));
-        }
-        for (auto * entry = buf.data();;) {
-            auto & info = *reinterpret_cast<const FILE_ID_BOTH_DIR_INFO *>(entry);
-            std::wstring_view name{info.FileName, info.FileNameLength / sizeof(wchar_t)};
-            if (name != L"." && name != L"..")
-                entries.emplace(
-                    os_string_to_string(name),
-                    /* Same classification as `fstat`, which reports every
-                       reparse point as a symlink. */
-                    info.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT ? tSymlink
-                    : info.FileAttributes & FILE_ATTRIBUTE_DIRECTORY   ? tDirectory
-                                                                       : tRegular);
-            if (!info.NextEntryOffset)
-                break;
-            entry += info.NextEntryOffset;
-        }
+        /* `DirectoryIterator` never gives empty names, `.` or `..`, and
+           the OS's file names never contain `/` or NUL. */
+        entries.emplace(
+            Filename::fromStringAsserting(os_string_to_string(entry.name.path().native())),
+            sourceAccessorTypeFromFileType(entry.type));
     }
-#else
-    AutoCloseDir dir(::fdopendir(dirFdOwning.get()));
-    if (!dir)
-        throw SysError("reading directory '%s'", showPath(path));
-    dirFdOwning.release();
-
-    const ::dirent * dirent = nullptr;
-
-    while (errno = 0, dirent = ::readdir(dir.get())) {
-        checkInterrupt();
-        std::string_view name(dirent->d_name);
-        if (name == "." || name == "..")
-            continue;
-
-        std::optional<Type> type;
-        switch (dirent->d_type) {
-        case DT_REG:
-            type = tRegular;
-            break;
-        case DT_DIR:
-            type = tDirectory;
-            break;
-        case DT_LNK:
-            type = tSymlink;
-            break;
-        case DT_CHR:
-            type = tChar;
-            break;
-        case DT_BLK:
-            type = tBlock;
-            break;
-        case DT_FIFO:
-            type = tFifo;
-            break;
-        case DT_SOCK:
-            type = tSocket;
-            break;
-        default:
-            type = std::nullopt;
-            break;
-        }
-        entries.emplace(name, type);
-    }
-
-    if (errno)
-        throw SysError("reading directory '%1%'", showPath(path));
-#endif
-
     return entries;
 } catch (SymlinkNotAllowed & e) {
     auto p = portablePathOf(e);
@@ -810,7 +757,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
                 , fsPath(std::move(fsPath_))
             {
                 MemorySink sink{*this};
-                sink.createSymlink(CanonPath::root, target);
+                sink.createSymlink(target);
                 displayPrefix = fsPath.string();
             }
 

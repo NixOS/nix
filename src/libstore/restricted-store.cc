@@ -69,6 +69,11 @@ public:
         return next->config->realStoreDir;
     }
 
+    Descriptor getRealStoreDirFd() override
+    {
+        return next->getRealStoreDirFd();
+    }
+
     StorePathSet queryAllValidPaths() override;
 
     void queryPathInfoUncached(

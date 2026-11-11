@@ -83,7 +83,7 @@ using Child = std::variant<Directory, File, Symlink>;
  */
 struct Directory
 {
-    std::map<std::string, Child, std::less<>> children;
+    std::map<Filename, Child, std::less<>> children;
 
     merkle::Mode mode() const
     {
@@ -184,14 +184,14 @@ struct TarAdapterImpl : merkle::TarAdapter
                 auto * dir = std::get_if<Directory>(cur);
                 if (!dir)
                     throw Error("parent of '%s' is not a directory", path);
-                cur = &dir->children.emplace(std::string(name), Directory{}).first->second;
+                cur = &dir->children.emplace(Filename{name}, Directory{}).first->second;
             }
 
             auto * dir = std::get_if<Directory>(cur);
             if (!dir)
                 throw Error("parent of '%s' is not a directory", path);
 
-            std::string name(*path.baseName());
+            Filename name{*path.baseName()};
             auto i = dir->children.find(name);
             if (i == dir->children.end()) {
                 dir->children.emplace(std::move(name), std::move(child));

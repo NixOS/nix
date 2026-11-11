@@ -4,7 +4,7 @@ namespace nix {
 
 std::string_view SourcePath::baseName() const
 {
-    return path.baseName().value_or("source");
+    return path.baseName().transform(&FilenameView::str).value_or("source");
 }
 
 SourcePath SourcePath::parent() const
@@ -62,11 +62,6 @@ std::string SourcePath::to_string() const
 SourcePath SourcePath::operator/(const CanonPath & x) const
 {
     return {accessor, path / x};
-}
-
-SourcePath SourcePath::operator/(std::string_view c) const
-{
-    return {accessor, path / c};
 }
 
 bool SourcePath::operator==(const SourcePath & x) const noexcept
