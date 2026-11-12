@@ -59,17 +59,6 @@ scope: {
       );
   };
 
-  sqlite =
-    if !stdenv.hostPlatform.isWindows then
-      pkgs.sqlite
-    else
-      pkgs.sqlite.overrideAttrs (prevAttrs: {
-        nativeBuildInputs = lib.filter (x: !(x.pname == "tcl")) prevAttrs.nativeBuildInputs or [ ];
-        configureFlags = (lib.filter (x: !(lib.hasPrefix "--with-tcl" x)) prevAttrs.configureFlags) ++ [
-          "--disable-tcl"
-        ];
-      });
-
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
   # TODO Boost 1.91 has a regression in boost.url :(
   boost =
