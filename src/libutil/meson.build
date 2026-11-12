@@ -98,6 +98,37 @@ boost = dependency(
 # boost is a public dependency, but not a pkg-config dependency unfortunately.
 deps_public_no_pkgconfig += boost
 
+# `FormatString` rejects a bad format string at compile time, which a test
+# case cannot observe. Each check converts to `FormatString<1>`. "%s" must
+# compile, so a failure of the others comes from `FormatString`, not from this
+# setup.
+foreach format, valid : {
+  '"%s"' : true,
+  '"%s %s"' : false,
+  '"%1% %s"' : false,
+  '"%s %"' : false,
+  '"%k"' : false,
+  '"%qd"' : false,
+  '"%0%"' : false,
+  '"%01%"' : false,
+  '"%5.1.2f"' : false,
+  '"%|1%|"' : false,
+  '"%|abc|"' : false,
+  '"%n"' : false,
+  '"%Tx"' : false,
+  '"%*d"' : false,
+}
+  if cxx.compiles(
+    '#include "nix/util/format-string.hh"\nnix::FormatString<1> s(' + format + ');\n',
+    include_directories : include_directories('include'),
+    name : 'FormatString<1>(' + format + ')',
+  ) != valid
+    error(
+      'FormatString<1>(' + format + ') should ' + (valid ? '' : 'not ') + 'compile',
+    )
+  endif
+endforeach
+
 openssl = dependency(
   'libcrypto',
   'openssl',

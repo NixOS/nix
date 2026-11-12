@@ -21,7 +21,7 @@ struct TarArchive
     /* Exception encountered when reading the source. */
     std::exception_ptr readException;
 
-    void check(int err, FormatString reason = "failed to extract archive (%s)", bool warningsAreFatal = true);
+    void check(int err, FormatString<1> reason = "failed to extract archive (%s)", bool warningsAreFatal = true);
 
     explicit TarArchive(const std::filesystem::path & path);
 

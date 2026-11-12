@@ -292,8 +292,8 @@ public:
             if (path && sub) {
                 auto name = storePathToName(*path);
                 i->s =
-                    fmt(hasPrefix(*sub, "local") ? FormatString("copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s")
-                                                 : FormatString("fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s"),
+                    fmt(hasPrefix(*sub, "local") ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"_fmt
+                                                 : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s"_fmt,
                         name,
                         *sub);
             }
@@ -563,7 +563,7 @@ public:
     {
         std::string res;
 
-        auto renderActivity = [&] [[nodiscard]] (ActivityType type, FormatString itemFmt, double unit = 1) {
+        auto renderActivity = [&] [[nodiscard]] (ActivityType type, FormatString<1> itemFmt, double unit = 1) {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
             for (auto & j : act.its) {
@@ -606,7 +606,7 @@ public:
             return s;
         };
 
-        auto renderSizeActivity = [&] [[nodiscard]] (ActivityType type, FormatString itemFmt = "%s") {
+        auto renderSizeActivity = [&] [[nodiscard]] (ActivityType type, FormatString<1> itemFmt = "%s") {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
             for (auto & j : act.its) {
@@ -650,9 +650,8 @@ public:
                     }
                 else {
                     commonUnit = getSizeUnit(done);
-                    s =
-                        fmt(done ? FormatString(ANSI_GREEN "%s" ANSI_NORMAL) : FormatString("%s"),
-                            renderSizeWithoutUnit(done, *commonUnit));
+                    s = fmt(
+                        done ? ANSI_GREEN "%s"_fmt ANSI_NORMAL : "%s"_fmt, renderSizeWithoutUnit(done, *commonUnit));
                 }
 
                 if (commonUnit)
@@ -675,7 +674,7 @@ public:
             res += s;
         };
 
-        auto showActivity = [&](ActivityType type, FormatString itemFmt, double unit = 1) {
+        auto showActivity = [&](ActivityType type, FormatString<1> itemFmt, double unit = 1) {
             maybeAppendToResult(renderActivity(type, itemFmt, unit));
         };
 

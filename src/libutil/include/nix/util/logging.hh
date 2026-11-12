@@ -194,7 +194,7 @@ public:
     }
 
     template<typename Arg, typename... Args>
-    inline void cout(FormatString fs, const Arg & arg, const Args &... args)
+    inline void cout(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
     {
         writeToStdout(fmt(fs, arg, args...));
     }
@@ -211,7 +211,7 @@ public:
     }
 
     template<typename Arg, typename... Args>
-    inline void coutStyled(FormatString fs, const Arg & arg, const Args &... args)
+    inline void coutStyled(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
     {
         writeStyledToStdout(fmt(fs, arg, args...));
     }
@@ -397,7 +397,7 @@ extern Verbosity verbosity;
  * Formats like `fmt`: a message without arguments is printed literally.
  */
 template<typename... Args>
-inline void warn(FormatString fs, const Args &... args)
+inline void warn(FormatString<sizeof...(Args)> fs, const Args &... args)
 {
     logger->warn(fmt(fs, args...));
 }

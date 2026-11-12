@@ -229,7 +229,7 @@ public:
     int status;
 
     template<typename... Args>
-    ExecError(int status, FormatString fs, const Args &... args)
+    ExecError(int status, FormatString<sizeof...(Args)> fs, const Args &... args)
         : CloneableError(fs, args...)
         , status(status)
     {

@@ -34,8 +34,8 @@ concept SystemErrorWithNativeCode =
     std::derived_from<E, SystemError> && std::constructible_from<E, typename E::NativeCode, const HintFmt &>
     && std::constructible_from<E, const HintFmt &>
     // The variadic constructors, for an example format string and arguments.
-    && std::constructible_from<E, typename E::NativeCode, FormatString, int, bool>
-    && std::constructible_from<E, FormatString, int, bool>
+    && std::constructible_from<E, typename E::NativeCode, FormatString<2>, int, bool>
+    && std::constructible_from<E, FormatString<2>, int, bool>
     // Also these methods
     && requires(typename E::NativeCode code) {
            { E::ambientError() } -> std::same_as<typename E::NativeCode>;

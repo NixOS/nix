@@ -510,7 +510,7 @@ public:
      */
     template<class T, typename Arg, typename... Args>
     [[nodiscard, gnu::noinline]]
-    EvalErrorBuilder<T> & error(FormatString fs, const Arg & arg, const Args &... args)
+    EvalErrorBuilder<T> & error(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
     {
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
         return *new EvalErrorBuilder<T>(T(*this, fs, arg, args...));
@@ -811,10 +811,10 @@ public:
 
     template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, FormatString fs, const Args &... formatArgs) const;
+    void addErrorTrace(Error & e, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const;
     template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, FormatString fs, const Args &... formatArgs) const;
+    void addErrorTrace(Error & e, const PosIdx pos, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const;
 
 public:
     /**

@@ -866,13 +866,14 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
 }
 
 template<typename... Args>
-void EvalState::addErrorTrace(Error & e, FormatString fs, const Args &... formatArgs) const
+void EvalState::addErrorTrace(Error & e, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const
 {
     e.addTrace(nullptr, HintFmt(fs, formatArgs...));
 }
 
 template<typename... Args>
-void EvalState::addErrorTrace(Error & e, const PosIdx pos, FormatString fs, const Args &... formatArgs) const
+void EvalState::addErrorTrace(
+    Error & e, const PosIdx pos, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const
 {
     e.addTrace(positions[pos], HintFmt(fs, formatArgs...));
 }
@@ -883,7 +884,7 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     Expr & expr,
     Env & env,
     std::variant<Pos, PosIdx> pos,
-    FormatString fs,
+    FormatString<sizeof...(Args)> fs,
     const Args &... formatArgs)
 {
     return std::make_unique<DebugTraceStacker>(
@@ -3343,9 +3344,8 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         return {corepkgsFS, CanonPath(path.substr(3))};
 
     error<ThrownError>(
-        settings.pureEval
-            ? FormatString("cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)")
-            : FormatString("file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)"),
+        settings.pureEval ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"_fmt
+                          : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)"_fmt,
         path)
         .atPos(pos)
         .debugThrow();

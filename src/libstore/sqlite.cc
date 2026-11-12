@@ -53,8 +53,8 @@ void SQLiteBusy::anchor() {}
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         auto exp = SQLiteBusy(path, errMsg, err, exterr, offset, std::move(hf));
         exp.err.msg = HintFmt(
-            err == SQLITE_PROTOCOL ? FormatString("SQLite database '%s' is busy (SQLITE_PROTOCOL)")
-                                   : FormatString("SQLite database '%s' is busy"),
+            err == SQLITE_PROTOCOL ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"_fmt
+                                   : "SQLite database '%s' is busy"_fmt,
             path ? path : "(in-memory)");
         throw std::move(exp);
     } else

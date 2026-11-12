@@ -90,7 +90,7 @@ public:
      * Variadic constructor for throwing with format strings.
      */
     template<typename... Args>
-    BuildError(Status status, FormatString fs, const Args &... args)
+    BuildError(Status status, FormatString<sizeof...(Args)> fs, const Args &... args)
         : CloneableError(fs, args...)
         , status{status}
     {
