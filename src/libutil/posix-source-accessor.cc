@@ -249,7 +249,9 @@ public:
         OsString path;
         bool first = true;
         for (const auto & pathComponent : dirAccessors) {
-            if (!first)
+            /* The root directory's own path, `/`, already ends in a
+               separator, which must not be doubled. */
+            if (!first && !path.ends_with(std::filesystem::path::preferred_separator))
                 path += std::filesystem::path::preferred_separator;
             path += pathComponent->fsPath;
             first = false;
