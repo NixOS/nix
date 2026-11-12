@@ -36,10 +36,8 @@ in
           pkgs.coreutils
         ];
         nix.nixPath = [ "nixpkgs=${pkgs.path}" ];
-        nix.extraOptions = ''
-          experimental-features = nix-command
-          substituters =
-        '';
+        nix.settings.experimental-features = [ "nix-command" ];
+        nix.settings.substituters = lib.mkForce [ ];
         services.garage = {
           enable = true;
           package = pkgs.garage_2;
@@ -68,14 +66,17 @@ in
       };
 
     client =
-      { config, pkgs, ... }:
+      {
+        config,
+        lib,
+        pkgs,
+        ...
+      }:
       {
         virtualisation.writableStore = true;
         virtualisation.cores = 2;
-        nix.extraOptions = ''
-          experimental-features = nix-command
-          substituters =
-        '';
+        nix.settings.experimental-features = [ "nix-command" ];
+        nix.settings.substituters = lib.mkForce [ ];
         networking.extraHosts = "192.168.1.2 vhost-test.${rootDomain} ${rootDomain}";
         environment.systemPackages = [
           pkgs.awscli2
