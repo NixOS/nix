@@ -29,11 +29,13 @@ let
       boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
     };
 
+  utils = pkgs.pkgsStatic.busybox;
+
   # Trivial Nix expression to build remotely.
   expr =
     config: nr:
     pkgs.writeText "expr.nix" ''
-      let utils = builtins.storePath ${config.system.build.extraUtils}; in
+      let utils = builtins.storePath ${utils}; in
       derivation {
         name = "hello-${toString nr}";
         system = "i686-linux";
@@ -94,7 +96,7 @@ in
             }
           ];
           virtualisation.writableStore = true;
-          virtualisation.additionalPaths = [ config.system.build.extraUtils ];
+          virtualisation.additionalPaths = [ utils ];
           nix.settings.substituters = lib.mkForce [ ];
           programs.ssh.extraConfig = "ConnectTimeout 30";
           environment.systemPackages = [
