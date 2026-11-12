@@ -10,15 +10,6 @@
 namespace nix {
 
 /**
- * `formatArgumentCount` calls these undefined, non-`constexpr` functions to
- * end constant evaluation, so the compiler error names the reason.
- */
-void formatStringMixesNumberedAndSequentialDirectives();
-void formatStringHasUnsupportedDirective();
-void formatStringEndsInPercent();
-void formatStringHasWrongArgumentCount();
-
-/**
  * The number of arguments that a `boost::format` format string consumes.
  *
  * Accepts this subset of boost's syntax, which follows
@@ -41,6 +32,9 @@ void formatStringHasWrongArgumentCount();
  * `boost::format::expected_args()`. With numbered directives, the count is
  * the highest N. Boost rejects a mix of numbered and sequential directives,
  * and so does this function.
+ *
+ * It rejects a string with a `throw`, which ends constant evaluation, so the
+ * compiler error quotes the `throw` and its reason.
  */
 consteval size_t formatArgumentCount(std::string_view s)
 {
@@ -55,7 +49,7 @@ consteval size_t formatArgumentCount(std::string_view s)
         if (s[i++] != '%')
             continue;
         if (i == s.size())
-            formatStringEndsInPercent();
+            throw "format string ends in a single %";
         if (s[i] == '%') {
             ++i;
             continue;
@@ -72,7 +66,7 @@ consteval size_t formatArgumentCount(std::string_view s)
         bool numbered = false, widthDone = false;
         if (i > digitsStart && i < s.size() && s[i] == '%') {
             if (bars)
-                formatStringHasUnsupportedDirective();
+                throw "format string has an unsupported directive";
             highestNumbered = std::max(highestNumbered, number);
             ++i;
             continue;
@@ -94,11 +88,11 @@ consteval size_t formatArgumentCount(std::string_view s)
             ++i;
         else {
             if (i == s.size() || std::string_view("bdiuoxXpaAeEfFgGcCsS").find(s[i]) == std::string_view::npos)
-                formatStringHasUnsupportedDirective();
+                throw "format string has an unsupported directive";
             ++i;
             if (bars) {
                 if (i == s.size() || s[i] != '|')
-                    formatStringHasUnsupportedDirective();
+                    throw "format string has an unsupported directive";
                 ++i;
             }
         }
@@ -108,7 +102,7 @@ consteval size_t formatArgumentCount(std::string_view s)
             ++sequential;
     }
     if (sequential && highestNumbered)
-        formatStringMixesNumberedAndSequentialDirectives();
+        throw "format string mixes numbered and sequential directives";
     return sequential + highestNumbered;
 }
 
@@ -144,7 +138,7 @@ class FormatString
     consteval void check()
     {
         if (nArgs != 0 && formatArgumentCount(s) != nArgs)
-            formatStringHasWrongArgumentCount();
+            throw "format string has the wrong argument count";
     }
 
 public:
