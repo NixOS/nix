@@ -227,7 +227,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
         Value nameValue;
         name.expr->eval(state, env, nameValue);
         state.forceStringNoCtx(nameValue, name.expr->getPos(), "while evaluating an attribute name");
-        return state.symbols.create(nameValue.string_view());
+        return state.symbols.create(nameValue);
     }
 }
 
@@ -1361,7 +1361,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (nameVal.type() == nNull)
             continue;
         state.forceStringNoCtx(nameVal, i.pos, "while evaluating the name of a dynamic attribute");
-        auto nameSym = state.symbols.create(nameVal.string_view());
+        auto nameSym = state.symbols.create(nameVal);
         if (sort)
             // FIXME: inefficient
             bindings.bindings->sort();
