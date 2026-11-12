@@ -359,4 +359,43 @@ TEST(RestoreSinkForPath, rejectsRoot)
 }
 #endif
 
+#ifndef _WIN32
+
+/**
+ * `getPhysicalPath`, with native separators, for comparing against
+ * `tmpDir`.
+ */
+static std::optional<std::filesystem::path> physicalPath(SourceAccessor & accessor, const CanonPath & path)
+{
+    auto p = accessor.getPhysicalPath(path);
+    if (p)
+        p->make_preferred();
+    return p;
+}
+
+TEST_F(FSSourceAccessorTest, rootAccessor)
+{
+    createDirs(tmpDir / "subdir");
+
+    auto accessor = makeFSSourceAccessor("/");
+    EXPECT_EQ(accessor->showPath(CanonPath::root), "/");
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), std::filesystem::path{"/"});
+
+    /* The root's trailing `/` is not doubled. */
+    auto subdirPath = CanonPath((tmpDir / "subdir").string());
+    EXPECT_EQ(accessor->showPath(subdirPath), (tmpDir / "subdir").string());
+    EXPECT_EQ(physicalPath(*accessor, subdirPath), tmpDir / "subdir");
+
+    /* Nor for the subdirectory accessors it makes. */
+    bool called = false;
+    accessor->readDirectory(subdirPath, [&](SourceAccessor & subdir, const CanonPath & rel) {
+        called = true;
+        EXPECT_EQ(subdir.showPath(rel), (tmpDir / "subdir").string());
+        EXPECT_EQ(physicalPath(subdir, rel), tmpDir / "subdir");
+    });
+    EXPECT_TRUE(called);
+}
+
+#endif
+
 } // namespace nix
