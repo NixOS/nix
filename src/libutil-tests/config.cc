@@ -326,6 +326,20 @@ TEST(Config, applyConfigInvalidThrows)
     ASSERT_THROW(config.applyConfig("value "), UsageError);
 }
 
+TEST(Config, applyConfigIncludeWithTwoPathsThrows)
+{
+    Config config;
+    try {
+        config.applyConfig("include a b", "/etc/nix/nix.conf");
+        FAIL();
+    } catch (UsageError & e) {
+        ASSERT_EQ(
+            e.info().msg.str(),
+            "syntax error in configuration line '" ANSI_WARNING "include a b" ANSI_NORMAL "' in " ANSI_WARNING
+            "\"/etc/nix/nix.conf\"" ANSI_NORMAL);
+    }
+}
+
 TEST(Config, toKeyValue)
 {
     Config config;
