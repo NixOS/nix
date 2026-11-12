@@ -1226,6 +1226,106 @@ private:
 
     friend struct Value;
     friend class ListBuilder;
+
+public:
+
+    /**
+     * Base class for extensions of `EvalState`, i.e. per-`EvalState`
+     * state that is owned by some component outside of `EvalState`
+     * (e.g. a cache used by a primop). See `RegisterExtension`.
+     *
+     * The virtual methods are hooks that are called by the
+     * corresponding methods of `EvalState`.
+     */
+    struct Extension
+    {
+        virtual ~Extension();
+
+        /**
+         * Add statistics to the top-level JSON object printed by
+         * `EvalState::printStatistics()`.
+         */
+        virtual void addStatistics(nlohmann::json & topObj) {}
+
+        /**
+         * Clear any caches that may become stale if files change. Called
+         * by `EvalState::resetFileCache()`.
+         */
+        virtual void resetFileCache() {}
+    };
+
+    using ExtensionFactory = std::unique_ptr<Extension> (*)(EvalState &);
+
+    /**
+     * Register an extension of `EvalState` of type `T`, which must be
+     * a subclass of `EvalState::Extension`. This must be a static
+     * object. Every `EvalState` gets its own instance of `T`, which
+     * can be retrieved using `EvalState::getExtension()`.
+     *
+     * The instance is created during the construction of the
+     * `EvalState`, after the base environment has been set up, so
+     * the constructor of `T` can evaluate Nix code. If `T` has a
+     * constructor that takes an `EvalState &`, it is used; otherwise
+     * `T` is default-constructed.
+     *
+     * Since multiple threads may evaluate concurrently, `T` must be
+     * thread-safe.
+     *
+     * Note: `EvalState` is not scanned by the garbage collector, so if
+     * `T` holds pointers to GC-allocated objects (like `Value *`), it
+     * must keep them reachable itself, e.g. by using `RootValue` or
+     * `traceable_allocator`.
+     */
+    template<typename T>
+        requires std::derived_from<T, Extension>
+    struct RegisterExtension
+    {
+        /**
+         * The index of this extension in `EvalState::extensions`.
+         */
+        const size_t index;
+
+        RegisterExtension()
+            : index(registerExtension(&create))
+        {
+        }
+
+    private:
+
+        static std::unique_ptr<Extension> create(EvalState & state)
+        {
+            if constexpr (std::is_constructible_v<T, EvalState &>)
+                return std::make_unique<T>(state);
+            else
+                return std::make_unique<T>();
+        }
+    };
+
+    /**
+     * Return this `EvalState`'s instance of the extension `ext`.
+     */
+    template<typename T>
+    T & getExtension(const RegisterExtension<T> & ext)
+    {
+        /* This fails if `ext` was registered after this `EvalState`
+           was created, e.g. by a library loaded using `dlopen()`. */
+        assert(ext.index < extensions.size());
+        return static_cast<T &>(*extensions[ext.index]);
+    }
+
+private:
+
+    static size_t registerExtension(ExtensionFactory factory);
+
+    /**
+     * The instances of the extensions registered using
+     * `RegisterExtension`, indexed by `RegisterExtension::index`.
+     *
+     * Note: keep this last, so that it's destroyed before all other
+     * members. That way, extensions can use the rest of `EvalState`
+     * in their destructors.
+     */
+    std::vector<std::unique_ptr<Extension>> extensions;
 };
 
 struct DebugTraceStacker
