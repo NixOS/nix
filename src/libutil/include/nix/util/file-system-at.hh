@@ -102,6 +102,16 @@ void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const Os
 Result<AutoCloseFD, NativeError> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path);
 
 /**
+ * Open a fresh handle to the directory @p dirFd refers to.
+ *
+ * Unlike `dupDescriptor`, the new handle has its own read position, so
+ * it can be read from without disturbing anyone else using @p dirFd.
+ *
+ * @return On success, the new handle. On failure, an error code.
+ */
+Result<AutoCloseFD, NativeError> reopenDirectory(Descriptor dirFd);
+
+/**
  * Create a directory relative to a directory file descriptor, and (best
  * effort, see below) open it.
  *

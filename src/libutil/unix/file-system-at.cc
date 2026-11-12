@@ -332,6 +332,14 @@ void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const Os
     symlinkAt(dirFd, path, target);
 }
 
+Result<AutoCloseFD, NativeError> reopenDirectory(Descriptor dirFd)
+{
+    AutoCloseFD fd = ::openat(dirFd, ".", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (!fd)
+        return outcome::failure(errno);
+    return outcome::success(std::move(fd));
+}
+
 Result<AutoCloseFD, NativeError> openDirectoryAt(Descriptor dirFd, const OsCanonPath & path)
 {
     assert(!path.empty());
