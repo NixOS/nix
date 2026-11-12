@@ -31,6 +31,7 @@ deps_public += rapidcheck
 deps_private_no_pkgconfig += cxx.find_library(
   'rapidcheck',
   dirs : [ rapidcheck.get_variable('libdir') ],
+  static : get_option('default_library') == 'static',
 )
 
 gtest = dependency('gtest')
