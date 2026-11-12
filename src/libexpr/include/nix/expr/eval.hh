@@ -228,10 +228,6 @@ struct WhileTryingToUse
 
 std::ostream & operator<<(std::ostream & os, WhileTryingToUse w);
 
-struct RegexCache;
-
-ref<RegexCache> makeRegexCache();
-
 struct DebugTrace
 {
     /* WARNING: Converting PosIdx -> Pos should be done with extra care. This is
@@ -555,11 +551,6 @@ private:
         boost::
             concurrent_flat_map<std::string, std::shared_ptr<LookupPathResolvedState>, StringViewHash, std::equal_to<>>>
         lookupPathResolved;
-
-    /**
-     * Cache used by prim_match().
-     */
-    const ref<RegexCache> regexCache;
 
 public:
 
@@ -1221,8 +1212,6 @@ private:
     friend struct ExprPath;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, CallSite callSite, Value * const * args, Value & v);
-    friend void prim_match(EvalState & state, CallSite callSite, Value * const * args, Value & v);
-    friend void prim_split(EvalState & state, CallSite callSite, Value * const * args, Value & v);
 
     friend struct Value;
     friend class ListBuilder;

@@ -16,7 +16,9 @@ static inline Value * mkString(EvalState & state, const std::csub_match & match)
     return v;
 }
 
-struct RegexCache
+namespace {
+
+struct RegexCache : EvalState::Extension
 {
     struct Entry
     {
@@ -43,10 +45,9 @@ struct RegexCache
     }
 };
 
-ref<RegexCache> makeRegexCache()
-{
-    return make_ref<RegexCache>();
-}
+} // namespace
+
+static EvalState::RegisterExtension<RegexCache> rRegexCache;
 
 void prim_match(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
@@ -54,7 +55,7 @@ void prim_match(EvalState & state, CallSite callSite, Value * const * args, Valu
 
     try {
 
-        auto regex = state.regexCache->get(re);
+        auto regex = state.getExtension(rRegexCache).get(re);
 
         NixStringContext context;
         const auto str = state.forceString(
@@ -128,7 +129,7 @@ void prim_split(EvalState & state, CallSite callSite, Value * const * args, Valu
 
     try {
 
-        auto regex = state.regexCache->get(re);
+        auto regex = state.getExtension(rRegexCache).get(re);
 
         NixStringContext context;
         const auto str = state.forceString(
