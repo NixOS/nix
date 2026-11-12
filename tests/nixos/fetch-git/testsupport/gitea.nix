@@ -33,7 +33,7 @@ in
         services.gitea.settings = {
           service.DISABLE_REGISTRATION = true;
           server = {
-            DOMAIN = "gitea";
+            ROOT_URL = "http://gitea:3000";
             HTTP_PORT = 3000;
             SSH_PORT = 3001;
             START_SSH_SERVER = true;
