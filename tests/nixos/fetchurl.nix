@@ -74,7 +74,7 @@ in
 
         virtualisation.writableStore = true;
 
-        nix.settings.experimental-features = "nix-command";
+        nix.settings.experimental-features = [ "nix-command" ];
       };
   };
 
