@@ -47,8 +47,8 @@ namespace nix {
 
 // we make use of the fact that the parser receives a private copy of the input
 // string and can munge around in it.
-// getting the position is expensive and thus it is implemented lazily.
-static StringToken unescapeStr(char * const s, size_t length, std::function<Pos()> && pos)
+// resolving a position is expensive, so @p pos is only resolved on error.
+static StringToken unescapeStr(char * const s, size_t length, const PosTable & positions, PosIdx pos)
 {
     bool noNullByte = true;
     char * t = s;
@@ -72,18 +72,25 @@ static StringToken unescapeStr(char * const s, size_t length, std::function<Pos(
         else *t = c;
     }
     if (!noNullByte) {
-        forceNoNullByte({s, size_t(t - s)}, std::move(pos));
+        throwNullByteError({s, size_t(t - s)}, &positions, pos);
     }
     return {s, size_t(t - s)};
 }
 
-static void requireExperimentalFeature(const ExperimentalFeature & feature, const Pos & pos)
+[[noreturn, gnu::cold, gnu::noinline]] static void
+throwExperimentalFeatureDisabled(const ExperimentalFeature & feature, const PosTable & positions, PosIdx pos)
 {
-    if (!experimentalFeatureSettings.isEnabled(feature))
-        throw ParseError(ErrorInfo{
-            .msg = HintFmt("experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it", showExperimentalFeature(feature)),
-            .pos = pos,
-        });
+    throw ParseError(ErrorInfo{
+        .msg = HintFmt("experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it", showExperimentalFeature(feature)),
+        .pos = positions[pos],
+    });
+}
+
+// resolving a position is expensive, so @p pos is only resolved on error.
+static void requireExperimentalFeature(const ExperimentalFeature & feature, const PosTable & positions, PosIdx pos)
+{
+    if (!experimentalFeatureSettings.isEnabled(feature)) [[unlikely]]
+        throwExperimentalFeatureDisabled(feature, positions, pos);
 }
 
 }
@@ -148,10 +155,10 @@ or          { return OR_KW; }
 \-\>        { return IMPL; }
 \/\/        { return UPDATE; }
 \+\+        { return CONCAT; }
-\<\|        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+\<\|        { requireExperimentalFeature(Xp::PipeOperators, state->positions, CUR_POS);
               return PIPE_FROM;
             }
-\|\>        { requireExperimentalFeature(Xp::PipeOperators, state->positions[CUR_POS]);
+\|\>        { requireExperimentalFeature(Xp::PipeOperators, state->positions, CUR_POS);
               return PIPE_INTO;
             }
 
@@ -196,7 +203,7 @@ or          { return OR_KW; }
                 /* It is impossible to match strings ending with '$' with one
                    regex because trailing contexts are only valid at the end
                    of a rule. (A sane but undocumented limitation.) */
-                yylval->emplace<StringToken>(unescapeStr(yytext, yyleng, [&]() { return state->positions[CUR_POS]; }));
+                yylval->emplace<StringToken>(unescapeStr(yytext, yyleng, state->positions, CUR_POS));
                 return STR;
               }
 <STRING>\$\{  { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }
@@ -212,7 +219,7 @@ or          { return OR_KW; }
 \'\'(\ *\n)?     { PUSH_STATE(IND_STRING); return IND_STRING_OPEN; }
 <IND_STRING>([^\$\']|\$[^\{\']|\'[^\'\$])+ {
                    yylval->emplace<StringToken>(yytext, (size_t) yyleng, true);
-                   forceNoNullByte(yylval->as<StringToken>(), [&]() { return state->positions[CUR_POS]; });
+                   forceNoNullByte(yylval->as<StringToken>(), &state->positions, CUR_POS);
                    return IND_STR;
                  }
 <IND_STRING>\'\'\$ |
@@ -225,7 +232,7 @@ or          { return OR_KW; }
                    return IND_STR;
                  }
 <IND_STRING>\'\'\\{ANY} {
-                   yylval->emplace<StringToken>(unescapeStr(yytext + 2, yyleng - 2, [&]() { return state->positions[CUR_POS]; }));
+                   yylval->emplace<StringToken>(unescapeStr(yytext + 2, yyleng - 2, state->positions, CUR_POS));
                    return IND_STR;
                  }
 <IND_STRING>\$\{ { PUSH_STATE(DEFAULT); return DOLLAR_CURLY; }

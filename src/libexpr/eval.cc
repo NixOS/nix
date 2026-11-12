@@ -3495,17 +3495,14 @@ std::ostream & operator<<(std::ostream & str, const ExternalValueBase & v)
     return v.print(str);
 }
 
-void forceNoNullByte(std::string_view s, std::function<Pos()> pos)
+void throwNullByteError(std::string_view s, const PosTable * positions, PosIdx pos)
 {
-    if (s.find('\0') != s.npos) {
-        using namespace std::string_view_literals;
-        auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
-        Error error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
-        if (pos) {
-            error.atPos(pos());
-        }
-        throw std::move(error);
-    }
+    using namespace std::string_view_literals;
+    auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
+    Error error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
+    if (positions)
+        error.atPos((*positions)[pos]);
+    throw std::move(error);
 }
 
 } // namespace nix

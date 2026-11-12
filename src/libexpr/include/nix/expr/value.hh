@@ -18,6 +18,7 @@
 #include "nix/util/source-path.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/util/checked-arithmetic.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <boost/unordered/unordered_flat_map_fwd.hpp>
 #include <nlohmann/json_fwd.hpp>
@@ -95,8 +96,8 @@ struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
 class SymbolStr;
-class PosIdx;
 struct Pos;
+class PosTable;
 class StorePath;
 class EvalState;
 class EvalMemory;
@@ -1610,5 +1611,21 @@ typedef std::shared_ptr<Value *> RootValue;
 
 RootValue allocRootValue(Value * v);
 
-void forceNoNullByte(std::string_view s, std::function<Pos()> = nullptr);
+/**
+ * Throws the error for a string that contains null bytes. If @p positions is
+ * given, the error points at @p pos.
+ */
+[[noreturn, gnu::cold, gnu::noinline]] void
+throwNullByteError(std::string_view s, const PosTable * positions = nullptr, PosIdx pos = noPos);
+
+/**
+ * Throws if @p s contains a null byte, which is not supported by the whole codebase yet.
+ * If @p positions is given, the error points at @p pos. The position is only
+ * resolved if the check fails.
+ */
+inline void forceNoNullByte(std::string_view s, const PosTable * positions = nullptr, PosIdx pos = noPos)
+{
+    if (s.find('\0') != s.npos) [[unlikely]]
+        throwNullByteError(s, positions, pos);
+}
 } // namespace nix
