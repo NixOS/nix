@@ -20,6 +20,7 @@
         "narSize": 136,
         "references": [],
         "registrationTime": null,
+        "lastUsageTime": null,
         "signatures": [],
         "storeDir": "/nix/store",
         "ultimate": false,
@@ -44,6 +45,7 @@
           "4k79i02avcckr96r97lqnswn75fi1gv7-dependency"
         ],
         "registrationTime": null,
+        "lastUsageTime": null,
         "signatures": [],
         "storeDir": "/nix/store",
         "ultimate": false,

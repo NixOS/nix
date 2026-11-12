@@ -305,8 +305,10 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 void BinaryCacheStore::addToStore(
     const ValidPathInfo & info, Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    if (!repair && isValidPath(info.path))
+    if (!repair && isValidPath(info.path)) {
+        bumpLastUsageTime(info.path);
         return;
+    }
 
     addToStoreCommon(narSource, repair, checkSigs, {[&](HashResult nar) {
                          /* FIXME reinstate these, once we can correctly do masked hash sink as

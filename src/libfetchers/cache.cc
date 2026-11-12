@@ -145,6 +145,8 @@ struct CacheImpl : Cache
             return std::nullopt;
         }
 
+        store.bumpLastUsageTime(res2.storePath);
+
         debug(
             "using cache entry '%s:%s' -> '%s', '%s'",
             key.first,

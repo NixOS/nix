@@ -274,6 +274,8 @@ static void prim_appendContext(EvalState & state, CallSite callSite, Value * con
         auto namePath = state.store->parseStorePath(name);
         if (!settings.readOnlyMode)
             state.store->getBuilder()->ensurePath(namePath);
+        else
+            state.store->bumpLastUsageTime(namePath);
         state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
 
         if (auto attr = i.value->attrs()->get(sPath)) {

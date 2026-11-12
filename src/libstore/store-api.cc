@@ -281,6 +281,8 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
                     showProgress();
                     return;
                 }
+            } else {
+                bumpLastUsageTime(info.path);
             }
 
             nrDone++;
@@ -377,6 +379,8 @@ ValidPathInfo Store::addToStoreSlow(
     if (!isValidPath(info.path)) {
         auto source = sinkToSource([&](Sink & scratchpadSink) { srcPath.dumpPath(scratchpadSink); });
         addToStore(info, *source);
+    } else {
+        bumpLastUsageTime(info.path);
     }
 
     return info;
@@ -919,8 +923,10 @@ void copyStorePath(
 {
     /* Bail out early (before starting a download from srcStore) if
        dstStore already has this path. */
-    if (!repair && dstStore.isValidPath(storePath))
+    if (!repair && dstStore.isValidPath(storePath)) {
+        dstStore.bumpLastUsageTime(storePath);
         return;
+    }
 
     const auto & srcCfg = srcStore.config;
     const auto & dstCfg = dstStore.config;
@@ -1028,6 +1034,9 @@ std::map<StorePath, StorePath> copyPaths(
     dstStore.addTempRoots(storePaths);
 
     auto valid = dstStore.queryValidPaths(storePaths, substitute);
+
+    for (auto & path : valid)
+        dstStore.bumpLastUsageTime(path);
 
     StorePathSet missing;
     for (auto & path : storePaths)

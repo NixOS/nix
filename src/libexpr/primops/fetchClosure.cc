@@ -43,7 +43,8 @@ static void runFetchClosureWithRewrite(
                      "Use this value for the 'toPath' attribute passed to 'fetchClosure'",
                      state.store->printStorePath(fromPath),
                      state.store->printStorePath(rewrittenPath))});
-    }
+    } else
+        state.store->bumpLastUsageTime(*toPathMaybe);
 
     const auto & toPath = *toPathMaybe;
 
@@ -76,6 +77,8 @@ runFetchClosureWithContentAddressedPath(EvalState & state, Store & fromStore, co
 
     if (!state.store->isValidPath(fromPath))
         copyClosure(fromStore, *state.store, RealisedPath::Set{fromPath});
+    else
+        state.store->bumpLastUsageTime(fromPath);
 
     auto info = state.store->queryPathInfo(fromPath);
 
@@ -105,6 +108,8 @@ runFetchClosureWithInputAddressedPath(EvalState & state, Store & fromStore, cons
 
     if (!state.store->isValidPath(fromPath))
         copyClosure(fromStore, *state.store, RealisedPath::Set{fromPath});
+    else
+        state.store->bumpLastUsageTime(fromPath);
 
     auto info = state.store->queryPathInfo(fromPath);
 

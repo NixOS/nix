@@ -138,8 +138,10 @@ Goal::Co<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::loadDer
      */
     auto drv = [&] {
         for (auto * drvStore : {&worker.evalStore, &worker.store})
-            if (drvStore->isValidPath(drvPath))
+            if (drvStore->isValidPath(drvPath)) {
+                drvStore->bumpLastUsageTime(drvPath);
                 return drvStore->readDerivation(drvPath);
+            }
         assert(false);
     }();
 

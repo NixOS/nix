@@ -157,6 +157,11 @@ struct WorkerProto
     static constexpr std::string_view featureAddTempRoots = "addTempRoots";
 
     /**
+     * Feature for transmitting the `lastUsageTime` store path attribute.
+     */
+    static constexpr std::string_view featurePathLastUsageTime = "path-last-usage-time";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
@@ -280,6 +285,7 @@ enum struct WorkerProto::Op : uint64_t {
     // QueryActiveBuilds = 48, // reserved for https://github.com/NixOS/nix/pull/15979
     AddTempRoots = 49,
     // QueryPathInfos = 50, // reserved for https://github.com/DeterminateSystems/nix-src/pull/539
+    BumpLastUsageTime = 51,
     SubmitOutput = 1000, // Only used within derivations with feature
     AddToStoreScanning = 1001,
 };

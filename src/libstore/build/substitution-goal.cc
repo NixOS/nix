@@ -43,6 +43,7 @@ Goal::Co<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
+        worker.store.bumpLastUsageTime(storePath);
         co_return Result{
             ecSuccess,
             BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::AlreadyValid}},

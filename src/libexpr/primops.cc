@@ -2048,6 +2048,8 @@ static void prim_storePath(EvalState & state, CallSite callSite, Value * const *
     auto storePath = state.store->toStorePath(sourcePath.path.abs()).first;
     if (!state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath))) && !settings.readOnlyMode)
         state.store->getBuilder()->ensurePath(storePath);
+    else
+        state.store->bumpLastUsageTime(storePath);
     context.insert(NixStringContextElem::Opaque{.path = storePath});
     v.mkString(sourcePath.path.abs(), context, state.mem);
 }
@@ -2975,8 +2977,10 @@ static void addPath(
                     .atPos(noPos)
                     .debugThrow();
             state.allowAndSetStorePathString(dstPath, v);
-        } else
+        } else {
+            state.store->bumpLastUsageTime(*expectedStorePath);
             state.allowAndSetStorePathString(*expectedStorePath, v);
+        }
     } catch (Error & e) {
         e.addTrace(nullptr, "while adding path '%s'", path);
         throw;

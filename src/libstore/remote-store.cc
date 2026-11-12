@@ -336,6 +336,16 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
     return WorkerProto::Serialise<std::optional<StorePath>>::read(*this, *conn);
 }
 
+void RemoteStore::bumpLastUsageTime(const StorePath & path)
+{
+    auto conn(getConnection());
+    if (conn->protoVersion.features.contains(WorkerProto::featurePathLastUsageTime)) {
+        conn->to << WorkerProto::Op::BumpLastUsageTime;
+        WorkerProto::write(*this, *conn, path);
+        conn.processStderr();
+    }
+}
+
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
     std::string_view name,
@@ -816,6 +826,10 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     bool supportsDeleteSpecificReferrers =
         conn->protoVersion.features.contains(WorkerProto::featureDeleteDeadSpecificReferrers);
+    bool supportsOlderThan = conn->protoVersion.features.contains(WorkerProto::featurePathLastUsageTime);
+
+    if (options.olderThan && !supportsOlderThan)
+        throw Error("Your daemon version is too old to support garbage collecting paths by age.");
 
     if (supportsDeleteSpecificReferrers) {
         conn->to << WorkerProto::Op::CollectGarbage;
@@ -844,6 +858,9 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
              << options.maxFreed
              /* removed options */
              << 0 << 0 << 0;
+
+    if (supportsOlderThan)
+        conn->to << options.olderThan.has_value() << options.olderThan.value_or(0);
 
     conn.processStderr();
 

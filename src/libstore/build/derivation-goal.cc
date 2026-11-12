@@ -82,6 +82,7 @@ Goal::Co<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation)
 
         /* If they are all valid, then we're done. */
         if (checkResult && checkResult->second == PathStatus::Valid && buildMode == bmNormal) {
+            worker.store.bumpLastUsageTime(checkResult->first.outPath);
             co_return success(BuildResult::Success::AlreadyValid, checkResult->first);
         }
 
