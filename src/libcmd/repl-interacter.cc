@@ -25,6 +25,7 @@ extern "C" {
 #include "nix/util/serialise.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 

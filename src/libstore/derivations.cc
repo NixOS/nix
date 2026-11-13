@@ -6,6 +6,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/util/logging.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/util/strings-inline.hh"

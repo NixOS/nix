@@ -9,6 +9,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/url.hh"
 #include "nix/util/users.hh"
+#include "nix/util/logging.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/environment-variables.hh"
 

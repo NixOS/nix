@@ -2,10 +2,11 @@
 ///@file
 
 #include "nix/util/error.hh"
+
+#include <iosfwd>
 #include <string>
 #include <optional>
 #include <cassert>
-#include <iostream>
 #include <set>
 #include <vector>
 #include <ranges>

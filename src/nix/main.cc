@@ -44,6 +44,8 @@
 
 #include "nix/util/strings.hh"
 
+#include <iostream>
+
 namespace nix {
 
 #ifndef _WIN32
@@ -371,8 +373,6 @@ static auto rCmdHelpStores = registerCommand<CmdHelpStores>("help-stores");
 
 void mainWrapped(int argc, char ** argv)
 {
-    savedArgv = argv;
-
     registerCrashHandler();
 
     /* The chroot helper needs to be run before any threads have been

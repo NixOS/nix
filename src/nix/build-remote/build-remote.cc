@@ -5,6 +5,7 @@
 #include <set>
 #include <memory>
 #include <tuple>
+#include <iostream>
 
 #ifdef __APPLE__
 #  include <sys/time.h>

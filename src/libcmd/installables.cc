@@ -21,10 +21,11 @@
 #include "nix/expr/eval-cache.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/store/build-result.hh"
+#include "nix/util/strings-inline.hh"
 
 #include <nlohmann/json.hpp>
 
-#include "nix/util/strings-inline.hh"
+#include <iostream>
 
 namespace nix {
 

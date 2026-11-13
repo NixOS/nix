@@ -3,7 +3,7 @@
 
 #include "nix/util/error.hh"
 
-#include <boost/outcome.hpp>
+#include <boost/outcome/result.hpp>
 
 #include <functional>
 #include <type_traits>

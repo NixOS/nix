@@ -3,14 +3,9 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
-#include "nix/util/logging.hh"
 #include "nix/util/strings.hh"
 
-#include <filesystem>
-#include <functional>
-#include <map>
 #include <set>
-#include <sstream>
 #include <bit>
 #include <optional>
 #include <ranges>
@@ -60,12 +55,6 @@ Strings quoteStrings(const C & c, char quote = '\'')
     for (auto & s : c)
         res.push_back(quoteString(s, quote));
     return res;
-}
-
-inline Strings quoteFSPaths(const std::set<std::filesystem::path> & paths, char quote = '\'')
-{
-    return paths | std::views::transform([&](const auto & p) { return quoteString(p.string(), quote); })
-           | std::ranges::to<Strings>();
 }
 
 /**
@@ -390,16 +379,6 @@ std::optional<typename T::value_type> pop(T & c)
     auto v = std::move(c.front());
     c.pop();
     return v;
-}
-
-/**
- * Append items to a container. TODO: remove this once we can use
- * C++23's `append_range()`.
- */
-template<class C, typename T>
-void append(C & c, std::initializer_list<T> l)
-{
-    c.insert(c.end(), l.begin(), l.end());
 }
 
 template<typename T>

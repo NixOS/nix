@@ -21,6 +21,7 @@
 #include <sys/jail.h>
 #include <sys/sockio.h>
 #include <jail.h>
+#include <fcntl.h>
 
 namespace nix {
 

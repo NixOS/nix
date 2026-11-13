@@ -15,6 +15,9 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 namespace nix {
 
 void LoggerSettings::anchor() {}

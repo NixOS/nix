@@ -7,10 +7,12 @@
 #include "linux-namespaces-private.hh"
 
 #include <mutex>
-#include <sys/resource.h>
 
+#include <sys/resource.h>
 #include <sys/mount.h>
 #include <sys/statvfs.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace nix {
 

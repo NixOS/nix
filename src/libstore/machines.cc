@@ -2,6 +2,7 @@
 #include "nix/store/machines.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/logging.hh"
 
 #include <algorithm>
 

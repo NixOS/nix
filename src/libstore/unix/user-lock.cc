@@ -1,7 +1,3 @@
-#include <vector>
-#include <pwd.h>
-#include <grp.h>
-
 #include "nix/store/user-lock.hh"
 #include "nix/store/local-settings.hh"
 #include "nix/util/file-system.hh"
@@ -9,6 +5,13 @@
 #include "nix/util/users.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/system-error.hh"
+
+#include <vector>
+
+#include <pwd.h>
+#include <grp.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace nix {
 

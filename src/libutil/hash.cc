@@ -12,6 +12,7 @@
 #include "nix/util/base-n.hh"
 #include "nix/util/base-nix-32.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/logging.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

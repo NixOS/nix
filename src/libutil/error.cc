@@ -27,13 +27,6 @@ void BaseError::addTrace(std::shared_ptr<const Pos> && e, HintFmt hint, TracePri
     err.traces.push_front(Trace{.pos = std::move(e), .hint = hint, .print = print});
 }
 
-void throwExceptionSelfCheck()
-{
-    // This is meant to be caught in initLibUtil()
-    throw Error(
-        "C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
-}
-
 void BaseError::recalcWhat() const
 {
     std::ostringstream oss;
