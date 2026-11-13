@@ -44,6 +44,8 @@
 
 #include "nix/util/strings.hh"
 
+#include <iostream>
+
 namespace nix {
 
 #ifndef _WIN32
