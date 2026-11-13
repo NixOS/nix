@@ -1,0 +1,10 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-empty-context.nix:1:1:
+            1| builtins.derivationOf ""
+             | ^
+            2|
+
+       … while evaluating the argument passed to builtins.derivationOf
+
+       error: string '' has 0 entries in its context. It should only have exactly one entry

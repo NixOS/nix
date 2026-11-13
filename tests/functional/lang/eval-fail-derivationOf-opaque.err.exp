@@ -1,0 +1,9 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-opaque.nix:4:1:
+            3| in
+            4| builtins.derivationOf (
+             | ^
+            5|   builtins.appendContext path {
+
+       error: string '/nix/store/11111111111111111111111111111111-source' refers to the opaque store path '/nix/store/11111111111111111111111111111111-source', whose deriver is not recorded in the string context
