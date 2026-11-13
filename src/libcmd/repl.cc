@@ -144,8 +144,15 @@ NixRepl::NixRepl(
 {
 }
 
-static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
+// The debug REPL writes to std::cout; keep its colors only when stdout wants them.
+static std::string debugOut(std::string_view s)
 {
+    return shouldANSI(StandardOutputStream::Stdout) ? std::string(s) : stripANSIEscapes(s);
+}
+
+static std::string showDebugTrace(const PosTable & positions, const DebugTrace & dt)
+{
+    std::ostringstream out;
     if (dt.isError)
         out << ANSI_RED "error: " << ANSI_NORMAL;
     out << dt.hint.str() << "\n";
@@ -161,7 +168,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
         }
     }
 
-    return out;
+    return out.str();
 }
 
 /**
@@ -409,8 +416,8 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (state->debugRepl && (command == ":bt" || command == ":backtrace")) {
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
-            std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-            showDebugTrace(std::cout, state->positions, i);
+            std::cout << debugOut(fmt("\n" ANSI_BLUE "%1%" ANSI_NORMAL ": ", idx));
+            std::cout << debugOut(showDebugTrace(state->positions, i));
         }
     }
 
@@ -432,8 +439,8 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
             if (idx == debugTraceIndex) {
-                std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                showDebugTrace(std::cout, state->positions, i);
+                std::cout << debugOut(fmt("\n" ANSI_BLUE "%1%" ANSI_NORMAL ": ", idx));
+                std::cout << debugOut(showDebugTrace(state->positions, i));
                 std::cout << std::endl;
                 printEnvBindings(*state, i.expr, i.env);
                 loadDebugTraceEnv(i);

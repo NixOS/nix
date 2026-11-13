@@ -1,0 +1,9 @@
+---
+synopsis: "REPL and debugger output on stdout is plain when stdout is not a terminal"
+issues: []
+prs: []
+---
+
+`nix repl` no longer writes ANSI escape codes to stdout when it is not a terminal, or when `NO_COLOR` is set: printed values, `:doc`, and the debugger's `:bt`, `:st` and `:env` colors.
+Set `CLICOLOR_FORCE` to keep the styling.
+`nix help` also decides by stdout now, before the pager takes it over.
