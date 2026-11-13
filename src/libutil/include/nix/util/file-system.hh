@@ -642,6 +642,7 @@ public:
 
 
 private:
+    std::filesystem::path dir_;
     std::filesystem::directory_iterator it_;
 };
 
