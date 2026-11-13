@@ -1,5 +1,6 @@
 #include "nix/store/store-registration.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/logging.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/json-utils.hh"

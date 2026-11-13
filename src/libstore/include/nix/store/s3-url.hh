@@ -1,6 +1,7 @@
 #pragma once
 ///@file
-#include "nix/store/config.hh"
+
+#include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/url.hh"
 #include "nix/util/util.hh"

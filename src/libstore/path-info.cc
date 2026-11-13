@@ -5,6 +5,7 @@
 #include "nix/util/json-utils.hh"
 #include "nix/util/comparator.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 

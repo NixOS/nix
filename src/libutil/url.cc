@@ -5,6 +5,7 @@
 #include "nix/util/canon-path.hh"
 #include "nix/util/strings-inline.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
 
 #include <boost/url.hpp>
 
