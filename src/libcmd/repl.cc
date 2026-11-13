@@ -114,7 +114,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
             str,
             v,
             PrintOptions{
-                .ansiColors = true,
+                .ansiColors = shouldANSI(StandardOutputStream::Stdout),
                 .force = true,
                 .derivationPaths = true,
                 .maxDepth = maxDepth,
