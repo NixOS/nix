@@ -532,6 +532,88 @@ VERSIONED_CHARACTERIZATION_TEST(
         t;
     }))
 
+static const std::tuple<BuildResult, BuildResult, BuildResult> buildResultsWithResourceUsage{
+    BuildResult{
+        .inner{BuildResult::Success{
+            .status = BuildResult::Success::Built,
+            .builtOutputs =
+                {
+                    {
+                        "foo",
+                        {
+                            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                        },
+                    },
+                },
+        }},
+        .timesBuilt = 1,
+        .startTime = 30,
+        .stopTime = 50,
+        .cpuUser = std::chrono::microseconds(500),
+        .cpuSystem = std::chrono::microseconds(604),
+        .resourceUsageByStatisticName =
+            {
+                {"memoryPeak", 1073741824},
+                {"memorySwapPeak", 0},
+                {"ioReadBytes", 4096},
+                {"ioWriteBytes", 8192},
+                {"oomKilledProcessCount", 0},
+            },
+    },
+    BuildResult{
+        .inner{BuildResult::Failure{{
+            .status = BuildResult::Failure::PermanentFailure,
+            .msg = HintFmt("builder was killed"),
+        }}},
+        .timesBuilt = 1,
+        .startTime = 30,
+        .stopTime = 50,
+        .resourceUsageByStatisticName =
+            {
+                {"memoryPeak", 2147483648},
+                {"oomKilledProcessCount", 3},
+            },
+    },
+    BuildResult{
+        .inner{BuildResult::Success{.status = BuildResult::Success::AlreadyValid}},
+    },
+};
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_resource_usage,
+    "build-result-resource-usage",
+    (WorkerProto::Version{
+        .number =
+            {
+                .major = 1,
+                .minor = 38,
+            },
+        .features = {"realisation-with-path-not-hash", "build-resource-usage"},
+    }),
+    buildResultsWithResourceUsage)
+
+TEST_F(WorkerProtoTest, buildResult_resource_usage_needs_feature)
+{
+    auto encode = [&](const BuildResult & result) {
+        StringSink to;
+        WorkerProto::write(
+            store,
+            WorkerProto::WriteConn{
+                .to = to,
+                .version = {.number = {.major = 1, .minor = 38}, .features = {"realisation-with-path-not-hash"}},
+            },
+            result);
+        return std::move(to.s);
+    };
+
+    auto withResourceUsage = std::get<0>(buildResultsWithResourceUsage);
+    auto withoutResourceUsage = withResourceUsage;
+    withoutResourceUsage.resourceUsageByStatisticName.clear();
+
+    EXPECT_EQ(encode(withResourceUsage), encode(withoutResourceUsage));
+}
+
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     keyedBuildResult_1_29,

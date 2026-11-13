@@ -1,1 +1,4 @@
-sources += files('file-system.cc')
+sources += files(
+  'cgroup.cc',
+  'file-system.cc',
+)

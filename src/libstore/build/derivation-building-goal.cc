@@ -1087,12 +1087,19 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
         builder->cleanupBuild(false);
         builder.reset();
         outputLocks.unlock();
+        std::string notes = diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "";
+        auto & usage = buildResult.resourceUsageByStatisticName;
+        if (auto outOfMemoryKilledProcessCount = usage.find("oomKilledProcessCount");
+            outOfMemoryKilledProcessCount != usage.end() && outOfMemoryKilledProcessCount->second > 0)
+            notes +=
+                fmt("\nnote: the kernel killed %d processes in the build because memory ran out",
+                    outOfMemoryKilledProcessCount->second);
         co_return fixupBuilderFailureErrorMessage(
             {
                 !derivation::type(*drv).isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
                                                                   : BuildResult::Failure::PermanentFailure,
                 status,
-                diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+                std::move(notes),
             },
             *buildLog);
     }

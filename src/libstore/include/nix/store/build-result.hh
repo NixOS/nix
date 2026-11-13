@@ -3,6 +3,8 @@
 
 #include <string>
 #include <chrono>
+#include <cstdint>
+#include <map>
 #include <optional>
 
 #include "nix/store/derived-path.hh"
@@ -192,6 +194,23 @@ struct BuildResult
      * User and system CPU time the build took.
      */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
+
+    /**
+     * Resource usage of the build, keyed by name. Only set on Linux when `use-cgroups` is enabled and only for
+     * statistics the kernel provides:
+     *
+     * - `memoryPeak`: Peak memory usage in bytes, including page cache (`memory.peak`, Linux 5.19 and later).
+     * - `memorySwapPeak`: Peak swap usage in bytes (`memory.swap.peak`, Linux 6.5 and later). This key is absent
+     *   without swap support.
+     * - `ioReadBytes`, `ioWriteBytes`: Bytes read from block devices and bytes written to block devices (`io.stat`).
+     *   Reads served from page cache and I/O on tmpfs don't count. These values leave out buffered writes that
+     *   reach disk after build completion.
+     * - `oomKilledProcessCount`: Number of build processes that the kernel killed due to out of memory (`oom_kill`
+     *   line in `memory.events`).
+     *
+     * New statistics add keys and nothing else. The worker protocol can stay unchanged.
+     */
+    std::map<std::string, uint64_t> resourceUsageByStatisticName;
 
     bool operator==(const BuildResult &) const noexcept;
     std::strong_ordering operator<=>(const BuildResult &) const noexcept;

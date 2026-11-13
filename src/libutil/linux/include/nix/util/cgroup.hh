@@ -2,6 +2,8 @@
 ///@file
 
 #include <chrono>
+#include <cstdint>
+#include <map>
 #include <optional>
 #include <filesystem>
 
@@ -17,6 +19,12 @@ StringMap getCgroups(const std::filesystem::path & cgroupFile);
 struct CgroupStats
 {
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
+
+    /**
+     * Cgroup statistics keyed by name: `memoryPeak`, `memorySwapPeak`, `ioReadBytes`, `ioWriteBytes`,
+     * `oomKilledProcessCount`. A statistic is absent when the kernel lacks that file or can't parse it.
+     */
+    std::map<std::string, uint64_t> resourceUsageByStatisticName;
 };
 
 /**

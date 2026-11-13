@@ -13,6 +13,7 @@
       }:
       {
         virtualisation.additionalPaths = [ pkgs.stdenvNoCC ];
+        environment.systemPackages = [ pkgs.jq ];
         nix.extraOptions = ''
           extra-experimental-features = nix-command auto-allocate-uids cgroups
           extra-system-features = uid-range
@@ -29,6 +30,17 @@
       start_all()
 
       host.wait_for_unit("multi-user.target")
+
+      host.succeed(
+          "NIX_REMOTE=daemon nix build --auto-allocate-uids --no-link --json "
+          "--file ${./resource-usage.nix} > /tmp/resource-usage.json"
+      )
+      host.succeed("cat /tmp/resource-usage.json >&2")
+      host.succeed(
+          "jq --exit-status '.[0].resourceUsage | "
+          "(.memoryPeak > 33554432) and ((.memorySwapPeak // 0) == 0) and (.oomKilledProcessCount == 0)"
+          "' /tmp/resource-usage.json"
+      )
 
       # Start build in background
       host.execute("NIX_REMOTE=daemon nix build --auto-allocate-uids --file ${./hang.nix} >&2 &")
