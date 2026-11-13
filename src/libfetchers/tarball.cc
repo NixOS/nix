@@ -160,7 +160,7 @@ static DownloadTarballResult downloadTarball_(
     auto _res = std::make_shared<Sync<FileTransferResult>>();
 
     auto source = sinkToSource([&](Sink & sink) {
-        FileTransferRequest req(url);
+        FileTransferRequest req(VerbatimURL{urlS});
         req.expectedETag = cached ? getStrAttr(cached->value, "etag") : "";
         getFileTransfer()->download(std::move(req), sink, [_res](FileTransferResult r) { *_res->lock() = r; });
     });
