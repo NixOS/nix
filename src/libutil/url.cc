@@ -337,15 +337,16 @@ std::string ParsedURL::renderPath(bool encode) const
     return renderUrlPathNoPctEncoding(path);
 }
 
-std::string ParsedURL::renderAuthorityAndPath() const
+std::string ParsedURL::to_string() const
 {
-    std::string res;
+    std::string res = scheme + ":";
     /* The following assertions correspond to 3.3. Path [rfc3986]. URL parser
        will never violate these properties, but hand-constructed ParsedURLs might. */
     if (authority.has_value()) {
         /* If a URI contains an authority component, then the path component
            must either be empty or begin with a slash ("/") character. */
         assert(path.empty() || path.front().empty());
+        res += "//";
         res += authority->to_string();
     } else if (std::ranges::equal(std::views::take(path, 3), std::views::repeat("", 3))) {
         /* If a URI does not contain an authority component, then the path cannot begin
@@ -353,17 +354,6 @@ std::string ParsedURL::renderAuthorityAndPath() const
         unreachable();
     }
     res += encodeUrlPath(path);
-    return res;
-}
-
-std::string ParsedURL::to_string() const
-{
-    std::string res;
-    res += scheme;
-    res += ":";
-    if (authority.has_value())
-        res += "//";
-    res += renderAuthorityAndPath();
     if (!query.empty()) {
         res += "?";
         res += encodeQuery(query);

@@ -46,7 +46,8 @@ StoreReference LocalBinaryCacheStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = "file",
-                .authority = encodeUrlPath(pathToUrlPath(binaryCacheDir)),
+                .authority = ParsedURL::Authority{},
+                .path = pathToUrlPath(binaryCacheDir),
             },
     };
 }
