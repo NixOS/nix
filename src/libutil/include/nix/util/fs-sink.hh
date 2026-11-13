@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
@@ -9,32 +10,38 @@
 namespace nix {
 
 /**
- * Actions on an open regular file in the process of creating it.
+ * A way to directly and recursively sink file system objects
  *
- * See `FileSystemObjectSink::createRegularFile`.
+ * This is a very well-restricted interface to recursively create file
+ * system objects "bottom up", and "one layer at a time". For example of
+ * some rules this enforces:
+ *
+ *  - Parent directories must be created before children.
+ *
+ *  - Child names must be picked before child contents (including file
+ *    type).
+ *
+ *  - Metadata like the executable bit on files must be chosen before
+ *    file contents are streamed.
+ *
+ *  As such, this interface is very good for two tasks in particular:
+ *
+ *  - Parsing Nix Archives, as the NAR format exactly corresponds to
+ *    this. (You can think of this as a NAR Visitor.)
+ *
+ *  - Creating files on disk, as the above invariants give us the
+ *    opportunity to create files in a very controlled manner, avoiding
+ *    all sorts of security issues.
+ *
+ *  What this is *not* good for is:
+ *
+ *  - Unpacking unstructured file formats like tarballs. (See `TarSink`
+ *    for that.)
+ *
+ *  - Merkle formats/protocols that do not want to consume all layers at
+ *    once, but support more asynchronous and lazy IO. (See
+ *    `merkle::FileSinkBuilder` for that.)
  */
-struct CreateRegularFileSink : virtual Sink
-{
-private:
-    void anchor() override;
-
-public:
-    /**
-     * If set to true, the sink will not be called with the contents
-     * of the file. `preallocateContents()` will still be called to
-     * convey the file size. Useful for sinks that want to efficiently
-     * discard the contents of the file.
-     */
-    bool skipContents = false;
-
-    virtual void isExecutable() = 0;
-
-    /**
-     * An optimization. By default, do nothing.
-     */
-    virtual void preallocateContents(uint64_t size) {};
-};
-
 struct FileSystemObjectSink
 {
 private:
@@ -43,41 +50,99 @@ private:
     virtual void anchor();
 
 public:
-    virtual ~FileSystemObjectSink() = default;
+    /**
+     * Actions on an open regular file in the process of creating it.
+     *
+     * See `FileSystemObjectSink::createRegularFile`.
+     *
+     * `Sink` is a virtual base so that an implementation can also be
+     * another kind of `Sink`, like `RestoreSink`'s is an `FdSink`. That
+     * is not just to reuse its `operator()`: `copyFdRange` finds the
+     * descriptor to write to with a `dynamic_cast` to `FdSink`, so that
+     * it can copy file contents with copy-on-write where possible.
+     *
+     * In other words, if we want to make this not virtual, we need to replace
+     * that `dynamic_cast` with something else.
+     */
+    struct OnRegularFile : virtual Sink
+    {
+    private:
+        void anchor() override;
 
-    virtual void createDirectory(const CanonPath & path) = 0;
+    public:
+        /**
+         * If set to true, the sink will not be called with the contents
+         * of the file. `preallocateContents()` will still be called to
+         * convey the file size. Useful for sinks that want to efficiently
+         * discard the contents of the file.
+         */
+        bool skipContents = false;
 
-    using DirectoryCreatedCallback = fun<void(FileSystemObjectSink & dirSink, const CanonPath & dirRelPath)>;
+        /**
+         * An optimization. By default, do nothing.
+         */
+        virtual void preallocateContents(uint64_t size) {};
+    };
 
     /**
-     * Create a directory and invoke a callback with a pair of sink + CanonPath
-     * of the created subdirectory relative to dirSink.
+     * Actions on an open directory in order to populate it with its
+     * children.
+     */
+    struct OnDirectory
+    {
+    private:
+        virtual void anchor();
+
+    public:
+        virtual ~OnDirectory() = default;
+
+        using ChildCreatedCallback = fun<void(FileSystemObjectSink & fsoSink)>;
+
+        /**
+         * Create a child of this directory. The callback provides us with a
+         * `FileSystemObjectSink` we can think of as "pointing" to the location
+         * which we have chosen, allowing us to subsequently choose what we
+         * want to put there.
+         *
+         * @param fileName must not contain any `/` or null bytes. It should
+         * also not contain any `\` when Windows host filesystems aim to be
+         * supported.
+         */
+        virtual void createChild(std::string_view fileName, ChildCreatedCallback callback) = 0;
+    };
+
+    virtual ~FileSystemObjectSink() = default;
+
+    using DirectoryCreatedCallback = fun<void(OnDirectory & dirSink)>;
+
+    /**
+     * Create a directory and invoke a callback with an `OnDirectory`
+     * for populating it.
      *
-     * @note This allows for UNIX RestoreSink implementations to implement
+     * @note This allows for `RestoreSink` to implement
      * *at-style accessors that always keep an open file descriptor for the
      * freshly created directory. Use this when it's important to disallow any
      * intermediate path components from being symlinks.
      */
-    virtual void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
-    {
-        createDirectory(path);
-        callback(*this, path);
-    }
+    virtual void createDirectory(DirectoryCreatedCallback callback) = 0;
+
+    using RegularFileCreatedCallback = fun<void(OnRegularFile & regFileSink)>;
 
     /**
      * This function in general is no re-entrant. Only one file can be
      * written at a time.
+     *
+     * @param isExecutable whether the file should be marked executable
      */
-    virtual void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) = 0;
+    virtual void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) = 0;
 
-    virtual void createSymlink(const CanonPath & path, const std::string & target) = 0;
+    virtual void createSymlink(const std::string & target) = 0;
 };
 
 /**
  * Recursively copy file system objects from the source into the sink.
  */
-void copyRecursive(
-    SourceAccessor & accessor, const CanonPath & sourcePath, FileSystemObjectSink & sink, const CanonPath & destPath);
+void copyRecursive(SourceAccessor & accessor, const CanonPath & sourcePath, FileSystemObjectSink & sink);
 
 /**
  * Ignore everything and do nothing
@@ -88,17 +153,23 @@ private:
     void anchor() override;
 
 public:
-    void createDirectory(const CanonPath & path) override {}
+    void createDirectory(DirectoryCreatedCallback) override;
 
-    void createSymlink(const CanonPath & path, const std::string & target) override {}
+    void createSymlink(const std::string & target) override {}
 
-    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback) override;
 };
 
 class RestoreSinkHooks;
 
 /**
  * Write files at the given path
+ *
+ * This sink must *never* follow intermediate symlinks in case a file collision
+ * is encountered for various reasons like case-insensitivity or other types of
+ * normalization. Using appropriate *at system calls and traversing only one
+ * path component at a time ensures that writing is race-free and is not
+ * susceptible to symlink replacement.
  */
 struct RestoreSink : FileSystemObjectSink
 {
@@ -107,36 +178,85 @@ private:
 
     RestoreSinkHooks * hooks = nullptr;
 
-public:
-    std::filesystem::path dstPath;
     /**
-     * File descriptor for the directory located at dstPath. Used for *at
-     * operations relative to this file descriptor. This sink must *never*
-     * follow intermediate symlinks (starting from dstPath) in case a file
-     * collision is encountered for various reasons like case-insensitivity or
-     * other types on normalization. using appropriate *at system calls and traversing
-     * only one path component at a time ensures that writing is race-free and is
-     * is not susceptible to symlink replacement.
+     * Owns `parentDir`, when this sink was made by `forPath`.
      */
-    AutoCloseFD dirFd;
+    AutoCloseFD ownedParentDir;
+
+    /**
+     * The directory to create the entry in.
+     *
+     * This is a borrowed descriptor (unless this sink was made by
+     * `forPath`); the caller must ensure it remains valid for the
+     * lifetime of operations on this sink.
+     */
+    Descriptor parentDir;
+
+    /**
+     * Name of the child to create within the parent directory.
+     */
+    OsFilename name;
+
     bool startFsync = false;
 
-    explicit RestoreSink(bool startFsync, RestoreSinkHooks * hooks = nullptr)
+    /**
+     * Whether only a directory may be created, because this sink was
+     * made by `forPath` from a path with a trailing separator.
+     */
+    bool mustBeDirectory = false;
+
+public:
+    /**
+     * Implementation of `OnDirectory` for `RestoreSink`.
+     *
+     * Made public just for sake tests, currently.
+     */
+    class Directory : public OnDirectory
+    {
+        AutoCloseFD directory;
+        bool startFsync;
+        RestoreSinkHooks * hooks;
+
+        friend struct RestoreSink;
+
+    public:
+        Directory(AutoCloseFD directory, bool startFsync = false, RestoreSinkHooks * hooks = nullptr)
+            : directory{std::move(directory)}
+            , startFsync{startFsync}
+            , hooks{hooks}
+        {
+        }
+
+        void createChild(std::string_view name, ChildCreatedCallback callback) override;
+    };
+
+    RestoreSink(Descriptor parentDir, OsFilename name, bool startFsync = false, RestoreSinkHooks * hooks = nullptr)
         : hooks{hooks}
+        , parentDir{parentDir}
+        , name{std::move(name)}
         , startFsync{startFsync}
     {
     }
 
     /**
-     * @todo Remove. Only keep the callback driven function (at least for recursive traversal).
+     * Make a sink that creates @p dstPath, by opening the parent
+     * directory of @p dstPath.
+     *
+     * As with POSIX, a trailing separator (e.g. `out/`) means that
+     * @p dstPath must be a directory: then only `createDirectory` is
+     * allowed, and the others throw `SysError` with `EISDIR`.
+     *
+     * @throws Error if @p dstPath is empty, or its last component is
+     * not a valid file name (e.g. `.` or `..`).
      */
-    void createDirectory(const CanonPath & path) override;
+    static RestoreSink
+    forPath(const std::filesystem::path & dstPath, bool startFsync, RestoreSinkHooks * hooks = nullptr);
 
-    void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback) override;
+    void createDirectory(DirectoryCreatedCallback callback) override;
 
-    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) override;
 
-    void createSymlink(const CanonPath & path, const std::string & target) override;
+    void createSymlink(const std::string & target) override;
 };
 
 /**
@@ -156,7 +276,7 @@ public:
 
     /**
      * @brief Called when the callback passed to @ref nix::RestoreSink::createDirectory()
-     * returns.
+     * returns, i.e. once the directory has been populated.
      *
      * Naturally, this means that recursive copying and @ref nix::restorePath()
      * drives these in post-order when walking up the directory tree. This makes
@@ -170,7 +290,7 @@ public:
      * Called when the callback passed to @ref nix::RestoreSink::createRegularFile() returns.
      *
      * @param fd File descriptor of the file.
-     * @param executable Whether @ref nix::CreateRegularFileSink::isExecutable() was called.
+     * @param executable Whether the file was created executable.
      */
     virtual void regularFileCreated(Descriptor fd, bool executable) = 0;
 
@@ -178,7 +298,7 @@ public:
      * @brief Called after a symlink is created.
      *
      * @param parentFd Directory file descriptor of the symlink parent (immediate one).
-     * @param name Relative path of the symlink beneath the parent directory.
+     * @param name Name of the symlink within the parent directory.
      */
     virtual void symlinkCreated(Descriptor parentFd, const OsFilename & name) = 0;
 };
@@ -202,19 +322,19 @@ public:
     {
     }
 
-    void createDirectory(const CanonPath & path) override
+    void createDirectory(DirectoryCreatedCallback) override
     {
         /* FIXME: Throw an error here. */
         regular = false;
     }
 
-    void createSymlink(const CanonPath & path, const std::string & target) override
+    void createSymlink(const std::string & target) override
     {
         /* FIXME: Throw an error here. */
         regular = false;
     }
 
-    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) override;
 };
 
 } // namespace nix
