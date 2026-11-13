@@ -31,6 +31,10 @@ R""(
   …
   ```
 
+  These human-readable sizes are intended for display and are not
+  compatible with `sort -h`. To sort by size, omit `--human-readable`
+  and sort the byte counts numerically, as in the example above.
+
 * Check the existence of a path in a binary cache:
 
   ```console
