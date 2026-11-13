@@ -101,6 +101,14 @@ Goal::Co<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::loadDer
             } catch (MissingRealisation &) {
                 return std::nullopt;
             }
+            /* Make `drvPath` a temporary root *before* checking
+               whether it's valid. Otherwise the garbage collector
+               could delete it right after the check, and we would
+               skip obtaining it but then fail to read it below. If
+               the garbage collector is deleting it right now,
+               `addTempRoot()` waits for that to finish, so the
+               check will see that it's gone. */
+            worker.evalStore.addTempRoot(drvPath);
             auto cond = worker.evalStore.isValidPath(drvPath) || worker.store.isValidPath(drvPath);
             return cond ? std::optional{drvPath} : std::nullopt;
         }()) {
@@ -140,7 +148,9 @@ Goal::Co<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::loadDer
         for (auto * drvStore : {&worker.evalStore, &worker.store})
             if (drvStore->isValidPath(drvPath))
                 return drvStore->readDerivation(drvPath);
-        assert(false);
+        /* This can only happen if something deleted the derivation
+           despite the temporary root. */
+        throw Error("derivation '%s' disappeared while trying to build it", worker.store.printStorePath(drvPath));
     }();
 
     co_return std::pair{std::move(drvPath), std::move(drv)};
