@@ -238,6 +238,21 @@ EvalMemory::EvalMemory()
     assertGCInitialized();
 }
 
+EvalState::Extension::~Extension() {}
+
+static Sync<std::vector<EvalState::ExtensionFactory>> & extensionFactories()
+{
+    static Sync<std::vector<EvalState::ExtensionFactory>> factories;
+    return factories;
+}
+
+size_t EvalState::registerExtension(ExtensionFactory factory)
+{
+    auto factories(extensionFactories().lock());
+    factories->push_back(factory);
+    return factories->size() - 1;
+}
+
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,
@@ -318,7 +333,6 @@ EvalState::EvalState(
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , positionToDocComment(make_ref<decltype(positionToDocComment)::element_type>())
     , lookupPathResolved(make_ref<decltype(lookupPathResolved)::element_type>())
-    , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &mem.allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
@@ -376,6 +390,14 @@ EvalState::EvalState(
         });
 
     createBaseEnv(settings);
+
+    /* Create the extensions. This is done after creating the base
+       environment so that they can evaluate Nix code. Copy the
+       factories so we don't hold the lock while calling them. */
+    auto factories = *extensionFactories().lock();
+    extensions.reserve(factories.size());
+    for (auto & factory : factories)
+        extensions.push_back(factory(*this));
 
     /* Register function call tracer. */
     if (settings.traceFunctionCalls)
@@ -1198,6 +1220,8 @@ void EvalState::resetFileCache()
     inputCache->clear();
     lookupPathResolved->clear();
     rootFS->invalidateCache();
+    for (auto & ext : extensions)
+        ext->resetFileCache();
 }
 
 void EvalState::eval(Expr * e, Value & v)
@@ -3153,6 +3177,9 @@ void EvalState::printStatistics()
         {"cycles", gcCycles},
     };
 #endif
+
+    for (auto & ext : extensions)
+        ext->addStatistics(topObj);
 
     if (countCalls) {
         {

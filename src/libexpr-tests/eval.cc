@@ -180,6 +180,60 @@ TEST_F(EvalStateTest, getBuiltin_fail)
     ASSERT_THROW(state.getBuiltin("nonexistent"), EvalError);
 }
 
+struct TestExtension : EvalState::Extension
+{
+    static inline std::atomic<size_t> instances = 0;
+
+    EvalState & state;
+
+    size_t nrResets = 0;
+
+    TestExtension(EvalState & state)
+        : state(state)
+    {
+        instances++;
+    }
+
+    ~TestExtension()
+    {
+        instances--;
+    }
+
+    void resetFileCache() override
+    {
+        nrResets++;
+    }
+};
+
+static EvalState::RegisterExtension<TestExtension> rTestExtension;
+
+TEST_F(EvalStateTest, getExtension)
+{
+    auto & ext = state.getExtension(rTestExtension);
+    ASSERT_EQ(&ext.state, &state);
+    ASSERT_EQ(&state.getExtension(rTestExtension), &ext);
+
+    auto instances = TestExtension::instances.load();
+
+    {
+        EvalState state2({}, store, fetchSettings, evalSettings, nullptr);
+        ASSERT_EQ(TestExtension::instances, instances + 1);
+        auto & ext2 = state2.getExtension(rTestExtension);
+        ASSERT_NE(&ext2, &ext);
+        ASSERT_EQ(&ext2.state, &state2);
+    }
+
+    ASSERT_EQ(TestExtension::instances, instances);
+}
+
+TEST_F(EvalStateTest, extensionHooks)
+{
+    auto & ext = state.getExtension(rTestExtension);
+    ASSERT_EQ(ext.nrResets, 0);
+    state.resetFileCache();
+    ASSERT_EQ(ext.nrResets, 1);
+}
+
 class PureEvalTest : public LibExprTest
 {
 public:
