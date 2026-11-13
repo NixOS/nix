@@ -167,10 +167,11 @@ void LocalStore::optimisePath_(
     /* Check if this is a known hash. */
     std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
 
-    /* Maybe delete the link, if it has been corrupted. */
-    if (pathExists(linkPath)) {
-        auto stLink = lstat(linkPath);
-        if (st.st_size != stLink.st_size || (repair && hash != ({
+    /* Maybe delete the link, if it has been corrupted. A concurrent garbage
+       collection may remove it between an existence check and the lstat, so
+       read it once and treat a vanished link as absent. */
+    if (auto stLink = maybeLstat(linkPath)) {
+        if (st.st_size != stLink->st_size || (repair && hash != ({
                                                            hashPath(
                                                                makeFSSourceAccessor(linkPath),
                                                                FileSerialisationMethod::NixArchive,
