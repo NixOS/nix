@@ -40,7 +40,7 @@ in
         nix.settings.substituters = lib.mkForce [ ];
         nix.settings.hashed-mirrors = null;
         nix.settings.connect-timeout = 1;
-        nix.extraOptions = "experimental-features = nix-command";
+        nix.settings.experimental-features = [ "nix-command" ];
         environment.localBinInPath = true;
         system.extraDependencies = [
           fallback-paths

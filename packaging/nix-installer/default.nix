@@ -6,8 +6,13 @@
   buildPackages,
   runCommand,
   rustPlatform,
+  pkg-config,
+  zstd,
   fetchFromGitHub,
   tarball,
+  # Hack around pkgsStatic.buildPackages being prefixed.
+  cctools,
+  sigtool,
 }:
 
 let
@@ -32,6 +37,14 @@ let
 
     cargoHash = "sha256-oNDsyjFCC7B9TovJqdZoXQwr7dtdFdUNltXOgv0aPLk=";
 
+    nativeBuildInputs = [
+      pkg-config
+    ];
+
+    buildInputs = [
+      zstd
+    ];
+
     doCheck = false;
 
     env = lib.optionalAttrs stdenv.hostPlatform.isDarwin {
@@ -48,8 +61,8 @@ runCommand "nix-installer-${tarball.passthru.nixVersion}"
       buildPackages.python3
     ]
     ++ lib.optionals stdenv.hostPlatform.isDarwin [
-      buildPackages.darwin.sigtool
-      buildPackages.darwin.cctools
+      sigtool
+      cctools
     ];
 
     # The appended payload contains store-path strings on purpose; don't

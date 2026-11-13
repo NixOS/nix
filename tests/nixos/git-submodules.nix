@@ -24,7 +24,10 @@
         {
           programs.ssh.extraConfig = "ConnectTimeout 30";
           environment.systemPackages = [ pkgs.git ];
-          nix.extraOptions = "experimental-features = nix-command flakes";
+          nix.settings.experimental-features = [
+            "nix-command"
+            "flakes"
+          ];
         };
     };
 

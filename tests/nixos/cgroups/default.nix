@@ -13,10 +13,12 @@
       }:
       {
         virtualisation.additionalPaths = [ pkgs.stdenvNoCC ];
-        nix.extraOptions = ''
-          extra-experimental-features = nix-command auto-allocate-uids cgroups
-          extra-system-features = uid-range
-        '';
+        nix.settings.experimental-features = [
+          "nix-command"
+          "auto-allocate-uids"
+          "cgroups"
+        ];
+        nix.settings.extra-system-features = [ "uid-range" ];
         nix.settings.use-cgroups = true;
         nix.settings.substituters = lib.mkForce [ ];
         nix.nixPath = [ "nixpkgs=${nixpkgs}" ];

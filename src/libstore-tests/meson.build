@@ -88,7 +88,11 @@ if build_unit_tests
     dependency('sqlite3', 'sqlite', version : '>=3.6.19'),
     rapidcheck,
     # See ../libutil-test-support/meson.build
-    cxx.find_library('rapidcheck', dirs : [ rapidcheck.get_variable('libdir') ]),
+    cxx.find_library(
+      'rapidcheck',
+      dirs : [ rapidcheck.get_variable('libdir') ],
+      static : get_option('default_library') == 'static',
+    ),
     dependency('gtest', main : true),
     dependency('gmock'),
   ]

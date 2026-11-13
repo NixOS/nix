@@ -14,19 +14,12 @@ in
   name = "chroot-store";
 
   nodes = {
-    machine =
-      {
-        config,
-        lib,
-        pkgs,
-        ...
-      }:
-      {
-        virtualisation.writableStore = true;
-        virtualisation.additionalPaths = [ pkgA ];
-        environment.systemPackages = [ pkgB ];
-        nix.extraOptions = "experimental-features = nix-command";
-      };
+    machine = {
+      virtualisation.writableStore = true;
+      virtualisation.additionalPaths = [ pkgA ];
+      environment.systemPackages = [ pkgB ];
+      nix.settings.experimental-features = [ "nix-command" ];
+    };
   };
 
   testScript =
