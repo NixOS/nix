@@ -12,7 +12,7 @@ struct CmdSubmitOutput : StoreCommand
 
     CmdSubmitOutput()
     {
-        expectArg("path", &path);
+        expectArgs({.label = "path", .handler = &path, .completer = completePath});
         expectArg("output", &output);
     }
 
