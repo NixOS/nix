@@ -113,30 +113,31 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     auto fragment = percentDecode(match[5].str());
 
     if (baseDir) {
-        /* Check if 'url' is a path (either absolute or relative
-           to 'baseDir'). If so, search upward to the root of the
-           repo. */
-
         path = absPath(path, get(baseDir), true);
+    } else {
+        if (!preserveRelativePaths && !path.is_absolute())
+        throw BadURL("flake reference '%s' is not an absolute path", url);
+    }
 
-        if (isFlake) {
-
-            if (!S_ISDIR(lstat(path).st_mode)) {
-                if (path.filename() == "flake.nix") {
-                    // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
-                    auto parentPath = path.parent_path();
-                    warn(
-                        "Path %s should point at the directory containing the 'flake.nix' file, not the file itself. "
-                        "Pretending that you meant %s",
-                        PathFmt(path),
-                        PathFmt(parentPath));
-                    path = parentPath;
-                } else {
-                    throw BadURL("path %s is not a flake (because it's not a directory)", PathFmt(path));
-                }
+    if (isFlake) {
+        if (pathAccessible(path) && !S_ISDIR(lstat(path).st_mode)) {
+            if (path.filename() == "flake.nix") {
+                // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
+                auto parentPath = path.parent_path();
+                warn(
+                    "Path %s should point at the directory containing the 'flake.nix' file, not the file itself. "
+                    "Pretending that you meant %s",
+                    PathFmt(path),
+                    PathFmt(parentPath));
+                path = parentPath;
+            } else {
+                throw BadURL("path %s is not a flake (because it's not a directory)", PathFmt(path));
             }
+        }
 
-            if (!allowMissing && !pathExists(path / "flake.nix")) {
+        if (!allowMissing) {
+            /* Search upward to find the flake containing the path */
+            if (!pathExists(path / "flake.nix")) {
                 notice("path %s does not contain a 'flake.nix', searching up", PathFmt(path));
 
                 // Save device to detect filesystem boundary
@@ -148,8 +149,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         break;
                     } else if (fetchers::getLocalRepoURL(path))
                         throw Error(
-                            "path %s is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)",
-                            PathFmt(path));
+                            "Repository at %s does not contain a 'flake.nix'", PathFmt(path));
                     else {
                         if (lstat(path).st_dev != device)
                             throw Error(
@@ -160,13 +160,13 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 if (!found)
                     throw BadURL("could not find a flake.nix file");
             }
-
-            if (!allowMissing && !pathExists(path / "flake.nix"))
-                throw BadURL("path %s is not a flake (because it doesn't contain a 'flake.nix' file)", PathFmt(path));
-
+        }
+        
+        if (!allowMissing || pathAccessible(path / ".")) {
             auto flakeRoot = path;
             std::string subdir;
 
+            /* Search upward to find the root of the repo containing the flake */
             while (flakeRoot.parent_path() != flakeRoot) {
                 if (auto repoURL = fetchers::getLocalRepoURL(flakeRoot)) {
                     auto parsedURL = std::move(*repoURL);
@@ -190,10 +190,6 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 flakeRoot = flakeRoot.parent_path();
             }
         }
-
-    } else {
-        if (!preserveRelativePaths && !path.is_absolute())
-            throw BadURL("flake reference '%s' is not an absolute path", url);
     }
 
     return fromParsedURL(
