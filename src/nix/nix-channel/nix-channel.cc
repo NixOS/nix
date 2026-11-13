@@ -14,6 +14,8 @@
 #include "man-pages.hh"
 #include "nix/util/system-error.hh"
 
+#include <iostream>
+
 #include <fcntl.h>
 #include <regex>
 #include <pwd.h>
