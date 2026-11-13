@@ -521,6 +521,15 @@ public:
 private:
 
     /**
+     * Derivations that fail to build for a reason of the derivation itself. Entries store a copy of the build error.
+     * Calls to `realiseDerivationsForImportFromDerivation()` rethrow that error instead of building the derivation
+     * again. Calls to `resetFileCache()` clear the entries.
+     */
+    const ref<boost::concurrent_flat_map<StorePath, std::exception_ptr>> failedRealisations;
+
+    void realiseDerivationsForImportFromDerivation(const std::vector<DerivedPath::Built> & drvs);
+
+    /**
      * A cache that maps paths to "resolved" paths for importing Nix
      * expressions, i.e. `/foo` to `/foo/default.nix`.
      */

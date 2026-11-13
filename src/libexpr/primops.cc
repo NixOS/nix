@@ -72,6 +72,88 @@ std::string EvalState::realiseString(Value & s, StorePathSet * storePathsOutMayb
     return nix::rewriteStrings(rawStr, rewrites);
 }
 
+static bool shouldRememberBuildFailure(BuildResult::Failure::Status status)
+{
+    switch (status) {
+    case BuildResult::Failure::PermanentFailure:
+    case BuildResult::Failure::InputRejected:
+    case BuildResult::Failure::OutputRejected:
+    case BuildResult::Failure::HashMismatch:
+    case BuildResult::Failure::LogLimitExceeded:
+    case BuildResult::Failure::NotDeterministic:
+    case BuildResult::Failure::TimedOut:
+        return true;
+    case BuildResult::Failure::TransientFailure:
+    case BuildResult::Failure::CachedFailure:
+    case BuildResult::Failure::MiscFailure:
+    case BuildResult::Failure::DependencyFailed:
+    case BuildResult::Failure::NoSubstituters:
+        return false;
+    }
+    unreachable();
+}
+
+static const StorePath * getDerivationStorePathIfOpaqueDerivedPath(const SingleDerivedPath & drvPath)
+{
+    auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&drvPath.raw());
+    return opaque ? &opaque->path : nullptr;
+}
+
+/* All importers of a derivation with a failed build cause another build in the
+   store. Replay can prevent that. A replay can cover failures and timeouts of
+   the derivation itself for the rest of evaluation. Further attempts wait for
+   the full timeout again. Imports from a broken derivation need one build per
+   process, not one per importer. Transient failures, such as network errors and
+   dependency failures, don't enter the cache. The store can run another build
+   after those failures. The stored exception is a separate copy. Higher handlers
+   add traces to the thrown exception. Those traces never appear again on
+   replay. */
+void EvalState::realiseDerivationsForImportFromDerivation(const std::vector<DerivedPath::Built> & drvs)
+{
+    std::vector<DerivedPath> buildReqs;
+    buildReqs.reserve(drvs.size());
+    for (auto & d : drvs) {
+        if (auto drvPath = getDerivationStorePathIfOpaqueDerivedPath(*d.drvPath))
+            if (auto failed = getConcurrent(*failedRealisations, *drvPath))
+                rethrowExceptionCopy(*failed);
+        buildReqs.emplace_back(DerivedPath{d});
+    }
+
+    auto results = buildStore->getBuilder(store)->buildPathsWithResults(buildReqs, bmNormal);
+
+    std::vector<std::pair<const DerivedPath *, BuildError *>> failedDerivedPathBuildErrorPairs;
+    ExitStatusFlags exitStatusFlags;
+    for (auto & result : results)
+        if (auto * failure = result.tryGetFailure()) {
+            failedDerivedPathBuildErrorPairs.emplace_back(&result.path, failure);
+            exitStatusFlags.updateFromStatus(failure->status);
+        }
+
+    if (failedDerivedPathBuildErrorPairs.empty())
+        return;
+
+    auto exitStatus = exitStatusFlags.failingExitStatus();
+    for (auto & [path, failure] : failedDerivedPathBuildErrorPairs) {
+        failure->withExitStatus(exitStatus);
+        auto * built = std::get_if<DerivedPath::Built>(&path->raw());
+        if (!built || !shouldRememberBuildFailure(failure->status))
+            continue;
+        if (auto drvPath = getDerivationStorePathIfOpaqueDerivedPath(*built->drvPath))
+            failedRealisations->insert_or_assign(*drvPath, std::make_exception_ptr(*failure));
+    }
+
+    if (failedDerivedPathBuildErrorPairs.size() == 1)
+        throw *failedDerivedPathBuildErrorPairs.front().second;
+
+    StringSet failedPaths;
+    for (auto & [path, failure] : failedDerivedPathBuildErrorPairs) {
+        if (!failure->message().empty())
+            logError(failure->info());
+        failedPaths.insert(path->to_string(*buildStore));
+    }
+    throw Error(exitStatus, "build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
+}
+
 StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
@@ -125,12 +207,10 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
             warn("built '%1%' during evaluation due to an import from derivation", drvs.begin()->to_string(*store));
     }
 
-    /* Build/substitute the context. */
-    std::vector<DerivedPath> buildReqs;
-    buildReqs.reserve(drvs.size());
-    for (auto & d : drvs)
-        buildReqs.emplace_back(DerivedPath{d});
-    buildStore->getBuilder(store)->buildPaths(buildReqs, bmNormal);
+    if (settings.realiseHook)
+        settings.realiseHook(drvs);
+    else
+        realiseDerivationsForImportFromDerivation(drvs);
 
     StorePathSet outputsToCopyAndAllow;
 
