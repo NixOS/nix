@@ -62,7 +62,6 @@ struct AttrDb
         SQLiteStmt upsertAttribute;
         SQLiteStmt insertAttributeIfNotExists;
         SQLiteStmt deleteMissingChildren;
-        std::unique_ptr<SQLiteTxn> txn;
     };
 
     std::unique_ptr<Sync<State>> _state;
@@ -106,29 +105,34 @@ struct AttrDb
             state->db, "insert or ignore into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
 
         state->deleteMissingChildren.create(state->db, "delete from Attributes where parent = ? and type = 3");
-
-        state->txn = std::make_unique<SQLiteTxn>(state->db);
     }
 
-    ~AttrDb()
-    {
-        try {
-            auto state(_state->lock());
-            if (!failed && state->txn->active)
-                state->txn->commit();
-            state->txn.reset();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-    }
-
+    /* Each write is a transaction of its own, taken with the write lock up
+       front. Evaluators of the same flake share the cache file and a
+       transaction kept open across their reads pins a snapshot: in WAL mode
+       a write from a stale snapshot fails at once, without the busy handler
+       and this cache then gave up for the rest of the process. An immediate
+       transaction instead waits for the other writer. */
     template<typename F>
     AttrId doSQLite(const F & fun)
     {
         if (failed)
             return 0;
         try {
-            return fun();
+            auto state(_state->lock());
+            state->db.exec("begin immediate;");
+            try {
+                auto rowId = fun(*state);
+                state->db.exec("commit;");
+                return rowId;
+            } catch (...) {
+                try {
+                    state->db.exec("rollback;");
+                } catch (...) {
+                    ignoreExceptionExceptInterrupt();
+                }
+                throw;
+            }
         } catch (SQLiteError &) {
             ignoreExceptionExceptInterrupt();
             failed = true;
@@ -138,11 +142,9 @@ struct AttrDb
 
     AttrId setAttrs(AttrKey key, const std::vector<Symbol> & attrs)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
+        return doSQLite([&](State & state) {
             // Seal the attribute names: we now know the complete set.
-            auto upsertAttribute(state->upsertAttribute.use()
+            auto upsertAttribute(state.upsertAttribute.use()
                                      .apply(key.first)
                                      .apply(symbols[key.second])
                                      .apply(AttrType::FullAttrs)
@@ -150,11 +152,11 @@ struct AttrDb
             upsertAttribute.next();
             auto rowId = (AttrId) upsertAttribute.getInt(0);
             assert(rowId);
-            state->deleteMissingChildren.use().apply(rowId).exec();
+            state.deleteMissingChildren.use().apply(rowId).exec();
 
             // Insert children as placeholders, but don't replace existing entries
             for (auto & attr : attrs)
-                state->insertAttributeIfNotExists.use()
+                state.insertAttributeIfNotExists.use()
                     .apply(rowId)
                     .apply(symbols[attr])
                     .apply(AttrType::Placeholder)
@@ -167,9 +169,7 @@ struct AttrDb
 
     AttrId setString(AttrKey key, std::string_view s, const Value::StringWithContext::Context * context = nullptr)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
+        return doSQLite([&](State & state) {
             if (context) {
                 std::string ctx;
                 bool first = true;
@@ -179,7 +179,7 @@ struct AttrDb
                     ctx.append(elem->view());
                     first = false;
                 }
-                state->insertAttributeWithContext.use()
+                state.insertAttributeWithContext.use()
                     .apply(key.first)
                     .apply(symbols[key.second])
                     .apply(AttrType::String)
@@ -187,7 +187,7 @@ struct AttrDb
                     .apply(ctx)
                     .exec();
             } else {
-                state->insertAttribute.use()
+                state.insertAttribute.use()
                     .apply(key.first)
                     .apply(symbols[key.second])
                     .apply(AttrType::String)
@@ -195,119 +195,111 @@ struct AttrDb
                     .exec();
             }
 
-            return state->db.getLastInsertedRowId();
+            return state.db.getLastInsertedRowId();
         });
     }
 
     AttrId setBool(AttrKey key, bool b)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
+        return doSQLite([&](State & state) {
+            state.insertAttribute.use()
                 .apply(key.first)
                 .apply(symbols[key.second])
                 .apply(AttrType::Bool)
                 .apply(b ? 1 : 0)
                 .exec();
 
-            return state->db.getLastInsertedRowId();
+            return state.db.getLastInsertedRowId();
         });
     }
 
     AttrId setInt(AttrKey key, int n)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
+        return doSQLite([&](State & state) {
+            state.insertAttribute.use()
                 .apply(key.first)
                 .apply(symbols[key.second])
                 .apply(AttrType::Int)
                 .apply(n)
                 .exec();
 
-            return state->db.getLastInsertedRowId();
+            return state.db.getLastInsertedRowId();
         });
     }
 
     AttrId setListOfStrings(AttrKey key, const std::vector<std::string> & l)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
+        return doSQLite([&](State & state) {
+            state.insertAttribute.use()
                 .apply(key.first)
                 .apply(symbols[key.second])
                 .apply(AttrType::ListOfStrings)
                 .apply(dropEmptyInitThenConcatStringsSep("\t", l))
                 .exec();
 
-            return state->db.getLastInsertedRowId();
+            return state.db.getLastInsertedRowId();
         });
     }
 
     AttrId setPlaceholder(AttrKey key)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
+        return doSQLite([&](State & state) {
+            /* Another evaluator may have inserted the row and cached members
+               beneath it since this cursor looked it up. Those members hang off
+               the row id, so the row is kept rather than replaced. */
+            state.insertAttributeIfNotExists.use()
                 .apply(key.first)
                 .apply(symbols[key.second])
                 .apply(AttrType::Placeholder)
                 .apply(0, false)
                 .exec();
 
-            return state->db.getLastInsertedRowId();
+            auto queryAttribute(state.queryAttribute.use().apply(key.first).apply(symbols[key.second]));
+            if (!queryAttribute.next())
+                throw Error("placeholder for '%s' vanished from the evaluation cache", symbols[key.second]);
+            return (AttrId) queryAttribute.getInt(0);
         });
     }
 
     AttrId setMissing(AttrKey key)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
+        return doSQLite([&](State & state) {
+            state.insertAttribute.use()
                 .apply(key.first)
                 .apply(symbols[key.second])
                 .apply(AttrType::Missing)
                 .apply(0, false)
                 .exec();
 
-            return state->db.getLastInsertedRowId();
+            return state.db.getLastInsertedRowId();
         });
     }
 
     AttrId setMisc(AttrKey key)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
+        return doSQLite([&](State & state) {
+            state.insertAttribute.use()
                 .apply(key.first)
                 .apply(symbols[key.second])
                 .apply(AttrType::Misc)
                 .apply(0, false)
                 .exec();
 
-            return state->db.getLastInsertedRowId();
+            return state.db.getLastInsertedRowId();
         });
     }
 
     AttrId setFailed(AttrKey key)
     {
-        return doSQLite([&]() {
-            auto state(_state->lock());
-
-            state->insertAttribute.use()
+        return doSQLite([&](State & state) {
+            state.insertAttribute.use()
                 .apply(key.first)
                 .apply(symbols[key.second])
                 .apply(AttrType::Failed)
                 .apply(0, false)
                 .exec();
 
-            return state->db.getLastInsertedRowId();
+            return state.db.getLastInsertedRowId();
         });
     }
 
@@ -470,6 +462,10 @@ Value & AttrCursor::forceValue()
 
     try {
         root->state.forceValue(v, noPos);
+    } catch (InvalidPathError &) {
+        /* The evaluation cache does not store `InvalidPathError`. The validity of store paths can trigger this error.
+           The flake is irrelevant. */
+        throw;
     } catch (EvalError &) {
         debug("setting '%s' to failed", getAttrPathStr());
         if (root->db)
@@ -634,7 +630,7 @@ string_t AttrCursor::getStringWithContext()
         fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
-                bool valid = true;
+                StorePathSet paths;
                 for (auto & c : s->second) {
                     const StorePath & path = std::visit(
                         overloaded{
@@ -646,12 +642,9 @@ string_t AttrCursor::getStringWithContext()
                         },
                         c.raw);
                     root->state.store->addTempRoot(path);
-                    if (!root->state.store->isValidPath(path)) {
-                        valid = false;
-                        break;
-                    }
+                    paths.insert(path);
                 }
-                if (valid) {
+                if (paths.empty() || root->state.store->queryValidPaths(paths).size() == paths.size()) {
                     debug("using cached string attribute '%s'", getAttrPathStr());
                     return *s;
                 }

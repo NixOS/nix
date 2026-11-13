@@ -84,3 +84,28 @@ nix build --no-link "$flake1Dir#stack-depth"
 expect 1 nix build "$flake1Dir#ifd" --option allow-import-from-derivation false 2>&1 \
   | grepQuiet 'error: cannot build .* during evaluation because the option '\''allow-import-from-derivation'\'' is disabled'
 nix build --no-link "$flake1Dir#ifd"
+
+searchDir="$TEST_ROOT/search-cache-flake"
+createGitRepo "$searchDir" ""
+cp "${config_nix}" "$searchDir/"
+
+cat >"$searchDir/flake.nix" <<EOF
+{
+  outputs = { self }: let inherit (import ./config.nix) mkDerivation; in {
+    legacyPackages.$system = {
+      removed = throw "removed";
+      hello = mkDerivation {
+        name = "hello";
+        buildCommand = "touch \\\$out";
+      };
+    };
+  };
+}
+EOF
+
+git -C "$searchDir" add config.nix flake.nix
+git -C "$searchDir" commit -m "Init"
+
+# Failed attributes stay in the cache. The second search can skip them without evaluating the flake.
+nix search "$searchDir" hello | grepQuiet hello
+NIX_ALLOW_EVAL=0 nix search "$searchDir" hello | grepQuiet hello
