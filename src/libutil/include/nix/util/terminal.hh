@@ -62,7 +62,8 @@ std::string filterANSIEscapes(
 
 /**
  * Remove all ANSI escape sequences, leaving the rest of the string,
- * including tabs and carriage returns, unchanged.
+ * including tabs and carriage returns, unchanged. A cursor forward is
+ * kept as spaces, as in `filterANSIEscapes`.
  */
 std::string stripANSIEscapes(std::string_view s);
 
