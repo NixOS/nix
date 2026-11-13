@@ -1,6 +1,7 @@
 #include "nix_api_util.h"
 #include "nix/util/config-global.hh"
 #include "nix/util/error.hh"
+#include "nix/util/terminal.hh"
 #include "nix_api_util_internal.h"
 #include "nix/util/util.hh"
 
@@ -34,7 +35,7 @@ nix_err nix_context_error(nix_c_context * context)
         throw;
     } catch (nix::Error & e) {
         /* Storing this exception is annoying, take what we need here */
-        context->last_err = e.what();
+        context->last_err = nix::filterANSIEscapes(e.what(), true);
         context->info = e.info();
         int status;
         const char * demangled = abi::__cxa_demangle(typeid(e).name(), 0, 0, &status);
@@ -148,7 +149,8 @@ nix_err nix_err_info_msg(
     if (read_context->last_err_code != NIX_ERR_NIX_ERROR) {
         return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Last error was not a nix error");
     }
-    return call_nix_get_string_callback(read_context->info->msg.str(), callback, user_data);
+    return call_nix_get_string_callback(
+        nix::filterANSIEscapes(read_context->info->msg.str(), true), callback, user_data);
 }
 
 nix_err nix_err_code(const nix_c_context * read_context)
