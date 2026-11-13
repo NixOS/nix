@@ -5,6 +5,8 @@
 
 namespace nix {
 
+struct MixEvalArgs;
+
 /**
  * Extra info about a \ref DerivedPath "derived path" that ultimately
  * come from a Flake.
@@ -42,7 +44,7 @@ struct InstallableFlake : InstallableValue
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
     InstallableFlake(
-        SourceExprCommand * cmd,
+        MixEvalArgs * cmd,
         ref<EvalState> state,
         FlakeRef && flakeRef,
         std::string_view fragment,
