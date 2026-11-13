@@ -194,7 +194,7 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
     auto sp2 = store->addToStoreSlow("nar-slow", {accessor}, ContentAddressMethod::Raw::NixArchive, getHashAlgo()).path;
     assertCanonicalPermissions(store->toRealPath(sp2));
 
-    Finally restoreNarBufferSize{[oldSize = settings.getLocalSettings().narBufferSize]() {
+    Finally restoreNarBufferSize{[oldSize = settings.getLocalSettings().narBufferSize.get()]() {
         settings.getLocalSettings().narBufferSize.assign(oldSize);
     }};
     // So that we always spill to the file system.
