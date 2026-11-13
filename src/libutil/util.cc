@@ -31,25 +31,6 @@ void initLibUtil()
 {
     static std::once_flag done;
     std::call_once(done, []() {
-        // Check that exception handling works. Exception handling has been observed
-        // not to work on darwin when the linker flags aren't quite right.
-        // In this case we don't want to expose the user to some unrelated uncaught
-        // exception, but rather tell them exactly that exception handling is
-        // broken.
-        // When exception handling fails, the message tends to be printed by the
-        // C++ runtime, followed by an abort.
-        // For example on macOS we might see an error such as
-        // libc++abi: terminating with uncaught exception of type nix::SystemError: error: C++ exception handling is
-        // broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.
-        bool caught = false;
-        try {
-            throwExceptionSelfCheck();
-        } catch (const nix::Error & _e) {
-            caught = true;
-        }
-        // This is not actually the main point of this check, but let's make sure anyway:
-        assert(caught);
-
         if (sodium_init() == -1)
             throw Error("could not initialise libsodium");
 

@@ -312,12 +312,6 @@ MakeError(UsageError, Error);
 MakeError(UnimplementedError, Error);
 
 /**
- * Throw an exception for the purpose of checking that exception
- * handling works; see 'initLibUtil()'.
- */
-void throwExceptionSelfCheck();
-
-/**
  * Print a message and std::terminate().
  */
 [[noreturn]]
