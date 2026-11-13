@@ -105,6 +105,12 @@ Value * EvalMemory::allocValue()
 }
 
 [[gnu::always_inline]]
+detail::ValueBase::IndexedCallDescriptor * EvalMemory::allocIndexedCallDescriptor()
+{
+    return (detail::ValueBase::IndexedCallDescriptor *) allocValue();
+}
+
+[[gnu::always_inline]]
 Env & EvalMemory::allocEnv(size_t size)
 {
     stats.nrEnvs++;
@@ -163,6 +169,8 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             handleEvalExceptionForApp(v, savedApp);
             throw;
         }
+    } else if (v.isIndexedCall()) {
+        forceIndexedCall(v, pos);
     } else if (v.isFailed()) {
         handleEvalFailed(v, pos);
     }
