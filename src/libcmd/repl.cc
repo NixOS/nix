@@ -9,6 +9,7 @@
 #include "nix/cmd/repl.hh"
 
 #include "nix/util/ansicolor.hh"
+#include "nix/util/terminal.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
@@ -642,7 +643,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
             markdown += stripIndentation(doc->doc);
 
-            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+            logger->cout(trim(renderMarkdownToTerminal(markdown, shouldANSI(StandardOutputStream::Stdout))));
         } else if (fallbackPos) {
             std::ostringstream ss;
             ss << "Attribute `" << fallbackName << "`\n\n";
@@ -654,7 +655,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             }
 
             auto markdown = ss.view();
-            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+            logger->cout(trim(renderMarkdownToTerminal(markdown, shouldANSI(StandardOutputStream::Stdout))));
 
         } else
             throw Error("value does not have documentation");

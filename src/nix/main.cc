@@ -292,8 +292,12 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
 
+    // Decide before the pager takes over stdout: behind the pager's pipe the check would see no terminal,
+    // while `less -R` on a terminal should keep the colors.
+    bool ansi = shouldANSI(StandardOutputStream::Stdout);
+
     RunPager pager;
-    std::cout << renderMarkdownToTerminal(markdown) << "\n";
+    std::cout << renderMarkdownToTerminal(markdown, ansi) << "\n";
 }
 
 static NixArgs & getNixArgs(Command & cmd)
