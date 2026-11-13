@@ -11,7 +11,7 @@ struct SrcToStore
 {
     boost::concurrent_flat_map<
         std::tuple<SourcePath, ContentAddressMethod::Raw, std::string>,
-        std::tuple<StorePath, Hash, FetchMode>>
+        std::tuple<StorePath, Hash, FetchMode, std::weak_ptr<Store>>>
         cache;
 };
 
@@ -55,8 +55,24 @@ std::pair<StorePath, Hash> fetchToStore2(
 
     if (!filter) {
         auto dstPathCached = getConcurrent(settings.srcToStore->cache, srcToStoreKey);
-        if (dstPathCached && (mode == FetchMode::DryRun || std::get<2>(*dstPathCached) == FetchMode::Copy))
-            return std::make_pair(std::get<0>(*dstPathCached), std::get<1>(*dstPathCached));
+        if (dstPathCached) {
+            auto & [storePath, hash, cachedMode, rootedBy] = *dstPathCached;
+            if (mode == FetchMode::DryRun)
+                return {storePath, hash};
+            /* Temporary roots persist for the lifetime of the store handle that acquired them. Paths rooted through
+               this handle remain valid. Other handles root that path and check that the garbage collector has not
+               removed the path since. */
+            if (cachedMode == FetchMode::Copy) {
+                if (rootedBy.lock().get() == &store)
+                    return {storePath, hash};
+                store.addTempRoot(storePath);
+                if (store.isValidPath(storePath)) {
+                    settings.srcToStore->cache.insert_or_assign(
+                        srcToStoreKey, std::make_tuple(storePath, hash, cachedMode, store.weak_from_this()));
+                    return {storePath, hash};
+                }
+            }
+        }
     }
 
     std::optional<fetchers::Cache::Key> cacheKey;
@@ -82,7 +98,8 @@ std::pair<StorePath, Hash> fetchToStore2(
                     path,
                     store.printStorePath(storePath),
                     hash.to_string(HashFormat::SRI, true));
-                settings.srcToStore->cache.insert_or_assign(srcToStoreKey, std::make_tuple(storePath, hash, mode));
+                settings.srcToStore->cache.insert_or_assign(
+                    srcToStoreKey, std::make_tuple(storePath, hash, mode, store.weak_from_this()));
                 return {storePath, hash};
             }
             debug("source path '%s' not in store", path);
@@ -142,7 +159,8 @@ std::pair<StorePath, Hash> fetchToStore2(
         settings.getCache()->upsert(*cacheKey, {{"hash", hash.to_string(HashFormat::SRI, true)}});
 
     if (!filter)
-        settings.srcToStore->cache.insert_or_assign(srcToStoreKey, std::make_tuple(storePath, hash, mode));
+        settings.srcToStore->cache.insert_or_assign(
+            srcToStoreKey, std::make_tuple(storePath, hash, mode, store.weak_from_this()));
 
     return {storePath, hash};
 }
