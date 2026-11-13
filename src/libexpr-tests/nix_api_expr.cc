@@ -3,6 +3,7 @@
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 
+#include "nix/expr/eval.hh"
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
 #include "nix/util/file-system.hh"
@@ -348,6 +349,45 @@ TEST_F(nix_api_expr_test, nix_alloc_primop_without_doc)
 
     nix_gc_decref(ctx, primop);
     assert_ctx_ok();
+}
+
+TEST_F(nix_api_expr_test, nix_alloc_primop_arg_names)
+{
+    const char * const args[] = {"s", "n", nullptr};
+    PrimOp * primop = nix_alloc_primop(ctx, primop_square, 2, "named", args, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, primop);
+    EXPECT_THAT(((nix::PrimOp *) primop)->args, testing::ElementsAre("s", "n"));
+
+    nix_gc_decref(ctx, primop);
+    assert_ctx_ok();
+}
+
+TEST_F(nix_api_expr_test, nix_alloc_primop_empty_arg_names)
+{
+    const char * const args[] = {nullptr};
+    PrimOp * primop = nix_alloc_primop(ctx, primop_square, 1, "unnamed", args, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, primop);
+    EXPECT_THAT(((nix::PrimOp *) primop)->args, testing::IsEmpty());
+
+    nix_gc_decref(ctx, primop);
+    assert_ctx_ok();
+}
+
+TEST_F(nix_api_expr_test, nix_alloc_primop_arg_names_arity_mismatch)
+{
+    const char * const tooMany[] = {"a", "b", nullptr};
+    ASSERT_EQ(nullptr, nix_alloc_primop(ctx, primop_square, 1, "tooMany", tooMany, nullptr, nullptr));
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("argument names were given"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("tooMany"));
+
+    const char * const tooFew[] = {"a", nullptr};
+    ASSERT_EQ(nullptr, nix_alloc_primop(ctx, primop_square, 2, "tooFew", tooFew, nullptr, nullptr));
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("argument names were given"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("tooFew"));
 }
 
 TEST_F(nix_api_expr_test, nix_expr_primop)
