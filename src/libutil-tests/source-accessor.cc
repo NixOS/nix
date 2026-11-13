@@ -43,15 +43,19 @@ TEST_F(FSSourceAccessorTest, works)
         GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
 #endif
     {
-        RestoreSink sink(false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
-        sink.createDirectory(CanonPath("subdir"));
-        sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });
-        sink.createRegularFile(CanonPath("subdir/file2"), [](CreateRegularFileSink & crf) { crf("content2"); });
-        sink.createSymlink(CanonPath("rootlink"), "target");
-        sink.createDirectory(CanonPath("a"));
-        sink.createSymlink(CanonPath("a/dirlink"), "../subdir");
+        RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        root.createChild("subdir", [](auto & s) {
+            s.createDirectory([](auto & subdir) {
+                subdir.createChild(
+                    "file2", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content2"); }); });
+            });
+        });
+        root.createChild("file1", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content1"); }); });
+        root.createChild("rootlink", [](auto & s) { s.createSymlink("target"); });
+        root.createChild("a", [](auto & s) {
+            s.createDirectory(
+                [](auto & a) { a.createChild("dirlink", [](auto & s) { s.createSymlink("../subdir"); }); });
+        });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(tmpDir / "file1"), testing::HasContents(CanonPath::root, "content1"));
@@ -193,17 +197,15 @@ TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
 }
 
 /* ----------------------------------------------------------------------------
- * RestoreSink non-directory at root (no dirFd)
+ * RestoreSink non-directory at root (`RestoreSink::forPath`)
  * --------------------------------------------------------------------------*/
 
 TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 {
     auto filePath = tmpDir / "rootfile";
     {
-        RestoreSink sink(false);
-        sink.dstPath = filePath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
+        auto sink = RestoreSink::forPath(filePath, /*startFsync=*/false);
+        sink.createRegularFile(false, [](auto & crf) { crf("root content"); });
     }
 
     EXPECT_THAT(makeFSSourceAccessor(filePath), testing::HasContents(CanonPath::root, "root content"));
@@ -217,13 +219,166 @@ TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 #endif
     auto linkPath = tmpDir / "rootlink";
     {
-        RestoreSink sink(false);
-        sink.dstPath = linkPath;
-        // No dirFd set - this tests the !dirFd path
-        sink.createSymlink(CanonPath::root, "symlink_target");
+        auto sink = RestoreSink::forPath(linkPath, /*startFsync=*/false);
+        sink.createSymlink("symlink_target");
     }
 
     EXPECT_THAT(makeFSSourceAccessor(linkPath), testing::HasSymlink(CanonPath::root, "symlink_target"));
 }
+
+/* As with POSIX, a trailing separator means the destination must be a
+   directory. */
+TEST_F(FSSourceAccessorTest, RestoreSinkTrailingSeparator)
+{
+    {
+        auto sink = RestoreSink::forPath(tmpDir / "dir" / "", /*startFsync=*/false);
+        sink.createDirectory([](auto & dir) {
+            dir.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content"); }); });
+        });
+    }
+    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "dir"), testing::HasContents(CanonPath("file"), "content"));
+
+    EXPECT_THAT(
+        [&] {
+            auto sink = RestoreSink::forPath(tmpDir / "file" / "", /*startFsync=*/false);
+            sink.createRegularFile(false, [](auto & crf) { crf("content"); });
+        },
+        testing::ThrowsSystemError(std::errc::is_a_directory));
+    EXPECT_THAT(
+        [&] {
+            auto sink = RestoreSink::forPath(tmpDir / "link" / "", /*startFsync=*/false);
+            sink.createSymlink("target");
+        },
+        testing::ThrowsSystemError(std::errc::is_a_directory));
+    EXPECT_FALSE(pathExists(tmpDir / "file"));
+    EXPECT_FALSE(pathExists(tmpDir / "link"));
+}
+
+#ifndef _WIN32
+/* The root directory always exists, and a sink only creates new
+   entries, so it can never be the destination. */
+TEST(RestoreSinkForPath, rejectsRoot)
+{
+    for (auto root : {"/", "//"})
+        EXPECT_THROW(RestoreSink::forPath(root, /*startFsync=*/false), Error) << root;
+}
+#endif
+
+/* ----------------------------------------------------------------------------
+ * getPhysicalPath
+ * --------------------------------------------------------------------------*/
+
+/**
+ * The physical path @p accessor reports for @p path, with the OS's
+ * preferred separators, so that it compares equal to paths made here.
+ */
+static std::optional<std::filesystem::path> physicalPath(SourceAccessor & accessor, const CanonPath & path)
+{
+    auto p = accessor.getPhysicalPath(path);
+    if (p)
+        p->make_preferred();
+    return p;
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfDirectory)
+{
+    createDirs(tmpDir / "subdir");
+    writeFile(tmpDir / "subdir" / "file", "contents");
+
+    auto accessor = makeFSSourceAccessor(tmpDir);
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir);
+    EXPECT_EQ(physicalPath(*accessor, CanonPath("subdir/file")), tmpDir / "subdir" / "file");
+    /* Like joining paths, whether or not it exists. */
+    EXPECT_EQ(physicalPath(*accessor, CanonPath("nonexistent")), tmpDir / "nonexistent");
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfFile)
+{
+    writeFile(tmpDir / "file", "contents");
+
+    auto accessor = makeFSSourceAccessor(tmpDir / "file");
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir / "file");
+    /* Nothing exists beneath a file. */
+    EXPECT_EQ(physicalPath(*accessor, CanonPath("foo")), std::nullopt);
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfSymlink)
+{
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+    createSymlink("target", tmpDir / "link");
+
+    auto accessor = makeFSSourceAccessor(tmpDir / "link", /*trackLastModified=*/false, FinalSymlink::DontFollow);
+    EXPECT_THAT(accessor, testing::HasSymlink(CanonPath::root, "target"));
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir / "link");
+
+    /* It keeps the path it was made from, so it is still its physical
+       path when shown as something else. */
+    accessor->setPathDisplay("«test»");
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir / "link");
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathWhenShownAsSomethingElse)
+{
+    createDirs(tmpDir / "subdir");
+    writeFile(tmpDir / "file", "contents");
+
+    /* The physical path does not come from how the accessor is shown, so
+       it stays the same. */
+
+    auto dirAccessor = makeFSSourceAccessor(tmpDir);
+    dirAccessor->setPathDisplay("«test»");
+    EXPECT_EQ(physicalPath(*dirAccessor, CanonPath::root), tmpDir);
+    EXPECT_EQ(physicalPath(*dirAccessor, CanonPath("subdir")), tmpDir / "subdir");
+
+    auto fileAccessor = makeFSSourceAccessor(tmpDir / "file");
+    fileAccessor->setPathDisplay("«test»");
+    EXPECT_EQ(physicalPath(*fileAccessor, CanonPath::root), tmpDir / "file");
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfSubdirectoryAccessor)
+{
+    createDirs(tmpDir / "a" / "b");
+
+    auto accessor = makeFSSourceAccessor(tmpDir);
+
+    bool called = false;
+    accessor->readDirectory(CanonPath("a"), [&](SourceAccessor & subdir, const CanonPath & rel) {
+        called = true;
+        EXPECT_EQ(subdir.showPath(rel), accessor->showPath(CanonPath("a")));
+        EXPECT_EQ(physicalPath(subdir, rel), tmpDir / "a");
+        EXPECT_EQ(physicalPath(subdir, rel / "b"), tmpDir / "a" / "b");
+    });
+    EXPECT_TRUE(called);
+}
+
+#ifndef _WIN32
+
+TEST_F(FSSourceAccessorTest, rootAccessor)
+{
+    createDirs(tmpDir / "subdir");
+
+    auto accessor = getFSSourceAccessor();
+    EXPECT_EQ(accessor->showPath(CanonPath::root), "/");
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), std::filesystem::path{"/"});
+
+    /* The root's trailing `/` is not doubled. */
+    auto subdirPath = CanonPath((tmpDir / "subdir").string());
+    EXPECT_EQ(accessor->showPath(subdirPath), (tmpDir / "subdir").string());
+    EXPECT_EQ(physicalPath(*accessor, subdirPath), tmpDir / "subdir");
+
+    /* Nor for the subdirectory accessors it makes. */
+    bool called = false;
+    accessor->readDirectory(subdirPath, [&](SourceAccessor & subdir, const CanonPath & rel) {
+        called = true;
+        EXPECT_EQ(subdir.showPath(rel), (tmpDir / "subdir").string());
+        EXPECT_EQ(physicalPath(subdir, rel), tmpDir / "subdir");
+    });
+    EXPECT_TRUE(called);
+}
+
+#endif
 
 } // namespace nix

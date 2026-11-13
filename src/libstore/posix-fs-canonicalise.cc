@@ -171,9 +171,9 @@ static void canonicalisePathMetaData_(
 #endif
 
     if (S_ISDIR(st.st_mode)) {
-        for (auto & i : DirectoryIterator{path}) {
+        for (const auto & i : DirectoryIterator{path}) {
             checkInterrupt();
-            canonicalisePathMetaData_(i.path(), options, inodesSeen);
+            canonicalisePathMetaData_(path / i.name.mkPath(), options, inodesSeen);
         }
     }
 }

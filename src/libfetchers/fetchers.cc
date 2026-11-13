@@ -522,9 +522,10 @@ void InputScheme::clone(
 
     Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 
-    RestoreSink sink(/*startFsync=*/false);
-    sink.dstPath = destDir;
-    copyRecursive(*accessor, CanonPath::root, sink, CanonPath::root);
+    /* This is used with an arbitrary user-given path (just `nix flake
+       clone` currently) and so we better follow any symlinks. */
+    auto sink = RestoreSink::forPath(destDir, /*startFsync=*/false);
+    copyRecursive(*accessor, CanonPath::root, sink);
 }
 
 std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
