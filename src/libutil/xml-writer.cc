@@ -1,6 +1,7 @@
-#include <cassert>
-
 #include "nix/util/xml-writer.hh"
+
+#include <cassert>
+#include <ostream>
 
 namespace nix {
 
