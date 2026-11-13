@@ -119,15 +119,12 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
 
 void dumpBlobPrefix(uint64_t size, Sink & sink)
 {
-    using namespace std::string_literals;
-    auto s = fmt("blob %d\0"s, std::to_string(size));
+    auto s = fmt("blob %d\0", std::to_string(size));
     sink(s);
 }
 
 void dumpTree(const Tree & entries, Sink & sink)
 {
-    using namespace std::string_literals;
-
     std::string v1;
 
     for (auto & [name, entry] : entries) {
@@ -137,12 +134,12 @@ void dumpTree(const Tree & entries, Sink & sink)
             assert(name2.back() == '/');
             name2.pop_back();
         }
-        v1 += fmt("%o %s\0"s, static_cast<RawMode>(entry.mode), name2);
+        v1 += fmt("%o %s\0", static_cast<RawMode>(entry.mode), name2);
         std::copy(entry.hash.hash, entry.hash.hash + entry.hash.hashSize, std::back_inserter(v1));
     }
 
     {
-        auto s = fmt("tree %d\0"s, v1.size());
+        auto s = fmt("tree %d\0", v1.size());
         sink(s);
     }
 

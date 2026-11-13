@@ -309,44 +309,6 @@ namespace nix {
 
 
     /* ----------------------------------------------------------------------------
-     * HintFmt
-     * --------------------------------------------------------------------------*/
-
-    TEST(HintFmt, percentStringWithoutArgs) {
-
-        const char *teststr = "this is 100%s correct!";
-
-        ASSERT_STREQ(
-            HintFmt(teststr).str().c_str(),
-            teststr);
-
-    }
-
-    TEST(HintFmt, fmtToHintfmt) {
-
-        ASSERT_STREQ(
-            HintFmt(fmt("the color of this this text is %1%", "not yellow")).str().c_str(),
-            "the color of this this text is not yellow");
-
-    }
-
-    TEST(HintFmt, tooFewArguments) {
-
-        ASSERT_STREQ(
-            HintFmt("only one arg %1% %2%", "fulfilled").str().c_str(),
-            "only one arg " ANSI_WARNING "fulfilled" ANSI_NORMAL " ");
-
-    }
-
-    TEST(HintFmt, tooManyArguments) {
-
-        ASSERT_STREQ(
-            HintFmt("what about this %1% %2%", "%3%", "one", "two").str().c_str(),
-            "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_YELLOW "one" ANSI_NORMAL);
-
-    }
-
-    /* ----------------------------------------------------------------------------
      * ErrPos
      * --------------------------------------------------------------------------*/
 

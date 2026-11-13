@@ -147,7 +147,7 @@ static void parseConfigFiles(
 
         if (include) {
             if (tokens.size() != 2)
-                throw UsageError("syntax error in configuration line '%1%' in %s", line, PathFmt(path));
+                throw UsageError("syntax error in configuration line '%s' in %s", line, PathFmt(path));
             auto parent = path.parent_path();
             auto p = absPath(std::filesystem::path{tokens[1]}, &parent);
             if (pathExists(p)) {

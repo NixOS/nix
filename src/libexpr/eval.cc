@@ -866,24 +866,31 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
 }
 
 template<typename... Args>
-void EvalState::addErrorTrace(Error & e, const Args &... formatArgs) const
+void EvalState::addErrorTrace(Error & e, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const
 {
-    e.addTrace(nullptr, HintFmt(formatArgs...));
+    e.addTrace(nullptr, HintFmt(fs, formatArgs...));
 }
 
 template<typename... Args>
-void EvalState::addErrorTrace(Error & e, const PosIdx pos, const Args &... formatArgs) const
+void EvalState::addErrorTrace(
+    Error & e, const PosIdx pos, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const
 {
-    e.addTrace(positions[pos], HintFmt(formatArgs...));
+    e.addTrace(positions[pos], HintFmt(fs, formatArgs...));
 }
 
 template<typename... Args>
 static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
-    EvalState & state, Expr & expr, Env & env, std::variant<Pos, PosIdx> pos, const Args &... formatArgs)
+    EvalState & state,
+    Expr & expr,
+    Env & env,
+    std::variant<Pos, PosIdx> pos,
+    FormatString<sizeof...(Args)> fs,
+    const Args &... formatArgs)
 {
     return std::make_unique<DebugTraceStacker>(
         state,
-        DebugTrace{.pos = std::move(pos), .expr = expr, .env = env, .hint = HintFmt(formatArgs...), .isError = false});
+        DebugTrace{
+            .pos = std::move(pos), .expr = expr, .env = env, .hint = HintFmt(fs, formatArgs...), .isError = false});
 }
 
 DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
@@ -3337,8 +3344,8 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
         return {corepkgsFS, CanonPath(path.substr(3))};
 
     error<ThrownError>(
-        settings.pureEval ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
-                          : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
+        settings.pureEval ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"_fmt
+                          : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)"_fmt,
         path)
         .atPos(pos)
         .debugThrow();

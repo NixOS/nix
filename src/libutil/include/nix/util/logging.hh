@@ -188,10 +188,15 @@ public:
 
     virtual void writeToStdout(std::string_view s);
 
-    template<typename... Args>
-    inline void cout(const Args &... args)
+    inline void cout(std::string_view s)
     {
-        writeToStdout(fmt(args...));
+        writeToStdout(s);
+    }
+
+    template<typename Arg, typename... Args>
+    inline void cout(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
+    {
+        writeToStdout(fmt(fs, arg, args...));
     }
 
     /**
@@ -200,10 +205,15 @@ public:
      */
     void writeStyledToStdout(std::string_view s);
 
-    template<typename... Args>
-    inline void coutStyled(const Args &... args)
+    inline void coutStyled(std::string_view s)
     {
-        writeStyledToStdout(fmt(args...));
+        writeStyledToStdout(s);
+    }
+
+    template<typename Arg, typename... Args>
+    inline void coutStyled(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
+    {
+        writeStyledToStdout(fmt(fs, arg, args...));
     }
 
     virtual std::optional<char> ask(std::string_view s)
@@ -383,13 +393,13 @@ extern Verbosity verbosity;
 
 /**
  * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ *
+ * Formats like `fmt`: a message without arguments is printed literally.
  */
 template<typename... Args>
-inline void warn(const std::string & fs, const Args &... args)
+inline void warn(FormatString<sizeof...(Args)> fs, const Args &... args)
 {
-    boost::format f(fs);
-    formatHelper(f, args...);
-    logger->warn(f.str());
+    logger->warn(fmt(fs, args...));
 }
 
 #define warnOnce(haveWarned, args...) \

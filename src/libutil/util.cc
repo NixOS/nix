@@ -209,7 +209,7 @@ std::string renderSizeWithoutUnit(int64_t value, SizeUnit unit, bool align)
     auto power = std::max<std::underlying_type_t<SizeUnit>>(1, std::to_underlying(unit));
     double denominator = std::pow(conversionNumber, power);
     double result = (double) value / denominator;
-    return fmt(align ? "%6.1f" : "%.1f", result);
+    return fmt(align ? "%6.1f"_fmt : "%.1f"_fmt, result);
 }
 
 char getSizeUnitSuffix(SizeUnit unit)

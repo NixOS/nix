@@ -85,22 +85,23 @@ namespace {
 struct GitError final : public CloneableError<GitError, Error>
 {
     template<typename... Ts>
-    GitError(const git_error & error, Ts &&... args)
+    GitError(const git_error & error, FormatString<sizeof...(Ts)> fs, const Ts &... args)
         : CloneableError("")
     {
-        auto hf = HintFmt(std::forward<Ts>(args)...);
+        auto hf = HintFmt(fs, args...);
         err.msg = HintFmt("%1%: %2% (libgit2 error code = %3%)", Uncolored(hf.str()), error.message, error.klass);
     }
 
     template<typename... Ts>
-    GitError(Ts &&... args)
+    GitError(FormatString<sizeof...(Ts)> fs, const Ts &... args)
         : GitError(
               []() -> const git_error & {
                   const git_error * p = git_error_last();
                   assert(p && "git_error_last() is unexpectedly null");
                   return *p;
               }(),
-              std::forward<Ts>(args)...)
+              fs,
+              args...)
     {
     }
 };

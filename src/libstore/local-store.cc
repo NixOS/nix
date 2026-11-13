@@ -426,14 +426,14 @@ void LocalStore::deleteStorePath(const std::filesystem::path & path, uint64_t & 
         if (config->ignoreGcDeleteFailure) {
             logWarning(
                 {.msg = HintFmt(
-                     isKnownPath ? "ignoring failure to remove store path %1%: %2%"
-                                 : "ignoring failure to remove garbage in store directory %1%: %2%",
+                     isKnownPath ? "ignoring failure to remove store path %1%: %2%"_fmt
+                                 : "ignoring failure to remove garbage in store directory %1%: %2%"_fmt,
                      PathFmt(path),
                      e.info().msg)});
         } else {
             e.addTrace(
                 {},
-                isKnownPath ? "While deleting store path %1%" : "While deleting garbage in store directory %1%",
+                isKnownPath ? "While deleting store path %1%"_fmt : "While deleting garbage in store directory %1%"_fmt,
                 PathFmt(path));
             throw;
         }

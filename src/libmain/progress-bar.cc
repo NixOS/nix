@@ -292,8 +292,8 @@ public:
             if (path && sub) {
                 auto name = storePathToName(*path);
                 i->s =
-                    fmt(hasPrefix(*sub, "local") ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
-                                                 : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
+                    fmt(hasPrefix(*sub, "local") ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"_fmt
+                                                 : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s"_fmt,
                         name,
                         *sub);
             }
@@ -563,53 +563,50 @@ public:
     {
         std::string res;
 
-        auto renderActivity =
-            [&] [[nodiscard]] (
-                ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-                auto & act = state.activitiesByType[type];
-                uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
-                for (auto & j : act.its) {
-                    done += j.second->done;
-                    expected += j.second->expected;
-                    running += j.second->running;
-                    failed += j.second->failed;
-                }
+        auto renderActivity = [&] [[nodiscard]] (ActivityType type, FormatString<1> itemFmt, double unit = 1) {
+            auto & act = state.activitiesByType[type];
+            uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
+            for (auto & j : act.its) {
+                done += j.second->done;
+                expected += j.second->expected;
+                running += j.second->running;
+                failed += j.second->failed;
+            }
 
-                expected = std::max(expected, act.expected);
+            expected = std::max(expected, act.expected);
 
-                std::string s;
+            std::string s;
 
-                if (running || done || expected || failed) {
-                    if (running)
-                        if (expected != 0)
-                            s =
-                                fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL "/"
-                                        + numberFmt,
-                                    running / unit,
-                                    done / unit,
-                                    expected / unit);
-                        else
-                            s =
-                                fmt(ANSI_BLUE + numberFmt + ANSI_NORMAL "/" ANSI_GREEN + numberFmt + ANSI_NORMAL,
-                                    running / unit,
-                                    done / unit);
-                    else if (expected != done)
-                        if (expected != 0)
-                            s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL "/" + numberFmt, done / unit, expected / unit);
-                        else
-                            s = fmt(ANSI_GREEN + numberFmt + ANSI_NORMAL, done / unit);
+            if (running || done || expected || failed) {
+                if (running)
+                    if (expected != 0)
+                        s =
+                            fmt(ANSI_BLUE "%d" ANSI_NORMAL "/" ANSI_GREEN "%d" ANSI_NORMAL "/%d",
+                                running / unit,
+                                done / unit,
+                                expected / unit);
                     else
-                        s = fmt(done ? ANSI_GREEN + numberFmt + ANSI_NORMAL : numberFmt, done / unit);
-                    s = fmt(itemFmt, s);
+                        s = fmt(
+                            ANSI_BLUE "%d" ANSI_NORMAL "/" ANSI_GREEN "%d" ANSI_NORMAL, running / unit, done / unit);
+                else if (expected != done)
+                    if (expected != 0)
+                        s = fmt(ANSI_GREEN "%d" ANSI_NORMAL "/%d", done / unit, expected / unit);
+                    else
+                        s = fmt(ANSI_GREEN "%d" ANSI_NORMAL, done / unit);
+                else if (done)
+                    s = fmt(ANSI_GREEN "%d" ANSI_NORMAL, done / unit);
+                else
+                    s = fmt("%d", done / unit);
+                s = fmt(itemFmt, s);
 
-                    if (failed)
-                        s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
-                }
+                if (failed)
+                    s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
+            }
 
-                return s;
-            };
+            return s;
+        };
 
-        auto renderSizeActivity = [&] [[nodiscard]] (ActivityType type, const std::string & itemFmt = "%s") {
+        auto renderSizeActivity = [&] [[nodiscard]] (ActivityType type, FormatString<1> itemFmt = "%s") {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
             for (auto & j : act.its) {
@@ -653,7 +650,8 @@ public:
                     }
                 else {
                     commonUnit = getSizeUnit(done);
-                    s = fmt(done ? ANSI_GREEN "%s" ANSI_NORMAL : "%s", renderSizeWithoutUnit(done, *commonUnit));
+                    s = fmt(
+                        done ? ANSI_GREEN "%s"_fmt ANSI_NORMAL : "%s"_fmt, renderSizeWithoutUnit(done, *commonUnit));
                 }
 
                 if (commonUnit)
@@ -676,10 +674,9 @@ public:
             res += s;
         };
 
-        auto showActivity =
-            [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-                maybeAppendToResult(renderActivity(type, itemFmt, numberFmt, unit));
-            };
+        auto showActivity = [&](ActivityType type, FormatString<1> itemFmt, double unit = 1) {
+            maybeAppendToResult(renderActivity(type, itemFmt, unit));
+        };
 
         showActivity(actBuilds, "%s built");
 

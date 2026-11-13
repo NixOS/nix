@@ -5,6 +5,7 @@
 #include <string>
 #include <filesystem>
 #include "nix/util/ansicolor.hh"
+#include "nix/util/format-string.hh"
 
 namespace nix {
 
@@ -79,12 +80,21 @@ inline std::string fmt(const char * s)
     return s;
 }
 
-template<typename... Args>
-inline std::string fmt(const std::string & fs, const Args &... args)
+/**
+ * Without arguments, the format string is returned unchanged, as for the
+ * other single-argument overloads.
+ */
+inline std::string fmt(FormatString<0> fs)
 {
-    boost::format f(fs);
+    return fs.str();
+}
+
+template<typename T, typename... Args>
+inline std::string fmt(FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
+{
+    boost::format f(fs.str());
     setExceptions(f);
-    formatHelper(f, args...);
+    formatHelper(f, arg, args...);
     return f.str();
 }
 
@@ -186,12 +196,18 @@ public:
     }
 
     /**
-     * Interpolate the given arguments into the format string.
+     * Interpolate the given arguments into the format string. Without
+     * arguments, print the format string literally, like the `std::string`
+     * constructor.
      */
     template<typename... Args>
-    HintFmt(const std::string & format, const Args &... args)
-        : HintFmt(boost::format(format), args...)
+    HintFmt(FormatString<sizeof...(Args)> format, const Args &... args)
+        : HintFmt(boost::format(sizeof...(Args) == 0 ? std::string("%s") : format.str()))
     {
+        if constexpr (sizeof...(Args) == 0)
+            *this % Uncolored(format.str());
+        else
+            formatHelper(*this, args...);
     }
 
     HintFmt(const HintFmt & hf)
@@ -200,8 +216,8 @@ public:
     }
 
     template<typename... Args>
-    HintFmt(boost::format && fmt, const Args &... args)
-        : fmt(std::move(fmt))
+    HintFmt(boost::format && f, const Args &... args)
+        : fmt(std::move(f))
     {
         static_assert(!(std::is_same_v<std::remove_cvref_t<Args>, std::filesystem::path> || ...));
         setExceptions(fmt);

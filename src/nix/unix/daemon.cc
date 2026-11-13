@@ -425,9 +425,10 @@ static void daemonLoop(
                 };
 
                 printInfo(
-                    (std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
+                    "accepted connection from pid %1%, user %2%%3%",
                     peer.pid ? std::to_string(*peer.pid) : "<unknown>",
-                    userName.value_or("<unknown>"));
+                    userName.value_or("<unknown>"),
+                    trusted ? " (trusted)" : "");
 
                 OsStrings args = {
                     OS_STR("--stdio"),

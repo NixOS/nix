@@ -74,8 +74,13 @@ protected:
      * The error message is appended to the formatted hint.
      */
     template<typename... Args>
-    SystemError(DisambigVarArgs, std::error_code errorCode, std::string_view errorDetails, Args &&... args)
-        : SystemError(DisambigHintFmt{}, errorCode, errorDetails, HintFmt{std::forward<Args>(args)...})
+    SystemError(
+        DisambigVarArgs,
+        std::error_code errorCode,
+        std::string_view errorDetails,
+        FormatString<sizeof...(Args)> fs,
+        const Args &... args)
+        : SystemError(DisambigHintFmt{}, errorCode, errorDetails, HintFmt(fs, args...))
     {
     }
 
@@ -94,8 +99,8 @@ public:
      * appended to the error message.
      */
     template<typename... Args>
-    SystemError(std::error_code errorCode, Args &&... args)
-        : SystemError(DisambigVarArgs{}, errorCode, errorCode.message(), std::forward<Args>(args)...)
+    SystemError(std::error_code errorCode, FormatString<sizeof...(Args)> fs, const Args &... args)
+        : SystemError(DisambigVarArgs{}, errorCode, errorCode.message(), fs, args...)
     {
     }
 
@@ -168,10 +173,9 @@ public:
      * `Fields::renderError` describes in the message.
      */
     template<typename... Args>
-    NativeCodeSystemError(NativeCode code, Args &&... args)
+    NativeCodeSystemError(NativeCode code, FormatString<sizeof...(Args)> fs, const Args &... args)
         : Fields{code}
-        , SystemError(
-              DisambigVarArgs{}, Fields::toErrorCode(code), Fields::renderError(code), std::forward<Args>(args)...)
+        , SystemError(DisambigVarArgs{}, Fields::toErrorCode(code), Fields::renderError(code), fs, args...)
     {
     }
 
@@ -195,8 +199,19 @@ public:
      * calling this constructor!
      */
     template<typename... Args>
-    NativeCodeSystemError(Args &&... args)
-        : NativeCodeSystemError(Fields::ambientError(), std::forward<Args>(args)...)
+    NativeCodeSystemError(FormatString<sizeof...(Args)> fs, const Args &... args)
+        : NativeCodeSystemError(Fields::ambientError(), fs, args...)
+    {
+    }
+
+    /**
+     * Construct using the ambient error code.
+     *
+     * Unlike above, the `HintFmt` already exists rather than being made on
+     * the spot.
+     */
+    NativeCodeSystemError(const HintFmt & hf)
+        : NativeCodeSystemError(Fields::ambientError(), hf)
     {
     }
 

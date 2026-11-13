@@ -78,12 +78,20 @@ public:
 
 public:
     /**
+     * Constructor taking a message that is used literally.
+     */
+    BuildError(Status status, const std::string & msg)
+        : CloneableError(msg)
+        , status{status}
+    {
+    }
+
+    /**
      * Variadic constructor for throwing with format strings.
-     * Delegates to the string constructor after formatting.
      */
     template<typename... Args>
-    BuildError(Status status, Args &&... args)
-        : CloneableError(std::forward<Args>(args)...)
+    BuildError(Status status, FormatString<sizeof...(Args)> fs, const Args &... args)
+        : CloneableError(fs, args...)
         , status{status}
     {
     }

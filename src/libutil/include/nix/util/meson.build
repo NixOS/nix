@@ -50,6 +50,7 @@ headers = [ config_pub_h ] + files(
   'file-system.hh',
   'finally.hh',
   'fmt.hh',
+  'format-string.hh',
   'fs-sink.hh',
   'fun.hh',
   'git.hh',

@@ -505,12 +505,44 @@ public:
      */
     void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
 
-    template<class T, typename... Args>
+    /**
+     * Construct an error from a format string and its arguments.
+     */
+    template<class T, typename Arg, typename... Args>
     [[nodiscard, gnu::noinline]]
-    EvalErrorBuilder<T> & error(const Args &... args)
+    EvalErrorBuilder<T> & error(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
     {
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
-        return *new EvalErrorBuilder<T>(*this, args...);
+        return *new EvalErrorBuilder<T>(T(*this, fs, arg, args...));
+    }
+
+    /**
+     * Construct an error with a message that is printed literally.
+     */
+    template<class T>
+    [[nodiscard, gnu::noinline]]
+    EvalErrorBuilder<T> & error(const std::string & msg)
+    {
+        return *new EvalErrorBuilder<T>(T(*this, msg));
+    }
+
+    /**
+     * Construct an error with arguments other than a message, such as
+     * `InvalidPathError(state, path)`.
+     */
+    template<class T>
+    [[nodiscard, gnu::noinline]]
+    EvalErrorBuilder<T> & error()
+    {
+        return *new EvalErrorBuilder<T>(T(*this));
+    }
+
+    template<class T, typename Arg, typename... Args>
+        requires(!std::is_convertible_v<const Arg &, std::string_view>)
+    [[nodiscard, gnu::noinline]]
+    EvalErrorBuilder<T> & error(const Arg & arg, const Args &... args)
+    {
+        return *new EvalErrorBuilder<T>(T(*this, arg, args...));
     }
 
     /**
@@ -779,10 +811,10 @@ public:
 
     template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const Args &... formatArgs) const;
+    void addErrorTrace(Error & e, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const;
     template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const Args &... formatArgs) const;
+    void addErrorTrace(Error & e, const PosIdx pos, FormatString<sizeof...(Args)> fs, const Args &... formatArgs) const;
 
 public:
     /**

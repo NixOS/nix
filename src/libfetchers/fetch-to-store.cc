@@ -98,7 +98,7 @@ std::pair<StorePath, Hash> fetchToStore2(
         *logger,
         lvlChatty,
         actFetchToStore,
-        fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path),
+        fmt(mode == FetchMode::DryRun ? "hashing '%s'"_fmt : "copying '%s' to the store"_fmt, path),
         std::to_array<Logger::Field>({path.to_string(), (uint64_t) (mode == FetchMode::DryRun)}));
 
     auto filter2 = filter ? *filter : defaultPathFilter;
