@@ -83,7 +83,7 @@ R""(
   ```
 
   Note that `--impure` is needed because we're using `<nixpkgs>`,
-  which relies on the `$NIX_PATH` environment variable.
+  which relies on the [`$NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH).
 
 * Fetch a store path from the configured substituters, if it doesn't
   already exist:

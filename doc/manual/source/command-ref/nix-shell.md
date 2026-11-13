@@ -90,7 +90,7 @@ All options not listed here are passed to `nix-store
   few variables, in particular `HOME`, `USER` and `DISPLAY`, are
   retained.  Note that the shell used to run commands is obtained from
   [`NIX_BUILD_SHELL`](#env-NIX_BUILD_SHELL) / `<nixpkgs>` from
-  `NIX_PATH`, and therefore not affected by `--pure`.
+  [`NIX_PATH`](#env-NIX_PATH), and therefore not affected by `--pure`.
 
 - `--packages` / `-p` *packages*…
 
@@ -195,7 +195,8 @@ $ nix-shell --packages sqlite 'git.override { withManual = false; }'
 ```
 
 The `-p` flag looks up Nixpkgs in the Nix search path. You can override
-it by passing `-I` or setting `NIX_PATH`. For example, the following
+it by passing `-I` or setting [`NIX_PATH`](#env-NIX_PATH).
+For example, the following
 gives you a shell containing the Pan package from a specific revision of
 Nixpkgs:
 
