@@ -43,6 +43,7 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'flakeref.cc',
+  'nix_api_eval_cache.cc',
   'nix_api_flake.cc',
   'url-name.cc',
 )
