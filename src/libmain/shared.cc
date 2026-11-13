@@ -22,6 +22,7 @@
 #include <signal.h>
 
 #ifndef _WIN32
+#  include <fcntl.h>
 #  include <sys/resource.h>
 #endif
 #ifdef __APPLE__

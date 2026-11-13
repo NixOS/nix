@@ -30,10 +30,6 @@
 #include <concepts>
 #include <type_traits>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-
 namespace nix {
 
 enum class Verbosity : unsigned {
