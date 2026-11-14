@@ -159,6 +159,41 @@ TEST(spawnProgram, chdirAndArgv0)
     ASSERT_TRUE(statusOk(status)) << "status: " << WEXITSTATUS(status);
 }
 
+TEST(spawnProgram, nonexistent)
+{
+    std::exception_ptr ex;
+    Pid pid;
+
+    try {
+        pid = spawnProgram(
+            {
+                .program = "/this/path/really/should/not/exist/for/real",
+            },
+            {});
+    } catch (...) {
+        ex = std::current_exception();
+    }
+
+    /* Due to platform differences, we either fail with ExecError or actually successfully spawn
+       the process but fail later. */
+    if (ex) {
+        ASSERT_FALSE(pid);
+        try {
+            std::rethrow_exception(ex);
+        } catch (const ExecError & e) {
+            ASSERT_TRUE(WIFEXITED(e.status));
+            ASSERT_EQ(WEXITSTATUS(e.status), 127);
+        } catch (...) {
+            FAIL();
+        }
+    } else if (pid) {
+        ASSERT_FALSE(ex);
+        int status = pid.wait();
+        ASSERT_TRUE(WIFEXITED(status));
+        ASSERT_EQ(WEXITSTATUS(status), 127);
+    }
+}
+
 #endif
 
 /* TODO: Test a bunch more things. */
