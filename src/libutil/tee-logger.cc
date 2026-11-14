@@ -40,6 +40,11 @@ public:
             logger->resume();
     };
 
+    bool isVerbose() override
+    {
+        return mainLogger().isVerbose();
+    }
+
     void log(Verbosity lvl, std::string_view s) noexcept override
     {
         for (auto & logger : loggers)

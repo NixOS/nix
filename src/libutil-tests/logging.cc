@@ -371,6 +371,37 @@ TEST(HintFmt, hintFmtArgument)
 
 namespace {
 
+/* Tees `mainLogger` with a JSON logger. */
+std::unique_ptr<Logger> makeTeeLoggerWithJSON(std::unique_ptr<Logger> mainLogger, Descriptor jsonFd)
+{
+    auto jsonLogger = makeJSONLogger(jsonFd, /*includeNixPrefix=*/false);
+    /* The tests rely on the JSON logger being verbose. Otherwise a tee
+       that asked every logger whether it is verbose would also pass
+       isNotVerboseWhenMainLoggerIsNotVerbose. */
+    EXPECT_EQ(jsonLogger->isVerbose(), true);
+    std::vector<std::unique_ptr<Logger>> extraLoggers;
+    extraLoggers.push_back(std::move(jsonLogger));
+    return makeTeeLogger(std::move(mainLogger), std::move(extraLoggers));
+}
+
+} // namespace
+
+TEST(TeeLogger, isVerboseWhenMainLoggerIsVerbose)
+{
+    auto jsonFile = createAnonymousTempFile();
+    auto tee = makeTeeLoggerWithJSON(makeSimpleLogger(/*printBuildLogs=*/true), jsonFile.get());
+    ASSERT_EQ(tee->isVerbose(), true);
+}
+
+TEST(TeeLogger, isNotVerboseWhenMainLoggerIsNotVerbose)
+{
+    auto jsonFile = createAnonymousTempFile();
+    auto tee = makeTeeLoggerWithJSON(makeSimpleLogger(/*printBuildLogs=*/false), jsonFile.get());
+    ASSERT_EQ(tee->isVerbose(), false);
+}
+
+namespace {
+
 class DeterministicActivityIdLogger : public Logger
 {
     std::unique_ptr<Logger> inner;

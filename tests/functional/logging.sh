@@ -40,3 +40,18 @@ if [[ "$NIX_REMOTE" != "daemon" ]]; then
     grep '{"action":"start","fields":\[".*-dependencies-top.drv","",1,1\],"id":.*,"level":3,"parent":0' "$TEST_ROOT/log.json" >&2
     (( $(grep -c '{"action":"msg","level":5,"msg":"executing builder .*"}' "$TEST_ROOT/log.json" ) == 5 ))
 fi
+
+# A failed build prints the log tail unless --print-build-logs already showed
+# the log. An extra JSON logger from json-log-path does not change that.
+clearStore
+expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link \
+    --json-log-path "$TEST_ROOT/log.json" | grepQuiet 'Last 25 log lines'
+
+# The daemon worker does not receive --print-build-logs and still prints the
+# tail: https://github.com/NixOS/nix/issues/16128
+if [[ "$NIX_REMOTE" != "daemon" ]]; then
+    expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link --print-build-logs \
+        | grepQuietInverse 'Last 25 log lines'
+    expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link --print-build-logs \
+        --json-log-path "$TEST_ROOT/log.json" | grepQuietInverse 'Last 25 log lines'
+fi
