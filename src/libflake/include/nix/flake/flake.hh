@@ -208,10 +208,15 @@ struct LockFlags
     std::map<NonEmptyInputAttrPath, FlakeRef> inputOverrides;
 
     /**
-     * Flake inputs to be updated. This means that any existing lock
-     * for those inputs will be ignored.
+     * Inputs specified to be updated or excluded. If exclude is true, then any existing locks for these inputs will be
+     * respected. If exclude is false, then any existing locks will be ignored.
      */
-    std::set<NonEmptyInputAttrPath> inputUpdates;
+    std::set<NonEmptyInputAttrPath> inputSpec;
+
+    /**
+     * Update all inputs except for the specified ones.
+     */
+    bool exclude = false;
 };
 
 /*
