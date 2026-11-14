@@ -2,7 +2,7 @@
 #include "nix/util/ref.hh"
 #include "nix/util/fmt.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/system-error.hh"
+#include "nix/util/error.hh"
 
 #include <array>
 #include <cctype>
@@ -39,7 +39,7 @@ void initLibUtil()
         // When exception handling fails, the message tends to be printed by the
         // C++ runtime, followed by an abort.
         // For example on macOS we might see an error such as
-        // libc++abi: terminating with uncaught exception of type nix::SystemError: error: C++ exception handling is
+        // libc++abi: terminating with uncaught exception of type nix::Error: error: C++ exception handling is
         // broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.
         bool caught = false;
         try {
