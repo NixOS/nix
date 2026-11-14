@@ -3,6 +3,7 @@
 #include "nix/util/tests/nix_api_util.hh"
 #include "nix/util/tests/string_callback.hh"
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <memory>
@@ -20,7 +21,9 @@ TEST_F(nix_api_util_context, nix_context_error)
     }
     ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
     ASSERT_EQ(ctx->name, "nix::Error");
-    // The message is kept as plain text, without the colors in e.what().
+    // The error keeps its colors for the CLI, which strips them where it
+    // prints them. The C API keeps the message as plain text.
+    ASSERT_THAT(err_msg_ref, ::testing::HasSubstr("\e["));
     ASSERT_EQ(*ctx->last_err, "error: testing error");
     ASSERT_EQ(ctx->info->msg.str(), "testing error");
 
