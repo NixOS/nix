@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <iostream>
+#include <filesystem>
 #include <ranges>
 #include <cstdlib>
 #include <cerrno>
@@ -49,6 +50,17 @@ static int spawnTestForLeakedFDsMain()
     return EXIT_SUCCESS;
 }
 
+static int spawnTestArgv0AndChdir(std::string_view argv0, std::string_view argv2)
+{
+    if (std::filesystem::current_path().native() != argv2)
+        return EXIT_FAILURE;
+
+    if (argv0 != "test")
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
+}
+
 #endif
 
 int main(int argc, char ** argv)
@@ -64,6 +76,10 @@ int main(int argc, char ** argv)
         } else if (argv1 == "__util_test_spawn_leaked_fds") {
 #ifndef _WIN32
             return spawnTestForLeakedFDsMain();
+#endif
+        } else if (argv1 == "__util_test_spawn_chdir_and_argv0" && argc > 2) {
+#ifndef _WIN32
+            return spawnTestArgv0AndChdir(argv[0], argv[2]);
 #endif
         }
     }

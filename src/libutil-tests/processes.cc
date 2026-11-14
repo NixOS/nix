@@ -1,5 +1,6 @@
 #include "nix/util/processes.hh"
 #include "nix/util/current-process.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/system-error.hh"
 
 #include <gmock/gmock.h>
@@ -137,6 +138,25 @@ TEST(runProgram2, leakedFDsAreClosed)
              fmt("%d,%d", readSide.get(), writeSide.get()),
          }}},
     }));
+}
+
+TEST(spawnProgram, chdirAndArgv0)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+    auto tempDir = createTempDir();
+
+    Pid pid = spawnProgram(
+        {
+            .program = *self,
+            .args = {"__util_test_spawn_chdir_and_argv0", tempDir.native()},
+            .argv0 = "test",
+            .chdir = tempDir,
+        },
+        {});
+
+    auto status = pid.wait();
+    ASSERT_TRUE(statusOk(status)) << "status: " << WEXITSTATUS(status);
 }
 
 #endif
