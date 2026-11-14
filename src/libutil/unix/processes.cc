@@ -320,7 +320,7 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 
 /* On Linux, the vfork()-based spawnProgram in linux/processes.cc is used
    instead, except with ASan. See the comment there for why. */
-#if !defined(__linux__) || NIX_ASAN_ENABLED
+#if (!defined(__linux__) || NIX_ASAN_ENABLED) && !defined(__APPLE__)
 
 Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fdr)
 {

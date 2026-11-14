@@ -242,6 +242,10 @@ if host_machine.system() == 'freebsd'
   subdir('freebsd')
 endif
 
+if host_machine.system() == 'darwin'
+  subdir('darwin')
+endif
+
 if host_machine.system() == 'windows'
   subdir('windows')
 else

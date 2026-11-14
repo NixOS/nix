@@ -42,6 +42,7 @@ mkMesonLibrary (finalAttrs: {
     ./freebsd/include/nix/util/meson.build
     ./unix/meson.build
     ./unix/include/nix/util/meson.build
+    ./darwin/meson.build
     ./windows/meson.build
     ./windows/include/nix/util/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
