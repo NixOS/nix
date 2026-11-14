@@ -207,8 +207,7 @@ std::pair<int, std::string> runProgram(RunOptions && options);
  *
  * @return Pid of the spawned process.
  * @throws SysError if fork() or vfork() fail in the parent, ExecError if
- * housekeeping fails with status code 1.
- * @todo Maybe align with posix_spawn and report 127 on housekeeping errors?
+ * housekeeping fails with status code 127 (as does posix_spawn).
  *
  * @param fdr Unless specified, standard in, out and error are inherited.
  * Redirections are applied in the same order in the child housekeeping.

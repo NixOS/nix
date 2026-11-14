@@ -107,7 +107,7 @@ struct ExecChildParams
         [[maybe_unused]] ssize_t ret; /* Swallow all errors. */
         ret = ::write(errorPipe, reinterpret_cast<const char *>(&err), sizeof(err));
         ret = ::write(errorPipe, msg, ::strlen(msg));
-        ::_exit(1);
+        ::_exit(127);
     };
 
     auto dieWithErrno = [&die] [[noreturn]] (const char * msg) { die(errno, msg); };

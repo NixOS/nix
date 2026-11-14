@@ -252,20 +252,42 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
            ~ProgressBar() tries to join a thread that doesn't
            exist. */
         logger = newLogger;
+
+        unsigned int exitCode = 1;
+
+        auto handleException = [&](const std::exception & e) {
+            try {
+                std::cerr << options.errorPrefix << e.what() << "\n";
+            } catch (...) {
+                /* The above code likely can't throw, but let's be safe. */
+            }
+
+            try {
+                std::rethrow_exception(std::current_exception());
+            } catch (const Error & error) {
+                /* Fish out the exit code. This is used by spawnProgram to report
+                   a 127 exit code for housekeeping errors to match posix_spawn. */
+                exitCode = error.info().status;
+                assert(exitCode); /* It really shouldn't be zero. */
+            } catch (...) {
+            }
+        };
+
         try {
 #ifdef __linux__
+            /* Note that if the processMain changes credentials, this is too early
+               to set parent-death signal. */
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif
             processMain();
-        } catch (std::exception & e) {
-            try {
-                std::cerr << options.errorPrefix << e.what() << "\n";
-            } catch (...) {
-            }
+        } catch (const std::exception & e) {
+            auto ex = std::current_exception();
+            handleException(e);
         } catch (...) {
         }
-        _exit(1);
+
+        _exit(exitCode);
     };
 
     pid_t pid = INVALID_PID;
@@ -304,54 +326,59 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
 {
     return startProcess(
         [&] {
-            if (options.environment)
-                replaceEnv(*options.environment);
+            try {
+                if (options.environment)
+                    replaceEnv(*options.environment);
 
-            std::vector<Descriptor> keepExtraFDs;
-            for (const auto & [from, to] : fdr) {
-                /* dup2 does nothing when from == to, but we still need to clear the CLOEXEC flag. */
-                if (from == to) {
-                    if (int prev = ::fcntl(from, F_GETFD);
-                        prev == -1 || ::fcntl(from, F_SETFD, prev & ~FD_CLOEXEC) == -1)
-                        throw SysError("clearing FD_CLOEXEC");
-                } else if (::dup2(from, to) == -1)
-                    throw SysError("dupping fd %d -> %d", from, to);
-                keepExtraFDs.push_back(to);
+                std::vector<Descriptor> keepExtraFDs;
+                for (const auto & [from, to] : fdr) {
+                    /* dup2 does nothing when from == to, but we still need to clear the CLOEXEC flag. */
+                    if (from == to) {
+                        if (int prev = ::fcntl(from, F_GETFD);
+                            prev == -1 || ::fcntl(from, F_SETFD, prev & ~FD_CLOEXEC) == -1)
+                            throw SysError("clearing FD_CLOEXEC");
+                    } else if (::dup2(from, to) == -1)
+                        throw SysError("dupping fd %d -> %d", from, to);
+                    keepExtraFDs.push_back(to);
+                }
+                if (options.chdir && chdir((*options.chdir).c_str()) == -1)
+                    throw SysError("chdir failed");
+                if (options.gid && setgid(*options.gid) == -1)
+                    throw SysError("setgid failed");
+                /* Drop all other groups if we're setgid. */
+                if (options.gid && setgroups(0, 0) == -1)
+                    throw SysError("setgroups failed");
+                if (options.uid && setuid(*options.uid) == -1)
+                    throw SysError("setuid failed");
+
+                Strings args_(options.args);
+                /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
+                   trickery. */
+                args_.push_front(options.argv0.value_or(options.program.native()));
+
+                restoreProcessContext(options.restoreMounts);
+
+                /* Unlike the Linux case, it doesn't matter much that we are closing
+                   the FDs before or after restoreProcessContext(), but on Linux
+                   it's crucial that it happens *after* restoreProcessContext() call
+                   because that re-enters the saved mountns. */
+                unix::closeExtraFDs(keepExtraFDs);
+
+                if (options.setSid && ::setsid() == -1)
+                    throw SysError("creating a new session");
+
+                if (options.lookupPath)
+                    execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
+                // This allows you to refer to a program with a pathname relative
+                // to the PATH variable.
+                else
+                    execv(options.program.c_str(), stringsToCharPtrs(args_).data());
+
+                throw SysError("executing %s", PathFmt(options.program));
+            } catch (Error & e) {
+                e.withExitStatus(127); /* Like posix_spawn. */
+                throw;
             }
-            if (options.chdir && chdir((*options.chdir).c_str()) == -1)
-                throw SysError("chdir failed");
-            if (options.gid && setgid(*options.gid) == -1)
-                throw SysError("setgid failed");
-            /* Drop all other groups if we're setgid. */
-            if (options.gid && setgroups(0, 0) == -1)
-                throw SysError("setgroups failed");
-            if (options.uid && setuid(*options.uid) == -1)
-                throw SysError("setuid failed");
-
-            Strings args_(options.args);
-            /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
-               trickery. */
-            args_.push_front(options.argv0.value_or(options.program.native()));
-
-            restoreProcessContext(options.restoreMounts);
-
-            /* Unlike the Linux case, it doesn't matter much that we are closing
-               the FDs before or after restoreProcessContext(), but on Linux
-               it's crucial that it happens *after* restoreProcessContext() call
-               because that re-enters the saved mountns. */
-            unix::closeExtraFDs(keepExtraFDs);
-
-            if (options.setSid && ::setsid() == -1)
-                throw SysError("creating a new session");
-
-            if (options.lookupPath)
-                execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
-            // This allows you to refer to a program with a pathname relative
-            // to the PATH variable.
-            else
-                execv(options.program.c_str(), stringsToCharPtrs(args_).data());
-
-            throw SysError("executing %s", PathFmt(options.program));
         },
         {
             /* TODO: This isn't really implemented on non-Linux. */
