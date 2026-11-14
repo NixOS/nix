@@ -342,16 +342,16 @@ rec {
     let
       components = nixComponentsFor.${system}.native;
       pkgs = components._pkgs;
-      # Embed the native (glibc) Nix even though the Linux installer
-      # binary is static/musl.
       tarball = pkgs.callPackage ./nix-installer/tarball.nix {
         # Not nix-cli because we want manual pages too.
         nix = components.nix-everything;
       };
-      builder = if pkgs.stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs;
     in
-    builder.callPackage ./nix-installer {
+    pkgs.pkgsStatic.callPackage ./nix-installer {
       inherit tarball;
+      # pkgsStatic.buildPackages doesn't seem to work on macOS and cctools/sigtool
+      # there end up with prefixed binaries which break code signing.
+      inherit (pkgs.darwin) cctools sigtool;
     }
   );
 

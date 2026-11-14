@@ -61,7 +61,10 @@ in
         ];
         virtualisation.memorySize = 4096;
         nix.settings.substituters = lib.mkForce [ ];
-        nix.extraOptions = "experimental-features = nix-command flakes";
+        nix.settings.experimental-features = [
+          "nix-command"
+          "flakes"
+        ];
       };
   };
 

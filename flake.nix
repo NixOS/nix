@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-26.05/nixexprs.tar.zst";
+  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.zst";
 
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
@@ -354,7 +354,7 @@
         system:
         let
           pkgs = nixpkgsFor.${system}.native;
-          opener = if pkgs.stdenv.isDarwin then "open" else "xdg-open";
+          opener = if pkgs.stdenv.hostPlatform.isDarwin then "open" else "xdg-open";
         in
         {
           open-manual = {
@@ -391,7 +391,7 @@
           prefixAttrs "native" (
             forAllStdenvs (stdenvName: makeShell' nixComponentsFor.${system}.nativeForStdenv.${stdenvName})
           )
-          // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
+          // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) (
             prefixAttrs "static" (
               forAllStdenvs (
                 stdenvName: makeShell' nixComponentsFor.${system}.nativeStaticForStdenv.${stdenvName}

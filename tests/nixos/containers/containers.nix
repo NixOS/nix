@@ -22,10 +22,12 @@
         ];
         virtualisation.memorySize = 4096;
         nix.settings.substituters = lib.mkForce [ ];
-        nix.extraOptions = ''
-          extra-experimental-features = nix-command auto-allocate-uids cgroups
-          extra-system-features = uid-range
-        '';
+        nix.settings.experimental-features = [
+          "nix-command"
+          "auto-allocate-uids"
+          "cgroups"
+        ];
+        nix.settings.extra-system-features = [ "uid-range" ];
         nix.nixPath = [ "nixpkgs=${nixpkgs}" ];
       };
   };

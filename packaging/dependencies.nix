@@ -13,20 +13,6 @@ in
 scope: {
   inherit stdenv;
 
-  mimalloc =
-    if lib.versionAtLeast pkgs.mimalloc.version "3.5.1" then
-      pkgs.mimalloc
-    else
-      pkgs.mimalloc.overrideAttrs rec {
-        version = "3.5.1";
-        src = pkgs.fetchFromGitHub {
-          owner = "microsoft";
-          repo = "mimalloc";
-          tag = "v${version}";
-          hash = "sha256-hljle/jR2hNvy2ikdOna9QZiyqzAuMjNUfC7vxl7g7k=";
-        };
-      };
-
   boehmgc =
     (pkgs.boehmgc.override {
       enableLargeConfig = true;
@@ -58,17 +44,6 @@ scope: {
         || (stdenv.cc.libcxx != null && stdenv.cc.libcxx.isLLVM)
       );
   };
-
-  sqlite =
-    if !stdenv.hostPlatform.isWindows then
-      pkgs.sqlite
-    else
-      pkgs.sqlite.overrideAttrs (prevAttrs: {
-        nativeBuildInputs = lib.filter (x: !(x.pname == "tcl")) prevAttrs.nativeBuildInputs or [ ];
-        configureFlags = (lib.filter (x: !(lib.hasPrefix "--with-tcl" x)) prevAttrs.configureFlags) ++ [
-          "--disable-tcl"
-        ];
-      });
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
   # TODO Boost 1.91 has a regression in boost.url :(

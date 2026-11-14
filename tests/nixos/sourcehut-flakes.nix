@@ -118,10 +118,11 @@ in
         ];
         virtualisation.memorySize = 4096;
         nix.settings.substituters = lib.mkForce [ ];
-        nix.extraOptions = ''
-          experimental-features = nix-command flakes
-          flake-registry = https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json
-        '';
+        nix.settings.experimental-features = [
+          "nix-command"
+          "flakes"
+        ];
+        nix.settings.flake-registry = "https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json";
         environment.systemPackages = [ pkgs.jq ];
         networking.hosts.${(builtins.head nodes.sourcehut.networking.interfaces.eth1.ipv4.addresses).address} =
           [ "git.sr.ht" ];

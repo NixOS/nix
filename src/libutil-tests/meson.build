@@ -107,7 +107,11 @@ if build_unit_tests
     dependency('nix-util-test-support'),
     rapidcheck,
     # See ../libutil-test-support/meson.build
-    cxx.find_library('rapidcheck', dirs : [ rapidcheck.get_variable('libdir') ]),
+    cxx.find_library(
+      'rapidcheck',
+      dirs : [ rapidcheck.get_variable('libdir') ],
+      static : get_option('default_library') == 'static',
+    ),
     dependency('gtest', main : false),
     dependency('gmock'),
     dependency('libzstd', version : '>= 1.4.0'),

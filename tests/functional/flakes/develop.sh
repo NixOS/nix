@@ -29,6 +29,8 @@ cat <<EOF >"$TEST_HOME/flake.nix"
         outputChecks.out = {
           disallowedReferences = [ "out" ];
           disallowedRequisites = [ "out" ];
+          # The environment is larger than this, so building it fails if the checks are kept.
+          maxSize = 1;
         };
       };
     };
@@ -155,7 +157,9 @@ EOF
 )" -ef "$BASH_INTERACTIVE_EXECUTABLE" ]]
 
 # Test whether `nix develop` works with `__structuredAttrs`
-[[ -z "$(nix develop --no-write-lock-file .#hello-structured </dev/null)" ]]
+# Assign first: in `[[ -z "$(...)" ]]` a failing `nix develop` prints nothing and passes.
+output="$(nix develop --no-write-lock-file .#hello-structured </dev/null)"
+[[ -z "$output" ]]
 
 clearStore
 
