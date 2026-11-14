@@ -218,6 +218,29 @@ TEST_F(nix_api_expr_test, nix_value_auto_call_function_missing_arg_is_error)
     nix_gc_decref(ctx, result);
 }
 
+TEST_F(nix_api_expr_test, nix_err_info_trace_items_are_plain_text)
+{
+    nix_expr_eval_from_string(
+        ctx, state, "builtins.addErrorContext \"while testing the trace\" (throw \"boom\")", ".", value);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
+
+    unsigned int n = 0;
+    ASSERT_EQ(NIX_OK, nix_err_info_trace_count(nullptr, ctx, &n));
+    ASSERT_GE(n, 1u);
+
+    std::vector<std::string> traces(n);
+    for (unsigned int i = 0; i < n; i++) {
+        ASSERT_EQ(NIX_OK, nix_err_info_trace_msg(nullptr, ctx, i, OBSERVE_STRING(traces[i])));
+        ASSERT_THAT(traces[i], ::testing::Not(::testing::HasSubstr("\e")));
+    }
+    ASSERT_THAT(traces, ::testing::Contains("while testing the trace"));
+
+    nix_c_context * err = nix_c_context_create();
+    std::string unused;
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_info_trace_msg(err, ctx, n, OBSERVE_STRING(unused)));
+    nix_c_context_free(err);
+}
+
 TEST_F(nix_api_expr_test, nix_value_auto_call_function_non_function_passthrough)
 {
     nix_expr_eval_from_string(ctx, state, "42", ".", value);

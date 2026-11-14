@@ -290,6 +290,49 @@ nix_err nix_err_info_msg(
     nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data);
 
 /**
+ * @brief Retrieves the number of trace items of the nix Error in a context.
+ *
+ * Trace items are the "… while evaluating" lines of an error. They are
+ * available whether or not the `show-trace` setting is on.
+ *
+ * @pre This function should only be called after a previous nix function has
+ * returned a NIX_ERR_NIX_ERROR
+ *
+ * @param[out] context optional, the context to store errors in if this function
+ * fails
+ * @param[in] read_context the context to retrieve the trace items from
+ * @param[out] n set to the number of trace items
+ * @return NIX_OK if there were no errors, an error code otherwise.
+ */
+nix_err nix_err_info_trace_count(nix_c_context * context, const nix_c_context * read_context, unsigned int * n);
+
+/**
+ * @brief Retrieves the message of one trace item of the nix Error in a context.
+ *
+ * Trace items are in the order the CLI prints them: index 0 is the outermost.
+ * The message is plain text, like the one from nix_err_info_msg.
+ *
+ * @pre This function should only be called after a previous nix function has
+ * returned a NIX_ERR_NIX_ERROR
+ *
+ * @param[out] context optional, the context to store errors in if this function
+ * fails
+ * @param[in] read_context the context to retrieve the trace item from
+ * @param[in] index the trace item, less than the count from nix_err_info_trace_count
+ * @param[in] callback Called with the trace item's message.
+ * @param[in] user_data optional, arbitrary data, passed to the callback when it's called.
+ * @see nix_get_string_callback
+ * @return NIX_OK if there were no errors, NIX_ERR_KEY if index is out of range,
+ * an error code otherwise.
+ */
+nix_err nix_err_info_trace_msg(
+    nix_c_context * context,
+    const nix_c_context * read_context,
+    unsigned int index,
+    nix_get_string_callback callback,
+    void * user_data);
+
+/**
  * @brief Retrieves the error name from a context.
  *
  * Used to inspect nix Error messages.

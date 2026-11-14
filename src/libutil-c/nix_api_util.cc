@@ -152,6 +152,37 @@ nix_err nix_err_info_msg(
     return call_nix_get_string_callback(nix::stripANSIEscapes(read_context->info->msg.str()), callback, user_data);
 }
 
+nix_err nix_err_info_trace_count(nix_c_context * context, const nix_c_context * read_context, unsigned int * n)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    if (read_context->last_err_code != NIX_ERR_NIX_ERROR) {
+        return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Last error was not a nix error");
+    }
+    *n = read_context->info->traces.size();
+    return NIX_OK;
+}
+
+nix_err nix_err_info_trace_msg(
+    nix_c_context * context,
+    const nix_c_context * read_context,
+    unsigned int index,
+    nix_get_string_callback callback,
+    void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    if (read_context->last_err_code != NIX_ERR_NIX_ERROR) {
+        return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Last error was not a nix error");
+    }
+    auto & traces = read_context->info->traces;
+    if (index >= traces.size()) {
+        return nix_set_err_msg(context, NIX_ERR_KEY, "Trace index out of range");
+    }
+    return call_nix_get_string_callback(
+        nix::stripANSIEscapes(std::next(traces.begin(), index)->hint.str()), callback, user_data);
+}
+
 nix_err nix_err_code(const nix_c_context * read_context)
 {
     return read_context->last_err_code;
