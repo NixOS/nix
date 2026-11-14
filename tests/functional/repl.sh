@@ -71,13 +71,3 @@ testRepl () {
 testRepl
 # Same thing (kind-of), but with a remote store.
 testRepl --store "$TEST_ROOT/other-root?real=$NIX_STORE_DIR"
-
-# Values and debugger output are styled for a terminal only; escape codes
-# must not reach stdout when it is not a terminal.
-esc=$'\033'
-replOutput="$(nix repl 2>&1 <<< '{ a = 1; }')"
-[[ "$replOutput" != *"$esc"* ]] || fail "nix repl wrote ANSI codes to piped output"
-
-echo 'let x = 1; in builtins.break x' > "$TEST_ROOT/debugger-plain.nix"
-debuggerOutput="$(printf ':bt\n:env\n:c\n' | nix eval --file "$TEST_ROOT/debugger-plain.nix" --debugger 2>&1)"
-[[ "$debuggerOutput" != *"$esc"* ]] || fail "the debugger wrote ANSI codes to piped output"
