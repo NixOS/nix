@@ -199,8 +199,13 @@ struct Env
     Value * values[0];
 };
 
-void printEnvBindings(const EvalState & es, const Expr & expr, const Env & env);
-void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
+/**
+ * Print the names bound in the environment to stdout, as the debugger's `:env` does.
+ *
+ * @param ansi Whether to color the names.
+ */
+void printEnvBindings(const EvalState & es, const Expr & expr, const Env & env, bool ansi);
+void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, bool ansi, int lvl = 0);
 
 std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
