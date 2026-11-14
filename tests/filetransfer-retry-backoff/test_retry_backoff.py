@@ -9,6 +9,7 @@ import http.server
 import re
 import socketserver
 import subprocess
+import tempfile
 import threading
 import time
 
@@ -20,6 +21,8 @@ fail_status = 503
 fail_body = b""
 stall_response = 0.0
 request_count = 0
+unsatisfied_range: str | None = None
+range_requests: list[str] = []
 lock = threading.Lock()
 
 
@@ -28,6 +31,9 @@ class FlakyHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         global fail_count, request_count
+        if self.path == "/unterminated":
+            self.serve_unterminated()
+            return
         with lock:
             request_count += 1
             n = fail_count
@@ -55,7 +61,29 @@ class FlakyHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(PAYLOAD)
 
-    def log_message(self, *_args):
+    def serve_unterminated(self):
+        """Send the whole payload in one chunk, then close the connection
+        without the terminating zero-length chunk. This means that client has
+        every byte of the body but cannot confirm completion. Return HTTP 416
+        with the configured `Content-Range` header for range requests."""
+        range_header = self.headers.get("Range")
+        if range_header is None:
+            self.send_response(200)
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            self.wfile.write(b"%x\r\n%s\r\n" % (len(PAYLOAD), PAYLOAD))
+            self.close_connection = True
+            return
+        with lock:
+            range_requests.append(range_header)
+        self.send_response(416)
+        if unsatisfied_range is not None:
+            self.send_header("Content-Range", unsatisfied_range)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, format: str, *_args: object) -> None:
         pass
 
 
@@ -78,9 +106,26 @@ def set_failures(
         request_count = 0
 
 
-def fetch(extra_opts: str = "") -> tuple[int, str, list[int]]:
+def set_unsatisfied_range(value: str | None) -> None:
+    global unsatisfied_range
+    with lock:
+        unsatisfied_range = value
+        range_requests.clear()
+
+
+def payload_hash() -> str:
+    with tempfile.NamedTemporaryFile() as f:
+        f.write(PAYLOAD)
+        f.flush()
+        r = subprocess.run(
+            ["nix-hash", "--type", "sha256", "--flat", "--base32", f.name],
+            capture_output=True, text=True, check=True)
+    return r.stdout.strip()
+
+
+def fetch(extra_opts: str = "", path: str = "file") -> tuple[int, str, list[int]]:
     """Run nix-prefetch-url, return (exit_code, output, retry_delays_ms)."""
-    cmd = f"nix-prefetch-url {extra_opts} http://127.0.0.1:{PORT}/file"
+    cmd = f"nix-prefetch-url {extra_opts} http://127.0.0.1:{PORT}/{path}"
     r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     out = r.stdout + r.stderr
     delays = [int(m) for m in re.findall(r"retrying in (\d+) ms", out)]
@@ -103,6 +148,8 @@ def main() -> None:
         test_download_attempts_alias()
         test_s3_xml_error_retried()
         test_timeout_with_s3_error_not_retried()
+        test_resume_after_complete_body()
+        test_resume_after_complete_body_invalid_range()
     finally:
         httpd.shutdown()
 
@@ -188,6 +235,40 @@ def test_timeout_with_s3_error_not_retried():
     assert rc != 0, f"Expected failure: {out}"
     assert not delays, f"Expected no retries, got {len(delays)}: {out}"
     assert request_count == 1, f"Expected 1 request, got {request_count}: {out}"
+
+
+def test_resume_after_complete_body():
+    """A resumed download succeeds when the server returns HTTP 416 with a
+    complete length equal to the bytes already received."""
+    for unit in ["bytes", "bYtEs"]:
+        set_unsatisfied_range(f"{unit} */{len(PAYLOAD)}")
+        rc, out, _ = fetch(path="unterminated")
+
+        assert rc == 0, f"Expected success for unit {unit}: {out}"
+        assert out.startswith(payload_hash() + "\n"), f"Unexpected hash: {out}"
+        assert range_requests == [f"bytes={len(PAYLOAD)}-"], f"Unexpected ranges {range_requests}: {out}"
+
+
+def test_resume_after_complete_body_invalid_range():
+    """A resumed download still fails on 416 unless the server reports a
+    valid complete length equal to the bytes already received."""
+    for content_range in [
+        f"bytes */{len(PAYLOAD) - 1}",
+        f"bytes */{len(PAYLOAD) + 1}",
+        None,
+        "bytes */invalid",
+        "bytes */",
+        f"bytes */+{len(PAYLOAD)}",
+        f"bytes */-{len(PAYLOAD)}",
+        f"bytes */{len(PAYLOAD)}x",
+        "bytes */9223372036854775808",
+    ]:
+        set_unsatisfied_range(content_range)
+        rc, out, _ = fetch(path="unterminated")
+
+        assert rc != 0, f"Expected failure for Content-Range {content_range!r}: {out}"
+        assert "HTTP error 416" in out, f"Missing 416 error for Content-Range {content_range!r}: {out}"
+        assert range_requests == [f"bytes={len(PAYLOAD)}-"], f"Unexpected ranges {range_requests}: {out}"
 
 
 
