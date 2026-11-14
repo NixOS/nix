@@ -1,6 +1,7 @@
 #include "nix/cmd/get-build-log.hh"
 #include "nix/store/log-store.hh"
 #include "nix/store/store-open.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 

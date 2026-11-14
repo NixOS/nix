@@ -5,6 +5,7 @@
 #include "nix/util/users.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/logging.hh"
 
 #include <fstream>
 #include <string>

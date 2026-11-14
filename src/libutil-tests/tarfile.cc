@@ -3,6 +3,7 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/config.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/finally.hh"
 
 #include <boost/context/detail/exception.hpp>
 

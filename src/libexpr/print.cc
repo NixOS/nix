@@ -1,6 +1,3 @@
-#include <limits>
-#include <sstream>
-
 #include "nix/expr/print.hh"
 #include "nix/util/ansicolor.hh"
 #include "nix/util/signals.hh"
@@ -10,6 +7,10 @@
 #include "nix/expr/eval.hh"
 
 #include <boost/unordered/unordered_flat_set.hpp>
+
+#include <limits>
+#include <sstream>
+#include <ostream>
 
 namespace nix {
 

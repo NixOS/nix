@@ -2,6 +2,7 @@
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/logging.hh"
 
 namespace nix::fetchers {
 

@@ -11,6 +11,8 @@
 #  include <sys/xattr.h>
 #endif
 
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/stat.h>
 
 namespace nix {

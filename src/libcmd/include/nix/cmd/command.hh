@@ -12,8 +12,6 @@
 
 namespace nix {
 
-extern char ** savedArgv;
-
 class EvalState;
 struct Pos;
 class Store;

@@ -1,6 +1,7 @@
 #include "nix/store/references.hh"
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
 #include "nix/util/base-nix-32.hh"
 
 #include <cstdlib>

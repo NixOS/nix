@@ -1,5 +1,7 @@
 #include "nix/util/english.hh"
 
+#include <ostream>
+
 namespace nix {
 
 std::ostream &

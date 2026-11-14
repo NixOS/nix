@@ -9,7 +9,7 @@
 #include <optional>
 
 #include "nix/util/types.hh"
-#include "nix/util/file-path.hh"
+#include "nix/util/os-string.hh"
 
 namespace nix {
 

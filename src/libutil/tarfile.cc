@@ -6,6 +6,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/canon-path.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 

@@ -2,6 +2,7 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/logging.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 

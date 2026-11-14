@@ -2,7 +2,6 @@ sources += files(
   'current-process.cc',
   'environment-variables.cc',
   'file-descriptor.cc',
-  'file-path.cc',
   'file-system-at.cc',
   'file-system.cc',
   'known-folders.cc',

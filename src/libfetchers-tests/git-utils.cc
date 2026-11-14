@@ -4,6 +4,7 @@
 #include "nix/util/tests/gmock-matchers.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/git.hh"
+#include "nix/util/finally.hh"
 
 #include <span>
 #include <tuple>

@@ -5,6 +5,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <sstream>
+
 namespace nix {
 
 struct ExperimentalFeatureDetails

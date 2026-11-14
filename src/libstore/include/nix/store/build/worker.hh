@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/types.hh"
+#include "nix/util/logging.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"
 #include "nix/store/derived-path-map.hh"

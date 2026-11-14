@@ -16,7 +16,8 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
-#include "nix/util/file-path.hh"
+
+#include <filesystem>
 
 namespace nix {
 

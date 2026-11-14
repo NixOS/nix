@@ -11,6 +11,9 @@
 #ifdef _WIN32
 #  include "nix/util/tests/wine.hh"
 #  include "nix/util/windows-environment.hh"
+#else
+#  include <fcntl.h>
+#  include <unistd.h>
 #endif
 
 namespace nix {
