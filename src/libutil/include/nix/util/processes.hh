@@ -117,7 +117,6 @@ struct ProcessOptions
 {
     std::string errorPrefix = "";
     bool dieWithParent = true;
-    bool runExitHandlers = false;
     /**
      * use clone() with the specified flags (Linux only)
      */

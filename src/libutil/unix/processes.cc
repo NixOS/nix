@@ -265,10 +265,7 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
             }
         } catch (...) {
         }
-        if (options.runExitHandlers)
-            exit(1);
-        else
-            _exit(1);
+        _exit(1);
     };
 
     pid_t pid = INVALID_PID;
