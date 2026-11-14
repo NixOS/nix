@@ -198,12 +198,19 @@ endif
 
 include_dirs = [ include_directories('.') ]
 
+link_args = linker_export_flags
+if host_machine.system() == 'darwin'
+  # Bump the executable's stack size to facilitate deep recursion in the evaluator.
+  # This is done statically so that we can use posix_spawn on macOS.
+  link_args += '-Wl,-stack_size,0x3C00000'
+endif
+
 this_exe = executable(
   meson.project_name(),
   sources,
   dependencies : deps_private_subproject + deps_private + deps_private_no_pkgconfig + deps_plugin_c_apis,
   include_directories : include_dirs,
-  link_args : linker_export_flags,
+  link_args : link_args,
   export_dynamic : get_option('plugin-c-api'),
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],

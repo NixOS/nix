@@ -28,6 +28,10 @@ unsigned int getMaxCPU();
 #ifndef _WIN32
 /**
  * Increase the RLIMIT_STACK rlimit if it is currently smaller than `stackSize`.
+ *
+ * @note Don't call this on Darwin. We set the stack size of the thread group leader
+ * via a linker option instead to avoid mucking with process-global state.
+ *
  * @note Not thread safe. Calls to this should be wrapped in a std::call_once.
  */
 void ensureStackSizeAtLeast(size_t stackSize);
