@@ -20,7 +20,8 @@ TEST_F(nix_api_util_context, nix_context_error)
     }
     ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
     ASSERT_EQ(ctx->name, "nix::Error");
-    ASSERT_EQ(*ctx->last_err, err_msg_ref);
+    // The message is kept as plain text, without the colors in e.what().
+    ASSERT_EQ(*ctx->last_err, "error: testing error");
     ASSERT_EQ(ctx->info->msg.str(), "testing error");
 
     try {

@@ -5,7 +5,6 @@
 
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
-#include "nix/util/tests/gmock-matchers.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -171,7 +170,7 @@ TEST_F(nix_api_expr_test, nix_value_auto_call_function_non_attr_auto_args_is_err
     nix_value * result = nix_alloc_value(ctx, state);
     nix_value_auto_call_function(ctx, state, args, value, result);
     ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
-    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), ::nix::testing::HasSubstrIgnoreANSIMatcher("expected a set"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), ::testing::HasSubstr("expected a set"));
 
     nix_gc_decref(ctx, args);
     nix_gc_decref(ctx, result);
@@ -203,17 +202,43 @@ TEST_F(nix_api_expr_test, nix_value_auto_call_function_missing_arg_is_error)
     assert_ctx_ok();
 
     nix_value * result = nix_alloc_value(ctx, state);
-    // 'b' has neither a supplied value nor a default. The argument name in the
-    // message is colorized, so use the ANSI-stripping matcher to assert on it.
+    // 'b' has neither a supplied value nor a default. The message names it
+    // as plain text, without the colors the CLI would add on a terminal.
     nix_value_auto_call_function(ctx, state, args, value, result);
     ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
     ASSERT_THAT(
         nix_err_msg(nullptr, ctx, nullptr),
-        ::nix::testing::HasSubstrIgnoreANSIMatcher(
-            "cannot evaluate a function that has an argument without a value ('b')"));
+        ::testing::HasSubstr("cannot evaluate a function that has an argument without a value ('b')"));
+    std::string info;
+    nix_err_info_msg(nullptr, ctx, OBSERVE_STRING(info));
+    ASSERT_THAT(info, ::testing::HasSubstr("('b')"));
+    ASSERT_THAT(info, ::testing::Not(::testing::HasSubstr("\e")));
 
     nix_gc_decref(ctx, args);
     nix_gc_decref(ctx, result);
+}
+
+TEST_F(nix_api_expr_test, nix_err_info_trace_items_are_plain_text)
+{
+    nix_expr_eval_from_string(
+        ctx, state, "builtins.addErrorContext \"while testing the trace\" (throw \"boom\")", ".", value);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
+
+    unsigned int n = 0;
+    ASSERT_EQ(NIX_OK, nix_err_info_trace_count(nullptr, ctx, &n));
+    ASSERT_GE(n, 1u);
+
+    std::vector<std::string> traces(n);
+    for (unsigned int i = 0; i < n; i++) {
+        ASSERT_EQ(NIX_OK, nix_err_info_trace_msg(nullptr, ctx, i, OBSERVE_STRING(traces[i])));
+        ASSERT_THAT(traces[i], ::testing::Not(::testing::HasSubstr("\e")));
+    }
+    ASSERT_THAT(traces, ::testing::Contains("while testing the trace"));
+
+    nix_c_context * err = nix_c_context_create();
+    std::string unused;
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_info_trace_msg(err, ctx, n, OBSERVE_STRING(unused)));
+    nix_c_context_free(err);
 }
 
 TEST_F(nix_api_expr_test, nix_value_auto_call_function_non_function_passthrough)
