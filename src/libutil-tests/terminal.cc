@@ -51,6 +51,9 @@ TEST(filterANSIEscapes, cursorForwardBecomesSpaces)
     ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true), "x   y");
     ASSERT_EQ(filterANSIEscapes("x\e[3Cy", false), "x   y");
     ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true, 3), "x  ");
+    // Colors are kept for a terminal, and removed for plain output.
+    ASSERT_EQ(filterANSIEscapes("\e[31mx\e[0m\e[1Cy", false), "\e[31mx\e[0m y");
+    ASSERT_EQ(filterANSIEscapes("\e[31mx\e[0m\e[1Cy", true), "x y");
 }
 
 TEST(filterANSIEscapes, utf8)
