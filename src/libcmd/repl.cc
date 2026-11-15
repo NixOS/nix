@@ -105,7 +105,8 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace & dt);
 
-    void printValue(std::ostream & str, Value & v, unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
+    void printValue(
+        std::ostream & str, Value & v, bool ansi, unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
     {
         // Hide the progress bar during printing because it might interfere
         auto suspension = logger->suspend();
@@ -114,7 +115,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
             str,
             v,
             PrintOptions{
-                .ansiColors = shouldANSI(StandardOutputStream::Stdout),
+                .ansiColors = ansi,
                 .force = true,
                 .derivationPaths = true,
                 .maxDepth = maxDepth,
@@ -376,7 +377,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     setInterrupted(false);
 
-    // Whether the debugger's output to stdout is colored.
+    // Whether the REPL's output to stdout is colored.
     const bool ansi = shouldANSI(StandardOutputStream::Stdout);
 
     std::string command, arg;
@@ -612,7 +613,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         if (v.type() == nString) {
             std::cout << v.string_view();
         } else {
-            printValue(std::cout, v);
+            printValue(std::cout, v, ansi);
         }
         std::cout << std::endl;
     }
@@ -721,7 +722,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             state->forceValue(v, v.determinePos(noPos));
 
             auto suspension = logger->suspend();
-            printValue(std::cout, v, 1);
+            printValue(std::cout, v, ansi, 1);
             std::cout << std::endl;
         } else {
             ExprAttrs * bindings = nullptr;
