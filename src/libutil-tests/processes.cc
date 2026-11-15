@@ -1,6 +1,8 @@
 #include "nix/util/processes.hh"
 #include "nix/util/current-process.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/signals.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -137,6 +139,99 @@ TEST(runProgram2, leakedFDsAreClosed)
              fmt("%d,%d", readSide.get(), writeSide.get()),
          }}},
     }));
+}
+
+TEST(spawnProgram, chdirAndArgv0)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+    auto tempDir = createTempDir();
+
+    Pid pid = spawnProgram(
+        {
+            .program = *self,
+            .args = {"__util_test_spawn_chdir_and_argv0", tempDir.native()},
+            .argv0 = "test",
+            .chdir = tempDir,
+        },
+        {});
+
+    auto status = pid.wait();
+    ASSERT_TRUE(statusOk(status)) << "status: " << WEXITSTATUS(status);
+}
+
+TEST(spawnProgram, nonexistent)
+{
+    std::exception_ptr ex;
+    Pid pid;
+
+    try {
+        pid = spawnProgram(
+            {
+                .program = "/this/path/really/should/not/exist/for/real",
+            },
+            {});
+    } catch (...) {
+        ex = std::current_exception();
+    }
+
+    /* Due to platform differences, we either fail with ExecError or actually successfully spawn
+       the process but fail later. */
+    if (ex) {
+        ASSERT_FALSE(pid);
+        try {
+            std::rethrow_exception(ex);
+        } catch (const ExecError & e) {
+            ASSERT_TRUE(WIFEXITED(e.status));
+            ASSERT_EQ(WEXITSTATUS(e.status), 127);
+        } catch (...) {
+            FAIL();
+        }
+    } else if (pid) {
+        ASSERT_FALSE(ex);
+        int status = pid.wait();
+        ASSERT_TRUE(WIFEXITED(status));
+        ASSERT_EQ(WEXITSTATUS(status), 127);
+    }
+}
+
+TEST(spawnProgram, restoresSignalMask)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+
+    /* Do the modifications in the child to not affect the primary test runner process. */
+
+    Pid child = startProcess([&]() {
+        /* We usually ignore SIGPIPE, but let's unblock it here and check that the child
+           also has it unblocked and does not inherit it from the process after it's modified
+           by startSignalHandlerThread. */
+
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGPIPE);
+        sigprocmask(SIG_UNBLOCK, &set, nullptr);
+
+        unix::startSignalHandlerThread();
+
+        Pid spawned = spawnProgram(
+            {
+                .program = *self,
+                .args = {"__util_test_spawn_sigmask"},
+            },
+            {});
+
+        if (!spawned)
+            _exit(1);
+
+        if (!statusOk(spawned.wait()))
+            _exit(2);
+
+        _exit(0);
+    });
+
+    ASSERT_TRUE(child);
+    ASSERT_TRUE(statusOk(child.wait()));
 }
 
 #endif

@@ -238,13 +238,13 @@ void DarwinDerivationBuilder::setUser()
 
 void DarwinDerivationBuilder::execBuilder(const Strings & args, const Strings & envStrs)
 {
-    posix_spawnattr_t attrp;
+    ::posix_spawnattr_t attrp;
 
-    if (posix_spawnattr_init(&attrp))
-        throw SysError("failed to initialize builder");
+    if (int err = ::posix_spawnattr_init(&attrp))
+        throw SysError(err, "failed to initialize builder");
 
-    if (posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
-        throw SysError("failed to initialize builder");
+    if (int err = ::posix_spawnattr_setflags(&attrp, POSIX_SPAWN_SETEXEC))
+        throw SysError(err, "failed to initialize builder");
 
     if (drv.platform == "aarch64-darwin") {
         // Unset kern.curproc_arch_affinity so we can escape Rosetta

@@ -34,8 +34,8 @@ void NotDeterministic::anchor() {}
 static void handleDiffHook(
     const std::filesystem::path & diffHook,
 #ifndef _WIN32
-    uid_t uid,
-    uid_t gid,
+    std::optional<uid_t> uid,
+    std::optional<uid_t> gid,
 #endif
     const std::filesystem::path & tryA,
     const std::filesystem::path & tryB,
@@ -595,8 +595,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                             handleDiffHook(
                                 *diffHook,
 #ifndef _WIN32
-                                buildUser ? buildUser->getUID() : getuid(),
-                                buildUser ? buildUser->getGID() : getgid(),
+                                buildUser ? std::optional(buildUser->getUID()) : std::nullopt,
+                                buildUser ? std::optional(buildUser->getGID()) : std::nullopt,
 #endif
                                 finalDestPath,
                                 dst,

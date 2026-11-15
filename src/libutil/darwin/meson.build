@@ -1,0 +1,3 @@
+sources += files(
+  'processes.cc',
+)
