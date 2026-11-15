@@ -6,7 +6,7 @@ error:
              |      ^
             3|
 
-       … while evaluating a path segment
+       … while evaluating a string interpolation
          at /pwd/lang/eval-fail-toString-returns-non-coercible.nix:2:2:
             1| # interpolation checks the return type of __toString
             2| "${{ __toString = self: null; }}"
