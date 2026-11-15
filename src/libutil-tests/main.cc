@@ -10,6 +10,7 @@
 #include <cerrno>
 
 #ifndef _WIN32
+#  include <signal.h>
 #  include <unistd.h>
 #endif
 
@@ -61,6 +62,18 @@ static int spawnTestArgv0AndChdir(std::string_view argv0, std::string_view argv2
     return EXIT_SUCCESS;
 }
 
+static int spawnTestSigMask()
+{
+    sigset_t current;
+    if (::sigprocmask(SIG_SETMASK, nullptr, &current))
+        return EXIT_SUCCESS;
+
+    if (sigismember(&current, SIGPIPE))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
+}
+
 #endif
 
 int main(int argc, char ** argv)
@@ -80,6 +93,10 @@ int main(int argc, char ** argv)
         } else if (argv1 == "__util_test_spawn_chdir_and_argv0" && argc > 2) {
 #ifndef _WIN32
             return spawnTestArgv0AndChdir(argv[0], argv[2]);
+#endif
+        } else if (argv1 == "__util_test_spawn_sigmask") {
+#ifndef _WIN32
+            return spawnTestSigMask();
 #endif
         }
     }

@@ -2,6 +2,7 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/signals.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -192,6 +193,45 @@ TEST(spawnProgram, nonexistent)
         ASSERT_TRUE(WIFEXITED(status));
         ASSERT_EQ(WEXITSTATUS(status), 127);
     }
+}
+
+TEST(spawnProgram, restoresSignalMask)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+
+    /* Do the modifications in the child to not affect the primary test runner process. */
+
+    Pid child = startProcess([&]() {
+        /* We usually ignore SIGPIPE, but let's unblock it here and check that the child
+           also has it unblocked and does not inherit it from the process after it's modified
+           by startSignalHandlerThread. */
+
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGPIPE);
+        sigprocmask(SIG_UNBLOCK, &set, nullptr);
+
+        unix::startSignalHandlerThread();
+
+        Pid spawned = spawnProgram(
+            {
+                .program = *self,
+                .args = {"__util_test_spawn_sigmask"},
+            },
+            {});
+
+        if (!spawned)
+            _exit(1);
+
+        if (!statusOk(spawned.wait()))
+            _exit(2);
+
+        _exit(0);
+    });
+
+    ASSERT_TRUE(child);
+    ASSERT_TRUE(statusOk(child.wait()));
 }
 
 #endif
