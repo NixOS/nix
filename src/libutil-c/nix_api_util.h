@@ -14,6 +14,8 @@
  * Also contains error handling utilities
  */
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -119,6 +121,7 @@ enum nix_err {
 };
 
 typedef enum nix_err nix_err;
+typedef struct nix_pos nix_pos;
 
 /**
  * @brief Verbosity level
@@ -362,6 +365,24 @@ void nix_clear_err(nix_c_context * context);
  * @param[in] level Verbosity level
  */
 nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level);
+
+/** @brief Get a position's line
+ * @param[in] pos the position
+ * @return the line
+ */
+uint32_t nix_get_pos_line(nix_pos * pos);
+
+/** @brief Get a position's column
+ * @param[in] pos the position
+ * @return the column
+ */
+uint32_t nix_get_pos_column(nix_pos * pos);
+
+/** @brief Get a position's source path
+ * @param[in] pos the position
+ * @return the source path
+ */
+const char * nix_get_pos_source_path(nix_pos * pos);
 
 /**
  *  @}
