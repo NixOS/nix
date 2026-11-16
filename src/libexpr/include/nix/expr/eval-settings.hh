@@ -95,7 +95,7 @@ public:
 
     static Strings parseNixPath(const std::string & s);
 
-    static std::string resolvePseudoUrl(std::string_view url);
+    static std::vector<std::string> resolvePseudoUrl(std::string_view url);
 
     LookupPathHooks lookupPathHooks;
 

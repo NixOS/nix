@@ -482,7 +482,7 @@ static RegisterPrimOp primop_fetchFinalTree({
 static void
 fetch(EvalState & state, Value * const * args, Value & v, const std::string & who, bool unpack, std::string name)
 {
-    std::optional<std::string> url;
+    std::vector<std::string> urls;
     std::optional<Hash> expectedHash;
 
     state.forceValue(*args[0], noPos);
@@ -495,7 +495,9 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
         for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
+                urls.push_back(
+                    std::string(
+                        state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch")));
             else if (n == "sha256")
                 expectedHash = newHashAllowEmpty(
                     state.forceStringNoCtx(
@@ -509,43 +511,48 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
                 state.error<EvalError>("unsupported argument '%s' to '%s'", n, who).atPos(noPos).debugThrow();
         }
 
-        if (!url)
+        if (urls.empty())
             state.error<EvalError>("'url' argument required").atPos(noPos).debugThrow();
     } else
-        url = state.forceStringNoCtx(*args[0], noPos, "while evaluating the url we should fetch");
+        urls.push_back(
+            std::string(state.forceStringNoCtx(*args[0], noPos, "while evaluating the url we should fetch")));
 
-    if (who == "fetchTarball")
-        url = state.settings.resolvePseudoUrl(*url);
+    // Resolve the URL we have for tarball; otherwise the URL is what
+    // we actually need to fetch
+    if (who == "fetchTarball") {
+        assert(urls.size() == 1);
+        urls = state.settings.resolvePseudoUrl(urls[0]);
+    }
 
-    state.checkURI(*url);
+    for (const auto & url : urls) {
+        state.checkURI(url);
 
-    if (name == "")
-        name = baseNameOf(*url);
+        auto nameForThisUrl = name == "" ? baseNameOf(url) : name;
+        try {
+            checkName(nameForThisUrl);
+        } catch (BadStorePathName & e) {
+            auto resolution =
+                nameAttrPassed
+                    ? HintFmt(
+                          "Please change the value for the 'name' attribute passed to '%s', so that it can create a valid store path.",
+                          who)
+                : isArgAttrs
+                    ? HintFmt(
+                          "Please add a valid 'name' attribute to the argument for '%s', so that it can create a valid store path.",
+                          who)
+                    : HintFmt(
+                          "Please pass an attribute set with 'url' and 'name' attributes to '%s',  so that it can create a valid store path.",
+                          who);
 
-    try {
-        checkName(name);
-    } catch (BadStorePathName & e) {
-        auto resolution =
-            nameAttrPassed
-                ? HintFmt(
-                      "Please change the value for the 'name' attribute passed to '%s', so that it can create a valid store path.",
-                      who)
-            : isArgAttrs
-                ? HintFmt(
-                      "Please add a valid 'name' attribute to the argument for '%s', so that it can create a valid store path.",
-                      who)
-                : HintFmt(
-                      "Please pass an attribute set with 'url' and 'name' attributes to '%s',  so that it can create a valid store path.",
-                      who);
-
-        state
-            .error<EvalError>(
-                std::string("invalid store path name when fetching URL '%s': %s. %s"),
-                *url,
-                Uncolored(e.message()),
-                Uncolored(resolution.str()))
-            .atPos(noPos)
-            .debugThrow();
+            state
+                .error<EvalError>(
+                    std::string("invalid store path name when fetching URL '%s': %s. %s"),
+                    url,
+                    Uncolored(e.message()),
+                    Uncolored(resolution.str()))
+                .atPos(noPos)
+                .debugThrow();
+        }
     }
 
     if (state.settings.pureEval && !expectedHash)
@@ -555,61 +562,81 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
 
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
-        auto expectedPath = state.store->makeFixedOutputPath(
-            name,
-            FixedOutputInfo{
-                .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
-                .hash = *expectedHash,
-                .references = {}});
+        for (const auto & url : urls) {
+            auto nameForThisUrl = name == "" ? baseNameOf(url) : name;
+            auto expectedPath = state.store->makeFixedOutputPath(
+                nameForThisUrl,
+                FixedOutputInfo{
+                    .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
+                    .hash = *expectedHash,
+                    .references = {}});
 
-        // Try to get the path from the local store or substituters
+            // Try to get the path from the local store or substituters
+            try {
+                state.store->getBuilder()->ensurePath(expectedPath);
+                debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), url);
+                state.allowAndSetStorePathString(expectedPath, v);
+                return;
+            } catch (Error & e) {
+                debug(
+                    "substitution of '%s' failed, will try to download: %s",
+                    state.store->printStorePath(expectedPath),
+                    e.what());
+            }
+        }
+        // Fall through to download
+    }
+
+    std::list<std::string> downloadErrors;
+
+    for (const auto & url : urls) {
         try {
-            state.store->getBuilder()->ensurePath(expectedPath);
-            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
-            state.allowAndSetStorePathString(expectedPath, v);
+            auto nameForThisUrl = std::string(name == "" ? baseNameOf(url) : name);
+            if (unpack) {
+                auto attrs = fetchers::Attrs{
+                    {"type", "tarball"},
+                    {"url", url},
+                    {"name", nameForThisUrl},
+                };
+                if (expectedHash)
+                    attrs.emplace("narHash", expectedHash->to_string(HashFormat::SRI, true));
+                auto input = fetchers::Input::fromAttrs(std::move(attrs));
+                auto cachedInput = state.inputCache->getAccessor(
+                    state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
+                auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
+                state.mkStorePathString(storePath, v);
+            } else {
+                auto storePath =
+                    fetchers::downloadFile(*state.store, state.fetchSettings, url, nameForThisUrl).storePath;
+                if (expectedHash) {
+                    auto hash = hashPath(
+                                    {state.store->requireStoreObjectAccessor(storePath)},
+                                    FileSerialisationMethod::Flat,
+                                    HashAlgorithm::SHA256)
+                                    .hash;
+                    if (hash != *expectedHash)
+                        state
+                            .error<EvalError>(
+                                "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                                url,
+                                expectedHash->to_string(HashFormat::Nix32, true),
+                                hash.to_string(HashFormat::Nix32, true))
+                            .withExitStatus(102)
+                            .debugThrow();
+                }
+                state.allowAndSetStorePathString(storePath, v);
+            }
+
+            // Fetching succeeded
             return;
-        } catch (Error & e) {
-            debug(
-                "substitution of '%s' failed, will try to download: %s",
-                state.store->printStorePath(expectedPath),
-                e.what());
-            // Fall through to download
+        } catch (FileTransferError & e) {
+            downloadErrors.push_back(e.message());
+            debug("fetching '%s' has failed, continuing onto the next url: %s", url, e.message());
         }
     }
 
-    if (unpack) {
-        auto attrs = fetchers::Attrs{
-            {"type", "tarball"},
-            {"url", *url},
-            {"name", name},
-        };
-        if (expectedHash)
-            attrs.emplace("narHash", expectedHash->to_string(HashFormat::SRI, true));
-        auto input = fetchers::Input::fromAttrs(std::move(attrs));
-        auto cachedInput =
-            state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
-        auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
-        state.mkStorePathString(storePath, v);
-    } else {
-        auto storePath = fetchers::downloadFile(*state.store, state.fetchSettings, *url, name).storePath;
-        if (expectedHash) {
-            auto hash = hashPath(
-                            {state.store->requireStoreObjectAccessor(storePath)},
-                            FileSerialisationMethod::Flat,
-                            HashAlgorithm::SHA256)
-                            .hash;
-            if (hash != *expectedHash)
-                state
-                    .error<EvalError>(
-                        "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                        *url,
-                        expectedHash->to_string(HashFormat::Nix32, true),
-                        hash.to_string(HashFormat::Nix32, true))
-                    .withExitStatus(102)
-                    .debugThrow();
-        }
-        state.allowAndSetStorePathString(storePath, v);
-    }
+    // Fetching all the URLs failed
+    throw Error("all of the URLs failed to fetch: %s", Uncolored(concatStringsSep("\n\t", downloadErrors)));
 }
 
 static void prim_fetchurl(EvalState & state, CallSite callSite, Value * const * args, Value & v)
