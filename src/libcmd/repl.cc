@@ -669,7 +669,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
             markdown += stripIndentation(doc->doc);
 
-            logger->cout(trim(renderMarkdownToTerminal(markdown, shouldANSI(StandardOutputStream::Stdout))));
+            logger->cout(trim(renderMarkdownToTerminal(markdown, ansi)));
         } else if (fallbackPos) {
             std::ostringstream ss;
             ss << "Attribute `" << fallbackName << "`\n\n";
@@ -681,7 +681,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             }
 
             auto markdown = ss.view();
-            logger->cout(trim(renderMarkdownToTerminal(markdown, shouldANSI(StandardOutputStream::Stdout))));
+            logger->cout(trim(renderMarkdownToTerminal(markdown, ansi)));
 
         } else
             throw Error("value does not have documentation");
