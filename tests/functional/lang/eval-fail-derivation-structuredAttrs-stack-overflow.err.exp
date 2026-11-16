@@ -21,7 +21,6 @@ error:
            37|
 
        … while evaluating derivation 'test'
-         whose name attribute is located at /pwd/lang/eval-fail-derivation-structuredAttrs-stack-overflow.nix:5:3
 
        … while evaluating attribute 'nested' of derivation 'test'
          at /pwd/lang/eval-fail-derivation-structuredAttrs-stack-overflow.nix:9:3:

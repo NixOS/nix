@@ -6,7 +6,6 @@ error:
             2|   name = "foo";
 
        … while evaluating derivation 'foo'
-         whose name attribute is located at /pwd/lang/eval-fail-derivationStrict-17.nix:2:3
 
        … while evaluating attribute '__impure' of derivation 'foo'
          at /pwd/lang/eval-fail-derivationStrict-17.nix:6:3:
