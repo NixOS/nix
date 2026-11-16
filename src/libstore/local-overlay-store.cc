@@ -211,13 +211,11 @@ void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & re
     remountIfNecessary();
 }
 
-void LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
+DeletePathResult LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, bool isKnownPath)
 {
-    bytesFreed = 0;
-
     if (path.parent_path() != config->realStoreDir.get()) {
         warn("local-overlay: unexpected gc path %s", PathFmt(path));
-        return;
+        return {};
     }
 
     StorePath storePath = {path.filename().string()};
@@ -229,14 +227,16 @@ void LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, uint
             debug("lower exists: %s", storePath.to_string());
             // Path also exists in lower store.
             // We must delete via upper layer to avoid creating a whiteout.
-            deletePath(upperPath, bytesFreed);
+            auto result = deletePath(upperPath);
             _remountRequired = true;
+            return result;
         } else {
             // Path does not exist in lower store.
             // So we can delete via overlayfs and not need to remount.
-            LocalStore::deleteStorePath(path, bytesFreed, isKnownPath);
+            return LocalStore::deleteStorePath(path, isKnownPath);
         }
     }
+    return {};
 }
 
 void LocalOverlayStore::optimiseStore()
@@ -252,9 +252,8 @@ void LocalOverlayStore::optimiseStore()
 
     for (auto & path : paths) {
         if (lowerStore->isValidPath(path)) {
-            uint64_t bytesFreed = 0;
             // Deduplicate store path
-            deleteStorePath(toRealPath(path), bytesFreed, true);
+            deleteStorePath(toRealPath(path), true);
         }
         done++;
         act.progress(done, paths.size());
