@@ -78,7 +78,7 @@ protected:
         DisambigVarArgs,
         std::error_code errorCode,
         std::string_view errorDetails,
-        FormatString fs,
+        FormatString<sizeof...(Args)> fs,
         const Args &... args)
         : SystemError(DisambigHintFmt{}, errorCode, errorDetails, HintFmt(fs, args...))
     {
@@ -99,7 +99,7 @@ public:
      * appended to the error message.
      */
     template<typename... Args>
-    SystemError(std::error_code errorCode, FormatString fs, const Args &... args)
+    SystemError(std::error_code errorCode, FormatString<sizeof...(Args)> fs, const Args &... args)
         : SystemError(DisambigVarArgs{}, errorCode, errorCode.message(), fs, args...)
     {
     }
@@ -173,7 +173,7 @@ public:
      * `Fields::renderError` describes in the message.
      */
     template<typename... Args>
-    NativeCodeSystemError(NativeCode code, FormatString fs, const Args &... args)
+    NativeCodeSystemError(NativeCode code, FormatString<sizeof...(Args)> fs, const Args &... args)
         : Fields{code}
         , SystemError(DisambigVarArgs{}, Fields::toErrorCode(code), Fields::renderError(code), fs, args...)
     {
@@ -199,7 +199,7 @@ public:
      * calling this constructor!
      */
     template<typename... Args>
-    NativeCodeSystemError(FormatString fs, const Args &... args)
+    NativeCodeSystemError(FormatString<sizeof...(Args)> fs, const Args &... args)
         : NativeCodeSystemError(Fields::ambientError(), fs, args...)
     {
     }

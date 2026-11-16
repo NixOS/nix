@@ -165,7 +165,7 @@ public:
     }
 
     template<typename T, typename... Args>
-    BaseError(unsigned int status, FormatString fs, const T & arg, const Args &... args)
+    BaseError(unsigned int status, FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
         : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}, .status = status}
     {
     }
@@ -176,7 +176,7 @@ public:
     }
 
     template<typename T, typename... Args>
-    explicit BaseError(FormatString fs, const T & arg, const Args &... args)
+    explicit BaseError(FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
         : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}}
     {
     }
@@ -187,7 +187,7 @@ public:
     }
 
     template<typename T, typename... Args>
-    BaseError(const Suggestions & sug, FormatString fs, const T & arg, const Args &... args)
+    BaseError(const Suggestions & sug, FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
         : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}, .suggestions = sug}
     {
     }
@@ -254,7 +254,8 @@ public:
      * @param args Format string arguments.
      */
     template<typename Arg, typename... Args>
-    void addTrace(std::shared_ptr<const Pos> && pos, FormatString fs, const Arg & arg, const Args &... args)
+    void addTrace(
+        std::shared_ptr<const Pos> && pos, FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
     {
         addTrace(std::move(pos), HintFmt(fs, arg, args...));
     }

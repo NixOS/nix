@@ -17,7 +17,7 @@ public:
     std::string_view raw;
 
     template<typename... Args>
-    BadNixStringContextElem(std::string_view raw_, FormatString fs, const Args &... args)
+    BadNixStringContextElem(std::string_view raw_, FormatString<sizeof...(Args)> fs, const Args &... args)
         : CloneableError("")
     {
         raw = raw_;

@@ -176,7 +176,7 @@ class SQLiteError : public CloneableError<SQLiteError, Error>
 
 public:
     template<typename... Args>
-    [[noreturn]] static void throw_(sqlite3 * db, FormatString fs, const Args &... args)
+    [[noreturn]] static void throw_(sqlite3 * db, FormatString<sizeof...(Args)> fs, const Args &... args)
     {
         throw_(db, HintFmt(fs, args...));
     }

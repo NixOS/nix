@@ -85,7 +85,7 @@ namespace {
 struct GitError final : public CloneableError<GitError, Error>
 {
     template<typename... Ts>
-    GitError(const git_error & error, FormatString fs, const Ts &... args)
+    GitError(const git_error & error, FormatString<sizeof...(Ts)> fs, const Ts &... args)
         : CloneableError("")
     {
         auto hf = HintFmt(fs, args...);
@@ -93,7 +93,7 @@ struct GitError final : public CloneableError<GitError, Error>
     }
 
     template<typename... Ts>
-    GitError(FormatString fs, const Ts &... args)
+    GitError(FormatString<sizeof...(Ts)> fs, const Ts &... args)
         : GitError(
               []() -> const git_error & {
                   const git_error * p = git_error_last();

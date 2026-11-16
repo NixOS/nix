@@ -155,7 +155,7 @@ struct ArchiveCompressionSink : CompressionSink
         check(archive_write_close(archive));
     }
 
-    void check(int err, FormatString reason = "failed to compress (%s)")
+    void check(int err, FormatString<1> reason = "failed to compress (%s)")
     {
         if (err == ARCHIVE_EOF)
             throw EndOfFile("reached end of archive");

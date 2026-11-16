@@ -42,7 +42,8 @@ public:
     }
 
     template<typename Arg, typename... Args>
-    explicit EvalBaseError(EvalState & state, FormatString formatString, const Arg & arg, const Args &... formatArgs)
+    explicit EvalBaseError(
+        EvalState & state, FormatString<1 + sizeof...(Args)> formatString, const Arg & arg, const Args &... formatArgs)
         : CloneableError(formatString, arg, formatArgs...)
         , state(state)
     {
@@ -181,7 +182,7 @@ public:
 
     template<typename... Args>
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> &
-    addTrace(PosIdx pos, FormatString formatString, const Args &... formatArgs);
+    addTrace(PosIdx pos, FormatString<sizeof...(Args)> formatString, const Args &... formatArgs);
 
     /**
      * Delete the `EvalErrorBuilder` and throw the underlying exception.

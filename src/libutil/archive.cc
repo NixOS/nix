@@ -136,7 +136,7 @@ void dumpString(std::string_view s, Sink & sink)
 }
 
 template<typename... Args>
-static SerialisationError badArchive(FormatString fs, const Args &... args)
+static SerialisationError badArchive(FormatString<sizeof...(Args)> fs, const Args &... args)
 {
     return SerialisationError("bad archive: %s", Uncolored(HintFmt(fs, args...).str()));
 }

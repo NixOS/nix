@@ -1524,7 +1524,10 @@ void FileTransferError::anchor() {}
 
 template<typename... Args>
 FileTransferError::FileTransferError(
-    FileTransfer::Error error, std::optional<std::string> response, FormatString fs, const Args &... args)
+    FileTransfer::Error error,
+    std::optional<std::string> response,
+    FormatString<sizeof...(Args)> fs,
+    const Args &... args)
     : CloneableError(HintFmt(fs, args...))
     , error(error)
     , response(response)

@@ -290,7 +290,7 @@ public:
     }
 
     template<typename... Args>
-    SymlinkNotAllowed(CanonPath path, FormatString fs, const Args &... args)
+    SymlinkNotAllowed(CanonPath path, FormatString<sizeof...(Args)> fs, const Args &... args)
         : CloneableError(fs, args...)
         , path(std::move(path))
     {
@@ -303,7 +303,7 @@ public:
     }
 
     template<typename... Args>
-    SymlinkNotAllowed(OsCanonPath path, FormatString fs, const Args &... args)
+    SymlinkNotAllowed(OsCanonPath path, FormatString<sizeof...(Args)> fs, const Args &... args)
         : CloneableError(fs, args...)
         , path(std::move(path))
     {

@@ -84,13 +84,13 @@ inline std::string fmt(const char * s)
  * Without arguments, the format string is returned unchanged, as for the
  * other single-argument overloads.
  */
-inline std::string fmt(FormatString fs)
+inline std::string fmt(FormatString<0> fs)
 {
     return fs.str();
 }
 
 template<typename T, typename... Args>
-inline std::string fmt(FormatString fs, const T & arg, const Args &... args)
+inline std::string fmt(FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
 {
     boost::format f(fs.str());
     setExceptions(f);
@@ -201,7 +201,7 @@ public:
      * constructor.
      */
     template<typename... Args>
-    HintFmt(FormatString format, const Args &... args)
+    HintFmt(FormatString<sizeof...(Args)> format, const Args &... args)
         : HintFmt(boost::format(sizeof...(Args) == 0 ? std::string("%s") : format.str()))
     {
         if constexpr (sizeof...(Args) == 0)

@@ -10,8 +10,67 @@ namespace nix {
 /* No constructor takes a `std::string` or a `const char *`. `is_convertible`
    does not evaluate a `consteval` constructor, so a run-time
    `std::string_view` is rejected only where it is passed. */
-static_assert(!std::is_convertible_v<std::string, FormatString>);
-static_assert(!std::is_convertible_v<const char *, FormatString>);
+static_assert(!std::is_convertible_v<std::string, FormatString<1>>);
+static_assert(!std::is_convertible_v<const char *, FormatString<1>>);
+
+/* Whether `literal` converts to `FormatString<nArgs>`. A conversion that is
+   not a constant expression makes the template argument invalid, so the
+   requirement is false instead of a compile error. */
+template<ArrayNoNullAdaptor literal, size_t nArgs>
+concept convertsToFormatString = requires {
+    std::integral_constant<int, (FormatString<nArgs>(std::string_view(literal.data.data(), literal.data.size())), 0)>{};
+};
+
+static_assert(convertsToFormatString<"%s", 1>);
+static_assert(!convertsToFormatString<"%s %s", 1>);
+static_assert(!convertsToFormatString<"%s", 2>);
+static_assert(!convertsToFormatString<"%1% %s", 2>);
+static_assert(!convertsToFormatString<"%s %", 1>);
+static_assert(!convertsToFormatString<"%k", 1>);
+static_assert(!convertsToFormatString<"%qd", 1>);
+static_assert(!convertsToFormatString<"%0%", 1>);
+static_assert(!convertsToFormatString<"%01%", 1>);
+static_assert(!convertsToFormatString<"%5.1.2f", 1>);
+static_assert(!convertsToFormatString<"%|1%|", 1>);
+static_assert(!convertsToFormatString<"%|abc|", 1>);
+static_assert(!convertsToFormatString<"%n", 1>);
+static_assert(!convertsToFormatString<"%Tx", 1>);
+static_assert(!convertsToFormatString<"%*d", 1>);
+
+static_assert(std::is_same_v<decltype(""_fmt), FormatString<0>>);
+static_assert(std::is_same_v<decltype("%6.1f"_fmt), FormatString<1>>);
+static_assert(std::is_same_v<decltype("%2% %1%"_fmt), FormatString<2>>);
+static_assert(std::is_same_v<decltype(ANSI_GREEN "%s"_fmt ANSI_NORMAL), FormatString<1>>);
+static_assert(std::is_same_v<decltype(true ? "%6.1f"_fmt : "%.1f"_fmt), FormatString<1>>);
+
+/* `n` must equal the count that `_fmt` takes from the directives. */
+template<size_t n>
+static void expectArgumentCount(FormatString<n> f)
+{
+    EXPECT_EQ(boost::format(f.str()).expected_args(), n) << f.str();
+}
+
+/* One case for each form that `formatArgumentCount` accepts. */
+TEST(formatArgumentCount, agreesWithBoost)
+{
+    expectArgumentCount<0>(""_fmt);
+    expectArgumentCount<0>("100%%"_fmt);
+    expectArgumentCount<1>("%s"_fmt);
+    expectArgumentCount<3>("%s: %s (%d)"_fmt);
+    expectArgumentCount<8>("%b %d %i %u %o %x %X %p"_fmt);
+    expectArgumentCount<8>("%a %A %e %E %f %F %g %G"_fmt);
+    expectArgumentCount<4>("%c %C %s %S"_fmt);
+    expectArgumentCount<8>("%-s %=s %_s % s %+s %0s %#s %'s"_fmt);
+    expectArgumentCount<5>("%-10s %5.1f %.3f %.f %010d"_fmt);
+    expectArgumentCount<7>("%hd %hhd %ld %lld %jd %zd %Lf"_fmt);
+    expectArgumentCount<6>("%|s| %|-10s| %|5| %|02| %|| %|.3|"_fmt);
+    expectArgumentCount<2>("%1%: %2%"_fmt);
+    expectArgumentCount<2>("%2% %1% %2%"_fmt);
+    expectArgumentCount<3>("%3%"_fmt);
+    expectArgumentCount<10>("%10%"_fmt);
+    expectArgumentCount<3>("%1$s %2$5d %3$-5.1f"_fmt);
+    expectArgumentCount<2>("%|2$-10s| %|1$|"_fmt);
+}
 
 TEST(FormatString, keepsEmbeddedNul)
 {
@@ -53,17 +112,12 @@ TEST(fmt, singleStringIsLiteral)
 TEST(fmt, formatStringWithoutArgumentsIsLiteral)
 {
     ASSERT_EQ(fmt("100%% %s"), "100%% %s");
-    ASSERT_EQ(fmt(FormatString("100%% %s")), "100%% %s");
-}
-
-TEST(fmt, tooFewArguments)
-{
-    ASSERT_EQ(fmt("%s %s", "a"), "a ");
+    ASSERT_EQ(fmt(FormatString<0>("100%% %s")), "100%% %s");
 }
 
 TEST(HintFmt, formatStringWithoutArgumentsIsLiteral)
 {
-    ASSERT_EQ(HintFmt(FormatString("100%% %s")).str(), "100%% %s");
+    ASSERT_EQ(HintFmt(FormatString<0>("100%% %s")).str(), "100%% %s");
 }
 
 TEST(HintFmt, percentStringWithoutArgs)
@@ -86,7 +140,7 @@ TEST(HintFmt, tooFewArguments)
 {
 
     ASSERT_STREQ(
-        HintFmt("only one arg %1% %2%", "fulfilled").str().c_str(),
+        (HintFmt::fromFormatString("only one arg %1% %2%") % "fulfilled").str().c_str(),
         "only one arg " ANSI_WARNING "fulfilled" ANSI_NORMAL " ");
 }
 
@@ -94,13 +148,8 @@ TEST(HintFmt, tooManyArguments)
 {
 
     ASSERT_STREQ(
-        HintFmt("what about this %1% %2%", "%3%", "one", "two").str().c_str(),
+        (HintFmt::fromFormatString("what about this %1% %2%") % "%3%" % "one" % "two").str().c_str(),
         "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_WARNING "one" ANSI_NORMAL);
-}
-
-TEST(Error, tooFewArguments)
-{
-    ASSERT_EQ(Error("%s %s", Uncolored("a")).info().msg.str(), "a ");
 }
 
 TEST(warn, messageWithoutArgumentsIsLiteral)
@@ -108,13 +157,6 @@ TEST(warn, messageWithoutArgumentsIsLiteral)
     testing::CaptureLogging capture;
     warn("100% %s %%");
     ASSERT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " 100% %s %%\n");
-}
-
-TEST(warn, tooFewArguments)
-{
-    testing::CaptureLogging capture;
-    warn("%s %s", "a");
-    ASSERT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " a \n");
 }
 
 TEST(SysError, formatsMessage)

@@ -500,7 +500,10 @@ public:
 
     template<typename... Args>
     FileTransferError(
-        FileTransfer::Error error, std::optional<std::string> response, FormatString fs, const Args &... args);
+        FileTransfer::Error error,
+        std::optional<std::string> response,
+        FormatString<sizeof...(Args)> fs,
+        const Args &... args);
 };
 
 } // namespace nix

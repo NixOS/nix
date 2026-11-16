@@ -414,8 +414,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
     {
         auto host = getHost(input);
         auto url =
-            fmt(host == "github.com" ? FormatString("https://api.%s/repos/%s/%s/commits/%s")
-                                     : FormatString("https://%s/api/v3/repos/%s/%s/commits/%s"),
+            fmt(host == "github.com" ? "https://api.%s/repos/%s/%s/commits/%s"_fmt
+                                     : "https://%s/api/v3/repos/%s/%s/commits/%s"_fmt,
                 host,
                 getOwner(input),
                 getRepo(input),
@@ -440,9 +440,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
         // If we have no auth headers then we default to the public archive
         // urls so we do not run into rate limits.
-        const FormatString urlFmt = host != "github.com" ? FormatString("https://%s/api/v3/repos/%s/%s/tarball/%s")
-                                    : headers.empty()    ? FormatString("https://%s/%s/%s/archive/%s.tar.gz")
-                                                         : FormatString("https://api.%s/repos/%s/%s/tarball/%s");
+        const auto urlFmt = host != "github.com" ? "https://%s/api/v3/repos/%s/%s/tarball/%s"_fmt
+                            : headers.empty()    ? "https://%s/%s/%s/archive/%s.tar.gz"_fmt
+                                                 : "https://api.%s/repos/%s/%s/tarball/%s"_fmt;
 
         const auto url =
             fmt(urlFmt, host, getOwner(input), getRepo(input), input.getRev()->to_string(HashFormat::Base16, false));
