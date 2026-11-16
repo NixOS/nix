@@ -13,6 +13,10 @@
 #  include <unistd.h>
 #endif
 
+#ifndef _WIN32
+#  include <sys/wait.h>
+#endif
+
 namespace nix {
 
 /* ----------------------------------------------------------------------------

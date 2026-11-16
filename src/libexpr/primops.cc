@@ -1458,21 +1458,12 @@ static void prim_derivationStrict(EvalState & state, CallSite callSite, Value * 
     try {
         derivationStrictInternal(state, drvName, attrs, v);
     } catch (Error & e) {
-        Pos pos = state.positions[nameAttr->pos];
-        /*
-         * Here we call addTrace in a slightly unusual way:
+        /* No position information because in all cases it's useless.
+         * In nixpkgs pretty much all positions point to make-derivation.nix or
+         * other shared helpers that define the name attribute. drvName itself should
+         * be sufficient together with ambient source locations in the trace.
          *
-         * 1. We print the location as a string (instead of passing it via the
-         * first argument to addTrace) to avoid a code snippet being printed.
-         * While the location of the name attribute is a good hint, the exact
-         * code there is irrelevant.
-         *
-         * Please keep in mind that error reporting is done on a best-effort
-         * basis in nix. There is no single accurate location for a derivation,
-         * as it often results from the composition of several functions
-         * (derivationStrict, derivation, mkDerivation, mkPythonModule, etc.)
-         *
-         * 2. We use TracePrint::Always so that users who have not enabled
+         * We use TracePrint::Always so that users who have not enabled
          * --show-trace will still get a full trace of the derivation
          * dependency chain that led to an evaluation error. The user may be
          * interested in the last item in the chain (the derivation with an
@@ -1482,14 +1473,7 @@ static void prim_derivationStrict(EvalState & state, CallSite callSite, Value * 
          * because they don't need the corresponding functionality), so
          * displaying the entire chain is worth the space.
          */
-        e.addTrace(
-            nullptr,
-            HintFmt(
-                "while evaluating derivation '%s'\n"
-                "  whose name attribute is located at %s",
-                drvName,
-                pos),
-            TracePrint::Always);
+        e.addTrace(nullptr, HintFmt("while evaluating derivation '%s'", drvName), TracePrint::Always);
         throw;
     }
 }
