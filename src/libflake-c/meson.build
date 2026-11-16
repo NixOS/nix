@@ -34,12 +34,15 @@ subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'nix_api_eval_cache.cc',
   'nix_api_flake.cc',
 )
 
 include_dirs = [ include_directories('.') ]
 
 headers = files(
+  'nix_api_eval_cache.h',
+  'nix_api_eval_cache_internal.hh',
   'nix_api_flake.h',
   'nix_api_flake_internal.hh',
 )
