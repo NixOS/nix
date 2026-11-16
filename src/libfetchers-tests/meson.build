@@ -53,6 +53,7 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'access-tokens.cc',
   'attrs.cc',
+  'fetch-to-store.cc',
   'git-lfs-fetch.cc',
   'git-utils.cc',
   'git.cc',
