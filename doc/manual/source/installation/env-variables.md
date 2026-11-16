@@ -58,5 +58,5 @@ environment variables: `http_proxy`, `https_proxy`, `ftp_proxy`,
 
 If any of these variables are set when running the Nix installer, then
 the installer will create an override file at
-`/etc/systemd/system/nix-daemon.service.d/override.conf` so `nix-daemon`
+`/etc/systemd/system/nix-daemon.service.d/overrides.conf` so `nix-daemon`
 will use them.
