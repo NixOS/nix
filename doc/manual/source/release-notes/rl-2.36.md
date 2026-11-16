@@ -1,5 +1,23 @@
 # Release 2.36.0 (2026-11-16)
 
+## Packaging
+
+- Starting with this release, [`nix-installer`](https://github.com/NixOS/nix-installer) binaries are shipped alongside other binary artifacts in [releases.nixos.org](https://releases.nixos.org/?prefix=nix/nix-2.36.0/).
+
+  You can run the installer with:
+
+  ```
+  curl -sSfL https://channels.nixos.org/nix-latest/nix-installer | sh -s -- install
+  ```
+
+  It's built for `x86_64-linux`, `aarch64-linux` and `aarch64-darwin` platforms and only supports multi-user installations.
+
+- Cross-built binary releases for `powerpc64-linux` and `powerpc64le-linux` platforms [#16274](https://github.com/NixOS/nix/pull/16274)
+
+- [Scripted installer](https://channels.nixos.org/nix-latest/install) supports busybox-based systems (e.g. Alpine) in single-user mode [#16537](https://github.com/NixOS/nix/pull/16537)
+
+- The scripted installer sets the correct store mtime [#16558](https://github.com/NixOS/nix/pull/16558)
+
 ## Improvements
 
 - Daemon worker spawning rework [#15857](https://github.com/NixOS/nix/issues/15857) [#16659](https://github.com/NixOS/nix/pull/16659)
@@ -69,10 +87,28 @@
 
   Add "optimize" as a linguistic variation of "optimise". Now both the `nix-store` and `nix store` commands work with the same spelling.
 
+- Downloads and store path copying produces significantly less log updates for `internal-json` logger [#16671](https://github.com/NixOS/nix/pull/16671) [#16670](https://github.com/NixOS/nix/pull/16670)
+
+  Tools such as `nix-output-monitor` were previously significantly bottlenecked parsing on the order of tens of MB/s of JSON.
+  Download progress updates are now chunked and rate-limited. Bandwidth requirements for the logger are now significantly lower.
+
 - Styled output on stdout is plain when stdout is not a terminal [#4626](https://github.com/NixOS/nix/issues/4626) [#9486](https://github.com/NixOS/nix/issues/9486) [#16710](https://github.com/NixOS/nix/issues/16710) [#16711](https://github.com/NixOS/nix/pull/16711)
 
   `nix profile list`, `nix profile history`, `nix flake metadata`, `nix flake show`, `nix search` and `nix store diff-closures` no longer write ANSI bold and color to stdout when it is not a terminal, or when `NO_COLOR` is set.
   Set `CLICOLOR_FORCE` to keep the styling.
+
+- Add `nix version` command with `--json` option [#16201](https://github.com/NixOS/nix/pull/16201)
+  A `--version` flag is more like a modern subcommand than a flag, and this provides a place for JSON output,
+  making it easier to consume in scripts.
+  When `--json` is passed, the output includes library versions.
+
+  `nix --version -vv` output also includes library versions in human-readable comma-separated format.
+
+- Bash completions now handle redirections [#16648](https://github.com/NixOS/nix/pull/16648)
+
+  File names after redirections (e.g. `nix log nixpkgs#hello > /tmp/hello-lo<TAB>`) can now be completed.
+
+- Nix now makes use of reflinking via `copy_file_range` when copying files on filesystem that support it [#15410](https://github.com/NixOS/nix/pull/15410)
 
 ## Error message improvements
 
@@ -112,7 +148,30 @@
 
   `addErrorContext` can no longer be abused to catch uncatchable errors like `abort`.
 
+- Error traces now show both the selection site in addition to the definition site when an attribute is retrieved and both locations are known. [#16249](https://github.com/NixOS/nix/pull/16249)
+
+- Error traces now always show the derivations that were getting instantiated [#16282](https://github.com/NixOS/nix/pull/16282)
+
+- All operators in error traces are displayed, and consistently [#16301](https://github.com/NixOS/nix/pull/16301)
+
+- Error messages for interrupted downloads are more concise [#16095](https://github.com/NixOS/nix/pull/16095) [#16646](https://github.com/NixOS/nix/pull/16646) [#14757](https://github.com/NixOS/nix/issues/14757)
+
 ## Bug fixes
+
+- `nix develop` no longer disables ASLR on Linux [#16624](https://github.com/NixOS/nix/pull/16624).
+
+  Previously, `nix develop` would enable `ADDR_NO_RANDOMIZE` personality bit. This disabled ASLR for all subsequent commands
+  run in the devshell.
+
+  Additionally, `impersonate-linux-26` setting has been removed. If you require this, you can change the personality manually
+  or use `deterministic-uname` from Nixpkgs depending on the use-case.
+
+- File descriptors are more reliably closed in children processes [#16247](https://github.com/NixOS/nix/pull/16247) [#16717](https://github.com/NixOS/nix/pull/16717) [#16749](https://github.com/NixOS/nix/pull/16749)
+
+  Also, Nix daemon no longer performs 1 million close syscalls (commonly configured RLIMIT_NOFILE for the daemon)
+  for each spawned derivation builder on macOS by relying on libproc for closing file descriptors in the child.
+
+- `post-build-hook` is no longer run in a mount namespace with a writable Nix store [#16247](https://github.com/NixOS/nix/pull/16247)
 
 - `builtins.pathExists` no longer swallows access errors from evaluating its argument [#16728](https://github.com/NixOS/nix/pull/16728)
 
@@ -125,6 +184,14 @@
   This evaluated to `false`, even though `builtins.readFile /etc/passwd` would throw, and `builtins.pathExists` never saw a supposed path.
 
   Now the error propagates, as it did in Nix 2.19 and earlier. This invocation fails with the same error observed by calling `builtins.readFile /etc/passwd` in isolation.
+
+- Store garbage collector can now delete App bundles on macOS [#16626](https://github.com/NixOS/nix/pull/16626) [#16719](https://github.com/NixOS/nix/pull/16719)
+
+  Previously, even when run as `root` Nix attempted to make directories writable for deletion, which is not allowed
+  for App bundles on macOS and would fail with `Operation not permitted`. Nix now skips the `chmod` when run as root
+  on macOS.
+
+  Additionally, when run with `DAC_OVERRIDE` capability on Linux, `chmod` operation is also skipped.
 
 - `nix eval --write-to` is stricter about what it writes [#16760](https://github.com/NixOS/nix/pull/16760)
 
@@ -152,6 +219,76 @@
   were misparsed (the host was taken as a URL scheme). This is fixed, but the
   bare form and the separate `scheme` parameter are deprecated: use a full URL
   such as `endpoint=https://minio.example.com` instead.
+
+- Boost.Context bug causing incorrect daemeon exception detection has been worked around in Nix and Nixpkgs, with a fix contributed upstream [#16197](https://github.com/NixOS/nix/pull/16197) [#16174](https://github.com/NixOS/nix/issues/16174).
+
+  This would cause spurious aborts in `nix repl` when `builtins.toFile` or other primops that fetch to the store failed.
+  It only affected builds of Nix using Boost's fcontext coroutine backend with libstdc++ standard library.
+
+- NUL bytes in derivation `builder` and `args` attributes are rejected [#16245](https://github.com/NixOS/nix/pull/16245)
+
+  This issue was not possible to encounter from the Nix evaluator, since Nix strings disallow embedded NUL bytes but could
+  lead to silent truncation in other cases.
+
+- Derivation parser is now more strict [#16237](https://github.com/NixOS/nix/issues/16237) [#16284](https://github.com/NixOS/nix/pull/16284)
+
+  The derivation ATerm parser now rejects derivations that are not in the form that's produced by the evaluator.
+
+- The NAR parser is stricter when file contents are discarded [#16325](https://github.com/NixOS/nix/pull/16325)
+
+  When computing the NAR listing (`.ls` files) and other operations that discard contents of regular files in NARs, Nix did not
+  sufficiently validate padding bytes.
+
+- Store path basenames that don't have the hash part followed by `-` are properly rejected [#16257](https://github.com/NixOS/nix/pull/16257).
+
+- Truncated Brotli compressed NARs no longer cause Nix to loop infinitely [#16575](https://github.com/NixOS/nix/pull/16575).
+
+- Errors while writing to compressed streams (e.g. copying to a local binary cache store) no longer cause a crash [#16664](https://github.com/NixOS/nix/pull/16664)
+
+- Non-lexically-canonical home-path literals (e.g. `~/repos/nixpkgs/.`) no longer crash the evaluator [#16651](https://github.com/NixOS/nix/pull/16651)
+
+- Deleting profiles with unexpected `mtime` no longer triggers a crash [#16634](https://github.com/NixOS/nix/pull/16634)
+
+- Internal source tree names no longer leak into evaluation results of `builtins.toXML` and value printing [#16780](https://github.com/NixOS/nix/pull/16780)
+
+  This is a regression from 2.32 for `pure-eval` mode, which is now fixed.
+
+- `builtins.readDir builtins.storeDir` no longer fails in impure evaluation mode [#16780](https://github.com/NixOS/nix/pull/16780)
+
+  Since 2.32, it would fail with `error: path '/nix/store/' is not in the Nix store`.
+
+- Logging has been hardened against crafted inputs [#16784](https://github.com/NixOS/nix/pull/16784) [#16456](https://github.com/NixOS/nix/pull/16456)
+
+  Nix now handles malformed inputs from derivation builders more robustly and warns on unknown activities and result types.
+
+- While reading git objects, Nix now rejects duplicate Git tree entries and unsorted trees [#16793](https://github.com/NixOS/nix/pull/16793)
+
+## `ca-derivations`
+
+- Add new `nix store build-trace delete` command [#15655](https://github.com/NixOS/nix/pull/15655)
+
+- Implement new `builder-rpc-v0` feature; see [#15793](https://github.com/NixOS/nix/pull/15793) below under `dynamic-derivations`.
+  While motivated primarily by the dynamic derivations feature, registering outputs is also useful for content-addressing derivations.
+  The builder can learn the calculated content-addressed path of one of its outputs before creating others, removing the need for any rewriting on the nix-daemon side after the derivation finishes.
+
+- Error instead of crashing when realisations cannot be queried [#16014](https://github.com/NixOS/nix/pull/16014)
+
+## `dynamic-derivations`
+
+- Implement new `builder-rpc-v0` feature [#15793](https://github.com/NixOS/nix/pull/15793)
+  This PR adds support for creating new store objects within a derivation at runtime,
+  then registering them as an output.
+- `nix store add --scan` for creating references, as well as in `builder-rpc-v0` [#16163](https://github.com/NixOS/nix/pull/16163)
+
+## C API
+
+- Expose evaluator helpers for working with derivation trees [#15842](https://github.com/NixOS/nix/pull/15842)
+  `nix_get_derivation`, `nix_value_auto_call_function`
+- Fix `nix_get_external` [#15954](https://github.com/NixOS/nix/pull/15954)
+
+## Contributing
+
+- Establish AI policy [#15984](https://github.com/NixOS/nix/pull/15984)
 
 ## Contributors
 
