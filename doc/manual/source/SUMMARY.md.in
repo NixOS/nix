@@ -160,6 +160,7 @@
   - [Contributing](development/contributing.md)
 - [Releases](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.36 (2026-11-16)](release-notes/rl-2.36.md)
   - [Release 2.35 (2026-06-22)](release-notes/rl-2.35.md)
   - [Release 2.34 (2026-02-27)](release-notes/rl-2.34.md)
   - [Release 2.33 (2025-12-09)](release-notes/rl-2.33.md)
