@@ -16,14 +16,12 @@
 }:
 
 let
-  installerVersion = "2.36.0pre";
+  installerVersion = "2.36.0";
   src = fetchFromGitHub {
     owner = "NixOS";
     repo = "nix-installer";
-    # Don't forget to bump this after release branch-off.
-    # TODO: Document this stuff in release-process.md.
-    rev = "fb0541d1785dcd5e252cbe05d08c6cba64da751f";
-    hash = "sha256-ZOZwGzo6P70ymfzwYwe+36KLLWwevBNEEUf1CW1nCqw=";
+    rev = "71db3b99eb4f0b8c40df2b35c3c6ba37f5a6c317";
+    hash = "sha256-/yxaQwcd0MggnuM5iSa136hWwdt8xjqOEk6MHUzDxog=";
   };
 
   # Bare binary: no Nix closure yet.  Appended below via `pack`, so the
@@ -35,7 +33,7 @@ let
 
     inherit src;
 
-    cargoHash = "sha256-oNDsyjFCC7B9TovJqdZoXQwr7dtdFdUNltXOgv0aPLk=";
+    cargoHash = "sha256-NZwRUReqDCrYiM7wWxyxOYTklA6fAgID+jO1r6M0lDM=";
 
     nativeBuildInputs = [
       pkg-config
