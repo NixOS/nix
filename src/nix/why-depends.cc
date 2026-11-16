@@ -118,8 +118,6 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             StorePathSet refs;
             StorePathSet rrefs;
             size_t dist = inf;
-            Node * prev = nullptr;
-            bool queued = false;
             bool visited = false;
         };
 
@@ -138,26 +136,21 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             for (auto & ref : node.second.refs)
                 graph.find(ref)->second.rrefs.insert(node.first);
 
-        /* Run Dijkstra's shortest path algorithm to get the distance
+        /* Run breadth-first search to get the distance
            of every path in the closure to 'dependency'. */
-        std::priority_queue<Node *> queue;
+        std::queue<Node *> queue;
 
         queue.push(&graph.at(dependencyPath));
 
         while (!queue.empty()) {
-            auto & node = *queue.top();
+            auto & node = *queue.front();
             queue.pop();
 
             for (auto & rref : node.rrefs) {
                 auto & node2 = graph.at(rref);
-                auto dist = node.dist + 1;
-                if (dist < node2.dist) {
-                    node2.dist = dist;
-                    node2.prev = &node;
-                    if (!node2.queued) {
-                        node2.queued = true;
-                        queue.push(&node2);
-                    }
+                if (node2.dist == inf) {
+                    node2.dist = node.dist + 1;
+                    queue.push(&node2);
                 }
             }
         }
