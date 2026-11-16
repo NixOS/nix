@@ -86,7 +86,8 @@ standard input.
 - `--find-file`
 
   Look up the given files in Nix’s search path (as specified by the
-  `NIX_PATH` environment variable). If found, print the corresponding
+  [`NIX_PATH` environment variable](#env-NIX_PATH)).
+  If found, print the corresponding
   absolute paths on standard output. For instance, if `NIX_PATH` is
   `nixpkgs=/home/alice/nixpkgs`, then `nix-instantiate --find-file
   nixpkgs/default.nix` will print `/home/alice/nixpkgs/default.nix`.
