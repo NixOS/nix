@@ -27,7 +27,8 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/diagnose.hh"
-#include "nix/expr/parser-state.hh"
+
+#include "parser-state.hh"
 
 #define YY_DECL                                    \
     int yylex(                                     \
