@@ -53,8 +53,9 @@ mkMesonLibrary (finalAttrs: {
     ./include/nix/expr/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
-    ./lexer.l
-    ./parser.y
+    ./parser/meson.build
+    ./parser/lexer.l
+    ./parser/parser.y
     (fileset.difference (fileset.fileFilter (file: file.hasExt "nix") ./.) ./package.nix)
   ];
 

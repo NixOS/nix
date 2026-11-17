@@ -28,9 +28,7 @@
 #include "nix/fetchers/input-cache.hh"
 #include "nix/util/current-process.hh"
 
-NIX_INCOMPLETE_SWITCH_BEGIN
-#include "parser-tab.hh"
-NIX_INCOMPLETE_SWITCH_END
+#include "parser/parser.hh"
 
 #include <algorithm>
 #include <cstddef>
