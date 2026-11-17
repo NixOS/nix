@@ -226,7 +226,7 @@ std::filesystem::path readLink(const std::filesystem::path & path)
     return readLinkAt(parentDir.get(), OsFilename::fromPathThrowing(path.filename()));
 #else
     try {
-        return std::filesystem::read_symlink(path);
+        return std::filesystem::read_symlink(path); // NOLINT(bugprone-unsafe-functions): this is the wrapper
     } catch (std::filesystem::filesystem_error & e) {
         throw SystemError(e.code(), "reading symbolic link %s", PathFmt(path));
     }
