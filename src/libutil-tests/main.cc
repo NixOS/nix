@@ -12,6 +12,8 @@
 #ifndef _WIN32
 #  include <signal.h>
 #  include <unistd.h>
+#  include <sys/types.h>
+#  include <sys/param.h>
 #endif
 
 static int spawnTrivialMain()
@@ -74,6 +76,27 @@ static int spawnTestSigMask()
     return EXIT_SUCCESS;
 }
 
+static int spawnTestSetuidSetgid()
+{
+    if (::geteuid() != 1 || ::getegid() != 1 || ::getuid() != 1 || ::getgid() != 1)
+        return EXIT_FAILURE;
+
+    int grn = ::getgroups(0, nullptr);
+    switch (grn) {
+    case 0:
+        /* It's not specified whether egid is included in the getgroups. */
+        return EXIT_SUCCESS;
+    case 1: {
+        gid_t groups[1] = {};
+        if (::getgroups(1, groups) == -1 || groups[0] != ::getegid())
+            return EXIT_FAILURE;
+        return EXIT_SUCCESS;
+    }
+    default:
+        return EXIT_FAILURE;
+    }
+}
+
 #endif
 
 int main(int argc, char ** argv)
@@ -86,19 +109,19 @@ int main(int argc, char ** argv)
             return spawnTrivialMain();
         } else if (argv1 == "__util_test_spawn_write_to_stdout_and_stderr") {
             return spawnWriteToStdoutAndStderr();
-        } else if (argv1 == "__util_test_spawn_leaked_fds") {
-#ifndef _WIN32
-            return spawnTestForLeakedFDsMain();
-#endif
-        } else if (argv1 == "__util_test_spawn_chdir_and_argv0" && argc > 2) {
-#ifndef _WIN32
-            return spawnTestArgv0AndChdir(argv[0], argv[2]);
-#endif
-        } else if (argv1 == "__util_test_spawn_sigmask") {
-#ifndef _WIN32
-            return spawnTestSigMask();
-#endif
         }
+
+#ifndef _WIN32
+        if (argv1 == "__util_test_spawn_leaked_fds") {
+            return spawnTestForLeakedFDsMain();
+        } else if (argv1 == "__util_test_spawn_chdir_and_argv0" && argc > 2) {
+            return spawnTestArgv0AndChdir(argv[0], argv[2]);
+        } else if (argv1 == "__util_test_spawn_sigmask") {
+            return spawnTestSigMask();
+        } else if (argv1 == "__util_test_spawn_setuid_setgid") {
+            return spawnTestSetuidSetgid();
+        }
+#endif
     }
 
     // Preserve environment filters; command-line flags are parsed below.
