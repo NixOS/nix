@@ -23,6 +23,10 @@ typedef fun<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
  */
 struct FilteringSourceAccessor : SourceAccessor
 {
+private:
+    void anchor() override;
+
+public:
     ref<SourceAccessor> next;
     CanonPath prefix;
     MakeNotAllowedError makeNotAllowedError;
@@ -78,6 +82,10 @@ struct FilteringSourceAccessor : SourceAccessor
  */
 struct AllowListSourceAccessor : public FilteringSourceAccessor
 {
+private:
+    void anchor() override;
+
+public:
     /**
      * Grant access to the specified prefix.
      */
@@ -97,6 +105,10 @@ struct AllowListSourceAccessor : public FilteringSourceAccessor
  */
 struct CachingFilteringSourceAccessor : FilteringSourceAccessor
 {
+private:
+    void anchor() override;
+
+public:
     const ref<boost::concurrent_flat_map<CanonPath, bool>> cache;
 
     CachingFilteringSourceAccessor(const SourcePath & src, MakeNotAllowedError && makeNotAllowedError);
