@@ -6,6 +6,8 @@
 
 namespace nix::fetchers {
 
+InputCache::~InputCache() {}
+
 InputCache::CachedResult InputCache::getAccessor(
     const Settings & settings, Store & store, const Input & originalInput, UseRegistries useRegistries)
 {

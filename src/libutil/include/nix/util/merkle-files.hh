@@ -55,7 +55,7 @@ struct TreeEntry
  */
 struct DirectorySink
 {
-    virtual ~DirectorySink() = default;
+    virtual ~DirectorySink();
 
     /**
      * Insert an existing object as a child of this directory.
