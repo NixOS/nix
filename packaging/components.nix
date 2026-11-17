@@ -127,25 +127,6 @@ let
     # `mesonBuildType` defaults to `plain` if not specified. We want our Nix-built binaries to be optimized by default.
     # More on build types here: https://mesonbuild.com/Builtin-options.html#details-for-buildtype.
     mesonBuildType = "release";
-    # NOTE:
-    # Users who are debugging Nix builds are expected to set the environment variable `mesonBuildType`, per the
-    # guidance in https://github.com/NixOS/nix/blob/8a3fc27f1b63a08ac983ee46435a56cf49ebaf4a/doc/manual/source/development/debugging.md?plain=1#L10.
-    # For this reason, we don't want to refer to `finalAttrs.mesonBuildType` here, but rather use the environment variable.
-    preConfigure =
-      prevAttrs.preConfigure or ""
-      +
-        lib.optionalString
-          (
-            !(stdenv.hostPlatform.isWindows || stdenv.hostPlatform.isCygwin)
-            # build failure
-            && !stdenv.hostPlatform.isStatic
-          )
-          ''
-            case "$mesonBuildType" in
-            release|minsize) appendToVar mesonFlags "-Db_lto=true"  ;;
-            *)               appendToVar mesonFlags "-Db_lto=false" ;;
-            esac
-          '';
     nativeBuildInputs = [
       meson
       ninja
