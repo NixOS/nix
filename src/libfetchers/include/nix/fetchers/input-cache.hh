@@ -35,7 +35,7 @@ struct InputCache
 
     static ref<InputCache> create();
 
-    virtual ~InputCache() = default;
+    virtual ~InputCache();
 };
 
 } // namespace nix::fetchers
