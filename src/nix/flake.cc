@@ -962,7 +962,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 } else if (st.type == SourceAccessor::tSymlink) {
                     auto target = from2.readLink();
                     if (std::filesystem::exists(to_st)) {
-                        if (std::filesystem::read_symlink(to2) != target) {
+                        if (readLink(to2) != target) {
                             printError(
                                 "refusing to overwrite existing file %s\n please merge it manually with '%s'",
                                 PathFmt(to2),
