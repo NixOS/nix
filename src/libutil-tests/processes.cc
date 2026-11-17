@@ -238,6 +238,26 @@ TEST(spawnProgram, restoresSignalMask)
     ASSERT_TRUE(statusOk(child.wait()));
 }
 
+TEST(RootSpawnProgram, setuidAndSetgid)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+
+    Pid spawned = spawnProgram(
+        {
+            .program = *self,
+            .args = {"__util_test_spawn_setuid_setgid"},
+            /* Some dummy uid/gid. */
+            .uid = uid_t(1),
+            .gid = gid_t(1),
+            .chdir = "/",
+        },
+        {});
+
+    ASSERT_TRUE(spawned);
+    ASSERT_TRUE(statusOk(spawned.wait()));
+}
+
 #endif
 
 /* TODO: Test a bunch more things. */

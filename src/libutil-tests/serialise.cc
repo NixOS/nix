@@ -105,6 +105,19 @@ TEST(readPadding, works)
     }
 }
 
+TEST(sourceToSink, empty)
+{
+    bool called = false;
+    StringSink sinkS;
+    auto sink = sourceToSink([&](Source & source) {
+        called = true;
+        source.drainInto(sinkS, 0);
+    });
+    sink->finish();
+    ASSERT_TRUE(called);
+    ASSERT_TRUE(sinkS.s.empty());
+}
+
 // The following test catches the bug only under fcontext backend,
 // but Boost.Coroutine2 stack switching when abandoning confuses the
 // hell out of ASan. The workaround to getting ASan working isn't
