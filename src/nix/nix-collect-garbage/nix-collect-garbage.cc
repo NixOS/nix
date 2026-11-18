@@ -1,4 +1,5 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/error.hh"
 #include "nix/util/system-error.hh"
@@ -30,7 +31,7 @@ void removeOldGenerations(std::filesystem::path dir)
 
     bool canWrite = access(dir.string().c_str(), W_OK) == 0;
 
-    for (const auto & i : DirectoryIterator{dir}) {
+    for (const auto & i : openDirectoryIterator(dir)) {
         checkInterrupt();
 
         auto path = (dir / i.name.mkPath()).string();

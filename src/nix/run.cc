@@ -1,4 +1,5 @@
 #include "nix/util/current-process.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/environment-variables.hh"
 #include "run.hh"
 #include "nix/cmd/command-installable-value.hh"
@@ -188,7 +189,7 @@ void chrootHelper(int argc, char ** argv)
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (const auto & entry : DirectoryIterator{"/"}) {
+        for (const auto & entry : openDirectoryIterator("/")) {
             checkInterrupt();
             auto src = std::filesystem::path{"/"} / entry.name.mkPath();
             std::filesystem::path dst = tmpDir / entry.name.mkPath();

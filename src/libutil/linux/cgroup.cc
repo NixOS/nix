@@ -2,6 +2,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/system-error.hh"
 
@@ -95,7 +96,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
 
     /* Otherwise, manually kill every process in the subcgroups and
        this cgroup. */
-    for (const auto & entry : DirectoryIterator{cgroup}) {
+    for (const auto & entry : openDirectoryIterator(cgroup)) {
         checkInterrupt();
         auto entryPath = cgroup / entry.name.mkPath();
         auto type = entry.type != std::filesystem::file_type::none ? entry.type

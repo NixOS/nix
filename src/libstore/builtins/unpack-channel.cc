@@ -1,4 +1,5 @@
 #include "nix/store/builtins.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/system-error.hh"
 
@@ -27,7 +28,7 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
 
     size_t fileCount;
     std::string fileName;
-    auto entries = DirectoryIterator{out};
+    auto entries = openDirectoryIterator(out);
     if (entries == std::default_sentinel)
         throw Error("channel tarball '%s' is empty", src);
     fileName = (out / entries->name.mkPath()).string();

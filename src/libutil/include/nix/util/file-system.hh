@@ -576,124 +576,15 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
  */
 void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst);
 
-/**
- * An entry read by @ref DirectoryIterator.
- */
-struct DirectoryEntry
-{
-    /**
-     * The entry's name. It refers to the iterator's own buffer, so it is
-     * only valid until the iterator is advanced; copy it into an
-     * `OsFilename` to keep it.
-     */
-    OsFilenameView name;
-
-    /**
-     * The entry's own type (symlinks are not followed), as reported by
-     * the directory read itself. `std::filesystem::file_type::none` if
-     * it was not reported, in which case callers that need it have to
-     * `lstat` the entry themselves.
-     */
-    std::filesystem::file_type type;
-};
+class DirectoryIterator;
 
 /**
- * @brief A directory iterator that can be used to iterate over the
- * contents of a directory, other than `.` and `..`. It is similar to
- * std::filesystem::directory_iterator but throws SystemError on failure
- * instead of std::filesystem::filesystem_error.
+ * Read the directory at @p path, following a symlink there.
  *
- * Unlike `std::filesystem::directory_iterator`, it can only be moved,
- * not copied, since copies could only ever share one position, and the
- * entries it hands out are overwritten as it advances. It is its own
- * range: `begin()` moves it, so it can be used directly in a
- * range-based for loop. Also unlike `std::filesystem::directory_iterator`,
- * entries are just names relative to the directory rather than full
- * paths.
+ * @todo Prefer opening the directory and giving it to
+ * `DirectoryIterator`'s descriptor constructor (see
+ * `file-system-at.hh`).
  */
-class DirectoryIterator
-{
-public:
-    // --- Iterator Traits ---
-    using iterator_concept = std::input_iterator_tag;
-    using value_type = DirectoryEntry;
-    using difference_type = std::ptrdiff_t;
-    using pointer = const DirectoryEntry *;
-    using reference = const DirectoryEntry &;
-
-    // Default constructor (represents end iterator)
-    DirectoryIterator() noexcept;
-
-    /**
-     * Read the directory @p dirFd refers to, taking ownership of it.
-     *
-     * The handle's read position is consumed, so it must not be shared.
-     * On Unix it must not be an `O_PATH` descriptor; on Windows it needs
-     * `FILE_LIST_DIRECTORY` access.
-     */
-    explicit DirectoryIterator(AutoCloseFD dirFd);
-
-    // Constructor taking a path
-    explicit DirectoryIterator(const std::filesystem::path & path);
-
-    DirectoryIterator(DirectoryIterator &&) noexcept;
-    DirectoryIterator & operator=(DirectoryIterator &&) noexcept;
-    ~DirectoryIterator();
-
-    reference operator*() const
-    {
-        return *entry;
-    }
-
-    pointer operator->() const
-    {
-        return &*entry;
-    }
-
-    DirectoryIterator & operator++();
-
-    // Postfix increment operator
-    void operator++(int)
-    {
-        ++*this;
-    }
-
-    /**
-     * Whether this is the end iterator.
-     */
-    bool operator==(std::default_sentinel_t) const noexcept
-    {
-        return !state;
-    }
-
-    // Allow direct use in range-based for loops if iterating over an instance
-    DirectoryIterator begin()
-    {
-        return std::move(*this);
-    }
-
-    std::default_sentinel_t end() const noexcept
-    {
-        return std::default_sentinel;
-    }
-
-private:
-    /**
-     * The entry `operator*` hands out, overwritten as the iterator
-     * advances.
-     */
-    std::optional<DirectoryEntry> entry;
-
-    /**
-     * Each platform's implementation defines this. Its destructor and
-     * the iterator's moves are defined there too, where it is complete.
-     */
-    struct PlatformState;
-
-    /**
-     * Null exactly for the end iterator.
-     */
-    std::unique_ptr<PlatformState> state;
-};
+DirectoryIterator openDirectoryIterator(const std::filesystem::path & path);
 
 } // namespace nix

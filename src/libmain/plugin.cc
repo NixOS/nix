@@ -7,6 +7,7 @@
 #include "nix/util/config-global.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/system-error.hh"
 
 namespace nix {
@@ -79,7 +80,7 @@ void initPlugins()
     for (const auto & pluginFile : pluginSettings.pluginFiles.get()) {
         std::vector<std::filesystem::path> pluginFiles;
         try {
-            auto ents = DirectoryIterator{pluginFile};
+            auto ents = openDirectoryIterator(pluginFile);
             for (const auto & ent : ents) {
                 checkInterrupt();
                 pluginFiles.emplace_back(pluginFile / ent.name.mkPath());

@@ -1,4 +1,5 @@
 #include "nix/cmd/command.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-open.hh"
@@ -129,7 +130,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             createDirs(unpacked);
             unpackTarfile(tmpFile, unpacked);
 
-            auto entries = DirectoryIterator{unpacked};
+            auto entries = openDirectoryIterator(unpacked);
             if (entries == std::default_sentinel)
                 throw Error("archive '%s' is empty", url.to_string());
             /* If the archive unpacks to a single file/directory, then use

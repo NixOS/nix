@@ -1,4 +1,5 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/system-error.hh"
