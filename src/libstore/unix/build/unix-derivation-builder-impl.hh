@@ -65,6 +65,12 @@ protected:
     std::filesystem::path topTmpDir;
 
     /**
+     * The directory `topTmpDir` is in, and `topTmpDir` itself, open for
+     * cleaning it up.
+     */
+    AutoCloseFD buildDirFd, topTmpDirFd;
+
+    /**
      * The file descriptor of the temporary directory.
      */
     AutoCloseFD tmpDirFd;
