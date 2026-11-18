@@ -2576,7 +2576,8 @@ BackedStringView EvalState::coerceToString(
                    which peel path (`__toString` or `outPath`) got us
                    here. */
                 return coerceToString(
-                    pos, *peeled, context, errorCtx, coerceMore, copyToStore, /*canonicalizePath=*/true);
+                           pos, *peeled, context, errorCtx, coerceMore, copyToStore, /*canonicalizePath=*/true)
+                    .toOwned();
             });
     }
 
