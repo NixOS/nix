@@ -188,15 +188,16 @@ public:
 
     virtual void writeToStdout(std::string_view s);
 
-    inline void cout(std::string_view s)
+    template<RuntimeMessage S>
+    inline void cout(const S & s)
     {
         writeToStdout(s);
     }
 
-    template<typename Arg, typename... Args>
-    inline void cout(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
+    template<typename... Args>
+    inline void cout(FormatString<sizeof...(Args)> fs, const Args &... args)
     {
-        writeToStdout(fmt(fs, arg, args...));
+        writeToStdout(fmt(fs, args...));
     }
 
     /**
@@ -205,15 +206,16 @@ public:
      */
     void writeStyledToStdout(std::string_view s);
 
-    inline void coutStyled(std::string_view s)
+    template<RuntimeMessage S>
+    inline void coutStyled(const S & s)
     {
         writeStyledToStdout(s);
     }
 
-    template<typename Arg, typename... Args>
-    inline void coutStyled(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
+    template<typename... Args>
+    inline void coutStyled(FormatString<sizeof...(Args)> fs, const Args &... args)
     {
-        writeStyledToStdout(fmt(fs, arg, args...));
+        writeStyledToStdout(fmt(fs, args...));
     }
 
     virtual std::optional<char> ask(std::string_view s)

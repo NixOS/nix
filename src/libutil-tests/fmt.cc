@@ -21,6 +21,9 @@ concept convertsToFormatString = requires {
     std::integral_constant<int, (FormatString<nArgs>(std::string_view(literal.data.data(), literal.data.size())), 0)>{};
 };
 
+static_assert(convertsToFormatString<"100", 0>);
+static_assert(!convertsToFormatString<"100%%", 0>);
+static_assert(!convertsToFormatString<"%s", 0>);
 static_assert(convertsToFormatString<"%s", 1>);
 static_assert(!convertsToFormatString<"%s %s", 1>);
 static_assert(!convertsToFormatString<"%s", 2>);
@@ -36,6 +39,11 @@ static_assert(!convertsToFormatString<"%|abc|", 1>);
 static_assert(!convertsToFormatString<"%n", 1>);
 static_assert(!convertsToFormatString<"%Tx", 1>);
 static_assert(!convertsToFormatString<"%*d", 1>);
+
+static_assert(RuntimeMessage<std::string>);
+static_assert(RuntimeMessage<std::string_view>);
+static_assert(RuntimeMessage<const char *>);
+static_assert(!RuntimeMessage<char[4]>);
 
 static_assert(std::is_same_v<decltype(""_fmt), FormatString<0>>);
 static_assert(std::is_same_v<decltype("%6.1f"_fmt), FormatString<1>>);
@@ -54,8 +62,8 @@ static void expectArgumentCount(FormatString<n> f)
 TEST(formatArgumentCount, agreesWithBoost)
 {
     expectArgumentCount<0>(""_fmt);
-    expectArgumentCount<0>("100%%"_fmt);
     expectArgumentCount<1>("%s"_fmt);
+    expectArgumentCount<1>("100%% %s"_fmt);
     expectArgumentCount<3>("%s: %s (%d)"_fmt);
     expectArgumentCount<8>("%b %d %i %u %o %x %X %p"_fmt);
     expectArgumentCount<8>("%a %A %e %E %f %F %g %G"_fmt);
@@ -109,15 +117,29 @@ TEST(fmt, singleStringIsLiteral)
     ASSERT_EQ(HintFmt("<%s>", Uncolored(data)).str(), "<" + data + ">");
 }
 
-TEST(fmt, formatStringWithoutArgumentsIsLiteral)
+TEST(fmt, messageWithoutArguments)
 {
-    ASSERT_EQ(fmt("100%% %s"), "100%% %s");
-    ASSERT_EQ(fmt(FormatString<0>("100%% %s")), "100%% %s");
-}
+    EXPECT_EQ(fmt("disk full"), "disk full");
+    EXPECT_EQ(HintFmt("disk full").str(), "disk full");
+    EXPECT_EQ(Error("disk full").info().msg.str(), "disk full");
+    EXPECT_EQ(Error(1u, "disk full").info().msg.str(), "disk full");
+    EXPECT_EQ(Error(Suggestions{}, "disk full").info().msg.str(), "disk full");
 
-TEST(HintFmt, formatStringWithoutArgumentsIsLiteral)
-{
-    ASSERT_EQ(HintFmt(FormatString<0>("100%% %s")).str(), "100%% %s");
+    Error e("x");
+    e.addTrace(nullptr, "disk full");
+    EXPECT_EQ(e.info().traces.front().hint.str(), "disk full");
+
+    errno = ENOSPC;
+    EXPECT_EQ(
+        SysError("disk full").info().msg.str(),
+        "disk full: " ANSI_WARNING + std::string(strerror(ENOSPC)) + ANSI_NORMAL);
+
+    testing::CaptureLogging capture;
+    logger->cout("disk full");
+    logger->coutStyled("disk full");
+    EXPECT_EQ(capture.getStdout(), "disk full\ndisk full\n");
+    warn("disk full");
+    EXPECT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " disk full\n");
 }
 
 TEST(HintFmt, percentStringWithoutArgs)
@@ -152,10 +174,10 @@ TEST(HintFmt, tooManyArguments)
         "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_WARNING "one" ANSI_NORMAL);
 }
 
-TEST(warn, messageWithoutArgumentsIsLiteral)
+TEST(warn, argumentKeepsPercentSigns)
 {
     testing::CaptureLogging capture;
-    warn("100% %s %%");
+    warn("%s", "100% %s %%");
     ASSERT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " 100% %s %%\n");
 }
 

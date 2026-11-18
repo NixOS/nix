@@ -159,36 +159,39 @@ public:
     BaseError & operator=(const BaseError &) = default;
     BaseError & operator=(BaseError &&) noexcept = default;
 
-    BaseError(unsigned int status, const std::string & msg)
+    template<RuntimeMessage S>
+    BaseError(unsigned int status, const S & msg)
         : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}, .status = status}
     {
     }
 
-    template<typename T, typename... Args>
-    BaseError(unsigned int status, FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}, .status = status}
+    template<typename... Args>
+    BaseError(unsigned int status, FormatString<sizeof...(Args)> fs, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}, .status = status}
     {
     }
 
-    explicit BaseError(const std::string & msg)
+    template<RuntimeMessage S>
+    explicit BaseError(const S & msg)
         : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}}
     {
     }
 
-    template<typename T, typename... Args>
-    explicit BaseError(FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}}
+    template<typename... Args>
+    explicit BaseError(FormatString<sizeof...(Args)> fs, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}}
     {
     }
 
-    BaseError(const Suggestions & sug, const std::string & msg)
+    template<RuntimeMessage S>
+    BaseError(const Suggestions & sug, const S & msg)
         : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}, .suggestions = sug}
     {
     }
 
-    template<typename T, typename... Args>
-    BaseError(const Suggestions & sug, FormatString<1 + sizeof...(Args)> fs, const T & arg, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}, .suggestions = sug}
+    template<typename... Args>
+    BaseError(const Suggestions & sug, FormatString<sizeof...(Args)> fs, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}, .suggestions = sug}
     {
     }
 
@@ -253,11 +256,10 @@ public:
      * @param fs Format string, see `HintFmt`
      * @param args Format string arguments.
      */
-    template<typename Arg, typename... Args>
-    void addTrace(
-        std::shared_ptr<const Pos> && pos, FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
+    template<typename... Args>
+    void addTrace(std::shared_ptr<const Pos> && pos, FormatString<sizeof...(Args)> fs, const Args &... args)
     {
-        addTrace(std::move(pos), HintFmt(fs, arg, args...));
+        addTrace(std::move(pos), HintFmt(fs, args...));
     }
 
     /**
@@ -266,9 +268,10 @@ public:
      * @param pos Nullable source position to put in trace item
      * @param msg Message, printed literally
      */
-    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view msg)
+    template<RuntimeMessage S>
+    void addTrace(std::shared_ptr<const Pos> && pos, const S & msg)
     {
-        addTrace(std::move(pos), HintFmt(std::string(msg)));
+        addTrace(std::move(pos), HintFmt(msg));
     }
 
     /**

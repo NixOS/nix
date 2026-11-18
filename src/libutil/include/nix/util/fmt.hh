@@ -65,24 +65,15 @@ inline void setExceptions(boost::format & fmt)
  * And `stringFromUserInput` contains formatting placeholders like `%s`, then
  * the code will crash at runtime. `fmt` helps you avoid this pitfall.
  */
-inline std::string fmt(const std::string & s)
+template<RuntimeMessage S>
+inline std::string fmt(const S & s)
 {
-    return s;
-}
-
-inline std::string fmt(std::string_view s)
-{
-    return std::string(s);
-}
-
-inline std::string fmt(const char * s)
-{
-    return s;
+    return std::string(std::string_view(s));
 }
 
 /**
- * Without arguments, the format string is returned unchanged, as for the
- * other single-argument overloads.
+ * Without arguments, the format string is returned unchanged, as is a
+ * run-time message.
  */
 inline std::string fmt(FormatString<0> fs)
 {
@@ -185,8 +176,9 @@ public:
      * Format the given string literally, without interpolating format
      * placeholders.
      */
-    HintFmt(const std::string & literal)
-        : HintFmt("%s", Uncolored(literal))
+    template<RuntimeMessage S>
+    HintFmt(const S & literal)
+        : HintFmt("%s", Uncolored(std::string_view(literal)))
     {
     }
 
@@ -197,7 +189,7 @@ public:
 
     /**
      * Interpolate the given arguments into the format string. Without
-     * arguments, print the format string literally, like the `std::string`
+     * arguments, print the format string literally, like the run-time message
      * constructor.
      */
     template<typename... Args>

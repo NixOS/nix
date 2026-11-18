@@ -508,20 +508,20 @@ public:
     /**
      * Construct an error from a format string and its arguments.
      */
-    template<class T, typename Arg, typename... Args>
+    template<class T, typename... Args>
     [[nodiscard, gnu::noinline]]
-    EvalErrorBuilder<T> & error(FormatString<1 + sizeof...(Args)> fs, const Arg & arg, const Args &... args)
+    EvalErrorBuilder<T> & error(FormatString<sizeof...(Args)> fs, const Args &... args)
     {
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
-        return *new EvalErrorBuilder<T>(T(*this, fs, arg, args...));
+        return *new EvalErrorBuilder<T>(T(*this, fs, args...));
     }
 
     /**
      * Construct an error with a message that is printed literally.
      */
-    template<class T>
+    template<class T, RuntimeMessage S>
     [[nodiscard, gnu::noinline]]
-    EvalErrorBuilder<T> & error(const std::string & msg)
+    EvalErrorBuilder<T> & error(const S & msg)
     {
         return *new EvalErrorBuilder<T>(T(*this, msg));
     }

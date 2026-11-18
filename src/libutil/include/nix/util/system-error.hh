@@ -220,7 +220,8 @@ public:
      * Construct using the ambient error code and a message that is printed
      * literally. The error code is read before the `HintFmt` is built.
      */
-    NativeCodeSystemError(const std::string & msg)
+    template<RuntimeMessage S>
+    NativeCodeSystemError(const S & msg)
         : NativeCodeSystemError(captureAmbientError([&] { return HintFmt(msg); }))
     {
     }

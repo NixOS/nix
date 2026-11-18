@@ -35,16 +35,16 @@ public:
     {
     }
 
-    explicit EvalBaseError(EvalState & state, const std::string & msg)
+    template<RuntimeMessage S>
+    explicit EvalBaseError(EvalState & state, const S & msg)
         : CloneableError(msg)
         , state(state)
     {
     }
 
-    template<typename Arg, typename... Args>
-    explicit EvalBaseError(
-        EvalState & state, FormatString<1 + sizeof...(Args)> formatString, const Arg & arg, const Args &... formatArgs)
-        : CloneableError(formatString, arg, formatArgs...)
+    template<typename... Args>
+    explicit EvalBaseError(EvalState & state, FormatString<sizeof...(Args)> formatString, const Args &... formatArgs)
+        : CloneableError(formatString, formatArgs...)
         , state(state)
     {
     }

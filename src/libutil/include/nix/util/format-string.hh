@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace nix {
 
@@ -114,8 +115,10 @@ consteval size_t formatArgumentCount(std::string_view s)
  * run time does not convert, so the compiler rejects code that uses data as a
  * format string. Such data can contain `%`, which `boost::format` interprets.
  * The constructor also rejects a format string whose directives do not take
- * exactly `nArgs` arguments, except for `nArgs` 0: without arguments, the
- * string is printed literally.
+ * exactly `nArgs` arguments. Without arguments, the string is printed
+ * literally, so the constructor rejects a `%`: a directive there means a
+ * forgotten argument, and a `%%` would print as two signs. To print a `%`,
+ * pass it as an argument, as in `warn("%s", "100%")`.
  *
  * A function that forwards a format string must take this type itself. The
  * conversion is checked where the literal is written, and a function
@@ -137,7 +140,10 @@ class FormatString
 
     consteval void check()
     {
-        if (nArgs != 0 && formatArgumentCount(s) != nArgs)
+        if (nArgs == 0) {
+            if (s.find('%') != std::string_view::npos)
+                throw "a message without arguments contains %";
+        } else if (formatArgumentCount(s) != nArgs)
             throw "format string has the wrong argument count";
     }
 
@@ -176,5 +182,16 @@ consteval auto operator""_fmt()
     constexpr std::string_view s(literal.data.data(), literal.data.size());
     return FormatString<formatArgumentCount(s)>(s);
 }
+
+/**
+ * A message that is not a `char` array, such as a `std::string`, a
+ * `std::string_view` or a `const char *`. Pass a `char` buffer as a
+ * `std::string_view`.
+ *
+ * An overload that prints such a message literally takes this, so that a
+ * literal goes to the `FormatString` overload beside it, which checks it.
+ */
+template<typename S>
+concept RuntimeMessage = std::is_convertible_v<const S &, std::string_view> && !std::is_array_v<S>;
 
 } // namespace nix
