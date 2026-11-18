@@ -6,6 +6,8 @@
 #include <memory>
 #include <functional>
 
+#include "nix/util/file-descriptor.hh"
+
 namespace nix {
 
 class AutoDelete;
@@ -31,8 +33,11 @@ struct BuildChrootParams
     /** The store directory (e.g., "/nix/store") */
     std::string storeDir;
 
-    /** Callback to change ownership of a path to the build user */
-    std::function<void(const std::filesystem::path &)> chownToBuilder;
+    /**
+     * Callback to change ownership of an open file to the build user.
+     * The path is only for error messages.
+     */
+    std::function<void(Descriptor fd, const std::filesystem::path & path)> chownToBuilder;
 };
 
 /**

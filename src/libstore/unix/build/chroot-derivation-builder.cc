@@ -38,7 +38,7 @@ void ChrootDerivationBuilder::prepareSandbox()
         .isSandboxed = derivationType.isSandboxed(),
         .buildUser = buildUser.get(),
         .storeDir = store->storeDir,
-        .chownToBuilder = [this](const std::filesystem::path & path) { this->chownToBuilder(path); },
+        .chownToBuilder = [this](Descriptor fd, const std::filesystem::path & path) { this->chownToBuilder(fd, path); },
     };
 
     // Create the chroot
