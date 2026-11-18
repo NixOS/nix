@@ -219,13 +219,19 @@ void LocalOverlayStore::deleteStorePath(const OsFilename & name, uint64_t & byte
     StorePath storePath = {name.path().string()};
     auto upperPath = config->toUpperPath(storePath);
 
-    if (pathExists(upperPath)) {
+    /* By path, following symlinks, as the upper layer is configured; the
+       store object in it is not followed. */
+    auto upperLayerFd = valueOr(
+        openDirectory(config->upperLayer.get()),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the upper layer %s", PathFmt(config->upperLayer.get())));
+
+    if (maybeFstatat(upperLayerFd.get(), name)) {
         debug("upper exists: %s", PathFmt(upperPath));
         if (lowerStore->isValidPath(storePath)) {
             debug("lower exists: %s", storePath.to_string());
             // Path also exists in lower store.
             // We must delete via upper layer to avoid creating a whiteout.
-            deletePath(upperPath, bytesFreed);
+            deletePathAt(upperLayerFd.get(), name, bytesFreed);
             _remountRequired = true;
         } else {
             // Path does not exist in lower store.
