@@ -268,9 +268,16 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
     if (buildUser)
         checkNotWorldWritable(buildDir);
 
+    buildDirFd = valueOr(
+        openDirectory(buildDir, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build directory %s", PathFmt(buildDir)));
+
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir(buildDir, "nix", 0700);
+    topTmpDirFd = valueOr(
+        openDirectoryAt(buildDirFd.get(), OsFilename::fromPathAsserting(topTmpDir.filename())),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build temporary directory %s", PathFmt(topTmpDir)));
     setBuildTmpDir();
     assert(!tmpDir.empty());
 
@@ -992,16 +999,28 @@ void UnixDerivationBuilderImpl::cleanupBuild(bool force)
          * This hardens against an attack which smuggles a file descriptor
          * to make use of the temporary directory.
          */
-        chmod(topTmpDir, 0000);
+        auto fchmodOrThrow = [](Descriptor fd, mode_t mode, const std::filesystem::path & path) {
+            if (::fchmod(fd, mode) == -1)
+                throw SysError("changing permissions of %s", PathFmt(path));
+        };
+
+        /* Set up together with `topTmpDir`, so only missing if that
+           failed partway. */
+        if (topTmpDirFd)
+            fchmodOrThrow(topTmpDirFd.get(), 0000, topTmpDir);
 
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv.isBuiltin()) {
             printError("note: keeping build directory %s", PathFmt(tmpDir));
-            chmod(topTmpDir, 0755);
-            chmod(tmpDir, 0755);
+            if (topTmpDirFd)
+                fchmodOrThrow(topTmpDirFd.get(), 0755, topTmpDir);
+            if (tmpDirFd)
+                fchmodOrThrow(tmpDirFd.get(), 0755, tmpDir);
         } else
-            deletePath(topTmpDir);
+            deletePathAt(buildDirFd.get(), OsFilename::fromPathAsserting(topTmpDir.filename()));
+        topTmpDirFd.close();
+        buildDirFd.close();
         topTmpDir = "";
         tmpDir = "";
     }
