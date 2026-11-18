@@ -7,6 +7,7 @@
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/eval-settings.hh" // for defexpr
 #include "nix/util/os-string.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/tarball.hh"
@@ -208,13 +209,14 @@ static void update(const StringSet & channelNames)
     runNixBin("nix-env", envArgs);
 
     // Make the channels appear in nix-env.
-    PosixStat st;
-    if (lstat(nixDefExpr.c_str(), &st) == 0) {
-        if (S_ISLNK(st.st_mode))
+    {
+        auto parentFd = valueOr(
+            openDirectory(nixDefExpr.parent_path()),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(nixDefExpr)));
+        auto name = OsFilename::fromPathThrowing(nixDefExpr.filename());
+        if (auto st = maybeFstatat(parentFd.get(), name); st && S_ISLNK(st->st_mode))
             // old-skool ~/.nix-defexpr
-            unlink(nixDefExpr);
-    } else if (errno != ENOENT) {
-        throw SysError("getting status of %1%", PathFmt(nixDefExpr));
+            unlinkAt(parentFd.get(), name);
     }
     createDirs(nixDefExpr);
     auto channelLink = nixDefExpr / "channels";
