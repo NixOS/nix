@@ -516,10 +516,4 @@ void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirF
         descriptorToPath(dstDirFd) / dst.path());
 }
 
-void createDir(const std::filesystem::path & path, mode_t mode)
-{
-    if (::mkdir(path.c_str(), mode) == -1)
-        throw SysError("creating directory %s", PathFmt(path));
-}
-
 } // namespace nix
