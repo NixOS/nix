@@ -41,6 +41,9 @@ overlayInode=$(stat -c %i "$overlayPath")
 [[ $upperInode == "$overlayInode" ]]
 [[ $upperInode != "$lowerInode" ]]
 
+# Statistics would describe hard-linking, which this store does not do.
+expectStderr 1 nix --store "$storeB" store stats | grepQuiet "does not provide statistics"
+
 # Run optimise to deduplicate store paths
 nix-store --store "$storeB" --optimise
 remountOverlayfs
