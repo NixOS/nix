@@ -179,18 +179,6 @@ bool pathExists(const std::filesystem::path & path)
     return maybeLstat(path).has_value();
 }
 
-bool pathAccessible(const std::filesystem::path & path)
-{
-    try {
-        return pathExists(path);
-    } catch (SystemError & e) {
-        // swallow EPERM
-        if (e.is(std::errc::operation_not_permitted))
-            return false;
-        throw;
-    }
-}
-
 std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
@@ -525,40 +513,6 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
     }
 }
 
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool contents)
-{
-    auto fromStatus = std::filesystem::symlink_status(from);
-
-    if (std::filesystem::is_symlink(fromStatus) || std::filesystem::is_regular_file(fromStatus)) {
-        if (contents) {
-            std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
-        } else {
-            std::filesystem::copy(
-                from,
-                to,
-                std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
-        }
-    } else if (std::filesystem::is_directory(fromStatus)) {
-        std::filesystem::create_directory(to);
-        for (const auto & entry : openDirectoryIterator(from)) {
-            copyFile(from / entry.name.mkPath(), to / entry.name.mkPath(), /*contents=*/false);
-        }
-    } else {
-        throw Error("file %s has an unsupported type", PathFmt(from));
-    }
-
-    /* TODO: Temporary. Once `copyFile` is descriptor-based throughout, it
-       will already have a handle to the destination's parent, and won't
-       need to `lstat` and reopen by path here. */
-    {
-        auto st = lstat(from);
-        auto parentFd = valueOr(
-            openDirectory(to.parent_path(), FinalSymlink::Follow),
-            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(to)));
-        setWriteTime(parentFd.get(), OsFilename::fromPathThrowing(to.filename()), st.st_atime, st.st_mtime);
-    }
-}
-
 //////////////////////////////////////////////////////////////////////
 
 bool isExecutableFileAmbient(const std::filesystem::path & exe)
@@ -596,12 +550,6 @@ void chmod(const std::filesystem::path & path, mode_t mode)
 #else
 #  define UNLINK_PROC ::unlink
 #endif
-
-void unlink(const std::filesystem::path & path)
-{
-    if (UNLINK_PROC(path.c_str()) == -1)
-        throw SysError("removing %s", PathFmt(path));
-}
 
 void tryUnlink(const std::filesystem::path & path)
 {

@@ -170,6 +170,47 @@ static void createPasswordFiles(std::filesystem::path & chrootRootDir, std::vect
 }
 
 /**
+ * Copy @p from to @p to. If @p contents is set, always create a regular
+ * file, even if the source is a symlink.
+ *
+ * @todo Make this descriptor-based. It is prone to TOCTOU races and
+ * follows symlinks in the destination.
+ */
+static void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool contents)
+{
+    auto fromStatus = std::filesystem::symlink_status(from);
+
+    if (std::filesystem::is_symlink(fromStatus) || std::filesystem::is_regular_file(fromStatus)) {
+        if (contents) {
+            std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
+        } else {
+            std::filesystem::copy(
+                from,
+                to,
+                std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
+        }
+    } else if (std::filesystem::is_directory(fromStatus)) {
+        std::filesystem::create_directory(to);
+        for (const auto & entry : openDirectoryIterator(from)) {
+            copyFile(from / entry.name.mkPath(), to / entry.name.mkPath(), /*contents=*/false);
+        }
+    } else {
+        throw Error("file %s has an unsupported type", PathFmt(from));
+    }
+
+    /* TODO: Temporary. Once `copyFile` is descriptor-based throughout, it
+       will already have a handle to the destination's parent, and won't
+       need to `lstat` and reopen by path here. */
+    {
+        auto st = lstat(from);
+        auto parentFd = valueOr(
+            openDirectory(to.parent_path(), FinalSymlink::Follow),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening parent directory of %s", PathFmt(to)));
+        setWriteTime(parentFd.get(), OsFilename::fromPathThrowing(to.filename()), st.st_atime, st.st_mtime);
+    }
+}
+
+/**
  * Create the new file @p path relative to @p dirFd, with @p contents.
  */
 static void writeNewFileAt(
