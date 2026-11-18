@@ -246,6 +246,28 @@ static void checkNotWorldWritable(std::filesystem::path path)
     return;
 }
 
+void UnixDerivationBuilderImpl::setBuildTmpDir()
+{
+    tmpDir = topTmpDir;
+    tmpDirFd = valueOr(
+        reopenDirectory(topTmpDirFd.get()),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening the build temporary directory %s", PathFmt(tmpDir)));
+}
+
+void UnixDerivationBuilderImpl::setBuildTmpDirToSubdir(const OsFilename & name)
+{
+    tmpDir = topTmpDir / name.path();
+    auto created = createDirectoryAt(topTmpDirFd.get(), name, 0700);
+    if (!created)
+        throw NativeSysError(created.error(), "creating the build temporary directory %s", PathFmt(tmpDir));
+    tmpDirFd =
+        created.value()
+            ? std::move(created).value()
+            : valueOr(
+                  openDirectoryAt(topTmpDirFd.get(), name),
+                  NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build temporary directory %s", PathFmt(tmpDir)));
+}
+
 std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
 {
     if (useBuildUsers(localSettings)) {
@@ -280,12 +302,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
         NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build temporary directory %s", PathFmt(topTmpDir)));
     setBuildTmpDir();
     assert(!tmpDir.empty());
-
-    /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
-       POSIX semantics.*/
-    tmpDirFd = valueOr(openDirectory(tmpDir, FinalSymlink::DontFollow), [&](auto err) {
-        throw SysError(err, "failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
-    });
+    assert(tmpDirFd);
 
     chownToBuilder(tmpDirFd.get(), tmpDir);
 
