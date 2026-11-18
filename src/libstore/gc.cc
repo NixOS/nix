@@ -11,6 +11,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/system-error.hh"
 
@@ -179,7 +180,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    for (const auto & i : DirectoryIterator{tempRootsDir}) {
+    for (const auto & i : openDirectoryIterator(tempRootsDir)) {
         checkInterrupt();
         auto name = os_string_to_string(i.name.native());
         if (name[0] == '.') {
@@ -250,7 +251,7 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
         NIX_INCOMPLETE_SWITCH_BEGIN
         switch (type) {
         case std::filesystem::file_type::directory:
-            for (const auto & i : DirectoryIterator{path}) {
+            for (const auto & i : openDirectoryIterator(path)) {
                 checkInterrupt();
                 findRoots(path / i.name.mkPath(), i.type, roots);
             }

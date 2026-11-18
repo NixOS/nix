@@ -1,4 +1,5 @@
 #include "nix/store/local-store.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/build.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/path-references.hh"
@@ -1501,7 +1502,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking link hashes...");
 
-        for (const auto & link : DirectoryIterator{linksDir}) {
+        for (const auto & link : openDirectoryIterator(linksDir)) {
             checkInterrupt();
             auto name = link.name.mkPath();
             auto linkPath = linksDir / name;
@@ -1596,7 +1597,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (const auto & i : DirectoryIterator{config->realStoreDir.get()}) {
+    for (const auto & i : openDirectoryIterator(config->realStoreDir.get())) {
         checkInterrupt();
         try {
             storePathsInStoreDir.insert({os_string_to_string(i.name.native())});

@@ -36,11 +36,11 @@
 
 namespace nix {
 
-DirectoryIterator::DirectoryIterator(const std::filesystem::path & path)
-    : DirectoryIterator{valueOr(
-          openDirectory(path, FinalSymlink::Follow),
-          NIX_THROW_NATIVE_SYS_ERROR_HANDLER("cannot read directory %s", PathFmt(path)))}
+DirectoryIterator openDirectoryIterator(const std::filesystem::path & path)
 {
+    return DirectoryIterator{valueOr(
+        openDirectory(path, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("cannot read directory %s", PathFmt(path)))};
 }
 
 std::filesystem::path
@@ -346,7 +346,7 @@ void recursiveSync(const std::filesystem::path & path)
     while (!dirsToEnumerate.empty()) {
         auto currentDir = dirsToEnumerate.back();
         dirsToEnumerate.pop_back();
-        for (const auto & entry : DirectoryIterator(currentDir)) {
+        for (const auto & entry : openDirectoryIterator(currentDir)) {
             auto entryPath = currentDir / entry.name.mkPath();
             auto type = entry.type != std::filesystem::file_type::none
                             ? entry.type
@@ -595,7 +595,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
         }
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);
-        for (const auto & entry : DirectoryIterator(from)) {
+        for (const auto & entry : openDirectoryIterator(from)) {
             copyFile(from / entry.name.mkPath(), to / entry.name.mkPath(), /*contents=*/false);
         }
     } else {

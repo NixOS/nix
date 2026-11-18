@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "nix/util/error.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/system-error.hh"
 #include "nix/cmd/repl-interacter.hh"
 #include "nix/cmd/repl.hh"
@@ -261,7 +262,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             auto dir = std::string(cur, 0, slash);
             auto prefix2 = std::string(cur, slash + 1);
             std::filesystem::path dirPath = dir == "" ? "/" : dir;
-            for (const auto & entry : DirectoryIterator{dirPath}) {
+            for (const auto & entry : openDirectoryIterator(dirPath)) {
                 checkInterrupt();
                 auto name = os_string_to_string(entry.name.native());
                 if (name[0] != '.' && hasPrefix(name, prefix2))

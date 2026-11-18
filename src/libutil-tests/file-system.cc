@@ -1,5 +1,6 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/system-error.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 #include "nix/util/tests/result.hh"
@@ -319,7 +320,7 @@ TEST_F(DirectoryIteratorTest, works)
 {
     nix::writeFile(tmpDir / "somefile", "");
 
-    for (const auto & entry : DirectoryIterator(tmpDir)) {
+    for (const auto & entry : openDirectoryIterator(tmpDir)) {
         ASSERT_EQ(entry.name.mkPath(), "somefile");
     }
 }
@@ -330,7 +331,7 @@ TEST_F(DirectoryIteratorTest, namesAndTypes)
     nix::createDir(tmpDir / "dir");
 
     std::map<std::filesystem::path, std::filesystem::file_type> entries;
-    for (const auto & entry : DirectoryIterator(tmpDir))
+    for (const auto & entry : openDirectoryIterator(tmpDir))
         entries.emplace(entry.name.mkPath(), entry.type);
 
     /* No `.` or `..`. */
@@ -357,19 +358,20 @@ TEST_F(DirectoryIteratorTest, fromDescriptor)
 
 TEST_F(DirectoryIteratorTest, empty)
 {
-    ASSERT_TRUE(DirectoryIterator(tmpDir) == std::default_sentinel);
+    ASSERT_TRUE(openDirectoryIterator(tmpDir) == std::default_sentinel);
 }
 
 TEST_F(DirectoryIteratorTest, nonexistent)
 {
-    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
+    ASSERT_THROW(openDirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
 }
 
 TEST_F(DirectoryIteratorTest, notADirectory)
 {
     nix::writeFile(tmpDir / "file", "");
 
-    ASSERT_THAT([&] { DirectoryIterator{tmpDir / "file"}; }, testing::ThrowsSystemError(std::errc::not_a_directory));
+    ASSERT_THAT(
+        [&] { openDirectoryIterator(tmpDir / "file"); }, testing::ThrowsSystemError(std::errc::not_a_directory));
 }
 
 /* ----------------------------------------------------------------------------
@@ -456,7 +458,7 @@ TEST_F(MovePathTest, works)
     unlink(dst);
     movePath(dirSrc, dst);
     std::vector<std::filesystem::path> files;
-    for (const auto & entry : DirectoryIterator{dst})
+    for (const auto & entry : openDirectoryIterator(dst))
         files.push_back(dst / entry.name.mkPath());
     ASSERT_EQ(files, std::vector{dst / OS_STR("reg")});
 }
