@@ -7,6 +7,7 @@
 #include "nix/util/util.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/file-system-at.hh"
 
 #include <stdlib.h>
 #include <string.h>
@@ -168,6 +169,29 @@ static void createPasswordFiles(std::filesystem::path & chrootRootDir, std::vect
     // our build user wouldn't be able to read them anyway
 }
 
+/**
+ * Create the new file @p path relative to @p dirFd, with @p contents.
+ */
+static void writeNewFileAt(
+    Descriptor dirFd, const CanonPath & path, std::string_view contents, const std::filesystem::path & pathForErrors)
+{
+    auto fd = valueOr(
+        openNewFileForWriteAt(dirFd, path, 0666, {}),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("creating %s", PathFmt(pathForErrors)));
+    writeFile(fd.get(), contents);
+}
+
+/**
+ * Create the new directory @p path relative to @p dirFd, with @p mode.
+ */
+static void
+createDirAt(Descriptor dirFd, const CanonPath & path, mode_t mode, const std::filesystem::path & pathForErrors)
+{
+    auto created = createDirectoryAt(dirFd, path, mode);
+    if (!created)
+        throw NativeSysError(created.error(), "creating directory %s", PathFmt(pathForErrors));
+}
+
 } // namespace
 
 template<size_t N>
@@ -235,21 +259,29 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
 
     createPasswordFiles(chrootRootDir, users);
 
+    /* The rest is created relative to this, so that nothing follows a
+       symlink planted in the chroot. */
+    auto chrootRootDirFd = valueOr(
+        openDirectory(chrootRootDir, FinalSymlink::DontFollow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(chrootRootDir)));
+
     // FreeBSD doesn't have a group database, just write a text file
-    writeFile(
-        chrootRootDir / "etc/group",
+    writeNewFileAt(
+        chrootRootDirFd.get(),
+        CanonPath("etc/group"),
         fmt("root:x:0:\n"
             "nixbld:!:%1%:\n"
             "nogroup:x:65534:\n",
-            sandboxGid()));
+            sandboxGid()),
+        chrootRootDir / "etc/group");
 
     // Linux waits until after entering the child to start mounting so it doesn't
     // pollute the root mount namespace.
     // FreeBSD doesn't have mount namespaces, so there's no reason to wait.
 
     auto devpath = chrootRootDir / "dev";
-    createDir(devpath, 0555);
-    createDir(chrootRootDir / "bin", 0555);
+    createDirAt(chrootRootDirFd.get(), CanonPath("dev"), 0555, devpath);
+    createDirAt(chrootRootDirFd.get(), CanonPath("bin"), 0555, chrootRootDir / "bin");
 
     std::array<char, 255> errmsg{};
     std::array<::iovec, 8> iov = {
@@ -269,7 +301,10 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
     autoDelJail->childrenMounts.emplace_back(devpath);
 
     for (const auto & [target, chrootPath] : pathsInChroot) {
-        std::filesystem::path path = chrootRootDir / target.relative_path();
+        /* Via `CanonPath`, which cannot climb out of the chroot. The
+           mount below uses the same, normalised path. */
+        CanonPath relPath(target.relative_path().string());
+        std::filesystem::path path = chrootRootDir / relPath.rel();
 
         auto maybeSt = maybeLstat(chrootPath.source);
         if (!maybeSt) {
@@ -281,14 +316,14 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
 
         /* Mount points must exist and be the right type. */
         if (S_ISDIR(maybeSt->st_mode)) {
-            createDirs(path);
+            createDirsAt(chrootRootDirFd.get(), relPath);
         } else if (S_ISLNK(maybeSt->st_mode)) {
-            createDirs(path.parent_path());
+            createDirsAt(chrootRootDirFd.get(), relPath.parent().value_or(CanonPath::root));
             copyFile(chrootPath.source, path, /*contents=*/false);
             continue;
         } else {
-            createDirs(path.parent_path());
-            writeFile(path, "");
+            auto parentFd = createDirsAt(chrootRootDirFd.get(), relPath.parent().value_or(CanonPath::root));
+            writeNewFileAt(parentFd.get(), CanonPath::root / *relPath.baseName(), "", path);
         }
 
         std::array<::iovec, 8> iov = {
@@ -325,7 +360,11 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
         // services. Don’t use it for anything else that may
         // be configured for this system. This limits the
         // potential impurities introduced in fixed-outputs.
-        writeFile(chrootRootDir / "etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
+        writeNewFileAt(
+            chrootRootDirFd.get(),
+            CanonPath("etc/nsswitch.conf"),
+            "hosts: files dns\nservices: files\n",
+            chrootRootDir / "etc/nsswitch.conf");
 
         /* N.B. it is realistic that these paths might not exist. It
            happens when testing Nix building fixed-output derivations
@@ -351,7 +390,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
         if (fileTransferSettings.caFile.get() && pathExists(fileTransferSettings.caFile.get().value())) {
             // For the same reasons as above, copy the CA certificates file too.
             // It should be even less likely to change during the build than resolv.conf.
-            createDirs(chrootRootDir / "etc/ssl/certs");
+            createDirsAt(chrootRootDirFd.get(), CanonPath("etc/ssl/certs"));
             copyFile(
                 fileTransferSettings.caFile.get().value(), chrootRootDir / "etc/ssl/certs/ca-certificates.crt", true);
         }
