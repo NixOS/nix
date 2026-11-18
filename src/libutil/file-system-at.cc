@@ -130,4 +130,28 @@ void AutoDeleteAt::deletePath()
     }
 }
 
+AutoCloseFD createDirsAt(Descriptor dirFd, const OsCanonPath & path)
+{
+    AutoCloseFD cur;
+    for (const OsFilename & name : path) {
+        Descriptor parent = cur ? cur.get() : dirFd;
+        auto created = createDirectoryAt(parent, name);
+        if (!created && NativeSysError::toErrorCode(created.error()) != std::errc::file_exists)
+            throw NativeSysError(
+                created.error(), "creating directory %s", PathFmt(descriptorToPath(parent) / name.path()));
+        AutoCloseFD next = created ? std::move(created).value() : AutoCloseFD{};
+        if (!next)
+            next = valueOr(
+                openDirectoryAt(parent, name),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER(
+                    "opening directory %s", PathFmt(descriptorToPath(parent) / name.path())));
+        cur = std::move(next);
+    }
+    if (!cur)
+        cur = valueOr(
+            reopenDirectory(dirFd),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening directory %s", PathFmt(descriptorToPath(dirFd))));
+    return cur;
+}
+
 } // namespace nix

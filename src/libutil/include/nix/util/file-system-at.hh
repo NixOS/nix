@@ -147,6 +147,17 @@ Result<AutoCloseFD, NativeError> createDirectoryAt(
 );
 
 /**
+ * Create the directory @p path relative to @p dirFd, along with any of
+ * its missing parents, like `mkdir -p`, and open it.
+ *
+ * Existing components must be directories: symlinks are never
+ * followed.
+ *
+ * @throws SystemError on failure.
+ */
+AutoCloseFD createDirsAt(Descriptor dirFd, const OsCanonPath & path);
+
+/**
  * Get status of an open file/directory handle.
  *
  * @param fd File descriptor/handle
