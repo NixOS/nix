@@ -303,11 +303,6 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 void createDirs(const std::filesystem::path & path);
 
 /**
- * Create a single directory.
- */
-void createDir(const std::filesystem::path & path, mode_t mode = 0755);
-
-/**
  * Create a symlink.
  *
  */

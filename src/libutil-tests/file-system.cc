@@ -298,7 +298,7 @@ TEST_F(DirectoryIteratorTest, works)
 TEST_F(DirectoryIteratorTest, namesAndTypes)
 {
     nix::writeFile(tmpDir / "file", "");
-    nix::createDir(tmpDir / "dir");
+    nix::createDirs(tmpDir / "dir");
 
     std::map<std::filesystem::path, std::filesystem::file_type> entries;
     for (const auto & entry : openDirectoryIterator(tmpDir))

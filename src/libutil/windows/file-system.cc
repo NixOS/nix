@@ -306,12 +306,4 @@ std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
     return statFromFileInfo(attrData);
 }
 
-void createDir(const std::filesystem::path & path, [[maybe_unused]] mode_t mode)
-{
-    using namespace nix::windows;
-
-    if (!::CreateDirectoryW(path.c_str(), nullptr))
-        throw WinError("creating directory %s", PathFmt(path));
-}
-
 } // namespace nix

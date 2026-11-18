@@ -115,7 +115,7 @@ TEST_F(LockFileTest, directory)
     GTEST_SKIP() << "can't lock directories on Windows";
 #endif
     auto dir = tmpDir / "dir";
-    createDir(dir);
+    createDirs(dir);
     auto a = testing::valueOrFail(openDirectory(dir, FinalSymlink::DontFollow));
     auto b = testing::valueOrFail(openDirectory(dir, FinalSymlink::DontFollow));
     ASSERT_TRUE(lockFile(a.get(), ltWrite, false));
