@@ -13,8 +13,7 @@ void ChrootDerivationBuilder::setBuildTmpDir()
        On macOS, we don't use an actual chroot, so this isn't
        possible. Any mitigation along these lines would have to be
        done directly in the sandbox profile. */
-    tmpDir = topTmpDir / "build";
-    createDir(tmpDir, 0700);
+    setBuildTmpDirToSubdir(OsFilename::fromPathAsserting("build"));
 }
 
 std::filesystem::path ChrootDerivationBuilder::tmpDirInSandbox()

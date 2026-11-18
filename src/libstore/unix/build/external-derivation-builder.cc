@@ -30,8 +30,7 @@ struct ExternalDerivationBuilder : UnixDerivationBuilderImpl
 
     void setBuildTmpDir() override
     {
-        tmpDir = topTmpDir / "build";
-        createDir(tmpDir, 0700);
+        setBuildTmpDirToSubdir(OsFilename::fromPathAsserting("build"));
     }
 
     void startChild() override

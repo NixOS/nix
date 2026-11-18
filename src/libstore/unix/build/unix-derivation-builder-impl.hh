@@ -175,10 +175,16 @@ protected:
      */
     PathsInChroot getPathsInSandbox();
 
-    virtual void setBuildTmpDir()
-    {
-        tmpDir = topTmpDir;
-    }
+    /**
+     * Set `tmpDir` and `tmpDirFd`, given `topTmpDir` and `topTmpDirFd`.
+     */
+    virtual void setBuildTmpDir();
+
+    /**
+     * Implementation of `setBuildTmpDir` for when `tmpDir` is to be the
+     * new subdirectory @p name of `topTmpDir`.
+     */
+    void setBuildTmpDirToSubdir(const OsFilename & name);
 
     /**
      * Return the path of the temporary directory in the sandbox.
