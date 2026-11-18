@@ -11,24 +11,31 @@
 
 namespace nix {
 
-std::pair<std::filesystem::path, AutoDelete> setupBuildChroot(const BuildChrootParams & params)
+std::pair<std::filesystem::path, AutoDeleteAt> setupBuildChroot(const BuildChrootParams & params)
 {
     /* Create a temporary directory in which we set up the chroot
        environment using bind-mounts.  We put it in the Nix store
        so that the build outputs can be moved efficiently from the
        chroot to their final location. */
     auto & chrootParentDir = params.chrootParentDir;
-    deletePath(chrootParentDir);
+    auto chrootParentName = OsFilename::fromPathAsserting(chrootParentDir.filename());
+    deletePathAt(params.realStoreDirFd, chrootParentName);
 
     /* Clean up the chroot directory automatically. */
-    AutoDelete autoDelChroot{chrootParentDir};
+    AutoDeleteAt autoDelChroot{params.realStoreDirFd, chrootParentName};
 
     printMsg(lvlChatty, "setting up chroot environment in %1%", PathFmt(chrootParentDir));
 
-    createDir(chrootParentDir, 0700);
-    auto chrootParentDirFd = valueOr(
-        openDirectory(chrootParentDir, FinalSymlink::DontFollow),
-        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(chrootParentDir)));
+    auto chrootParentDirFd = [&] {
+        auto created = createDirectoryAt(params.realStoreDirFd, chrootParentName, 0700);
+        if (!created)
+            throw NativeSysError(created.error(), "creating directory %s", PathFmt(chrootParentDir));
+        if (created.value())
+            return std::move(created).value();
+        return valueOr(
+            openDirectoryAt(params.realStoreDirFd, chrootParentName),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(chrootParentDir)));
+    }();
 
     std::filesystem::path chrootRootDir = chrootParentDir / "root";
 

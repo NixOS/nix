@@ -33,6 +33,7 @@ void ChrootDerivationBuilder::prepareSandbox()
     // Set up chroot parameters
     BuildChrootParams params{
         .chrootParentDir = store->toRealPath(drvPath) + ".chroot",
+        .realStoreDirFd = store->getRealStoreDirFd(),
         .useUidRange = drvOptions.useUidRange(drv),
         .isSandboxed = derivationType.isSandboxed(),
         .buildUser = buildUser.get(),
