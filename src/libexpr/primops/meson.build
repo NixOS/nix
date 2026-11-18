@@ -4,4 +4,5 @@ sources += files(
   'fetchMercurial.cc',
   'fetchTree.cc',
   'fromTOML.cc',
+  'regex.cc',
 )
