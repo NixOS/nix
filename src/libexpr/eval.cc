@@ -295,11 +295,21 @@ EvalState::EvalState(
            mounted fetchTree.
 
            This is the only place where we should allow ourselves to
-           read arbitrarily within the host file system. Anything else
-           should use `makeFSSourceAccessor` for just what it needs to
-           read. */
+           read arbitrarily within the host file system (or drive, on
+           Windows). Anything else should use `makeFSSourceAccessor` for
+           just what it needs to read. */
+        std::filesystem::path hostRoot =
+#ifdef _WIN32
+            /* `/` is not absolute on Windows, which has a root per drive.
+               Use the current drive's, which is what a path without a drive,
+               like `/foo`, refers to anyway. */
+            std::filesystem::current_path().root_path()
+#else
+            "/"
+#endif
+            ;
         auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({makeFSSourceAccessor("/"), storeFS});
+                                          : makeUnionSourceAccessor({makeFSSourceAccessor(hostRoot), storeFS});
         /* Cache positive lstat/readlink results to speed up resolveSymlinks. */
         accessor = makeCachingSourceAccessor(accessor);
 
