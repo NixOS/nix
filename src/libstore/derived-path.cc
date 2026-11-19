@@ -28,7 +28,7 @@ std::string SingleDerivedPath::Built::to_string(const StoreDirConfig & store) co
 
 std::string SingleDerivedPath::Built::to_string_legacy(const StoreDirConfig & store) const
 {
-    return drvPath->to_string(store) + "!" + output;
+    return drvPath->to_string_legacy(store) + "!" + output;
 }
 
 std::string DerivedPath::Built::to_string(const StoreDirConfig & store) const
@@ -121,15 +121,15 @@ DerivedPath::Built DerivedPath::Built::parse(
 static SingleDerivedPath parseWithSingle(
     const StoreDirConfig & store,
     std::string_view s,
-    std::string_view separator,
+    std::string_view separators,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    size_t n = s.rfind(separator);
+    size_t n = s.find_last_of(separators);
     return n == s.npos
                ? (SingleDerivedPath) SingleDerivedPath::Opaque::parse(store, s)
                : (SingleDerivedPath) SingleDerivedPath::Built::parse(
                      store,
-                     make_ref<const SingleDerivedPath>(parseWithSingle(store, s.substr(0, n), separator, xpSettings)),
+                     make_ref<const SingleDerivedPath>(parseWithSingle(store, s.substr(0, n), separators, xpSettings)),
                      s.substr(n + 1),
                      xpSettings);
 }
@@ -143,21 +143,24 @@ SingleDerivedPath SingleDerivedPath::parse(
 SingleDerivedPath SingleDerivedPath::parseLegacy(
     const StoreDirConfig & store, std::string_view s, const ExperimentalFeatureSettings & xpSettings)
 {
-    return parseWithSingle(store, s, "!", xpSettings);
+    /* Before every layer was printed with `!`, inner layers were printed
+       with `^`. Neither character can occur in a store path name, nor in
+       the name of an output that can be built, so accept both. */
+    return parseWithSingle(store, s, "!^", xpSettings);
 }
 
 static DerivedPath parseWith(
     const StoreDirConfig & store,
     std::string_view s,
-    std::string_view separator,
+    std::string_view separators,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    size_t n = s.rfind(separator);
+    size_t n = s.find_last_of(separators);
     return n == s.npos
                ? (DerivedPath) DerivedPath::Opaque::parse(store, s)
                : (DerivedPath) DerivedPath::Built::parse(
                      store,
-                     make_ref<const SingleDerivedPath>(parseWithSingle(store, s.substr(0, n), separator, xpSettings)),
+                     make_ref<const SingleDerivedPath>(parseWithSingle(store, s.substr(0, n), separators, xpSettings)),
                      s.substr(n + 1),
                      xpSettings);
 }
@@ -171,7 +174,8 @@ DerivedPath::parse(const StoreDirConfig & store, std::string_view s, const Exper
 DerivedPath DerivedPath::parseLegacy(
     const StoreDirConfig & store, std::string_view s, const ExperimentalFeatureSettings & xpSettings)
 {
-    return parseWith(store, s, "!", xpSettings);
+    /* See SingleDerivedPath::parseLegacy. */
+    return parseWith(store, s, "!^", xpSettings);
 }
 
 DerivedPath DerivedPath::fromSingle(const SingleDerivedPath & req)
