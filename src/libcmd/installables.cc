@@ -22,6 +22,7 @@
 #include "nix/fetchers/registry.hh"
 #include "nix/store/build-result.hh"
 #include "nix/util/strings-inline.hh"
+#include "nix/flake/settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -445,6 +446,30 @@ static StorePath getDeriver(ref<Store> store, const Installable & i, const Store
     return *derivers.begin();
 }
 
+static bool isBareInstallableName(std::string_view s, const std::filesystem::path & baseDir)
+{
+    if (s.empty() || s[0] == '.' || s[0] == '~' || s.find_first_of("#/:?\\") != std::string_view::npos)
+        return false;
+
+    std::error_code ec;
+    return !std::filesystem::exists(baseDir / std::string(s), ec);
+}
+
+/* TODO: Look up the registries once per invocation instead of once per name. */
+static bool isFlakeRegistryName(Store & store, const std::string & name, bool useRegistries)
+{
+    if (!useRegistries)
+        return false;
+    try {
+        auto flakeRef = parseFlakeRef(name, std::nullopt);
+        auto resolved =
+            fetchers::lookupInRegistries(fetchSettings, store, flakeRef.input, fetchers::UseRegistries::All).first;
+        return !(resolved == flakeRef.input);
+    } catch (Error &) {
+        return false;
+    }
+}
+
 Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<std::string> ss)
 {
     Installables result;
@@ -484,6 +509,12 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
 
     } else {
 
+        const auto & defaultFlakeRef = flakeSettings.defaultFlakeRef.get();
+        const bool flakesEnabled = experimentalFeatureSettings.isEnabled(Xp::Flakes);
+        const bool useRegistries = lockFlags.useRegistries.value_or(flakeSettings.useRegistries.get());
+        auto baseDir = absPath(getCommandBaseDir());
+        Value * legacyNixpkgs = nullptr; // evaluated lazily, only without flakes
+
         for (auto & s : ss) {
             std::exception_ptr ex;
 
@@ -505,9 +536,30 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
                 }
             }
 
+            std::string flakeRefS{prefix};
+
+            // FIXME: Share this with `nix search`, `nix profile` and completion.
+            if (!defaultFlakeRef.empty() && isBareInstallableName(prefix, baseDir)) {
+                if (!flakesEnabled) {
+                    // TODO: Honour `default-flake-ref` instead of hard-coding `<nixpkgs>`.
+                    auto state = getEvalState();
+                    if (!legacyNixpkgs) {
+                        legacyNixpkgs = state->allocValue();
+                        state->eval(
+                            state->parseExprFromString("import <nixpkgs> {}", state->rootPath(baseDir.string())),
+                            *legacyNixpkgs);
+                    }
+                    result.push_back(
+                        make_ref<InstallableAttrPath>(InstallableAttrPath::parse(
+                            state, *this, legacyNixpkgs, std::string{prefix}, std::move(extendedOutputsSpec))));
+                    continue;
+                }
+                if (!isFlakeRegistryName(*store, flakeRefS, useRegistries))
+                    flakeRefS = defaultFlakeRef + "#" + flakeRefS;
+            }
+
             try {
-                auto [flakeRef, fragment] =
-                    parseFlakeRefWithFragment(std::string{prefix}, absPath(getCommandBaseDir()));
+                auto [flakeRef, fragment] = parseFlakeRefWithFragment(flakeRefS, baseDir);
                 result.push_back(
                     make_ref<InstallableFlake>(
                         this,

@@ -27,6 +27,7 @@ suites += {
     'dubious-query.sh',
     'shebang.sh',
     'commit-lock-file-summary.sh',
+    'default-flake-ref.sh',
     'non-flake-inputs.sh',
     'relative-paths.sh',
     'relative-paths-lockfile.sh',
