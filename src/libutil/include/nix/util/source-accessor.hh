@@ -264,7 +264,7 @@ public:
 /**
  * Return a source accessor that contains only an empty root directory.
  */
-ref<SourceAccessor> makeEmptySourceAccessor();
+ref<SourceAccessor> makeEmptyDirectorySourceAccessor();
 
 /**
  * Exception thrown when accessing a filtered path (see
