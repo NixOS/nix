@@ -26,6 +26,11 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
         R"(
           The name of the AWS configuration profile to use. By default
           Nix uses the `default` profile.
+
+          `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` take
+          precedence over this setting, including when it is passed as
+          `?profile=` in the store URL. Unset those variables if you
+          want the named profile to be used.
         )"};
 
     Setting<std::string> region{
