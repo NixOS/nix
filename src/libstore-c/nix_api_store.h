@@ -14,6 +14,7 @@
 #include "nix_api_util.h"
 #include "nix_api_store/store_path.h"
 #include "nix_api_store/derivation.h"
+#include "nix_api_store/path_info.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -282,6 +283,19 @@ StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store *
  */
 nix_err nix_store_copy_path(
     nix_c_context * context, Store * srcStore, Store * dstStore, const StorePath * path, bool repair, bool checkSigs);
+
+/**
+ * @brief Query metadata about a store path
+ *
+ * The path must be valid in the store; otherwise an error is returned.
+ *
+ * @note Don't forget to free this with nix_path_info_free()!
+ * @param[out] context Optional, stores error information
+ * @param[in] store Nix store reference
+ * @param[in] path The store path to query
+ * @return owned nix_path_info, NULL on error
+ */
+nix_path_info * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path);
 
 // cffi end
 #ifdef __cplusplus
