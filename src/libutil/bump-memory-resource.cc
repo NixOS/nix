@@ -98,7 +98,8 @@ BumpMemoryResource::BumpMemoryResource(std::size_t reserveSize, std::pmr::memory
        waste little memory, but save most page faults and TLB misses. This
        matters where transparent huge pages are only used on request. It is
        only a hint, so failure is harmless. */
-    ::madvise(p, reserveSize, MADV_HUGEPAGE);
+    if (adviseHugePages)
+        (void) ::madvise(p, reserveSize, MADV_HUGEPAGE);
 #  endif
 #endif
 }

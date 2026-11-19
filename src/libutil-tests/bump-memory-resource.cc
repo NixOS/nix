@@ -1,11 +1,22 @@
 #include "nix/util/thread-pool.hh"
 #include "nix/util/util.hh"
 #include "nix/util/bump-memory-resource.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/system-error.hh"
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <cstdlib>
 #include <memory_resource>
 #include <numeric>
+
+#ifdef __linux__
+#  include <sys/mman.h>
+#  include <unistd.h>
+#endif
 
 namespace nix {
 
@@ -43,5 +54,81 @@ TEST(BumpMemoryResource, ConcurrentAllocation)
             ASSERT_TRUE(std::ranges::equal(*intVec, std::views::iota(i + j, i + j + intVecSize)));
     }
 }
+
+#ifdef __linux__
+
+/**
+ * The `VmFlags` of the mapping that contains `p`, from `/proc/self/smaps`.
+ * `hg` among them records MADV_HUGEPAGE advice, whether or not huge pages
+ * back the mapping.
+ */
+static StringSet vmFlagsAt(const void * p)
+{
+    auto addr = reinterpret_cast<std::uintptr_t>(p);
+    bool inMapping = false;
+    for (auto & line : tokenizeString<std::vector<std::string>>(readFile("/proc/self/smaps"), "\n")) {
+        if (line.starts_with("VmFlags:")) {
+            if (inMapping)
+                return tokenizeString<StringSet>(line.substr(8));
+            continue;
+        }
+        char * end;
+        auto start = std::strtoull(line.c_str(), &end, 16);
+        if (*end != '-')
+            continue;
+        auto stop = std::strtoull(end + 1, nullptr, 16);
+        inMapping = start <= addr && addr < stop;
+    }
+    throw Error("no mapping contains %p", p);
+}
+
+/**
+ * Whether MADV_HUGEPAGE sets `hg` on a probe mapping. Linux without
+ * transparent huge page support and qemu-user reject the advice; checking
+ * the flag rather than the result also covers an implementation that
+ * accepts it and does nothing.
+ */
+static bool hugePageAdviceRecorded()
+{
+#  ifdef MADV_HUGEPAGE
+    auto size = static_cast<std::size_t>(::sysconf(_SC_PAGESIZE));
+    void * p = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (p == MAP_FAILED)
+        throw SysError("mmap");
+    ::madvise(p, size, MADV_HUGEPAGE);
+    bool recorded = vmFlagsAt(p).count("hg") == 1;
+    ::munmap(p, size);
+    return recorded;
+#  else
+    return false;
+#  endif
+}
+
+/**
+ * The `hg` count of a new resource's region, with `adviseHugePages` set to
+ * `advise`.
+ */
+static size_t hugePageAdviceOfNewRegion(bool advise)
+{
+    auto saved = BumpMemoryResource::adviseHugePages;
+    Finally restore([&] { BumpMemoryResource::adviseHugePages = saved; });
+    BumpMemoryResource::adviseHugePages = advise;
+
+    BumpMemoryResource resource;
+    auto * first = static_cast<char *>(resource.allocate(4096));
+    if (resource.allocate(4096) != first + 4096)
+        throw Error("no reserved region, allocations come from the upstream resource");
+    return vmFlagsAt(first).count("hg");
+}
+
+TEST(BumpMemoryResource, HugePageAdvice)
+{
+    if (!hugePageAdviceRecorded())
+        GTEST_SKIP() << "MADV_HUGEPAGE is not recorded here";
+    EXPECT_EQ(hugePageAdviceOfNewRegion(true), 1);
+    EXPECT_EQ(hugePageAdviceOfNewRegion(false), 0);
+}
+
+#endif
 
 } // namespace nix
