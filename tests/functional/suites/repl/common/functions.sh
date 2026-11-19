@@ -1,10 +1,5 @@
 # shellcheck shell=bash
 
-# Remove ANSI escape sequences. They can prevent grep from finding a match.
-stripColors () {
-    sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g'
-}
-
 testReplResponseGeneral () {
     local grepMode commands expectedResponse response
     grepMode="$1"; shift
@@ -15,7 +10,7 @@ testReplResponseGeneral () {
     # awk ORS always adds a trailing record separator, so we strip it with sed.
     expectedResponse="$(printf '%s' "$1" | awk 1 ORS=TEST_NEWLINE | sed 's/TEST_NEWLINE$//')"; shift
     # We don't need to strip trailing record separator here, since extra data is ok.
-    response="$(nix repl "$@" <<< "$commands" 2>&1 | stripColors | awk 1 ORS=TEST_NEWLINE)"
+    response="$(nix repl "$@" <<< "$commands" 2>&1 | awk 1 ORS=TEST_NEWLINE)"
     printf '%s' "$response" | grepQuiet "$grepMode" -s "$expectedResponse" \
       || fail "$(echo "repl command set:
 
@@ -74,8 +69,7 @@ filterReplOutput () {
 
   testDirNoUnderscores="${testDir//_/}"
 
-  stripColors \
-    | tr -d '\0' \
+  tr -d '\0' \
     | stripEmptyLinesBeforePrompt \
     | stripFinalPrompt \
     | sed \

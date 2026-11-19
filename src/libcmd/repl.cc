@@ -9,6 +9,7 @@
 #include "nix/cmd/repl.hh"
 
 #include "nix/util/ansicolor.hh"
+#include "nix/util/terminal.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
@@ -104,7 +105,8 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace & dt);
 
-    void printValue(std::ostream & str, Value & v, unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
+    void printValue(
+        std::ostream & str, Value & v, bool ansi, unsigned int maxDepth = std::numeric_limits<unsigned int>::max())
     {
         // Hide the progress bar during printing because it might interfere
         auto suspension = logger->suspend();
@@ -113,7 +115,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
             str,
             v,
             PrintOptions{
-                .ansiColors = true,
+                .ansiColors = ansi,
                 .force = true,
                 .derivationPaths = true,
                 .maxDepth = maxDepth,
@@ -143,11 +145,31 @@ NixRepl::NixRepl(
 {
 }
 
-static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
+static void showDebugTraceIndex(std::ostream & out, size_t idx, bool ansi)
 {
+    out << "\n";
+    if (ansi)
+        out << ANSI_BLUE << idx << ANSI_NORMAL;
+    else
+        out << idx;
+    out << ": ";
+}
+
+/**
+ * @param ansi Whether to color the trace. `HintFmt` and `printCodeLines()` color
+ * their output as they format it, so without it those parts are stripped.
+ */
+static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt, bool ansi)
+{
+    auto styled = [&](std::string s) {
+        if (!ansi)
+            return stripANSIEscapes(s);
+        return s;
+    };
+
     if (dt.isError)
-        out << ANSI_RED "error: " << ANSI_NORMAL;
-    out << dt.hint.str() << "\n";
+        out << (ansi ? ANSI_RED "error: " ANSI_NORMAL : "error: ");
+    out << styled(dt.hint.str()) << "\n";
 
     auto pos = dt.getPos(positions);
 
@@ -155,7 +177,9 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
         out << pos;
         if (auto loc = pos.getCodeLines()) {
             out << "\n";
-            printCodeLines(out, "", pos, *loc);
+            std::ostringstream codeLines;
+            printCodeLines(codeLines, "", pos, *loc);
+            out << styled(codeLines.str());
             out << "\n";
         }
     }
@@ -353,6 +377,9 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     setInterrupted(false);
 
+    // Whether the REPL's output to stdout is colored.
+    const bool ansi = shouldANSI(StandardOutputStream::Stdout);
+
     std::string command, arg;
 
     if (line[0] == ':') {
@@ -408,15 +435,15 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
     else if (state->debugRepl && (command == ":bt" || command == ":backtrace")) {
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
-            std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-            showDebugTrace(std::cout, state->positions, i);
+            showDebugTraceIndex(std::cout, idx, ansi);
+            showDebugTrace(std::cout, state->positions, i, ansi);
         }
     }
 
     else if (state->debugRepl && (command == ":env")) {
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
             if (idx == debugTraceIndex) {
-                printEnvBindings(*state, i.expr, i.env);
+                printEnvBindings(*state, i.expr, i.env, ansi);
                 break;
             }
         }
@@ -431,10 +458,10 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
         for (const auto & [idx, i] : enumerate(state->debugTraces)) {
             if (idx == debugTraceIndex) {
-                std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                showDebugTrace(std::cout, state->positions, i);
+                showDebugTraceIndex(std::cout, idx, ansi);
+                showDebugTrace(std::cout, state->positions, i, ansi);
                 std::cout << std::endl;
-                printEnvBindings(*state, i.expr, i.env);
+                printEnvBindings(*state, i.expr, i.env, ansi);
                 loadDebugTraceEnv(i);
                 break;
             }
@@ -586,7 +613,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         if (v.type() == nString) {
             std::cout << v.string_view();
         } else {
-            printValue(std::cout, v);
+            printValue(std::cout, v, ansi);
         }
         std::cout << std::endl;
     }
@@ -642,7 +669,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
             markdown += stripIndentation(doc->doc);
 
-            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+            logger->cout(trim(renderMarkdownToTerminal(markdown, ansi)));
         } else if (fallbackPos) {
             std::ostringstream ss;
             ss << "Attribute `" << fallbackName << "`\n\n";
@@ -654,7 +681,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             }
 
             auto markdown = ss.view();
-            logger->cout(trim(renderMarkdownToTerminal(markdown)));
+            logger->cout(trim(renderMarkdownToTerminal(markdown, ansi)));
 
         } else
             throw Error("value does not have documentation");
@@ -695,7 +722,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             state->forceValue(v, v.determinePos(noPos));
 
             auto suspension = logger->suspend();
-            printValue(std::cout, v, 1);
+            printValue(std::cout, v, ansi, 1);
             std::cout << std::endl;
         } else {
             ExprAttrs * bindings = nullptr;

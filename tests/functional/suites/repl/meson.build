@@ -3,6 +3,7 @@ suites += {
   'deps' : [],
   'tests' : [
     'characterisation.sh',
+    'color.sh',
     'edit-builtin-files.sh',
     'simple.sh',
     'reload-flakes.sh',

@@ -468,7 +468,13 @@ void rethrowExceptionCopy(std::exception_ptr ex)
 
 void panic(std::string_view msg)
 {
-    writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL);
+    bool colour = shouldANSI(StandardOutputStream::Stderr);
+    writeErr("\n\n");
+    if (colour)
+        writeErr(ANSI_RED);
+    writeErr("terminating due to unexpected unrecoverable internal error: ");
+    if (colour)
+        writeErr(ANSI_NORMAL);
     writeErr(msg);
     writeErr("\n");
     std::terminate();

@@ -719,62 +719,68 @@ static StaticEnv::Vars lexicographicOrder(const SymbolTable & st, StaticEnv::Var
 }
 
 // just for the current level of StaticEnv, not the whole chain.
-static void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
+static void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, bool ansi)
 {
-    std::cout << ANSI_MAGENTA;
+    if (ansi)
+        std::cout << ANSI_MAGENTA;
     for (auto & [name, displacement] : lexicographicOrder(st, se.vars))
         std::cout << st[name] << " ";
-    std::cout << ANSI_NORMAL;
+    if (ansi)
+        std::cout << ANSI_NORMAL;
     std::cout << std::endl;
 }
 
 // just for the current level of Env, not the whole chain.
-static void printWithBindings(const SymbolTable & st, const Env & env)
+static void printWithBindings(const SymbolTable & st, const Env & env, bool ansi)
 {
     if (!env.values[0]->isThunk()) {
         std::cout << "with: ";
-        std::cout << ANSI_MAGENTA;
+        if (ansi)
+            std::cout << ANSI_MAGENTA;
         auto * bindings = env.values[0]->attrs();
         /* TODO: Don't print the whole attribute set, since it can be quite large. */
         for (const Attr * attr : bindings->lexicographicOrder(st))
             std::cout << st[attr->name] << " ";
-        std::cout << ANSI_NORMAL;
+        if (ansi)
+            std::cout << ANSI_NORMAL;
         std::cout << std::endl;
     }
 }
 
-void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl)
+void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, bool ansi, int lvl)
 {
     std::cout << "Env level " << lvl << std::endl;
 
     if (se.up && env.up) {
         std::cout << "static: ";
-        printStaticEnvBindings(st, se);
+        printStaticEnvBindings(st, se, ansi);
         if (se.isWith)
-            printWithBindings(st, env);
+            printWithBindings(st, env, ansi);
         std::cout << std::endl;
-        printEnvBindings(st, *se.up, *env.up, ++lvl);
+        printEnvBindings(st, *se.up, *env.up, ansi, ++lvl);
     } else {
-        std::cout << ANSI_MAGENTA;
+        if (ansi)
+            std::cout << ANSI_MAGENTA;
         // for the top level, don't print the double underscore ones;
         // they are in builtins.
         for (auto & i : lexicographicOrder(st, se.vars))
             if (!hasPrefix(st[i.first], "__"))
                 std::cout << st[i.first] << " ";
-        std::cout << ANSI_NORMAL;
+        if (ansi)
+            std::cout << ANSI_NORMAL;
         std::cout << std::endl;
         if (se.isWith)
-            printWithBindings(st, env); // probably nothing there for the top level.
+            printWithBindings(st, env, ansi); // probably nothing there for the top level.
         std::cout << std::endl;
     }
 }
 
-void printEnvBindings(const EvalState & es, const Expr & expr, const Env & env)
+void printEnvBindings(const EvalState & es, const Expr & expr, const Env & env, bool ansi)
 {
     // just print the names for now
     auto se = es.getStaticEnv(expr);
     if (se)
-        printEnvBindings(es.symbols, *se, env, 0);
+        printEnvBindings(es.symbols, *se, env, ansi, 0);
 }
 
 void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, ValMap & vm)

@@ -174,7 +174,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                                                                                     const std::string & tailPad) {
             assert(node.dist != inf);
             if (precise) {
-                logger->cout(
+                logger->coutStyled(
                     "%s%s%s%s" ANSI_NORMAL,
                     firstPad,
                     node.visited ? "\e[38;5;244m" : "",
@@ -263,14 +263,14 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
                 for (auto & hit : hits[hash]) {
                     bool first = hit == *hits[hash].begin();
-                    logger->cout(
+                    logger->coutStyled(
                         "%s%s%s", tailPad, (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine)), hit);
                     if (!all)
                         break;
                 }
 
                 if (!precise) {
-                    logger->cout(
+                    logger->coutStyled(
                         "%s%s%s%s" ANSI_NORMAL,
                         firstPad,
                         ref.second->visited ? "\e[38;5;244m" : "",

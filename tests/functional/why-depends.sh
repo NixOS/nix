@@ -27,3 +27,9 @@ echo "$PRECISE_WHY_DEPENDS_OUTPUT" | grepQuiet reference-to-input-2
 <<<"$PRECISE_WHY_DEPENDS_OUTPUT" sed -n '3p' | grep "    →" | grepQuiet "dependencies-input-2"
 <<<"$PRECISE_WHY_DEPENDS_OUTPUT" sed -n '4p' | grepQuiet "    └───input0: …"                          # in input-2, file input0
 <<<"$PRECISE_WHY_DEPENDS_OUTPUT" sed -n '5p' | grep "        →" | grepQuiet "dependencies-input-0"    # is dependencies-input-0 referenced
+
+# Styled output carries no ANSI escapes when it is not going to a terminal
+(( $(nix why-depends ./toplevel ./dep | grep -c $'\x1b') == 0 ))
+(( $(CLICOLOR_FORCE=1 nix why-depends ./toplevel ./dep | grep -c $'\x1b') > 0 ))
+(( $(nix why-depends ./toplevel ./dep --precise | grep -c $'\x1b') == 0 ))
+(( $(CLICOLOR_FORCE=1 nix why-depends ./toplevel ./dep --precise | grep -c $'\x1b') > 0 ))

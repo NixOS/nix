@@ -14,7 +14,7 @@
 namespace nix {
 
 #if HAVE_LOWDOWN
-static std::string doRenderMarkdownToTerminal(std::string_view markdown)
+static std::string doRenderMarkdownToTerminal(std::string_view markdown, bool ansi)
 {
     int windowWidth = getWindowSize().second;
 
@@ -47,7 +47,7 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
 #  endif
     };
 
-    if (!shouldANSI())
+    if (!ansi)
         opts.oflags |= LOWDOWN_TERM_NOANSI;
 
     auto doc = lowdown_doc_new(&opts);
@@ -78,16 +78,16 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
     return std::string(buf->data, buf->size);
 }
 
-std::string renderMarkdownToTerminal(std::string_view markdown)
+std::string renderMarkdownToTerminal(std::string_view markdown, bool ansi)
 {
     if (auto e = getEnv("_NIX_TEST_RAW_MARKDOWN"); e && *e == "1")
         return std::string(markdown);
     else
-        return doRenderMarkdownToTerminal(markdown);
+        return doRenderMarkdownToTerminal(markdown, ansi);
 }
 
 #else
-std::string renderMarkdownToTerminal(std::string_view markdown)
+std::string renderMarkdownToTerminal(std::string_view markdown, bool)
 {
     return std::string(markdown);
 }
