@@ -27,6 +27,17 @@ test -d "$outp"
 
 nix log "$outp"
 
+# A cursor forward in build output (as Wine prints instead of a space)
+# is shown as the gap it leaves.
+cat > "$builder" <<'EOF'
+#!/bin/sh
+printf 'x\033[1Cy\n'
+mkdir $out
+EOF
+nix-build -E \
+    'with import '"${config_nix}"'; mkDerivation { name = "gap"; builder = '"$builder"'; }' \
+    --no-out-link 2>&1 | grepQuiet 'x y'
+
 if isDaemonNewer "2.26"; then
     # Build works despite ill-formed structured build log entries.
     expectStderr 0 nix build -f ./logging/unusual-logging.nix --no-link | grepQuiet -i 'warning: unable to handle a JSON message from the derivation builder:'
