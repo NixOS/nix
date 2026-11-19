@@ -7,6 +7,7 @@ then 200) and asserts nix-prefetch-url retry timing/counts from stderr.
 
 import http.server
 import re
+import socket
 import socketserver
 import subprocess
 import threading
@@ -83,17 +84,41 @@ def fetch(extra_opts: str = "") -> tuple[int, str, list[int]]:
     cmd = f"nix-prefetch-url {extra_opts} http://127.0.0.1:{PORT}/file"
     r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     out = r.stdout + r.stderr
-    delays = [int(m) for m in re.findall(r"retrying in (\d+) ms", out)]
+    # Only count retries caused by the server's responses. A transient
+    # "Could not connect to server" (seen on macOS CI before the listener
+    # accepts connections) is not what these tests are measuring.
+    delays = [
+        int(m.group(1))
+        for line in out.splitlines()
+        if "Could not connect to server" not in line
+        and (m := re.search(r"retrying in (\d+) ms", line))
+    ]
     return r.returncode, out, delays
+
+
+def wait_for_server(timeout: float = 10.0) -> None:
+    """Block until the server is accepting connections."""
+    deadline = time.time() + timeout
+    while True:
+        try:
+            with socket.create_connection(("127.0.0.1", PORT), timeout=1):
+                return
+        except OSError:
+            if time.time() > deadline:
+                raise
+            time.sleep(0.05)
 
 
 def main() -> None:
     global PORT
-    socketserver.TCPServer.allow_reuse_address = True
-    httpd = socketserver.TCPServer(("127.0.0.1", 0), FlakyHandler)
+    socketserver.ThreadingTCPServer.allow_reuse_address = True
+    socketserver.ThreadingTCPServer.daemon_threads = True
+    socketserver.ThreadingTCPServer.request_queue_size = 128
+    httpd = socketserver.ThreadingTCPServer(("127.0.0.1", 0), FlakyHandler)
     PORT = httpd.server_address[1]
     print(f"Flaky server on port {PORT}")
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    wait_for_server()
 
     try:
         test_rate_limit_delay_and_retry_after()
