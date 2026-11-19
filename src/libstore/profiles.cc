@@ -128,7 +128,7 @@ void deleteGenerations(
 
     auto [gens, curGen] = findGenerations(profile);
 
-    if (gensToDelete.count(*curGen))
+    if (curGen && gensToDelete.contains(*curGen))
         throw Error("cannot delete current version of profile %1%", PathFmt(profile));
 
     for (auto & i : gens) {

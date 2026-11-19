@@ -200,6 +200,14 @@ nix-env --set "$outPath10"
 nix-env --set "$drvPath10"
 [ "$(nix-store -q --resolve "$profiles"/test)" = "$outPath10" ]
 
+# Deleting specific generations works if the profile has no current
+# generation.
+nix-env -p "$TEST_ROOT"/no-such-profile --delete-generations 1
+nix-env -p "$TEST_ROOT"/no-current --set "$outPath10"
+rm "$TEST_ROOT"/no-current
+nix-env -p "$TEST_ROOT"/no-current --delete-generations 1
+[ ! -e "$TEST_ROOT"/no-current-1-link ]
+
 # Test the case where $HOME contains a symlink.
 mkdir -p "$TEST_ROOT"/real-home/alice/.nix-defexpr/channels
 ln -sfn "$TEST_ROOT"/real-home "$TEST_ROOT"/home
