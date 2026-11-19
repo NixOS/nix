@@ -70,6 +70,10 @@ struct GitArchiveInputScheme : InputScheme
                 attrs.insert_or_assign("ref", value);
             } else if (name == "host")
                 attrs.insert_or_assign("host", value);
+            else if (name == "submodules")
+                attrs.insert_or_assign("submodules", Explicit<bool>{value == "1" || value == "true"});
+            else if (name == "lfs")
+                attrs.insert_or_assign("lfs", Explicit<bool>{value == "1" || value == "true"});
             else if (name == "narHash")
                 attrs.insert_or_assign("narHash", value);
             else
@@ -118,6 +122,14 @@ struct GitArchiveInputScheme : InputScheme
                 "treeHash",
                 {},
             },
+            {
+                "submodules",
+                {},
+            },
+            {
+                "lfs",
+                {},
+            },
         };
         return attrs;
     }
@@ -145,8 +157,15 @@ struct GitArchiveInputScheme : InputScheme
         if (auto host = maybeGetStrAttr(attrs, "host"); host && !std::regex_match(*host, hostRegex))
             throw BadURL("input %s contains an invalid instance host", attrsToJSON(attrs));
 
+        /* Delegate to the git scheme if we need to. */
+        if (auto gitAttrs = gitEquivalentAttrs(attrs))
+            return Input::fromAttrs(std::move(*gitAttrs));
+
         Input input{};
         input.attrs = attrs;
+        /* An explicit `false` is the archive default. */
+        input.attrs.erase("submodules");
+        input.attrs.erase("lfs");
         return input;
     }
 
@@ -253,6 +272,52 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const = 0;
 
+    /**
+     * The transport URL of the equivalent `git` input (e.g.
+     * `https://github.com/owner/repo.git`), i.e. what `clone()` clones
+     * minus the `git+` prefix. Reads only the identity attributes
+     * (host/owner/repo).
+     */
+    virtual std::string getGitUrl(const Input & input) const = 0;
+
+    /**
+     * The attributes of the equivalent `git` input, for inputs that
+     * request tree features an archive tarball cannot provide.
+     *
+     * Returns std::nullopt when neither feature is requested.
+     */
+    std::optional<Attrs> gitEquivalentAttrs(const Attrs & attrs) const
+    {
+        auto submodules = maybeGetBoolAttr(attrs, "submodules").value_or(false);
+        auto lfs = maybeGetBoolAttr(attrs, "lfs").value_or(false);
+        if (!submodules && !lfs)
+            return std::nullopt;
+
+        /* getGitUrl() only reads the identity attributes. */
+        Input probe{};
+        probe.attrs = attrs;
+
+        Attrs res;
+        res.insert_or_assign("type", std::string{"git"});
+        res.insert_or_assign("url", getGitUrl(probe));
+        /* Should be a shallow fetch since an archive is too. */
+        res.insert_or_assign("shallow", Explicit<bool>{true});
+        if (submodules)
+            res.insert_or_assign("submodules", Explicit<bool>{true});
+        if (lfs)
+            res.insert_or_assign("lfs", Explicit<bool>{true});
+        if (auto ref = maybeGetStrAttr(attrs, "ref"))
+            res.insert_or_assign("ref", *ref);
+        if (auto rev = maybeGetStrAttr(attrs, "rev"))
+            res.insert_or_assign("rev", *rev);
+        /* These should be the exact same, just with a different scheme */
+        if (auto narHash = maybeGetStrAttr(attrs, "narHash"))
+            res.insert_or_assign("narHash", *narHash);
+        if (auto lastModified = maybeGetIntAttr(attrs, "lastModified"))
+            res.insert_or_assign("lastModified", *lastModified);
+        return res;
+    }
+
     struct TarballInfo
     {
         Hash treeHash;
@@ -335,6 +400,10 @@ struct GitArchiveInputScheme : InputScheme
     std::pair<ref<SourceAccessor>, Input>
     getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
+        /* Handle submodules/LFS with the git protocol instead of a tarball. */
+        if (auto gitAttrs = gitEquivalentAttrs(_input.attrs))
+            return Input::fromAttrs(std::move(*gitAttrs)).getAccessor(settings, store);
+
         auto [input, tarballInfo] = downloadArchive(settings, store, _input);
 
 #if 0
@@ -449,11 +518,15 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return DownloadUrl{parseURL(url), headers};
     }
 
+    std::string getGitUrl(const Input & input) const override
+    {
+        return fmt("https://%s/%s/%s.git", getHost(input), getOwner(input), getRepo(input));
+    }
+
     void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
         const override
     {
-        auto host = getHost(input);
-        Input::fromURL(fmt("git+https://%s/%s/%s.git", host, getOwner(input), getRepo(input)))
+        Input::fromURL("git+" + getGitUrl(input))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(settings, store, destDir);
     }
@@ -537,13 +610,17 @@ struct GitLabInputScheme : GitArchiveInputScheme
         return DownloadUrl{parseURL(url), headers};
     }
 
+    std::string getGitUrl(const Input & input) const override
+    {
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
+        return fmt("https://%s/%s/%s.git", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"));
+    }
+
     void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
         const override
     {
-        auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
-        Input::fromURL(
-            fmt("git+https://%s/%s/%s.git", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+        Input::fromURL("git+" + getGitUrl(input))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(settings, store, destDir);
     }
@@ -632,12 +709,16 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         return DownloadUrl{parseURL(url), headers};
     }
 
+    std::string getGitUrl(const Input & input) const override
+    {
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
+        return fmt("https://%s/%s/%s", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"));
+    }
+
     void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
         const override
     {
-        auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
-        Input::fromURL(
-            fmt("git+https://%s/%s/%s", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+        Input::fromURL("git+" + getGitUrl(input))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(settings, store, destDir);
     }
