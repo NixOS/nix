@@ -538,3 +538,10 @@ cat > "$inputsFromTop/flake.nix" <<EOF2
 EOF2
 git -C "$inputsFromTop" add flake.nix
 [[ "$(nix eval --raw --inputs-from "$inputsFromTop" dep#x)" = hi ]]
+
+# `--override-flake` takes precedence over `--inputs-from`, whatever their order.
+inputsFromOther=$TEST_ROOT/inputs-from-other
+mkdir -p "$inputsFromOther"
+echo '{ outputs = _: { x = "other"; }; }' > "$inputsFromOther/flake.nix"
+[[ "$(nix eval --raw --inputs-from "$inputsFromTop" --override-flake dep "path:$inputsFromOther" dep#x)" = other ]]
+[[ "$(nix eval --raw --override-flake dep "path:$inputsFromOther" --inputs-from "$inputsFromTop" dep#x)" = other ]]
