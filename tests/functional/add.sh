@@ -93,3 +93,13 @@ clearStoreIfPossible
     path2=$(nix eval --impure --raw --expr 'builtins.toFile "dummy" (builtins.readFile ./dummy)')
     [[ "$path1" == "$path2" ]]
 )
+
+# Flat ingestion only accepts a regular file, and the whole NAR is still
+# read, so this is not mistaken for a hash mismatch.
+(
+    mkdir -p "$TEST_ROOT/flat-dir/sub"
+    echo a > "$TEST_ROOT/flat-dir/a"
+    echo b > "$TEST_ROOT/flat-dir/sub/b"
+    expectStderr 1 nix-store --add-fixed sha256 "$TEST_ROOT/flat-dir" | grepQuiet "is not a regular file"
+    expectStderr 1 nix store add --mode flat "$TEST_ROOT/flat-dir" | grepQuiet "is not a regular file"
+)

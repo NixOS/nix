@@ -11,6 +11,7 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/fs-sink.hh"
 #include "nix/util/signals.hh"
 
 namespace nix {
@@ -141,7 +142,7 @@ static SerialisationError badArchive(std::string_view s, Args &&... args)
     return SerialisationError("bad archive: " + s, std::forward<Args>(args)...);
 }
 
-static void parseContents(CreateRegularFileSink & sink, Source & source)
+static void parseContents(FileSystemObjectSink::OnRegularFile & sink, Source & source)
 {
     uint64_t size = readLongLong(source);
 
@@ -171,7 +172,7 @@ struct CaseInsensitiveCompare
     }
 };
 
-static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path, size_t depth)
+static void parse(FileSystemObjectSink & sink, Source & source, size_t depth)
 {
     if (depth >= narMaxDepth)
         throw badArchive("NAR directory nesting exceeds maximum depth of %d", narMaxDepth);
@@ -203,28 +204,27 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
     auto type = getString(narMaxTag);
 
     if (type == "regular") {
-        sink.createRegularFile(path, [&](auto & crf) {
-            auto tag = getString(narMaxTag);
+        auto tag = getString(narMaxTag);
 
-            if (tag == "executable") {
-                auto s2 = getString(0);
-                if (s2 != "")
-                    throw badArchive("executable marker has non-empty value");
-                crf.isExecutable();
-                tag = getString(narMaxTag);
-            }
+        bool isExecutable = false;
+        if (tag == "executable") {
+            auto s2 = getString(0);
+            if (s2 != "")
+                throw badArchive("executable marker has non-empty value");
+            isExecutable = true;
+            tag = getString(narMaxTag);
+        }
 
-            if (tag != "contents")
-                throw badArchive("expected tag 'contents', got '%s'", tag);
+        if (tag != "contents")
+            throw badArchive("expected tag 'contents', got '%s'", tag);
 
-            parseContents(crf, source);
+        sink.createRegularFile(isExecutable, [&](auto & crf) { parseContents(crf, source); });
 
-            expectTag(")");
-        });
+        expectTag(")");
     }
 
     else if (type == "directory") {
-        sink.createDirectory(path, [&](FileSystemObjectSink & dirSink, const CanonPath & relDirPath) {
+        sink.createDirectory([&](FileSystemObjectSink::OnDirectory & dirSink) {
             std::map<std::string, int, CaseInsensitiveCompare> names;
 
             std::string prevName;
@@ -267,7 +267,8 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
                 expectTag("node");
 
-                parse(dirSink, source, relDirPath / name, depth + 1);
+                dirSink.createChild(
+                    name, [&](FileSystemObjectSink & childSink) { parse(childSink, source, depth + 1); });
 
                 expectTag(")");
             }
@@ -280,7 +281,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
         auto target = getString(narMaxTarget);
         if (target.empty() || target.find((char) 0) != std::string::npos)
             throw badArchive("NAR contains invalid symlink target");
-        sink.createSymlink(path, target);
+        sink.createSymlink(target);
 
         expectTag(")");
     }
@@ -300,14 +301,7 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     }
     if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
-    parse(sink, source, CanonPath::root, 0);
-}
-
-void restorePath(const std::filesystem::path & path, Source & source, bool startFsync, RestoreSinkHooks * hooks)
-{
-    RestoreSink sink{startFsync, hooks};
-    sink.dstPath = path;
-    parseDump(sink, source);
+    parse(sink, source, 0);
 }
 
 void copyNAR(Source & source, Sink & sink)

@@ -148,30 +148,79 @@ public:
      * @brief Insert a new regular file into with the specified @p contents.
      * @todo Have a way to insert "borrowed" std::string_view without copying.
      */
-    SourcePath addFile(CanonPath path, std::string && contents);
+    void addFile(const CanonPath & path, std::string && contents, bool executable = false);
+
+    /**
+     * @brief Insert a new, empty directory.
+     */
+    void addDirectory(const CanonPath & path);
+
+    /**
+     * @brief Insert a new symlink to @p target.
+     */
+    void addSymlink(const CanonPath & path, std::string && target);
+
+private:
+
+    /**
+     * Get the file system object at @p path, creating it as @p file if
+     * it doesn't exist yet, for the `add*` functions.
+     */
+    File & add(const CanonPath & path, File file, std::string_view what);
 };
 
 /**
- * Write to a `MemorySourceAccessor` at the given path
+ * Write to a `MemorySourceAccessor::File`
  */
 struct MemorySink : FileSystemObjectSink
 {
 private:
     void anchor() override;
 
-public:
-    MemorySourceAccessor & dst;
+    using CreateRoot = fun<MemorySourceAccessor::File &(MemorySourceAccessor::File)>;
 
-    MemorySink(MemorySourceAccessor & dst)
-        : dst(dst)
+    /**
+     * The accessor being written to, for showing paths in errors.
+     */
+    MemorySourceAccessor & accessor;
+
+    /**
+     * Where in `accessor` this sink creates its file system object.
+     */
+    CanonPath path;
+
+    /**
+     * Puts the file system object at `path`, returning it.
+     */
+    CreateRoot createRoot;
+
+    MemorySink(MemorySourceAccessor & accessor, CanonPath path, CreateRoot createRoot)
+        : accessor(accessor)
+        , path(std::move(path))
+        , createRoot(std::move(createRoot))
     {
     }
 
-    void createDirectory(const CanonPath & path) override;
+public:
+    /**
+     * Write the file system object to the root of @p dst, which must
+     * outlive this sink.
+     */
+    explicit MemorySink(MemorySourceAccessor & dst)
+        : MemorySink(dst, CanonPath::root, [&dst](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+            /* Like `createChild`, only ever create new entries. */
+            if (dst.root)
+                throw Error("file '%s' already exists", dst.showPath(CanonPath::root));
+            return dst.root.emplace(std::move(file));
+        })
+    {
+    }
 
-    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
+    void createDirectory(DirectoryCreatedCallback callback) override;
 
-    void createSymlink(const CanonPath & path, const std::string & target) override;
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) override;
+
+    void createSymlink(const std::string & target) override;
 };
 
 template<>

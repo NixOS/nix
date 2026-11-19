@@ -761,7 +761,8 @@ static void opRestore(Strings opFlags, Strings opArgs)
         throw UsageError("only one argument allowed");
 
     FdSource source(STDIN_FILENO);
-    restorePath(*opArgs.begin(), source);
+    auto sink = RestoreSink::forPath(*opArgs.begin(), /*startFsync=*/false);
+    parseDump(sink, source);
 }
 
 static void opExport(Strings opFlags, Strings opArgs)

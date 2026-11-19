@@ -313,16 +313,24 @@ EvalState::EvalState(
     }())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
-    , derivationInternal{internalFS->addFile(
-          CanonPath("derivation-internal.nix"),
-          {
+    , derivationInternal{[&] {
+        CanonPath path{"derivation-internal.nix"};
+        internalFS->addFile(
+            path,
+            {
 #embed "primops/derivation.nix"
-          })}
-    , importedDrvToDerivation{internalFS->addFile(
-          CanonPath("imported-drv-to-derivation.nix"),
-          {
+            });
+        return SourcePath{internalFS, std::move(path)};
+    }()}
+    , importedDrvToDerivation{[&] {
+        CanonPath path{"imported-drv-to-derivation.nix"};
+        internalFS->addFile(
+            path,
+            {
 #embed "imported-drv-to-derivation.nix"
-          })}
+            });
+        return SourcePath{internalFS, std::move(path)};
+    }()}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , inputCache(fetchers::InputCache::create())

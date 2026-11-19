@@ -378,6 +378,9 @@ nix build -o "$TEST_ROOT"/result file://"$TEST_ROOT"/flake.tar.gz
 nix flake clone "file://$TEST_ROOT/flake.tar.gz" --dest "$TEST_ROOT/unpacked"
 [[ -e $TEST_ROOT/unpacked/flake.nix ]]
 expectStderr 1 nix flake clone "file://$TEST_ROOT/flake.tar.gz" --dest "$TEST_ROOT/unpacked" | grep 'existing path'
+# A trailing slash is fine, since the tree is a directory.
+nix flake clone "file://$TEST_ROOT/flake.tar.gz" --dest "$TEST_ROOT/unpacked-slash/"
+[[ -e $TEST_ROOT/unpacked-slash/flake.nix ]]
 
 # Building with a tarball URL containing a SRI hash should also work.
 url=$(nix flake metadata --json file://"$TEST_ROOT"/flake.tar.gz | jq -r .url)

@@ -285,7 +285,8 @@ TEST_F(LibExprTest, gcThreadPropagatesException)
 TEST_F(LibExprTest, resetFileCacheReleasesValues)
 {
     auto accessor = make_ref<MemorySourceAccessor>();
-    auto file = accessor->addFile(CanonPath("/test.nix"), "{ a = 1; }");
+    auto file = SourcePath{accessor, CanonPath("/test.nix")};
+    accessor->addFile(file.path, "{ a = 1; }");
 
     auto weak = static_cast<void **>(GC_MALLOC_ATOMIC(sizeof(void *)));
     ASSERT_NE(nullptr, weak);

@@ -29,13 +29,11 @@ enum class NarContentMode {
 
 struct DrainingFileSystemObjectSink : NullFileSystemObjectSink
 {
-    void createRegularFile(const CanonPath &, fun<void(CreateRegularFileSink &)> func) override
+    void createRegularFile(bool, RegularFileCreatedCallback func) override
     {
-        struct : CreateRegularFileSink
+        struct : OnRegularFile
         {
             void operator()(std::string_view) override {}
-
-            void isExecutable() override {}
         } sink;
 
         func(sink);
