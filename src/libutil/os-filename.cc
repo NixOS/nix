@@ -15,7 +15,11 @@ void OsFilename::validateAssert() const noexcept
 void OsFilename::validateThrow(const std::filesystem::path & p)
 {
     const OsString & native = p.native();
+    /* No special path traversal names. */
     bool invalid = p.empty() || native == OS_STR(".") || native == OS_STR("..");
+    /* A NUL would cut the name short in system calls, so that different
+       names could refer to the same file. */
+    invalid |= native.contains(OsString::value_type{});
 #ifndef _WIN32
     invalid |= native.contains('/');
 #else

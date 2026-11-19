@@ -14,6 +14,7 @@ namespace nix {
  * - Has no directory separators
  * - Is not empty
  * - Is not `.` or `..`
+ * - Has no NUL characters
  *
  * This type is useful for APIs that expect a bare filename rather than
  * a full path, providing compile-time documentation and runtime validation.

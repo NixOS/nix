@@ -88,6 +88,12 @@ TEST(OsFilename, fromPathThrowingRejects)
         EXPECT_THAT([&] { OsFilename::fromPathThrowing(p); }, throwsInvalid);
         ASSERT_DEATH(OsFilename::fromPathAsserting(p), "invalid filename");
     }
+
+    /* Embedded NULs need an explicit length. */
+    for (const auto & p : {std::string{"foo\0bar", 7}, std::string{"\0", 1}}) {
+        EXPECT_THAT([&] { OsFilename::fromPathThrowing(p); }, throwsInvalid);
+        ASSERT_DEATH(OsFilename::fromPathAsserting(p), "invalid filename");
+    }
 }
 
 } // namespace nix
