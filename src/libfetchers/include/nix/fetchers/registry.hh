@@ -37,8 +37,6 @@ struct Registry
     {
     }
 
-    static std::shared_ptr<Registry> read(const Settings & settings, const SourcePath & path, RegistryType type);
-
     void write(const std::filesystem::path & path);
 
     void add(const Input & from, const Input & to, const Attrs & extraAttrs);
@@ -46,11 +44,11 @@ struct Registry
     void remove(const Input & input);
 };
 
-typedef std::vector<std::shared_ptr<Registry>> Registries;
+typedef std::vector<ref<Registry>> Registries;
 
-std::shared_ptr<Registry> getUserRegistry(const Settings & settings);
+ref<Registry> getUserRegistry(const Settings & settings);
 
-std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p);
+ref<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p);
 
 std::filesystem::path getUserRegistryPath();
 

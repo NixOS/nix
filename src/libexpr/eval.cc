@@ -294,9 +294,13 @@ EvalState::EvalState(
            underlying directory available. This is necessary for
            instance if we're evaluating a file from the physical
            /nix/store while using a chroot store, and also for lazy
-           mounted fetchTree. */
+           mounted fetchTree.
+
+           This is the only place that should read the entire host file
+           system (or drive, on Windows) programmatically. Anything else
+           should use `makeFSSourceAccessor` for just what it reads. */
         auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
+                                          : makeUnionSourceAccessor({makeFSSourceAccessor("/"), storeFS});
         /* Cache positive lstat/readlink results to speed up resolveSymlinks. */
         accessor = makeCachingSourceAccessor(accessor);
 

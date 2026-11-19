@@ -311,11 +311,6 @@ public:
 };
 
 /**
- * Return an accessor for the root filesystem.
- */
-ref<SourceAccessor> getFSSourceAccessor();
-
-/**
  * Optional parameters for `makeFSSourceAccessor`.
  */
 struct MakeFSSourceAccessorParams
@@ -353,6 +348,17 @@ struct MakeFSSourceAccessorParams
  * @param root Path to file/tree to open.
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, MakeFSSourceAccessorParams params = {});
+
+/**
+ * Like `makeFSSourceAccessor`, but if @p root cannot be opened, an
+ * accessor that remembers why, rather than throwing now.
+ *
+ * If there is nothing at @p root (including when one of its parents is
+ * not a directory), its root does not exist: `pathExists` is false and
+ * `maybeLstat` is `std::nullopt`. Anything else rethrows the error from
+ * opening it, as does every other use whatever the error.
+ */
+ref<SourceAccessor> makeFSSourceAccessorOrError(std::filesystem::path root, MakeFSSourceAccessorParams params = {});
 
 /**
  * Construct an accessor that presents a "union" view of a vector of
