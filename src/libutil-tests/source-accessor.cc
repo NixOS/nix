@@ -113,6 +113,78 @@ TEST_F(FSSourceAccessorTest, relativeRoot)
     EXPECT_TRUE(std::filesystem::equivalent(*physicalPath, tmpDir / "file"));
 }
 
+TEST_F(FSSourceAccessorTest, orErrorExisting)
+{
+    writeFile(tmpDir / "file", "contents");
+    auto accessor = makeFSSourceAccessorOrError(tmpDir / "file");
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath::root, "contents"));
+}
+
+TEST_F(FSSourceAccessorTest, orErrorMissing)
+{
+    /* Both a missing file and one under a non-directory count as nothing
+       there. Other uses rethrow the error from opening it. */
+    writeFile(tmpDir / "file", "");
+    for (auto & [path, errc] : std::initializer_list<std::pair<std::filesystem::path, std::errc>>{
+             {tmpDir / "missing", std::errc::no_such_file_or_directory},
+             {tmpDir / "file" / "child", std::errc::not_a_directory},
+         }) {
+        auto accessor = makeFSSourceAccessorOrError(path);
+        EXPECT_FALSE(accessor->pathExists(CanonPath::root)) << path;
+        EXPECT_FALSE(accessor->maybeLstat(CanonPath::root)) << path;
+        EXPECT_EQ(accessor->showPath(CanonPath::root), path.generic_string());
+#ifdef _WIN32
+        /* Windows reports these with its own error codes, which need not
+           map to the POSIX ones. */
+        (void) errc;
+        EXPECT_THROW(accessor->readFile(CanonPath::root), SystemError) << path;
+        EXPECT_THROW(accessor->readDirectory(CanonPath::root), SystemError) << path;
+        EXPECT_THROW(accessor->readLink(CanonPath::root), SystemError) << path;
+        EXPECT_THROW(accessor->getFingerprint(CanonPath::root), SystemError) << path;
+        EXPECT_THROW(accessor->getLastModified(), SystemError) << path;
+#else
+        EXPECT_THAT([&] { accessor->readFile(CanonPath::root); }, testing::ThrowsSystemError(errc)) << path;
+        EXPECT_THAT([&] { accessor->readDirectory(CanonPath::root); }, testing::ThrowsSystemError(errc)) << path;
+        EXPECT_THAT([&] { accessor->readLink(CanonPath::root); }, testing::ThrowsSystemError(errc)) << path;
+        EXPECT_THAT([&] { accessor->getFingerprint(CanonPath::root); }, testing::ThrowsSystemError(errc)) << path;
+        EXPECT_THAT([&] { accessor->getLastModified(); }, testing::ThrowsSystemError(errc)) << path;
+#endif
+    }
+}
+
+#ifndef _WIN32
+TEST_F(FSSourceAccessorTest, orErrorUnsupportedType)
+{
+    /* A device is an unsupported type. That error is not a `SystemError`,
+       but is still deferred, and is not nothing there. */
+    auto accessor = makeFSSourceAccessorOrError("/dev/null");
+    EXPECT_THROW(accessor->pathExists(CanonPath::root), Error);
+    EXPECT_THROW(accessor->readFile(CanonPath::root), Error);
+}
+#endif
+
+TEST_F(FSSourceAccessorTest, orErrorOtherError)
+{
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+    /* A symlink loop is an error, not nothing there, so even asking
+       whether it exists throws. */
+    createSymlink("b", tmpDir / "a");
+    createSymlink("a", tmpDir / "b");
+    auto accessor = makeFSSourceAccessorOrError(tmpDir / "a", {.finalSymlink = FinalSymlink::Follow});
+#ifdef _WIN32
+    /* Windows reports a loop with its own error code, which need not map
+       to `ELOOP`. */
+    EXPECT_THROW(accessor->pathExists(CanonPath::root), SystemError);
+#else
+    EXPECT_THAT(
+        [&] { accessor->pathExists(CanonPath::root); },
+        testing::ThrowsSystemError(std::errc::too_many_symbolic_link_levels));
+#endif
+}
+
 TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
 {
 #ifdef _WIN32

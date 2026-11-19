@@ -311,11 +311,6 @@ public:
 };
 
 /**
- * Return an accessor for the root filesystem.
- */
-ref<SourceAccessor> getFSSourceAccessor();
-
-/**
  * Optional parameters for `makeFSSourceAccessor`.
  */
 struct MakeFSSourceAccessorParams
@@ -353,6 +348,25 @@ struct MakeFSSourceAccessorParams
  * @param root Path to file/tree to open.
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, MakeFSSourceAccessorParams params = {});
+
+/**
+ * Like `makeFSSourceAccessor`, but if opening @p root fails with an
+ * `Error`, return an accessor that rethrows that error on use, rather
+ * than throwing now.
+ *
+ * This is especially useful when trying to retrofit better TOCTOU
+ * discipline on code that expects to do the file IO at the last moment,
+ * and only handle the errors then.
+ *
+ * If there is nothing at @p root (including when one of its parents is
+ * not a directory), its root does not exist: `pathExists` is false and
+ * `maybeLstat` is `std::nullopt`. Any other use rethrows the error, as
+ * does every use for any other error.
+ *
+ * Making @p root absolute (when `requireAbsolute` is false) still throws
+ * now.
+ */
+ref<SourceAccessor> makeFSSourceAccessorOrError(std::filesystem::path root, MakeFSSourceAccessorParams params = {});
 
 /**
  * Construct an accessor that presents a "union" view of a vector of

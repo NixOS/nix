@@ -37,8 +37,6 @@ struct Registry
     {
     }
 
-    static ref<Registry> read(const Settings & settings, const SourcePath & path, RegistryType type);
-
     void write(const std::filesystem::path & path);
 
     void add(const Input & from, const Input & to, const Attrs & extraAttrs);
