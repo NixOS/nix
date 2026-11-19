@@ -34,6 +34,7 @@ fuzz_dependencies = deps_private + deps_private_no_pkgconfig
 
 sources = files(
   'build-result.cc',
+  'buildenv.cc',
   'common-protocol.cc',
   'content-address.cc',
   'daemon.cc',

@@ -1,6 +1,7 @@
 #include "nix/store/builtins/buildenv.hh"
 #include "nix/store/builtins.hh"
 #include "nix/store/derivations.hh"
+#include "nix/util/archive.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/system-error.hh"
 
@@ -23,7 +24,8 @@ namespace {
 
 struct State
 {
-    std::map<std::filesystem::path, int> priorities;
+    MemorySourceAccessor & out;
+    std::map<CanonPath, int> priorities;
     unsigned long symlinks = 0;
 };
 
@@ -31,7 +33,7 @@ struct State
 
 /* For each activated package, create symlinks */
 static void
-createLinks(State & state, const std::filesystem::path & srcDir, const std::filesystem::path & dstDir, int priority)
+createLinks(State & state, const std::filesystem::path & srcDir, const CanonPath & dstDir, int priority, size_t depth)
 {
     DirectoryIterator srcFiles;
 
@@ -51,10 +53,10 @@ createLinks(State & state, const std::filesystem::path & srcDir, const std::file
         if (name.string()[0] == '.')
             /* not matched by glob */
             continue;
-        auto srcFile = (std::filesystem::path{srcDir} / name).string();
-        auto dstFile = (std::filesystem::path{dstDir} / name).string();
+        auto srcFile = srcDir / name;
+        auto dstFile = dstDir / name.string();
 
-        auto srcStOpt = maybeStat(srcFile.c_str());
+        auto srcStOpt = maybeStat(srcFile);
         if (!srcStOpt) {
             warn("skipping dangling symlink '%s'", dstFile);
             continue;
@@ -67,71 +69,63 @@ createLinks(State & state, const std::filesystem::path & srcDir, const std::file
          * Python package brings its own
          * `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
          */
-        if (hasSuffix(srcFile, "/propagated-build-inputs") || hasSuffix(srcFile, "/nix-support")
-            || hasSuffix(srcFile, "/perllocal.pod") || hasSuffix(srcFile, "/info/dir") || hasSuffix(srcFile, "/log")
-            || hasSuffix(srcFile, "/manifest.nix") || hasSuffix(srcFile, "/manifest.json"))
+        if (name == "propagated-build-inputs" || name == "nix-support" || name == "perllocal.pod"
+            || (name == "dir" && srcDir.filename() == "info") || name == "log" || name == "manifest.nix"
+            || name == "manifest.json")
             continue;
 
-        else if (S_ISDIR(srcSt.st_mode)) {
-            auto dstStOpt = maybeLstat(dstFile.c_str());
-            if (dstStOpt) {
-                auto & dstSt = *dstStOpt;
-                if (S_ISDIR(dstSt.st_mode)) {
-                    createLinks(state, srcFile, dstFile, priority);
+        if (depth + 1 >= narMaxDepth)
+            throw Error("path '%s' exceeds maximum NAR directory depth of %d", dstFile, narMaxDepth);
+
+        if (S_ISDIR(srcSt.st_mode)) {
+            if (auto * dst = state.out.open(dstFile, std::nullopt)) {
+                if (std::holds_alternative<MemorySourceAccessor::File::Directory>(dst->raw)) {
+                    createLinks(state, srcFile, dstFile, priority, depth + 1);
                     continue;
-                } else if (S_ISLNK(dstSt.st_mode)) {
-                    auto target = canonPath(dstFile, true);
+                } else if (auto * link = std::get_if<MemorySourceAccessor::File::Symlink>(&dst->raw)) {
+                    auto target = canonPath(link->target, true);
                     if (!S_ISDIR(lstat(target).st_mode))
                         throw Error("collision between %1% and non-directory %2%", PathFmt(srcFile), PathFmt(target));
-                    unlink(dstFile);
-                    if (mkdir(
-                            dstFile.c_str()
-#ifndef _WIN32 // TODO abstract mkdir perms for Windows
-                                ,
-                            0755
-#endif
-                            )
-                        == -1)
-                        throw SysError("creating directory '%1%'", dstFile);
-                    createLinks(state, target, dstFile, state.priorities[dstFile]);
-                    createLinks(state, srcFile, dstFile, priority);
+                    dst->raw = MemorySourceAccessor::File::Directory{};
+                    createLinks(state, target, dstFile, state.priorities[dstFile], depth + 1);
+                    createLinks(state, srcFile, dstFile, priority, depth + 1);
                     continue;
                 }
             }
         }
 
         else {
-            auto dstStOpt = maybeLstat(dstFile.c_str());
-            if (dstStOpt) {
-                auto & dstSt = *dstStOpt;
-                if (S_ISLNK(dstSt.st_mode)) {
+            if (auto * dst = state.out.open(dstFile, std::nullopt)) {
+                if (auto * link = std::get_if<MemorySourceAccessor::File::Symlink>(&dst->raw)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw BuildEnvFileConflictError(readLink(dstFile), srcFile, priority);
+                        throw BuildEnvFileConflictError(link->target, srcFile, priority);
                     if (prevPriority < priority)
                         continue;
-                    unlink(dstFile);
-                } else if (S_ISDIR(dstSt.st_mode))
-                    throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
+                } else if (std::holds_alternative<MemorySourceAccessor::File::Directory>(dst->raw))
+                    throw Error("collision between non-directory %1% and directory %2%", PathFmt(srcFile), dstFile);
             }
         }
 
-        createSymlink(srcFile, dstFile);
+        MemorySink{state.out}.createSymlink(dstFile, srcFile.string());
         state.priorities[dstFile] = priority;
         state.symlinks++;
     }
 }
 
-void buildProfile(const std::filesystem::path & out, Packages && pkgs)
+ref<MemorySourceAccessor> buildProfile(Packages && pkgs)
 {
-    State state;
+    auto out = make_ref<MemorySourceAccessor>();
+    out->open(CanonPath::root, MemorySourceAccessor::File::Directory{});
+
+    State state{.out = *out};
 
     std::set<std::filesystem::path> done, postponed;
 
     auto addPkg = [&](const std::filesystem::path & pkgDir, int priority) {
         if (!done.insert(pkgDir).second)
             return;
-        createLinks(state, pkgDir, out, priority);
+        createLinks(state, pkgDir, CanonPath::root, priority, 0);
 
         try {
             for (const auto & p : tokenizeString<std::vector<std::string>>(
@@ -169,6 +163,8 @@ void buildProfile(const std::filesystem::path & out, Packages && pkgs)
     }
 
     debug("created %d symlinks in user environment", state.symlinks);
+
+    return out;
 }
 
 static void builtinBuildenv(const BuiltinBuilderContext & ctx)
@@ -181,7 +177,6 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
     };
 
     auto out = ctx.outputs.at("out");
-    createDirs(out);
 
     /* Convert the stuff we get from the environment back into a
      * coherent data type. */
@@ -202,7 +197,11 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
         }
     }
 
-    buildProfile(out, std::move(pkgs));
+    auto profile = buildProfile(std::move(pkgs));
+
+    RestoreSink sink(/*startFsync=*/false);
+    sink.dstPath = out;
+    copyRecursive(*profile, CanonPath::root, sink, CanonPath::root);
 
     createSymlink(getAttr("manifest"), out + "/manifest.nix");
 }
