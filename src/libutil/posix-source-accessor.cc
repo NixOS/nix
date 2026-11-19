@@ -791,14 +791,19 @@ try {
 
 ref<SourceAccessor> getFSSourceAccessor()
 {
-    static auto rootFS = makeFSSourceAccessor("/", /*trackLastModified=*/false);
+    static auto rootFS = makeFSSourceAccessor("/");
     return rootFS;
 }
 
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified, FinalSymlink finalSymlink)
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, MakeFSSourceAccessorParams params)
 {
+    /* TODO: `absPath` resolves `..` lexically, which is wrong after a
+       symlink. Better to leave that to opening the path. But we cannot just do
+       that yet because then `showPath` and `getPhysicalPath` will be wrong. */
+    if (!params.requireAbsolute)
+        root = absPath(root);
     assert(root.is_absolute());
-    auto fd = openFileReadonly(root, finalSymlink);
+    auto fd = openFileReadonly(root, params.finalSymlink);
 
     if (canTraverseWithoutRead && !fd && NativeSysError::toErrorCode(fd.error()) == std::errc::permission_denied) {
         /* `root` may be a directory we can traverse but not list (e.g.
@@ -813,7 +818,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
            not with `SeBackupPrivilege` enabled, since
            `FILE_FLAG_BACKUP_SEMANTICS` then bypasses the access check. */
         /* Not a directory after all: keep the original error. */
-        if (auto traversable = openDirectoryTraversable(root, finalSymlink))
+        if (auto traversable = openDirectoryTraversable(root, params.finalSymlink))
             fd = std::move(traversable);
     }
 
@@ -827,7 +832,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
     if (S_ISLNK(st.st_mode)) {
 #else
     if (!fd) {
-        if (finalSymlink == FinalSymlink::Follow || fd.error() != NIX_ERR_OPEN_SYMLINK)
+        if (params.finalSymlink == FinalSymlink::Follow || fd.error() != NIX_ERR_OPEN_SYMLINK)
             throw NativeSysError(fd.error(), "opening file %1%", PathFmt(root));
 #endif
 
@@ -883,7 +888,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
         std::time_t mtime = 0;
 
         auto relPath = OsFilename::fromPathAsserting(root.filename());
-        if (trackLastModified) {
+        if (params.trackLastModified) {
             /* On Windows we already have the symlink's own status, from the
                handle to the symlink itself. */
 #ifndef _WIN32
@@ -893,20 +898,20 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
         }
 
         auto linkTarget = os_string_to_string(readLinkAt(parentFd.get(), relPath));
-        return make_ref<SymlinkSourceAccessor>(std::move(linkTarget), std::move(root), trackLastModified, mtime);
+        return make_ref<SymlinkSourceAccessor>(std::move(linkTarget), std::move(root), params.trackLastModified, mtime);
     }
 
 #ifndef _WIN32
     auto st = nix::fstat(fd.value().get());
 #endif
     if (S_ISREG(st.st_mode))
-        return make_ref<PosixFileSourceAccessor>(std::move(fd).value(), std::move(root), trackLastModified, st);
+        return make_ref<PosixFileSourceAccessor>(std::move(fd).value(), std::move(root), params.trackLastModified, st);
 
     else if (S_ISDIR(st.st_mode)) {
         auto res = make_ref<PosixDirectorySourceAccessor>(
             std::move(fd).value(),
             std::move(root),
-            trackLastModified,
+            params.trackLastModified,
             PosixDirectorySourceAccessor::getGlobalFdLimit() / 8);
         PosixDirectorySourceAccessor::registerAccessor(res);
         return res;
