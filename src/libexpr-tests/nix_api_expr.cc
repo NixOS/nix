@@ -12,6 +12,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <nlohmann/json.hpp>
+
 #include "expr-tests-config.hh"
 
 namespace nixC {
@@ -769,6 +771,47 @@ TEST_F(nix_api_expr_test, nix_expr_thunk_re_evaluation_after_deployment)
     nix_get_string(ctx, thunk, OBSERVE_STRING(result));
     assert_ctx_ok();
     ASSERT_STREQ("vm-12345", result.c_str());
+}
+
+static nix_err recordingFetchHook(
+    void * user_data,
+    nix_c_context * context,
+    const char * request_json,
+    nix_get_string_callback callback,
+    void * callback_user_data)
+{
+    *static_cast<std::string *>(user_data) = request_json;
+    return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "left to the embedder");
+}
+
+TEST_F(nix_api_expr_test, nix_eval_state_builder_set_fetch_hook)
+{
+    std::string request;
+    auto builder = nix_eval_state_builder_new(ctx, store);
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, nix_eval_state_builder_set_fetch_hook(ctx, builder, recordingFetchHook, &request));
+    assert_ctx_ok();
+    auto hookedState = nix_eval_state_build(ctx, builder);
+    assert_ctx_ok();
+    nix_eval_state_builder_free(builder);
+
+    auto fetched = nix_alloc_value(ctx, hookedState);
+    auto err = nix_expr_eval_from_string(
+        ctx,
+        hookedState,
+        R"(builtins.fetchurl { url = "https://example.invalid/source.tar.gz"; name = "source"; })",
+        ".",
+        fetched);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, err);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("left to the embedder"));
+    ASSERT_EQ(
+        nlohmann::json::parse(request),
+        nlohmann::json(
+            {{"builtin", "fetchurl"},
+             {"args", {{"url", "https://example.invalid/source.tar.gz"}, {"name", "source"}}}}));
+
+    nix_value_decref(ctx, fetched);
+    nix_state_free(hookedState);
 }
 
 } // namespace nixC
