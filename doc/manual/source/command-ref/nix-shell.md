@@ -310,6 +310,7 @@ The examples above all used `-p` to get dependencies from Nixpkgs. You
 can also use a Nix expression to build your own dependencies. For
 example, the Python example could have been written as:
 
+
 ```python
 #! /usr/bin/env nix-shell
 #! nix-shell deps.nix -i python
@@ -323,6 +324,10 @@ with import <nixpkgs> {};
 
 runCommand "dummy" { buildInputs = [ python3 python3Packages.prettytable ]; } ""
 ```
+
+> **Note**
+>
+> Filenames in `nix-shell` shebangs are interpreted relative to the location of the script.
 
 The script's file name is passed as the first argument to the interpreter specified by the `-i` flag.
 
