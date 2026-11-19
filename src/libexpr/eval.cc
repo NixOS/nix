@@ -262,7 +262,7 @@ EvalState::EvalState(
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
     , storeFS(makeMountedSourceAccessor({
-          {CanonPath::root, makeEmptySourceAccessor()},
+          {CanonPath::root, makeEmptyDirectorySourceAccessor()},
           /* In the pure eval case, we can simply require
              valid paths. However, in the *impure* eval
              case this gets in the way of the union
