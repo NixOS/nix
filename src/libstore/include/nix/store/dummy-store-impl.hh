@@ -64,6 +64,75 @@ public:
     bool operator==(const DummyStore &) const;
 };
 
+class WholeStoreViewAccessor;
+
+struct DummyStoreImpl : DummyStore
+{
+private:
+    void anchor() override;
+
+public:
+    using Config = DummyStoreConfig;
+
+    /**
+     * This view conceptually just borrows the file systems objects of
+     * each store object from `contents` and combines them together
+     * into one store-wide source accessor.
+     *
+     * This is needed just in order to implement `Store::getFSAccessor`.
+     */
+    ref<WholeStoreViewAccessor> wholeStoreView;
+
+    DummyStoreImpl(ref<const Config> config);
+
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+
+    /**
+     * Do this to avoid `queryPathInfoUncached` computing `PathInfo`
+     * that we don't need just to return a `bool`.
+     */
+    bool isValidPathUncached(const StorePath & path) override;
+
+    /**
+     * The dummy store is incapable of *not* trusting! :)
+     */
+    std::optional<TrustedFlag> isTrustedClient() override;
+
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
+
+    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
+
+    StorePath addToStoreFromDump(
+        Source & source,
+        std::string_view name,
+        FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
+        ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
+        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
+        const StorePathSet & references = StorePathSet(),
+        RepairFlag repair = NoRepair) override;
+
+    StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair) override;
+
+    Derivation readDerivation(const StorePath & drvPath) override;
+
+    /**
+     * No such thing as an "invalid derivation" with the dummy store
+     */
+    Derivation readInvalidDerivation(const StorePath & drvPath) override;
+
+    void registerDrvOutputUnchecked(const Realisation & output) override;
+
+    void queryRealisationUncached(
+        const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+
+    std::shared_ptr<MemorySourceAccessor> getMemoryFSAccessor(const StorePath & path, bool requireValidPath = true);
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
+
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
+};
+
 template<>
 struct json_avoids_null<DummyStore::PathInfoAndContents> : std::true_type
 {};
