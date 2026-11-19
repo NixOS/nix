@@ -38,6 +38,10 @@ public:
     static constexpr std::size_t defaultReserveSize =
         sizeof(void *) >= 8 ? std::size_t(8) << 30 : std::size_t(64) << 20;
 
+    /* The size of the region's start where we intentionally do not use huge pages.
+       See BumpMemoryResource constructor definition for details. */
+    static constexpr std::size_t regularPagesPrefix = std::size_t(2) << 20;
+
     explicit BumpMemoryResource(
         std::size_t reserveSize = defaultReserveSize,
         std::pmr::memory_resource * upstream = std::pmr::new_delete_resource(),
