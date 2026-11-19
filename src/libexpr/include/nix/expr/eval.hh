@@ -832,6 +832,9 @@ public:
      */
     void ensureLazyPathsCopied(const NixStringContext & context);
 
+    /** `Builder::ensurePath()` on `store`, falling back to copying the closure from `buildStore`. */
+    void ensurePath(const StorePath & path);
+
     /**
      * String coercion.
      *
