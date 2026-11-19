@@ -27,6 +27,8 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
 
     void startChild() override;
 
+    freebsd::Embryo & confineEmbryo(freebsd::Embryo & embryo) override;
+
     void enterChroot() override;
 
     void addDependencyImpl(const StorePath & path) override;

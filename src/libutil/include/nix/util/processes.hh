@@ -39,6 +39,14 @@ class Pid
 {
 #ifndef _WIN32
     pid_t pid = unix::INVALID_PID;
+#  ifdef __FreeBSD__
+    /**
+     * The process descriptor of the process, if it was created with one.
+     * While it is open the process cannot be reaped by anyone else, so `pid`
+     * cannot be reused under us.
+     */
+    AutoCloseFD procDesc;
+#  endif
     bool separatePG = false;
     int killSignal = SIGKILL;
     std::chrono::milliseconds killTimeout;
@@ -54,6 +62,9 @@ public:
     Pid & operator=(Pid && other) noexcept;
 #ifndef _WIN32
     Pid(pid_t pid);
+#  ifdef __FreeBSD__
+    Pid(pid_t pid, AutoCloseFD procDesc);
+#  endif
     void operator=(pid_t pid);
     operator pid_t() const;
 #else
@@ -85,6 +96,13 @@ public:
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);
     void setKillTimeout(std::chrono::milliseconds duration);
+    /**
+     * Stop managing the process, leaving it running.
+     *
+     * @note On FreeBSD this closes the process descriptor, if any, which
+     * kills the process unless it was created not to die with its parent
+     * (`PD_DAEMON`).
+     */
     pid_t release();
 #endif
 
@@ -93,6 +111,9 @@ public:
         using std::swap;
 #ifndef _WIN32
         swap(lhs.pid, rhs.pid);
+#  ifdef __FreeBSD__
+        swap(lhs.procDesc, rhs.procDesc);
+#  endif
         swap(lhs.separatePG, rhs.separatePG);
         swap(lhs.killSignal, rhs.killSignal);
 #else
@@ -159,7 +180,7 @@ struct SpawnOptions
     std::optional<std::filesystem::path> chdir;
     std::optional<OsStringMap> environment;
     /**
-     * @brief (Linux-only) whether to have the process die when its parent (us) exists.
+     * @brief (Linux and FreeBSD only) whether to have the process die when its parent (us) exists.
      *
      * Implemented on best-effort basis and ignored if not implemented.
      */

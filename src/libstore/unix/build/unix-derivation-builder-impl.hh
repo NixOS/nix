@@ -204,15 +204,39 @@ protected:
     }
 
     /**
+     * Open the slave side of the pseudoterminal, in raw mode.
+     */
+    AutoCloseFD openSlaveFd();
+
+    /**
      * Open the slave side of the pseudoterminal and use it as stderr.
      */
     void openSlave();
 
     /**
      * Called by prepareBuild() to start the child process for the
-     * build. Must set `pid`. The child must call runChild().
+     * build. Must set `pid`. The child must call runChild(), unless
+     * `childSetsUp` is cleared.
      */
     virtual void startChild();
+
+    /**
+     * Whether the child sets up the build environment itself, in
+     * runChild(), and reports through `builderOut` when it is done.
+     * startChild() clears this when it set up the child from the
+     * outside instead, so there is nothing to wait for.
+     */
+    bool childSetsUp = true;
+
+    /**
+     * The builder's arguments, including `argv[0]`.
+     */
+    Strings getBuilderArgs();
+
+    /**
+     * The builder's environment, as `name=value` strings.
+     */
+    Strings getBuilderEnv();
 
 #if NIX_WITH_AWS_AUTH
     /**

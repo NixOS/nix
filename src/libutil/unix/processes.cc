@@ -40,6 +40,9 @@ Pid::Pid() {}
 
 Pid::Pid(Pid && other) noexcept
     : pid(other.pid)
+#ifdef __FreeBSD__
+    , procDesc(std::move(other.procDesc))
+#endif
     , separatePG(other.separatePG)
     , killSignal(other.killSignal)
 {
@@ -50,6 +53,14 @@ Pid::Pid(pid_t pid)
     : pid(pid)
 {
 }
+
+#ifdef __FreeBSD__
+Pid::Pid(pid_t pid, AutoCloseFD procDesc)
+    : pid(pid)
+    , procDesc(std::move(procDesc))
+{
+}
+#endif
 
 Pid::~Pid()
 {
@@ -134,6 +145,11 @@ int Pid::wait(bool allowInterrupts)
         int res = waitpid(pid, &status, 0);
         if (res == pid) {
             pid = INVALID_PID;
+#ifdef __FreeBSD__
+            /* The zombie is only reaped once its process descriptor is
+               closed too. */
+            procDesc.close();
+#endif
             return status;
         }
         if (errno != EINTR)
@@ -319,8 +335,9 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 }
 
 /* On Linux, the vfork()-based spawnProgram in linux/processes.cc is used
-   instead, except with ASan. See the comment there for why. */
-#if (!defined(__linux__) || NIX_ASAN_ENABLED) && !defined(__APPLE__)
+   instead, except with ASan. See the comment there for why. FreeBSD uses the
+   embryonic-process one in freebsd/processes.cc. */
+#if (!defined(__linux__) || NIX_ASAN_ENABLED) && !defined(__APPLE__) && !defined(__FreeBSD__)
 
 Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fdr)
 {

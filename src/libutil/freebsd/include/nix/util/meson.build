@@ -3,5 +3,6 @@
 include_dirs += include_directories('../..')
 
 headers += files(
+  'freebsd-embryo.hh',
   'freebsd-jail.hh',
 )

@@ -7,6 +7,8 @@
 #include "nix/util/util.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/result.hh"
 
 #include <stdlib.h>
 #include <string.h>
@@ -22,10 +24,93 @@
 #include <sys/sockio.h>
 #include <jail.h>
 #include <fcntl.h>
+#include <sys/procctl.h>
+#include <sys/resource.h>
+#include <sys/ucred.h>
 
 namespace nix {
 
 FreeBSDDerivationBuilder::~FreeBSDDerivationBuilder() {}
+
+void FreeBSDDerivationBuilder::startChild()
+{
+    /* A builtin builder is our own code rather than a program, so it can
+       only run in a forked copy of us, which sets itself up in runChild(). */
+    if (drv.isBuiltin()) {
+        UnixDerivationBuilderImpl::startChild();
+        return;
+    }
+
+    freebsd::Embryo embryo;
+    configureEmbryo(embryo);
+
+    /* A failure to load the builder is thrown here, so unlike runChild()
+       there is no setup to report back through the log. */
+    pid = std::move(embryo).exec(drv.builder, getBuilderArgs(), getBuilderEnv());
+    childSetsUp = false;
+}
+
+freebsd::Embryo & FreeBSDDerivationBuilder::configureEmbryo(freebsd::Embryo & embryo)
+{
+    /* Everything below is what runChild() and commonChildInit() do in a
+       forked child, done from the outside instead. Anything not done here
+       the embryo starts without: it has no other file descriptors, blocks
+       no signals, and gives every signal its default disposition. */
+
+    /* Put the child in a separate session (and thus a separate process
+       group) so that it has no controlling terminal (meaning that e.g. ssh
+       cannot open /dev/tty) and it doesn't receive terminal signals.
+       Standard output and error go to the log, and standard input is the
+       null device. */
+    auto slave = openSlaveFd();
+    embryo.setsid()
+        .setFd(STDOUT_FILENO, slave.get())
+        .setFd(STDERR_FILENO, slave.get())
+        .setFd(STDIN_FILENO, openNullFD().get());
+
+    confineEmbryo(embryo);
+
+    /* Disable core dumps by default. */
+    embryo.setRlimit(RLIMIT_CORE, {0, RLIM_INFINITY});
+
+    /* The builder needs a predictable umask that is not group-writable,
+       since registerOutputs rejects those as defense-in-depth. An embryo's
+       is always `CMASK`, 022, which is exactly that. */
+
+    /* Don't let the builder gain privileges through setuid or setgid
+       programs. */
+    if (!localSettings.allowNewPrivileges) {
+        int enable = PROC_NO_NEW_PRIVS_ENABLE;
+        embryo.procctl(PROC_NO_NEW_PRIVS_CTL, &enable);
+    }
+
+    /* If we are running in `build-users' mode, then run as the user we
+       allocated, dropping all root privileges. Unlike setUser() in a forked
+       child, this happens before the builder exists, so there is no death
+       signal to preserve and no window in which killUser() would miss it. */
+    if (buildUser) {
+        /* Preserve supplementary groups of the build user, to allow admins
+           to specify groups such as "kvm". */
+        auto gids = buildUser->getSupplementaryGIDs();
+        struct setcred cred = SETCRED_INITIALIZER;
+        cred.sc_uid = cred.sc_ruid = cred.sc_svuid = buildUser->getUID();
+        cred.sc_gid = cred.sc_rgid = cred.sc_svgid = buildUser->getGID();
+        cred.sc_supp_groups_nb = gids.size();
+        cred.sc_supp_groups = gids.data();
+        embryo.setCred(
+            SETCREDF_UID | SETCREDF_RUID | SETCREDF_SVUID | SETCREDF_GID | SETCREDF_RGID | SETCREDF_SVGID
+                | SETCREDF_SUPP_GROUPS,
+            cred);
+    }
+
+    return embryo;
+}
+
+freebsd::Embryo & FreeBSDDerivationBuilder::confineEmbryo(freebsd::Embryo & embryo)
+{
+    /* Without a sandbox, the builder runs in our root. */
+    return embryo.chroot().chdir(tmpDirFd.get());
+}
 
 namespace {
 
@@ -364,12 +449,6 @@ void ChrootFreeBSDDerivationBuilder::startChild()
 
     int jid;
 
-    RunChildArgs args{
-#if NIX_WITH_AWS_AUTH
-        .awsCredentials = preResolveAwsCredentials(),
-#endif
-    };
-
     if (derivationType.isSandboxed()) {
         jid = jail_setv(
             JAIL_CREATE,
@@ -390,6 +469,12 @@ void ChrootFreeBSDDerivationBuilder::startChild()
 
         // Everything from here to the end of the block is setting up the network
         // code adapted from freebsd/sbin/ifconfig/af_inet.c, in_exec_nl
+        //
+        // This is our own code, which has to run in the jail to talk to its
+        // network stack, so unlike the builder it is still a forked copy of us.
+        //
+        // TODO make this work without fork. It would be very nice if we could
+        // set up the loopback interface for the jail outside the jail.
         Pid helper = startProcess([&]() {
             closeExtraFDs();
             enterChroot();
@@ -459,10 +544,23 @@ void ChrootFreeBSDDerivationBuilder::startChild()
         autoDelJail->jid = jid;
     }
 
-    pid = startProcess([&]() {
-        openSlave();
-        runChild(args);
-    });
+    FreeBSDDerivationBuilder::startChild();
+}
+
+freebsd::Embryo & ChrootFreeBSDDerivationBuilder::confineEmbryo(freebsd::Embryo & embryo)
+{
+    /* This also gives it the jail's root. */
+    embryo.jailAttach(autoDelJail->jid);
+
+    /* Open the build directory through its mount inside the jail, rather
+       than using `tmpDirFd`, which refers to it outside the jail's root. A
+       working directory outside its root would let the builder escape the
+       jail with `..`. */
+    auto dir = chrootRootDir / tmpDirInSandbox().relative_path();
+    auto dirFd = valueOr(
+        openDirectory(dir, FinalSymlink::DontFollow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build directory %s", PathFmt(dir)));
+    return embryo.chdir(dirFd.get());
 }
 
 void ChrootFreeBSDDerivationBuilder::enterChroot()

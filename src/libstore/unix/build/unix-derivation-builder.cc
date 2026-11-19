@@ -398,7 +398,8 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
 
     pid.setSeparatePG(true);
 
-    processSandboxSetupMessages();
+    if (childSetsUp)
+        processSandboxSetupMessages();
 
     return builderOut.get();
 }
@@ -484,7 +485,7 @@ void UnixDerivationBuilderImpl::prepareSandbox()
         throw Error("feature 'uid-range' is not supported on this platform");
 }
 
-void UnixDerivationBuilderImpl::openSlave()
+AutoCloseFD UnixDerivationBuilderImpl::openSlaveFd()
 {
     std::string slaveName = getPtsName(builderOut.get());
 
@@ -502,7 +503,12 @@ void UnixDerivationBuilderImpl::openSlave()
     if (tcsetattr(builderOut.get(), TCSANOW, &term))
         throw SysError("putting pseudoterminal into raw mode");
 
-    if (dup2(builderOut.get(), STDERR_FILENO) == -1)
+    return builderOut;
+}
+
+void UnixDerivationBuilderImpl::openSlave()
+{
+    if (dup2(openSlaveFd().get(), STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
 }
 
@@ -924,17 +930,7 @@ void UnixDerivationBuilderImpl::runChild(RunChildArgs args)
 
         /* It's not a builtin builder, so execute the program. */
 
-        Strings args;
-        args.push_back(std::string(baseNameOf(drv.builder)));
-
-        for (auto & i : drv.args)
-            args.push_back(rewriteStrings(i, inputRewrites));
-
-        Strings envStrs;
-        for (auto & i : env)
-            envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
-
-        execBuilder(args, envStrs);
+        execBuilder(getBuilderArgs(), getBuilderEnv());
 
         throw SysError("executing '%1%'", drv.builder);
 
@@ -942,6 +938,26 @@ void UnixDerivationBuilderImpl::runChild(RunChildArgs args)
         handleChildException(sendException);
         _exit(1);
     }
+}
+
+Strings UnixDerivationBuilderImpl::getBuilderArgs()
+{
+    Strings args;
+    args.push_back(std::string(baseNameOf(drv.builder)));
+
+    for (auto & i : drv.args)
+        args.push_back(rewriteStrings(i, inputRewrites));
+
+    return args;
+}
+
+Strings UnixDerivationBuilderImpl::getBuilderEnv()
+{
+    Strings envStrs;
+    for (auto & i : env)
+        envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
+
+    return envStrs;
 }
 
 void UnixDerivationBuilderImpl::setUser()
