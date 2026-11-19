@@ -1,0 +1,13 @@
+error:
+       … while calling the 'appendContext' builtin
+         at /pwd/lang/eval-fail-appendContext-empty-output-list.nix:1:1:
+            1| builtins.appendContext "" {
+             | ^
+            2|   "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = {
+
+       error: expected a non-empty list of outputs, but the output at index 0 is [ ], suggesting a reference to the derivation itself, instead of an actual output. To represent a reference to a store derivation, use path = true instead of outputs.
+       at /pwd/lang/eval-fail-appendContext-empty-output-list.nix:3:5:
+            2|   "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = {
+            3|     outputs = [ [ ] ];
+             |     ^
+            4|   };
