@@ -1,5 +1,6 @@
 #include "nix/util/configuration.hh"
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
@@ -324,6 +325,16 @@ TEST(Config, applyConfigInvalidThrows)
     Config config;
     ASSERT_THROW(config.applyConfig("value == key"), UsageError);
     ASSERT_THROW(config.applyConfig("value "), UsageError);
+}
+
+TEST(Config, applyConfigIncludeWithTwoPathsThrows)
+{
+    Config config;
+    ASSERT_THAT(
+        [&] { config.applyConfig("include a b", "/etc/nix/nix.conf"); },
+        ::testing::ThrowsMessage<UsageError>(::testing::Eq(
+            ANSI_RED "error:" ANSI_NORMAL " syntax error in configuration line '" ANSI_WARNING "include a b" ANSI_NORMAL
+                     "' in " ANSI_WARNING "\"/etc/nix/nix.conf\"" ANSI_NORMAL)));
 }
 
 TEST(Config, toKeyValue)

@@ -540,7 +540,7 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
 
         state
             .error<EvalError>(
-                std::string("invalid store path name when fetching URL '%s': %s. %s"),
+                "invalid store path name when fetching URL '%s': %s. %s",
                 *url,
                 Uncolored(e.message()),
                 Uncolored(resolution.str()))

@@ -413,12 +413,13 @@ struct GitHubInputScheme : GitArchiveInputScheme
     RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
     {
         auto host = getHost(input);
-        auto url = fmt(
-            host == "github.com" ? "https://api.%s/repos/%s/%s/commits/%s" : "https://%s/api/v3/repos/%s/%s/commits/%s",
-            host,
-            getOwner(input),
-            getRepo(input),
-            *input.getRef());
+        auto url =
+            fmt(host == "github.com" ? "https://api.%s/repos/%s/%s/commits/%s"_fmt
+                                     : "https://%s/api/v3/repos/%s/%s/commits/%s"_fmt,
+                host,
+                getOwner(input),
+                getRepo(input),
+                *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(settings, host, input);
 
@@ -439,9 +440,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
         // If we have no auth headers then we default to the public archive
         // urls so we do not run into rate limits.
-        const auto urlFmt = host != "github.com" ? "https://%s/api/v3/repos/%s/%s/tarball/%s"
-                            : headers.empty()    ? "https://%s/%s/%s/archive/%s.tar.gz"
-                                                 : "https://api.%s/repos/%s/%s/tarball/%s";
+        const auto urlFmt = host != "github.com" ? "https://%s/api/v3/repos/%s/%s/tarball/%s"_fmt
+                            : headers.empty()    ? "https://%s/%s/%s/archive/%s.tar.gz"_fmt
+                                                 : "https://api.%s/repos/%s/%s/tarball/%s"_fmt;
 
         const auto url =
             fmt(urlFmt, host, getOwner(input), getRepo(input), input.getRev()->to_string(HashFormat::Base16, false));

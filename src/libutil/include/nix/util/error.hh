@@ -155,21 +155,39 @@ public:
     BaseError & operator=(const BaseError &) = default;
     BaseError & operator=(BaseError &&) noexcept = default;
 
-    template<typename... Args>
-    BaseError(unsigned int status, Args &&... args)
-        : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .status = status}
+    template<RuntimeMessage S>
+    BaseError(unsigned int status, const S & msg)
+        : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}, .status = status}
     {
     }
 
     template<typename... Args>
-    explicit BaseError(const std::string & fs, Args &&... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, std::forward<Args>(args)...), .pos = {}}
+    BaseError(unsigned int status, FormatString<sizeof...(Args)> fs, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}, .status = status}
+    {
+    }
+
+    template<RuntimeMessage S>
+    explicit BaseError(const S & msg)
+        : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}}
     {
     }
 
     template<typename... Args>
-    BaseError(const Suggestions & sug, Args &&... args)
-        : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .suggestions = sug}
+    explicit BaseError(FormatString<sizeof...(Args)> fs, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}}
+    {
+    }
+
+    template<RuntimeMessage S>
+    BaseError(const Suggestions & sug, const S & msg)
+        : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}, .suggestions = sug}
+    {
+    }
+
+    template<typename... Args>
+    BaseError(const Suggestions & sug, FormatString<sizeof...(Args)> fs, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}, .suggestions = sug}
     {
     }
 
@@ -235,9 +253,21 @@ public:
      * @param args Format string arguments.
      */
     template<typename... Args>
-    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view fs, Args &&... args)
+    void addTrace(std::shared_ptr<const Pos> && pos, FormatString<sizeof...(Args)> fs, const Args &... args)
     {
-        addTrace(std::move(pos), HintFmt(std::string(fs), std::forward<Args>(args)...));
+        addTrace(std::move(pos), HintFmt(fs, args...));
+    }
+
+    /**
+     * Prepends an item to the error trace, as is usual for extra context.
+     *
+     * @param pos Nullable source position to put in trace item
+     * @param msg Message, printed literally
+     */
+    template<RuntimeMessage S>
+    void addTrace(std::shared_ptr<const Pos> && pos, const S & msg)
+    {
+        addTrace(std::move(pos), HintFmt(msg));
     }
 
     /**

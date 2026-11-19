@@ -9,6 +9,7 @@ namespace nix::testing {
 class CaptureLogger : public Logger
 {
     std::ostringstream oss;
+    std::ostringstream stdoutStream;
 
 public:
     CaptureLogger() {}
@@ -16,6 +17,11 @@ public:
     std::string get() const
     {
         return oss.str();
+    }
+
+    std::string getStdout() const
+    {
+        return stdoutStream.str();
     }
 
     void log(Verbosity lvl, std::string_view s) noexcept override
@@ -26,6 +32,11 @@ public:
     void logEI(const ErrorInfo & ei) noexcept override
     {
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
+    }
+
+    void writeToStdout(std::string_view s) override
+    {
+        stdoutStream << s << "\n";
     }
 };
 
@@ -45,6 +56,11 @@ public:
     std::string get() const
     {
         return logger->get();
+    }
+
+    std::string getStdout() const
+    {
+        return logger->getStdout();
     }
 
     CaptureLogging(CaptureLogging &&) = delete;
