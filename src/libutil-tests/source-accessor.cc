@@ -86,11 +86,31 @@ TEST_F(FSSourceAccessorTest, works)
     }
 
     {
-        auto accessor = makeFSSourceAccessor(tmpDir, true);
+        auto accessor = makeFSSourceAccessor(tmpDir, {.trackLastModified = true});
         EXPECT_EQ(accessor->getLastModified(), 0);
         accessor->maybeLstat(CanonPath("file1"));
         EXPECT_GT(accessor->getLastModified(), 0);
     }
+}
+
+TEST_F(FSSourceAccessorTest, relativeRoot)
+{
+    writeFile(tmpDir / "file", "contents");
+    /* Relative to wherever the tests run, without changing directory. */
+    auto relPath = std::filesystem::relative(tmpDir / "file");
+    if (relPath.empty())
+        GTEST_SKIP() << "no relative path to the temporary directory (on another drive?)";
+    ASSERT_TRUE(relPath.is_relative());
+
+    /* Opened relative to the current directory, but reports absolute
+       paths. */
+    auto accessor = makeFSSourceAccessor(relPath, {.requireAbsolute = false});
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath::root, "contents"));
+
+    auto physicalPath = accessor->getPhysicalPath(CanonPath::root);
+    ASSERT_TRUE(physicalPath);
+    EXPECT_TRUE(physicalPath->is_absolute());
+    EXPECT_TRUE(std::filesystem::equivalent(*physicalPath, tmpDir / "file"));
 }
 
 TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)

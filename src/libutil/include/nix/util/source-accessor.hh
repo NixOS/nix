@@ -316,6 +316,32 @@ public:
 ref<SourceAccessor> getFSSourceAccessor();
 
 /**
+ * Optional parameters for `makeFSSourceAccessor`.
+ */
+struct MakeFSSourceAccessorParams
+{
+    /**
+     * Whether to keep track of the latest modification time of the
+     * files read, for `SourceAccessor::getLastModified`.
+     */
+    bool trackLastModified = false;
+
+    /**
+     * Whether the final symlink path component is resolved or opened
+     * itself. Note that regular POSIX semantics of trailing `/` applies
+     * regardless of this parameter.
+     */
+    FinalSymlink finalSymlink = FinalSymlink::DontFollow;
+
+    /**
+     * Whether the root must be an absolute path. If not, a relative one
+     * is made absolute against the current directory, once, when the
+     * accessor is made.
+     */
+    bool requireAbsolute = true;
+};
+
+/**
  * @brief Construct an accessor for the filesystem rooted at @p root.
  *
  * Note that it is not possible to escape @p root by appending `..` path
@@ -325,12 +351,8 @@ ref<SourceAccessor> getFSSourceAccessor();
  * Symlinks in parents of `root` are always resolved.
  *
  * @param root Path to file/tree to open.
- * @param finalSymlink Whether the final symlink path component is resolved
- *        or opened itself. Note that regular POSIX semantics of trailing `/`
- *        applies regardless of this parameter.
  */
-ref<SourceAccessor> makeFSSourceAccessor(
-    std::filesystem::path root, bool trackLastModified = false, FinalSymlink finalSymlink = FinalSymlink::DontFollow);
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, MakeFSSourceAccessorParams params = {});
 
 /**
  * Construct an accessor that presents a "union" view of a vector of

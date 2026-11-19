@@ -791,12 +791,18 @@ try {
 
 ref<SourceAccessor> getFSSourceAccessor()
 {
-    static auto rootFS = makeFSSourceAccessor("/", /*trackLastModified=*/false);
+    static auto rootFS = makeFSSourceAccessor("/");
     return rootFS;
 }
 
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified, FinalSymlink finalSymlink)
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, MakeFSSourceAccessorParams params)
 {
+    auto [trackLastModified, finalSymlink, requireAbsolute] = params;
+    /* TODO: `absPath` resolves `..` lexically, which is wrong after a
+       symlink. Better to leave that to opening the path. But we cannot just do
+       that yet because then `showPath` and `getPhysicalPath` will be wrong. */
+    if (!requireAbsolute)
+        root = absPath(root);
     assert(root.is_absolute());
     auto fd = openFileReadonly(root, finalSymlink);
 
