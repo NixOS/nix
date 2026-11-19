@@ -14,10 +14,10 @@ multiOutput=$(nix-instantiate ./nondeterministic-ns.nix -A multiOut)
 # First build
 singleOutPath=$(nix-build ./nondeterministic-ns.nix -A singleOut --no-out-link)
 nix-store --delete "$singleOutPath"
-# We should still have the build trace/realisation in the database, so second build will fail
-expect 1 nix-build ./nondeterministic-ns.nix -A singleOut --no-out-link
-# Deleting the build trace/realisation should fix it though
+# The build trace outlives the output
+nix store build-trace info "$singleOutput"^out
 nix store build-trace delete "$singleOutput"^out
+expect 1 nix store build-trace info "$singleOutput"^out
 nix-build ./nondeterministic-ns.nix -A singleOut --no-out-link
 
 # Multi-output first
