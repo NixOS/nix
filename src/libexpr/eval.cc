@@ -287,21 +287,29 @@ EvalState::EvalState(
           {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
       }))
     , rootFS([&] {
-        /* In pure eval mode, we provide a filesystem that only
-           contains the Nix store.
+/* In pure eval mode, we provide a filesystem that only
+   contains the Nix store.
 
-           Otherwise, use a union accessor to make the augmented store
-           available at its logical location while still having the
-           underlying directory available. This is necessary for
-           instance if we're evaluating a file from the physical
-           /nix/store while using a chroot store, and also for lazy
-           mounted fetchTree.
+   Otherwise, use a union accessor to make the augmented store
+   available at its logical location while still having the
+   underlying directory available. This is necessary for
+   instance if we're evaluating a file from the physical
+   /nix/store while using a chroot store, and also for lazy
+   mounted fetchTree.
 
-           This is the only place that should read the entire host file
-           system (or drive, on Windows) programmatically. Anything else
-           should use `makeFSSourceAccessor` for just what it reads. */
+   This is the only place that should read the entire host file
+   system (or drive, on Windows) programmatically. Anything else
+   should use `makeFSSourceAccessor` for just what it reads. */
+#ifdef _WIN32
+        /* `/` is not absolute on Windows, which has a root per drive.
+           Use the current drive's, which is what a path without a drive,
+           like `/foo`, refers to anyway. */
+        std::filesystem::path hostRoot = std::filesystem::current_path().root_path();
+#else
+        std::filesystem::path hostRoot = "/";
+#endif
         auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({makeFSSourceAccessor("/"), storeFS});
+                                          : makeUnionSourceAccessor({makeFSSourceAccessor(hostRoot), storeFS});
         /* Cache positive lstat/readlink results to speed up resolveSymlinks. */
         accessor = makeCachingSourceAccessor(accessor);
 
