@@ -3,6 +3,10 @@
 #include "nix/util/mounted-source-accessor.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 
+#ifdef _WIN32
+#  include <cwctype>
+#endif
+
 namespace nix {
 
 SourcePath EvalState::rootPath(CanonPath path)
@@ -10,11 +14,32 @@ SourcePath EvalState::rootPath(CanonPath path)
     return {rootFS, std::move(path)};
 }
 
+std::optional<CanonPath> EvalState::maybeRootCanonPath(const std::filesystem::path & path)
+{
+    auto abs = absPath(path);
+#ifdef _WIN32
+    /* Drive letters are case-insensitive. */
+    auto lower = [](const std::filesystem::path & p) {
+        auto s = p.native();
+        for (auto & c : s)
+            c = std::towlower(c);
+        return s;
+    };
+    if (lower(abs.root_name()) != lower(std::filesystem::current_path().root_name()))
+        return std::nullopt;
+#endif
+    return CanonPath(std::string_view(abs.relative_path().generic_string()));
+}
+
 SourcePath EvalState::rootPath(std::string_view path)
 {
     /* FIXME: Move this out of EvalState, since it's using native
        std::filesystem::path and current working directory. */
-    return {rootFS, CanonPath(absPath(path).string())};
+    auto canonPath = maybeRootCanonPath(std::filesystem::path{path});
+    if (!canonPath)
+        throw Error(
+            "path '%s' is not on the current drive, which is all the evaluator can access on Windows for now", path);
+    return {rootFS, std::move(*canonPath)};
 }
 
 SourcePath EvalState::storePath(const StorePath & path)
