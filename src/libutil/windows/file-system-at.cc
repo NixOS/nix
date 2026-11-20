@@ -2,6 +2,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/logging.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/util.hh"
 #include "nix/util/system-error.hh"
@@ -269,6 +270,23 @@ bool isReparsePoint(HANDLE handle)
     return (basicInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
+/**
+ * `writeSymlinkTarget` for a file or directory just created to become
+ * the symlink. If that fails, delete it again, as there is no symlink
+ * to leave behind, only an empty file or directory.
+ */
+void writeNewSymlinkTarget(HANDLE handle, const std::filesystem::path & target)
+{
+    try {
+        writeSymlinkTarget(handle, target);
+    } catch (...) {
+        FILE_DISPOSITION_INFO disposition{.DeleteFile = TRUE};
+        if (!SetFileInformationByHandle(handle, FileDispositionInfo, &disposition, sizeof(disposition)))
+            logWarning(WinError("deleting half-made symlink").info());
+        throw;
+    }
+}
+
 } // anonymous namespace
 
 } // namespace windows
@@ -295,7 +313,7 @@ void createFileSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsStr
     auto handle =
         ntOpenAt(dirFd, path.c_str(), GENERIC_WRITE | DELETE | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT, FILE_CREATE);
 
-    writeSymlinkTarget(handle.get(), target);
+    writeNewSymlinkTarget(handle.get(), target);
 }
 
 void createDirectorySymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target)
@@ -312,7 +330,7 @@ void createDirectorySymlinkAt(Descriptor dirFd, const OsCanonPath & path, const 
         FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT,
         FILE_CREATE);
 
-    writeSymlinkTarget(handle.get(), target);
+    writeNewSymlinkTarget(handle.get(), target);
 }
 
 void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target)
