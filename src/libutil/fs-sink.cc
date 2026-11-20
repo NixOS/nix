@@ -116,12 +116,11 @@ RestoreSink RestoreSink::forPath(const std::filesystem::path & dstPath_, bool st
     return sink;
 }
 
-void RestoreSink::Directory::createChild(std::string_view name, ChildCreatedCallback callback)
+void RestoreSink::Directory::createChild(FilenameView name, ChildCreatedCallback callback)
 {
-    /* Checked, not asserted: NAR and other sink inputs only exclude `/`,
-       so a name may contain `\` or a drive prefix, which on Windows is
-       not a single filename. */
-    RestoreSink childSink{directory.get(), OsFilename::fromPathThrowing(name), startFsync, hooks};
+    /* Checked, not asserted: a `Filename` may contain `\` or a drive
+       prefix, which on Windows is not a single filename. */
+    RestoreSink childSink{directory.get(), OsFilename::fromPathThrowing(name.str()), startFsync, hooks};
     callback(childSink);
 }
 
@@ -307,7 +306,7 @@ void NullFileSystemObjectSink::createDirectory(DirectoryCreatedCallback func)
 
         /* The children get this very sink, so that a subclass's
            overrides apply at every depth. */
-        void createChild(std::string_view, ChildCreatedCallback callback) override
+        void createChild(FilenameView, ChildCreatedCallback callback) override
         {
             callback(sink);
         }

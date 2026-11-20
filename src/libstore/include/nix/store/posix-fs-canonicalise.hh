@@ -9,6 +9,8 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/os-filename.hh"
 #include "nix/store/config.hh"
 
 namespace nix {
@@ -66,11 +68,11 @@ struct CanonicalizePathMetadataOptions
  *   running as root. (Unix only.)
  */
 void canonicalisePathMetaData(
-    const std::filesystem::path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen);
+    Descriptor dirFd, const OsFilename & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen);
 
-void canonicalisePathMetaData(const std::filesystem::path & path, CanonicalizePathMetadataOptions options);
+void canonicalisePathMetaData(Descriptor dirFd, const OsFilename & path, CanonicalizePathMetadataOptions options);
 
-void canonicaliseTimestampAndPermissions(const std::filesystem::path & path);
+void canonicaliseTimestampAndPermissions(Descriptor dirFd, const OsFilename & path);
 
 class RestoreSinkHooks;
 

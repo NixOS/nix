@@ -46,23 +46,44 @@ static void checkPathName(std::string_view path, std::string_view name)
     }
 }
 
-StorePath::StorePath(std::string_view _baseName)
-    : baseName(_baseName)
+/**
+ * A checked store path base name is always a valid `Filename`: it
+ * starts with the hash part, so it is not empty, `.` or `..`, and the
+ * characters allowed in it don't include `/` or NUL.
+ */
+static Filename checkedBaseName(std::string baseName)
 {
-    if (baseName.size() < HashLen + 1)
+    return Filename::fromStringAsserting(std::move(baseName));
+}
+
+static Filename checkBaseName(std::string_view baseName)
+{
+    if (baseName.size() < StorePath::HashLen + 1)
         throw BadStorePath("'%s' is too short to be a valid store path basename", baseName);
-    for (auto c : hashPart())
+    for (auto c : baseName.substr(0, StorePath::HashLen))
         if (c == 'e' || c == 'o' || c == 'u' || c == 't' || !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')))
             throw BadStorePath("store path basename '%s' contains illegal base-32 character '%s'", baseName, c);
-    if (baseName[HashLen] != '-')
+    if (baseName[StorePath::HashLen] != '-')
         throw BadStorePath("'%s' can't name a store path because the hash part is not followed by a '-'", baseName);
-    checkPathName(baseName, name());
+    checkPathName(baseName, baseName.substr(StorePath::HashLen + 1));
+    return checkedBaseName(std::string{baseName});
+}
+
+StorePath::StorePath(std::string_view _baseName)
+    : baseName(checkBaseName(_baseName))
+{
+}
+
+static Filename checkBaseName(const Hash & hash, std::string_view name)
+{
+    auto baseName = (hash.to_string(HashFormat::Nix32, false) + "-").append(std::string(name));
+    checkPathName(baseName, name);
+    return checkedBaseName(std::move(baseName));
 }
 
 StorePath::StorePath(const Hash & hash, std::string_view _name)
-    : baseName((hash.to_string(HashFormat::Nix32, false) + "-").append(std::string(_name)))
+    : baseName(checkBaseName(hash, _name))
 {
-    checkPathName(baseName, name());
 }
 
 bool StorePath::isDerivation() const noexcept

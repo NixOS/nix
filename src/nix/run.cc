@@ -1,4 +1,5 @@
 #include "nix/util/current-process.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/environment-variables.hh"
 #include "run.hh"
 #include "nix/cmd/command-installable-value.hh"
@@ -188,20 +189,29 @@ void chrootHelper(int argc, char ** argv)
         if (mount(realStoreDir.c_str(), (tmpDir + storeDir).c_str(), "", MS_BIND, 0) == -1)
             throw SysError("mounting '%s' on '%s'", realStoreDir, storeDir);
 
-        for (const auto & entry : DirectoryIterator{"/"}) {
+        for (const auto & entry : openDirectoryIterator("/")) {
             checkInterrupt();
-            const auto & src = entry.path();
-            std::filesystem::path dst = tmpDir / entry.path().filename();
+            auto src = std::filesystem::path{"/"} / entry.name.mkPath();
+            std::filesystem::path dst = tmpDir / entry.name.mkPath();
             if (pathExists(dst))
                 continue;
-            auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
+            auto type = entry.type != std::filesystem::file_type::none ? entry.type
+                                                                       : std::filesystem::symlink_status(src).type();
+            NIX_INCOMPLETE_SWITCH_BEGIN
+            switch (type) {
+            case std::filesystem::file_type::directory:
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory %s", PathFmt(dst));
                 if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting %s on %s", PathFmt(src), PathFmt(dst));
-            } else if (std::filesystem::is_symlink(st))
+                break;
+            case std::filesystem::file_type::symlink:
                 createSymlink(readLink(src), dst);
+                break;
+            default:
+                break;
+            }
+            NIX_INCOMPLETE_SWITCH_END
         }
 
         char * cwd = getcwd(0, 0);

@@ -200,7 +200,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
            rewriting doesn't contain a hard link to /etc/shadow or
            something like that. */
         canonicalisePathMetaData(
-            actualPath,
+            realStoreDirFdInHost(),
+            OsFilename{scratchOutput->filename()},
             {
 #ifndef _WIN32
                 .uidRange = buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
@@ -280,6 +281,10 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
         auto actualPath = realPathInHost(*scratchPath);
+        /* `actualPath` again, as a directory handle and a name in it, for
+           `*At` operations. Kept in sync with `actualPath`. */
+        Descriptor actualDirFd = realStoreDirFdInHost();
+        auto actualName = OsFilename{scratchPath->filename()};
 
         /* An optional file descriptor of a directory used for intermediate
            operations. */
@@ -340,7 +345,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
                 canonicalisePathMetaData(
-                    actualPath,
+                    actualDirFd,
+                    actualName,
                     {
 #ifndef _WIN32
                         // builder UIDs are already dealt with
@@ -445,7 +451,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             std::tie(tempDir, tempDirFd) = localStore.createTempDirInStore();
             delTempDir = AutoDelete(tempDir);
 
-            auto tmpOutput = tempDir / "x";
+            auto tmpName = OsFilename::fromPathAsserting("x");
+            auto tmpOutput = tempDir / tmpName.path();
 
             /* Copy files to break stale file descriptors. copyRecursive below will use
                reflinking to optimise the copying overhead. */
@@ -456,6 +463,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                of thumb is that actualPath points to the current location of the stuff
                that we'll end up registering. */
             actualPath = std::move(tmpOutput);
+            actualDirFd = tempDirFd.get();
+            actualName = std::move(tmpName);
         };
 
         ValidPathInfo newInfo = std::visit(
@@ -516,7 +525,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
         canonicalisePathMetaData(
-            actualPath,
+            actualDirFd,
+            actualName,
             {
 #ifndef _WIN32
                 // builder UIDs are already dealt with
@@ -785,6 +795,11 @@ struct LocalBuildingStore : BuildingStore
     std::filesystem::path getRealStoreDir() const override
     {
         return localStore.config->realStoreDir.get();
+    }
+
+    Descriptor getRealStoreDirFd() const override
+    {
+        return localStore.getRealStoreDirFd();
     }
 
     std::filesystem::path getBuildDir() const override

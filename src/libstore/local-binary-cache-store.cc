@@ -1,4 +1,5 @@
 #include "nix/store/local-binary-cache-store.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-registration.hh"
@@ -104,9 +105,9 @@ protected:
     {
         StorePathSet paths;
 
-        for (auto & entry : DirectoryIterator{config->binaryCacheDir}) {
+        for (const auto & entry : openDirectoryIterator(config->binaryCacheDir)) {
             checkInterrupt();
-            auto name = entry.path().filename().string();
+            auto name = os_string_to_string(entry.name.native());
             if (name.size() != 40 || !hasSuffix(name, ".narinfo"))
                 continue;
             paths.insert(parseStorePath(storeDir + "/" + name.substr(0, name.size() - 8) + "-" + MissingName));

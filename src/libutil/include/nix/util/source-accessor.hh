@@ -4,6 +4,7 @@
 #include <variant>
 
 #include "nix/util/canon-path.hh"
+#include "nix/util/filename.hh"
 #include "nix/util/fmt.hh"
 #include "nix/util/os-canon-path.hh"
 #include "nix/util/fun.hh"
@@ -147,7 +148,7 @@ public:
 
     typedef std::optional<Type> DirEntry;
 
-    typedef std::map<std::string, DirEntry> DirEntries;
+    typedef std::map<Filename, DirEntry, std::less<>> DirEntries;
 
     /**
      * @note Like `readFile`, this method should *not* follow symlinks.
