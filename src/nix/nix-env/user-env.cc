@@ -18,12 +18,16 @@ namespace nix {
 PackageInfos queryInstalled(EvalState & state, const std::filesystem::path & userEnv)
 {
     PackageInfos elems;
-    if (pathExists(userEnv / "manifest.json"))
+    /* Rooted at the user environment rather than the manifest itself,
+       as evaluating a file needs its parent directory too. */
+    auto accessor =
+        makeFSSourceAccessorOrError(userEnv, {.finalSymlink = FinalSymlink::Follow, .requireAbsolute = false});
+    if (accessor->pathExists(CanonPath("manifest.json")))
         throw Error("profile %s is incompatible with 'nix-env'; please use 'nix profile' instead", PathFmt(userEnv));
-    auto manifestFile = userEnv / "manifest.nix";
-    if (pathExists(manifestFile)) {
+    SourcePath manifest{accessor, CanonPath("manifest.nix")};
+    if (manifest.pathExists()) {
         Value v;
-        state.evalFile(state.rootPath(CanonPath(manifestFile.string())).resolveSymlinks(), v);
+        state.evalFile(manifest, v);
         const Bindings & bindings = Bindings::emptyBindings;
         getDerivations(state, v, "", bindings, elems, false);
     }

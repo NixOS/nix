@@ -303,7 +303,7 @@ EvalState::EvalState(
 #ifdef _WIN32
         /* `/` is not absolute on Windows, which has a root per drive.
            Use the current drive's, which is what a path without a drive,
-           like `/foo`, refers to anyway. */
+           like `/foo`, refers to anyway. See also `maybeRootCanonPath`. */
         std::filesystem::path hostRoot = std::filesystem::current_path().root_path();
 #else
         std::filesystem::path hostRoot = "/";
@@ -512,8 +512,12 @@ void EvalState::checkURI(const std::string & uri0)
     {
         std::filesystem::path path(uri0);
         if (path.is_absolute()) {
+            /* A path the root filesystem cannot reach is not allowed. */
+            auto canonPath = maybeRootCanonPath(path);
+            if (!canonPath)
+                throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri0);
             if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-                rootFS2->checkAccess(CanonPath(path.string()));
+                rootFS2->checkAccess(*canonPath);
             return;
         }
     }
@@ -521,8 +525,11 @@ void EvalState::checkURI(const std::string & uri0)
     try {
         ParsedURL uri = parseURL(uri0);
         if (uri.scheme == "file") {
+            auto canonPath = maybeRootCanonPath(urlPathToPath(uri.path));
+            if (!canonPath)
+                throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri0);
             if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-                rootFS2->checkAccess(CanonPath(urlPathToPath(uri.path).string()));
+                rootFS2->checkAccess(*canonPath);
             return;
         }
     } catch (BadURL &) {
@@ -3439,8 +3446,10 @@ EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAcces
         }
     }
 
-    {
-        auto path = rootPath(value);
+    if (auto canonPath = maybeRootCanonPath(std::filesystem::path{value}); !canonPath)
+        logWarning({.msg = HintFmt("Nix search path entry '%1%' is not on the current drive, ignoring", value)});
+    else {
+        SourcePath path{rootFS, std::move(*canonPath)};
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {

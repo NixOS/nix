@@ -591,8 +591,20 @@ public:
 
     /**
      * Variant which accepts relative paths too.
+     *
+     * @throws Error if @p path has no counterpart in the root filesystem;
+     * see `maybeRootCanonPath`.
      */
     SourcePath rootPath(std::string_view path);
+
+    /**
+     * The path in the root filesystem for the host path @p path
+     * (made absolute first), or `std::nullopt` if it has none.
+     *
+     * On Windows, the root filesystem is only the current drive, so
+     * paths on other drives have none.
+     */
+    static std::optional<CanonPath> maybeRootCanonPath(const std::filesystem::path & path);
 
     /**
      * Return a `SourcePath` that refers to `path` in the store.
