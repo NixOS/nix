@@ -25,6 +25,8 @@ namespace nix {
  * that the input is already canonical. Unlike `CanonPath` which is a
  * virtual Unix-style path wrapping `std::string`, `OsCanonPath` wraps
  * `std::filesystem::path` and respects OS-native directory separators.
+ *
+ * See `PathView` for how this relates to the other path types.
  */
 class OsCanonPath
 {
@@ -71,6 +73,15 @@ public:
     }
 
     /**
+     * Like the constructor from an `OsFilename`, copying the name
+     * @p name refers to.
+     */
+    OsCanonPath(OsFilenameView name)
+        : p(name.native())
+    {
+    }
+
+    /**
      * Construct an `OsCanonPath` from a `CanonPath`.
      *
      * Builds the path component-by-component using
@@ -95,6 +106,18 @@ public:
     CanonPath toPortable() const;
 
     const std::filesystem::path & path() const noexcept
+    {
+        return p;
+    }
+
+    /**
+     * The most specific view of this path, which must not outlive it.
+     *
+     * That is a `PathView`, since there is no `OsCanonPathView` yet.
+     *
+     * @todo Return an `OsCanonPathView` once there is one.
+     */
+    PathView view() const noexcept
     {
         return p;
     }

@@ -264,4 +264,121 @@ TEST(RestoreSinkForPath, rejectsRoot)
 }
 #endif
 
+/* ----------------------------------------------------------------------------
+ * getPhysicalPath
+ * --------------------------------------------------------------------------*/
+
+/**
+ * The physical path @p accessor reports for @p path, with the OS's
+ * preferred separators, so that it compares equal to paths made here.
+ */
+static std::optional<std::filesystem::path> physicalPath(SourceAccessor & accessor, const CanonPath & path)
+{
+    auto p = accessor.getPhysicalPath(path);
+    if (p)
+        p->make_preferred();
+    return p;
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfDirectory)
+{
+    createDirs(tmpDir / "subdir");
+    writeFile(tmpDir / "subdir" / "file", "contents");
+
+    auto accessor = makeFSSourceAccessor(tmpDir);
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir);
+    EXPECT_EQ(physicalPath(*accessor, CanonPath("subdir/file")), tmpDir / "subdir" / "file");
+    /* Like joining paths, whether or not it exists. */
+    EXPECT_EQ(physicalPath(*accessor, CanonPath("nonexistent")), tmpDir / "nonexistent");
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfFile)
+{
+    writeFile(tmpDir / "file", "contents");
+
+    auto accessor = makeFSSourceAccessor(tmpDir / "file");
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir / "file");
+    /* Nothing exists beneath a file. */
+    EXPECT_EQ(physicalPath(*accessor, CanonPath("foo")), std::nullopt);
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfSymlink)
+{
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+    createSymlink("target", tmpDir / "link");
+
+    auto accessor = makeFSSourceAccessor(tmpDir / "link", /*trackLastModified=*/false, FinalSymlink::DontFollow);
+    EXPECT_THAT(accessor, testing::HasSymlink(CanonPath::root, "target"));
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir / "link");
+
+    /* It keeps the path it was made from, so it is still its physical
+       path when shown as something else. */
+    accessor->setPathDisplay("«test»");
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), tmpDir / "link");
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathWhenShownAsSomethingElse)
+{
+    createDirs(tmpDir / "subdir");
+    writeFile(tmpDir / "file", "contents");
+
+    /* The physical path does not come from how the accessor is shown, so
+       it stays the same. */
+
+    auto dirAccessor = makeFSSourceAccessor(tmpDir);
+    dirAccessor->setPathDisplay("«test»");
+    EXPECT_EQ(physicalPath(*dirAccessor, CanonPath::root), tmpDir);
+    EXPECT_EQ(physicalPath(*dirAccessor, CanonPath("subdir")), tmpDir / "subdir");
+
+    auto fileAccessor = makeFSSourceAccessor(tmpDir / "file");
+    fileAccessor->setPathDisplay("«test»");
+    EXPECT_EQ(physicalPath(*fileAccessor, CanonPath::root), tmpDir / "file");
+}
+
+TEST_F(FSSourceAccessorTest, physicalPathOfSubdirectoryAccessor)
+{
+    createDirs(tmpDir / "a" / "b");
+
+    auto accessor = makeFSSourceAccessor(tmpDir);
+
+    bool called = false;
+    accessor->readDirectory(CanonPath("a"), [&](SourceAccessor & subdir, const CanonPath & rel) {
+        called = true;
+        EXPECT_EQ(subdir.showPath(rel), accessor->showPath(CanonPath("a")));
+        EXPECT_EQ(physicalPath(subdir, rel), tmpDir / "a");
+        EXPECT_EQ(physicalPath(subdir, rel / "b"), tmpDir / "a" / "b");
+    });
+    EXPECT_TRUE(called);
+}
+
+#ifndef _WIN32
+
+TEST_F(FSSourceAccessorTest, rootAccessor)
+{
+    createDirs(tmpDir / "subdir");
+
+    auto accessor = getFSSourceAccessor();
+    EXPECT_EQ(accessor->showPath(CanonPath::root), "/");
+    EXPECT_EQ(physicalPath(*accessor, CanonPath::root), std::filesystem::path{"/"});
+
+    /* The root's trailing `/` is not doubled. */
+    auto subdirPath = CanonPath((tmpDir / "subdir").string());
+    EXPECT_EQ(accessor->showPath(subdirPath), (tmpDir / "subdir").string());
+    EXPECT_EQ(physicalPath(*accessor, subdirPath), tmpDir / "subdir");
+
+    /* Nor for the subdirectory accessors it makes. */
+    bool called = false;
+    accessor->readDirectory(subdirPath, [&](SourceAccessor & subdir, const CanonPath & rel) {
+        called = true;
+        EXPECT_EQ(subdir.showPath(rel), (tmpDir / "subdir").string());
+        EXPECT_EQ(physicalPath(subdir, rel), tmpDir / "subdir");
+    });
+    EXPECT_TRUE(called);
+}
+
+#endif
+
 } // namespace nix
