@@ -86,11 +86,73 @@ TEST_F(FSSourceAccessorTest, works)
     }
 
     {
-        auto accessor = makeFSSourceAccessor(tmpDir, true);
+        auto accessor = makeFSSourceAccessor(tmpDir, {.trackLastModified = true});
         EXPECT_EQ(accessor->getLastModified(), 0);
         accessor->maybeLstat(CanonPath("file1"));
         EXPECT_GT(accessor->getLastModified(), 0);
     }
+}
+
+TEST_F(FSSourceAccessorTest, relativeRoot)
+{
+    writeFile(tmpDir / "file", "contents");
+    /* Relative to wherever the tests run, without changing directory. */
+    auto relPath = std::filesystem::relative(tmpDir / "file");
+    if (relPath.empty())
+        GTEST_SKIP() << "no relative path to the temporary directory (on another drive?)";
+    ASSERT_TRUE(relPath.is_relative());
+
+    /* Opened relative to the current directory, but reports absolute
+       paths. */
+    auto accessor = makeFSSourceAccessor(relPath, {.requireAbsolute = false});
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath::root, "contents"));
+
+    auto physicalPath = accessor->getPhysicalPath(CanonPath::root);
+    ASSERT_TRUE(physicalPath);
+    EXPECT_TRUE(physicalPath->is_absolute());
+    EXPECT_TRUE(std::filesystem::equivalent(*physicalPath, tmpDir / "file"));
+}
+
+TEST_F(FSSourceAccessorTest, orErrorExisting)
+{
+    writeFile(tmpDir / "file", "contents");
+    auto accessor = makeFSSourceAccessorOrError(tmpDir / "file");
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath::root, "contents"));
+}
+
+TEST_F(FSSourceAccessorTest, orErrorMissing)
+{
+    /* Both a missing file and one under a non-directory count as nothing
+       there. */
+    writeFile(tmpDir / "file", "");
+    for (auto & path : {tmpDir / "missing", tmpDir / "file" / "child"}) {
+        auto accessor = makeFSSourceAccessorOrError(path);
+        EXPECT_FALSE(accessor->pathExists(CanonPath::root)) << path;
+        EXPECT_FALSE(accessor->maybeLstat(CanonPath::root)) << path;
+        EXPECT_THROW(accessor->readFile(CanonPath::root), SystemError) << path;
+    }
+}
+
+TEST_F(FSSourceAccessorTest, orErrorOtherError)
+{
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+    /* A symlink loop is an error, not nothing there, so even asking
+       whether it exists throws. */
+    createSymlink("b", tmpDir / "a");
+    createSymlink("a", tmpDir / "b");
+    auto accessor = makeFSSourceAccessorOrError(tmpDir / "a", {.finalSymlink = FinalSymlink::Follow});
+#ifdef _WIN32
+    /* Windows reports a loop with its own error code, which need not map
+       to `ELOOP`. */
+    EXPECT_THROW(accessor->pathExists(CanonPath::root), SystemError);
+#else
+    EXPECT_THAT(
+        [&] { accessor->pathExists(CanonPath::root); },
+        testing::ThrowsSystemError(std::errc::too_many_symbolic_link_levels));
+#endif
 }
 
 TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)

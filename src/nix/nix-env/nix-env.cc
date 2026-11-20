@@ -1522,8 +1522,7 @@ static int main_nix_env(int argc, char ** argv)
             globals.state->repair = myArgs.repair;
 
             globals.instSource.nixExprPath = std::make_shared<SourcePath>(
-                file != "" ? lookupFileArg(*globals.state, file)
-                           : globals.state->rootPath(CanonPath(nixExprPath.string())));
+                file != "" ? lookupFileArg(*globals.state, file) : globals.state->rootPath(nixExprPath.string()));
 
             globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 

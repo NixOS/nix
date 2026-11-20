@@ -120,14 +120,14 @@ void ArchiveSettings::anchor() {}
 
 time_t dumpPathAndGetMtime(const std::filesystem::path & path, Sink & sink, PathFilter & filter)
 {
-    SourcePath path2 = makeFSSourceAccessor(absPath(path), /*trackLastModified=*/true);
+    SourcePath path2 = makeFSSourceAccessor(path, {.trackLastModified = true, .requireAbsolute = false});
     path2.dumpPath(sink, filter);
     return path2.accessor->getLastModified().value();
 }
 
 void dumpPath(const std::filesystem::path & path, Sink & sink, PathFilter & filter)
 {
-    SourcePath path2 = makeFSSourceAccessor(absPath(path), /*trackLastModified=*/false);
+    SourcePath path2 = makeFSSourceAccessor(path, {.requireAbsolute = false});
     path2.dumpPath(sink, filter);
 }
 

@@ -21,6 +21,7 @@
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
@@ -264,7 +265,7 @@ EvalState::EvalState(
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
     , storeFS(makeMountedSourceAccessor({
-          {CanonPath::root, makeEmptySourceAccessor()},
+          {CanonPath::root, makeEmptyDirectorySourceAccessor()},
           /* In the pure eval case, we can simply require
              valid paths. However, in the *impure* eval
              case this gets in the way of the union
@@ -286,17 +287,29 @@ EvalState::EvalState(
           {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
       }))
     , rootFS([&] {
-        /* In pure eval mode, we provide a filesystem that only
-           contains the Nix store.
+/* In pure eval mode, we provide a filesystem that only
+   contains the Nix store.
 
-           Otherwise, use a union accessor to make the augmented store
-           available at its logical location while still having the
-           underlying directory available. This is necessary for
-           instance if we're evaluating a file from the physical
-           /nix/store while using a chroot store, and also for lazy
-           mounted fetchTree. */
+   Otherwise, use a union accessor to make the augmented store
+   available at its logical location while still having the
+   underlying directory available. This is necessary for
+   instance if we're evaluating a file from the physical
+   /nix/store while using a chroot store, and also for lazy
+   mounted fetchTree.
+
+   This is the only place that should read the entire host file
+   system (or drive, on Windows) programmatically. Anything else
+   should use `makeFSSourceAccessor` for just what it reads. */
+#ifdef _WIN32
+        /* `/` is not absolute on Windows, which has a root per drive.
+           Use the current drive's, which is what a path without a drive,
+           like `/foo`, refers to anyway. See also `maybeRootCanonPath`. */
+        std::filesystem::path hostRoot = std::filesystem::current_path().root_path();
+#else
+        std::filesystem::path hostRoot = "/";
+#endif
         auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
+                                          : makeUnionSourceAccessor({makeFSSourceAccessor(hostRoot), storeFS});
         /* Cache positive lstat/readlink results to speed up resolveSymlinks. */
         accessor = makeCachingSourceAccessor(accessor);
 
@@ -499,8 +512,12 @@ void EvalState::checkURI(const std::string & uri0)
     {
         std::filesystem::path path(uri0);
         if (path.is_absolute()) {
+            /* A path the root filesystem cannot reach is not allowed. */
+            auto canonPath = maybeRootCanonPath(path);
+            if (!canonPath)
+                throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri0);
             if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-                rootFS2->checkAccess(CanonPath(path.string()));
+                rootFS2->checkAccess(*canonPath);
             return;
         }
     }
@@ -508,8 +525,11 @@ void EvalState::checkURI(const std::string & uri0)
     try {
         ParsedURL uri = parseURL(uri0);
         if (uri.scheme == "file") {
+            auto canonPath = maybeRootCanonPath(urlPathToPath(uri.path));
+            if (!canonPath)
+                throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri0);
             if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-                rootFS2->checkAccess(CanonPath(urlPathToPath(uri.path).string()));
+                rootFS2->checkAccess(*canonPath);
             return;
         }
     } catch (BadURL &) {
@@ -3260,7 +3280,8 @@ SourcePath resolveExprPath(SourcePath path, bool addDefaultNix)
     while (!path.path.isRoot()) {
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
-            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+            throw SymlinkResolutionTooDeep(
+                path.path, "too many symbolic links encountered while traversing the path '%s'", path);
         auto p = path.parent().resolveSymlinks() / path.baseName();
         if (p.lstat().type != SourceAccessor::tSymlink)
             break;
@@ -3425,8 +3446,10 @@ EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAcces
         }
     }
 
-    {
-        auto path = rootPath(value);
+    if (auto canonPath = maybeRootCanonPath(std::filesystem::path{value}); !canonPath)
+        logWarning({.msg = HintFmt("Nix search path entry '%1%' is not on the current drive, ignoring", value)});
+    else {
+        SourcePath path{rootFS, std::move(*canonPath)};
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {

@@ -189,13 +189,16 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
            member of the store. */
         if (!isValidPath(path))
             return nullptr;
+        /* A valid store object must exist, so this must succeed. */
+        return makeFSSourceAccessor(std::move(absPath));
     } else {
-        /* Return non-null as long as the some file system data exists,
+        /* Return non-null as long as some file system data exists,
            even if the store object is not fully registered. */
-        if (!pathExists(absPath))
+        auto accessor = makeFSSourceAccessorOrError(std::move(absPath));
+        if (!accessor->pathExists(CanonPath::root))
             return nullptr;
+        return accessor;
     }
-    return makeFSSourceAccessor(std::move(absPath));
 }
 
 const std::filesystem::path LocalFSStore::drvsLogDir = "drvs";
@@ -206,8 +209,8 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
     for (int j = 0; j < 2; j++) {
 
-        auto logPath = config.logDir.get()
-                       / (j == 0 ? drvsLogDir / baseName.substr(0, 2) / baseName.substr(2) : drvsLogDir / baseName);
+        auto logPath = config.logDir.get() / drvsLogDir
+                       / (j == 0 ? std::filesystem::path{baseName.substr(0, 2)} / baseName.substr(2) : baseName);
         auto logBz2Path = logPath;
         logBz2Path += ".bz2";
 

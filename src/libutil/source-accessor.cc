@@ -17,6 +17,8 @@ void RestrictedPathError::anchor() {}
 
 void SymlinkNotAllowed::anchor() {}
 
+void SymlinkResolutionTooDeep::anchor() {}
+
 static std::atomic<size_t> nextNumber{0};
 
 bool SourceAccessor::Stat::isNotNARSerialisable()
@@ -120,7 +122,7 @@ CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolut
             if (mode == SymlinkResolution::Full || !todo.empty()) {
                 if (auto st = maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
                     if (!linksAllowed--)
-                        throw Error("infinite symlink recursion in path '%s'", showPath(path));
+                        throw SymlinkResolutionTooDeep(path, "infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
                     if (std::filesystem::path(target).is_absolute()) {
                         res = CanonPath::root;

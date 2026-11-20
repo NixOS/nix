@@ -2,6 +2,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/system-error.hh"
 
+#ifdef _WIN32
+#  include "nix/util/tests/wine.hh"
+#  include "nix/util/windows-environment.hh"
+#endif
+
 #include <limits.h>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
@@ -348,6 +353,32 @@ TEST(createTempDir, works)
     auto tmpDir = createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
     ASSERT_TRUE(std::filesystem::is_directory(tmpDir));
+}
+
+/* ----------------------------------------------------------------------------
+ * replaceSymlink
+ * --------------------------------------------------------------------------*/
+
+TEST(replaceSymlink, replacesSymlink)
+{
+    auto tmpDir = createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+
+    auto link = tmpDir / OS_STR("link");
+    replaceSymlink(OS_STR("first"), link);
+    ASSERT_EQ(readLink(link), OS_STR("first"));
+
+    /* Replacing it again, and again, leaves just the link: no temporary
+       links behind. */
+    replaceSymlink(OS_STR("second"), link);
+    replaceSymlink(OS_STR("third"), link);
+    ASSERT_EQ(readLink(link), OS_STR("third"));
+    auto files = std::ranges::to<std::vector<std::filesystem::path>>(DirectoryIterator{tmpDir});
+    ASSERT_EQ(files, std::vector{link});
 }
 
 /* ----------------------------------------------------------------------------

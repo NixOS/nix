@@ -1532,7 +1532,7 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     ref<SourceAccessor> fileAccessor =
         AllowListSourceAccessor::create(
             // Follow the final symlink to the repo. Older nix versions used to do this (maybe somewhat accidentally).
-            makeFSSourceAccessor(path, /*trackLastModified=*/false, FinalSymlink::Follow),
+            makeFSSourceAccessor(path, {.finalSymlink = FinalSymlink::Follow}),
             /*allowedPrefixes=*/wd.files,
             // Always allow access to the root, but not its children.
             /*allowedPaths=*/{CanonPath::root},

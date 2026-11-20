@@ -155,7 +155,14 @@ MixFlakeOptions::MixFlakeOptions()
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
-            lockFlags.referenceLockFilePath = {getFSSourceAccessor(), CanonPath(absPath(lockFilePath).string())};
+            /* Following symlinks. If there is no such file, a path that does
+               not exist either, which means there is no lock file. */
+            lockFlags.referenceLockFilePath = SourcePath{makeFSSourceAccessorOrError(
+                lockFilePath,
+                {
+                    .finalSymlink = FinalSymlink::Follow,
+                    .requireAbsolute = false,
+                })};
         }},
         .completer = completePath,
     });
