@@ -79,13 +79,13 @@ INSTANTIATE_TEST_SUITE_P(
         // Unpacking a NAR with a NUL character in a file name should fail.
         std::pair{"nul-character", "bad archive: NAR contains invalid file name 'f"},
         // Likewise for a '.' filename.
-        std::pair{"dot", "bad archive: NAR contains invalid file name '.'"},
+        std::pair{"dot", "bad archive: NAR contains invalid file name '.': cannot be '.'"},
         // Likewise for a '..' filename.
-        std::pair{"dotdot", "bad archive: NAR contains invalid file name '..'"},
+        std::pair{"dotdot", "bad archive: NAR contains invalid file name '..': cannot be '..'"},
         // Likewise for a filename containing a slash.
-        std::pair{"slash", "bad archive: NAR contains invalid file name 'x/y'"},
+        std::pair{"slash", "bad archive: NAR contains invalid file name 'x/y': cannot contain '/'"},
         // Likewise for an empty filename.
-        std::pair{"empty", "bad archive: NAR contains invalid file name ''"},
+        std::pair{"empty", "bad archive: NAR contains invalid file name '': cannot be empty"},
         // Test that the 'executable' field cannot come before the 'contents' field.
         std::pair{"executable-after-contents", "bad archive: expected tag ')', got 'executable'"},
         // Test that the 'name' field cannot come before the 'node' field in a directory entry.

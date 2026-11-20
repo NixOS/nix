@@ -46,7 +46,8 @@ TEST(CanonPath, nullBytes)
 {
     std::string s = "/hello/world";
     s[8] = '\0';
-    ASSERT_THROW(CanonPath("/").push(std::string(1, '\0')), BadCanonPath);
+    /* `push` takes a `FilenameView`, which cannot contain a NUL byte. */
+    ASSERT_THROW(FilenameView::fromStringThrowing(std::string(1, '\0')), Error);
     ASSERT_THROW(CanonPath(std::string_view(s)), BadCanonPath);
     ASSERT_THROW(CanonPath(s, CanonPath::root), BadCanonPath);
 }
@@ -102,19 +103,20 @@ TEST(CanonPath, iter)
     }
 }
 
-/* The general algebra of `/` is covered by the shared `CanonicalPath` suite;
-   what is left here is the `std::string_view` overload, which `OsCanonPath`
-   has no counterpart for. */
+/* The general algebra of `/` is covered by the shared `CanonicalPath` suite
+   in `canon-path-shared.cc`; what is left here is the `FilenameView`
+   overload, whose `OsCanonPath` counterpart (taking `OsFilename`) is tested
+   in `os-canon-path.cc`. */
 TEST(CanonPath, concatComponent)
 {
     {
         CanonPath p("/foo/bar");
-        ASSERT_EQ((p / "x").abs(), "/foo/bar/x");
+        ASSERT_EQ((p / "x"_filename).abs(), "/foo/bar/x");
     }
 
     {
         CanonPath p("/");
-        ASSERT_EQ((p / "foo" / "bar").abs(), "/foo/bar");
+        ASSERT_EQ((p / "foo"_filename / "bar"_filename).abs(), "/foo/bar");
     }
 }
 

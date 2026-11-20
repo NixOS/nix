@@ -54,12 +54,12 @@ NarListing parseNarListing(Source & source)
                 {
                 }
 
-                void createChild(std::string_view name, ChildCreatedCallback callback) override
+                void createChild(FilenameView name, ChildCreatedCallback callback) override
                 {
-                    auto [it, inserted] = dir.entries.emplace(std::string{name}, NarListing{});
+                    auto [it, inserted] = dir.entries.emplace(name, NarListing{});
                     /* Like the other sinks, only ever create new entries. */
                     if (!inserted)
-                        throw Error("NAR contains duplicate entry '%s'", name);
+                        throw Error("NAR contains duplicate entry '%s'", name.str());
                     auto oldDst = indexer.currentDst;
                     indexer.currentDst = &it->second;
 

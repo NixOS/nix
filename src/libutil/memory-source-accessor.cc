@@ -30,7 +30,7 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
     bool newF = false;
 
     unsigned j = 0;
-    for (std::string_view name : path) {
+    for (FilenameView name : path) {
         auto * curDirP = std::get_if<File::Directory>(&cur->raw);
         if (!curDirP) {
             CanonPath curDirPath = CanonPath::root;
@@ -54,7 +54,7 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
                 i = curDir.entries.insert(
                     i,
                     {
-                        std::string{name},
+                        Filename{name},
                         File::Directory{},
                     });
             }
@@ -235,19 +235,12 @@ void MemorySink::createDirectory(DirectoryCreatedCallback callback)
         {
         }
 
-        void createChild(std::string_view name, ChildCreatedCallback callback) override
+        void createChild(FilenameView name, ChildCreatedCallback callback) override
         {
-            try {
-                /* Throws if `name` is not a single valid file name. */
-                (void) CanonPath::fromFilename(name);
-            } catch (Error & e) {
-                e.addTrace({}, "while creating an entry in directory '%s'", parent.accessor.showPath(parent.path));
-                throw;
-            }
             auto childPath = parent.path / name;
-            auto createChildRoot = [&, name = std::string{name}](File file) -> File & {
+            auto createChildRoot = [&](File file) -> File & {
                 /* Like `RestoreSink`, only ever create new entries. */
-                auto [it, inserted] = dir.entries.try_emplace(name, std::move(file));
+                auto [it, inserted] = dir.entries.try_emplace(Filename{name}, std::move(file));
                 if (!inserted)
                     throw Error("file '%s' already exists", parent.accessor.showPath(childPath));
                 return it->second;

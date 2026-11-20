@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/local-store.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/globals.hh"
 
 #include "nix/util/archive.hh"
@@ -118,8 +119,8 @@ protected:
             ASSERT_TRUE(modeTypeMaskedOut == 0555 || modeTypeMaskedOut == 0444);
         } else if (S_ISDIR(st.st_mode)) {
             ASSERT_EQ(modeTypeMaskedOut, 0555);
-            for (const auto & p : DirectoryIterator{path})
-                assertCanonicalPermissions(p.path());
+            for (const auto & p : openDirectoryIterator(path))
+                assertCanonicalPermissions(path / p.name.mkPath());
         } else {
             FAIL() << fmt("unknown file type at %1%", PathFmt(path));
         }

@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "nix/util/types.hh"
+#include "nix/util/filename.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/util/json-non-null.hh"
 
@@ -28,10 +29,13 @@ void checkName(std::string_view name);
  *
  * See store/store-path.html for more information on a
  * conceptual level.
+ *
+ * A store path's base name is always a valid `Filename`, which is what
+ * this wraps.
  */
 class StorePath
 {
-    std::string baseName;
+    Filename baseName;
 
 public:
 
@@ -62,6 +66,15 @@ public:
 
     std::string_view to_string() const noexcept
     {
+        return baseName.str();
+    }
+
+    /**
+     * The base name, as the name of the store object in the store
+     * directory.
+     */
+    const Filename & filename() const noexcept
+    {
         return baseName;
     }
 
@@ -80,12 +93,12 @@ public:
 
     std::string_view name() const
     {
-        return std::string_view(baseName).substr(HashLen + 1);
+        return to_string().substr(HashLen + 1);
     }
 
     std::string_view hashPart() const
     {
-        return std::string_view(baseName).substr(0, HashLen);
+        return to_string().substr(0, HashLen);
     }
 
     static const StorePath dummy;
