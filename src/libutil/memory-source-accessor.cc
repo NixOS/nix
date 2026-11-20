@@ -286,7 +286,7 @@ void MemorySink::createSymlink(const std::string & target)
     createRoot(File::Symlink{.target = target});
 }
 
-ref<SourceAccessor> makeEmptySourceAccessor()
+ref<SourceAccessor> makeEmptyDirectorySourceAccessor()
 {
     static auto empty = []() {
         auto empty = make_ref<MemorySourceAccessor>();

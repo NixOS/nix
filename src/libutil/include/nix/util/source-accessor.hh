@@ -264,7 +264,7 @@ public:
 /**
  * Return a source accessor that contains only an empty root directory.
  */
-ref<SourceAccessor> makeEmptySourceAccessor();
+ref<SourceAccessor> makeEmptyDirectorySourceAccessor();
 
 /**
  * Exception thrown when accessing a filtered path (see
@@ -311,9 +311,30 @@ public:
 };
 
 /**
- * Return an accessor for the root filesystem.
+ * Optional parameters for `makeFSSourceAccessor`.
  */
-ref<SourceAccessor> getFSSourceAccessor();
+struct MakeFSSourceAccessorParams
+{
+    /**
+     * Whether to keep track of the latest modification time of the
+     * files read, for `SourceAccessor::getLastModified`.
+     */
+    bool trackLastModified = false;
+
+    /**
+     * Whether the final symlink path component is resolved or opened
+     * itself. Note that regular POSIX semantics of trailing `/` applies
+     * regardless of this parameter.
+     */
+    FinalSymlink finalSymlink = FinalSymlink::DontFollow;
+
+    /**
+     * Whether the root must be an absolute path. If not, a relative one
+     * is made absolute against the current directory, once, when the
+     * accessor is made.
+     */
+    bool requireAbsolute = true;
+};
 
 /**
  * @brief Construct an accessor for the filesystem rooted at @p root.
@@ -325,12 +346,19 @@ ref<SourceAccessor> getFSSourceAccessor();
  * Symlinks in parents of `root` are always resolved.
  *
  * @param root Path to file/tree to open.
- * @param finalSymlink Whether the final symlink path component is resolved
- *        or opened itself. Note that regular POSIX semantics of trailing `/`
- *        applies regardless of this parameter.
  */
-ref<SourceAccessor> makeFSSourceAccessor(
-    std::filesystem::path root, bool trackLastModified = false, FinalSymlink finalSymlink = FinalSymlink::DontFollow);
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, MakeFSSourceAccessorParams params = {});
+
+/**
+ * Like `makeFSSourceAccessor`, but if @p root cannot be opened, an
+ * accessor that remembers why, rather than throwing now.
+ *
+ * If there is nothing at @p root (including when one of its parents is
+ * not a directory), its root does not exist: `pathExists` is false and
+ * `maybeLstat` is `std::nullopt`. Anything else rethrows the error from
+ * opening it, as does every other use whatever the error.
+ */
+ref<SourceAccessor> makeFSSourceAccessorOrError(std::filesystem::path root, MakeFSSourceAccessorParams params = {});
 
 /**
  * Construct an accessor that presents a "union" view of a vector of

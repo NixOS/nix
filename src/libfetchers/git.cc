@@ -1040,7 +1040,7 @@ struct GitInputScheme : InputScheme
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {
                 if (!getSubmodulesAttr(input) || submodule.url.empty()) {
-                    mounts.insert_or_assign(submodule.path, makeEmptySourceAccessor());
+                    mounts.insert_or_assign(submodule.path, makeEmptyDirectorySourceAccessor());
                     continue;
                 }
 

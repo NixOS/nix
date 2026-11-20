@@ -789,14 +789,87 @@ try {
 
 } // namespace
 
-ref<SourceAccessor> getFSSourceAccessor()
+namespace {
+
+/**
+ * The accessor `makeFSSourceAccessorOrError` gives when opening failed.
+ */
+class FailedFSSourceAccessor : public SourceAccessor
 {
-    static auto rootFS = makeFSSourceAccessor("/", /*trackLastModified=*/false);
-    return rootFS;
+    void anchor() override {}
+
+    /** The error from opening the root. */
+    std::exception_ptr error;
+
+    /** Whether that error just means there is nothing at the root. */
+    bool missing;
+
+    [[noreturn]] void rethrow() const
+    {
+        /* A copy, so that handlers adding traces do not change it for
+           the next use. */
+        rethrowExceptionCopy(error);
+    }
+
+public:
+    FailedFSSourceAccessor(std::exception_ptr error, bool missing, const std::filesystem::path & root)
+        : error(std::move(error))
+        , missing(missing)
+    {
+        displayPrefix = root.generic_string();
+    }
+
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
+    {
+        if (missing)
+            return std::nullopt;
+        rethrow();
+    }
+
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
+    {
+        rethrow();
+    }
+
+    DirEntries readDirectory(const CanonPath & path) override
+    {
+        rethrow();
+    }
+
+    std::string readLink(const CanonPath & path) override
+    {
+        rethrow();
+    }
+
+    std::string showPath(const CanonPath & path) override
+    {
+        return path.isRoot() ? displayPrefix : SourceAccessor::showPath(path);
+    }
+};
+
+} // namespace
+
+ref<SourceAccessor> makeFSSourceAccessorOrError(std::filesystem::path root, MakeFSSourceAccessorParams params)
+{
+    /* Here too, so that a failed accessor shows the absolute path. */
+    if (!params.requireAbsolute)
+        root = absPath(root);
+    try {
+        return makeFSSourceAccessor(root, params);
+    } catch (SystemError & e) {
+        bool missing = e.is(std::errc::no_such_file_or_directory, std::errc::not_a_directory);
+        return make_ref<FailedFSSourceAccessor>(std::current_exception(), missing, root);
+    }
 }
 
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified, FinalSymlink finalSymlink)
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, MakeFSSourceAccessorParams params)
 {
+    auto [trackLastModified, finalSymlink, requireAbsolute] = params;
+    /* TODO: `absPath` resolves `..` lexically, which is wrong after a
+       symlink. Better to leave that to opening the path. But we cannot just do
+       that yet because then `showPath` and `getPhysicalPath` will be wrong. */
+    if (!requireAbsolute)
+        root = absPath(root);
     assert(root.is_absolute());
     auto fd = openFileReadonly(root, finalSymlink);
 
