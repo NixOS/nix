@@ -10,6 +10,12 @@
     flake = false;
   };
 
+  # Fork of passt for adding namespace fd support and a startup pipe
+  inputs.passt = {
+    url = "github:lisanna-dettwyler/passt/dev-nix";
+    flake = false;
+  };
+
   # dev tooling
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
   inputs.git-hooks-nix.url = "github:cachix/git-hooks.nix";
@@ -169,6 +175,7 @@
         (import ./packaging/scopes.nix {
           inherit officialRelease lib;
           src = self;
+          passtSrc = inputs.passt;
         }).packageSetsFor;
     in
     {

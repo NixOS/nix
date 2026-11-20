@@ -102,6 +102,23 @@
         "type": "github"
       }
     },
+    "passt": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1795207542,
+        "narHash": "sha256-bRLC8HpSEIFHvhIDQA0XeeSGSuNuD543P8sg9BTdEuY=",
+        "owner": "lisanna-dettwyler",
+        "repo": "passt",
+        "rev": "86b5d5c6bb6ab182d58a29d478c5299ee679c50c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "lisanna-dettwyler",
+        "ref": "dev-nix",
+        "repo": "passt",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -109,7 +126,8 @@
         "git-hooks-nix": "git-hooks-nix",
         "nixpkgs": "nixpkgs",
         "nixpkgs-23-11": "nixpkgs-23-11",
-        "nixpkgs-regression": "nixpkgs-regression"
+        "nixpkgs-regression": "nixpkgs-regression",
+        "passt": "passt"
       }
     }
   },

@@ -2,6 +2,7 @@
   lib,
   officialRelease,
   src,
+  passtSrc,
 }:
 rec {
   packageSetsFor =
@@ -49,7 +50,7 @@ rec {
           {
             otherSplices = lib.renameCrossIndexTo "self" nixDependenciesSplices;
             f = import ./dependencies.nix {
-              inherit pkgs;
+              inherit pkgs passtSrc;
               stdenv = getStdenv pkgs;
             };
           };

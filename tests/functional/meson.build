@@ -151,6 +151,7 @@ suites = [
       'optimise-store.sh',
       'output-normalization.sh',
       'pass-as-file.sh',
+      'pasta-network.sh',
       'path-from-hash-part.sh',
       'path-info.sh',
       'placeholders.sh',
