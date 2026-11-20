@@ -30,10 +30,10 @@ TEST(fchmodatTryNoFollow, works)
 
     {
         RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-        root.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
-        root.createChild("dir", [](auto & s) { s.createDirectory([](auto &) {}); });
-        root.createChild("filelink", [](auto & s) { s.createSymlink("file"); });
-        root.createChild("dirlink", [](auto & s) { s.createSymlink("dir"); });
+        root.createChild("file"_filename, [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
+        root.createChild("dir"_filename, [](auto & s) { s.createDirectory([](auto &) {}); });
+        root.createChild("filelink"_filename, [](auto & s) { s.createSymlink("file"); });
+        root.createChild("dirlink"_filename, [](auto & s) { s.createSymlink("dir"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
@@ -111,8 +111,8 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
 
     {
         RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-        root.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
-        root.createChild("link", [](auto & s) { s.createSymlink("file"); });
+        root.createChild("file"_filename, [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
+        root.createChild("link"_filename, [](auto & s) { s.createSymlink("file"); });
     }
 
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));

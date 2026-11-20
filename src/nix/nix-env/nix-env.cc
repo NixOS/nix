@@ -118,7 +118,7 @@ static bool parseInstallSourceOptions(Globals & globals, Strings::iterator & i, 
 static bool isNixExpr(const SourcePath & path, struct SourceAccessor::Stat & st)
 {
     return st.type == SourceAccessor::tRegular
-           || (st.type == SourceAccessor::tDirectory && (path / "default.nix").resolveSymlinks().pathExists());
+           || (st.type == SourceAccessor::tDirectory && (path / "default.nix"_filename).resolveSymlinks().pathExists());
 }
 
 static constexpr size_t maxAttrs = 1024;
@@ -127,7 +127,7 @@ static void getAllExprs(EvalState & state, const SourcePath & path, StringSet & 
 {
     StringSet namesSorted;
     for (auto & [name, _] : path.resolveSymlinks().readDirectory())
-        namesSorted.insert(name);
+        namesSorted.insert(name.str());
 
     for (auto & i : namesSorted) {
         /* Ignore the manifest.nix used by profiles.  This is
@@ -136,7 +136,8 @@ static void getAllExprs(EvalState & state, const SourcePath & path, StringSet & 
         if (i == "manifest.nix")
             continue;
 
-        auto path2 = (path / i).resolveSymlinks();
+        /* `i` came from `readDirectory`, so it is a valid file name. */
+        auto path2 = (path / FilenameView::fromStringAsserting(i)).resolveSymlinks();
 
         SourceAccessor::Stat st;
         try {

@@ -60,7 +60,11 @@ void adl_serializer<nix::NarListing::Regular>::to_json(json & j, const nix::NarL
 template<typename Child>
 void adl_serializer<nix::fso::DirectoryT<Child>>::to_json(json & j, const nix::fso::DirectoryT<Child> & d)
 {
-    j["entries"] = d.entries;
+    /* By hand, since a map with non-string keys would otherwise become
+       an array of pairs. */
+    auto & entries = j["entries"] = json::object();
+    for (auto & [name, child] : d.entries)
+        entries[name.str()] = child;
 }
 
 template<typename Child>
@@ -68,9 +72,10 @@ nix::fso::DirectoryT<Child> adl_serializer<nix::fso::DirectoryT<Child>>::from_js
 {
     using namespace nix;
     auto & obj = getObject(json);
-    return {
-        .entries = valueAt(obj, "entries"),
-    };
+    nix::fso::DirectoryT<Child> d;
+    for (auto & [name, child] : getObject(valueAt(obj, "entries")))
+        d.entries.emplace(Filename::fromStringThrowing(name), child.get<Child>());
+    return d;
 }
 
 // fso::Symlink

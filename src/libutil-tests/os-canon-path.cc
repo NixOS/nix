@@ -43,7 +43,7 @@ TEST(OsCanonPath, equality)
 
 /* The general algebra of `/`, `pop`, `parent`, `isWithin` and `removePrefix`,
    plus the `toPortable` homomorphism, live in the shared `CanonicalPath` suite
-   in `canon-path-algebra.cc`. What follows is specific to this type: the
+   in `canon-path-shared.cc`. What follows is specific to this type: the
    `OsFilename` overloads, and the canonicality assertions. */
 TEST(OsCanonPath, concatOsCanonPathWithOsFilename)
 {

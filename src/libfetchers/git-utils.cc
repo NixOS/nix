@@ -1058,7 +1058,7 @@ public:
                         }
                         NIX_INCOMPLETE_SWITCH_END
 
-                        auto [it, inserted] = res.emplace(name.rel(), type);
+                        auto [it, inserted] = res.emplace(Filename{*name.baseName()}, type);
                         /* Should be structurally unreachable combined with the comparison above. */
                         if (!inserted)
                             throw Error("duplicate tree entry '%1%'", showPath(path / name));
@@ -1473,13 +1473,13 @@ struct GitDirectorySinkImpl : merkle::DirectorySinkWithFinalize
             throw GitError("creating a tree builder");
     }
 
-    void insertChild(std::string_view name, merkle::TreeEntry entry) override
+    void insertChild(FilenameView name, merkle::TreeEntry entry) override
     {
         auto oid = hashToOID(entry.hash);
         if (git_treebuilder_insert(
                 nullptr,
                 builder.get(),
-                requireCString(std::string(name)),
+                requireCString(std::string(name.str())),
                 &oid,
                 static_cast<git_filemode_t>(entry.mode)))
             throw GitError("adding '%s' to a tree builder", name);

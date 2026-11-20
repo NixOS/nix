@@ -4,6 +4,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
+#include "nix/util/file-descriptor.hh"
 
 namespace nix {
 
@@ -92,6 +93,11 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
 private:
     void anchor() override;
 
+    /**
+     * Handle to `getRealStoreDir()`, opened by `init()`.
+     */
+    AutoCloseFD realStoreDirFd;
+
 public:
     using Config = LocalFSStoreConfig;
 
@@ -102,6 +108,16 @@ public:
     static const std::filesystem::path drvsLogDir;
 
     LocalFSStore(const Config & params);
+
+    /**
+     * Opens `getRealStoreDir()`, unless that has already been done.
+     *
+     * Not done in the constructor, because subclasses such as
+     * `LocalStore` may only create the directory in theirs. Those can
+     * call this themselves once the directory exists, to use the handle
+     * in the rest of their constructor.
+     */
+    void init() override;
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
@@ -126,6 +142,14 @@ public:
     {
         return config.realStoreDir;
     }
+
+    /**
+     * A handle to `getRealStoreDir()`, for `*At` operations on store
+     * objects.
+     *
+     * @pre `init()` has been called.
+     */
+    virtual Descriptor getRealStoreDirFd();
 
     std::filesystem::path toRealPath(const StorePath & storePath)
     {
