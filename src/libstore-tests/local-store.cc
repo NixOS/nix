@@ -224,6 +224,8 @@ INSTANTIATE_TEST_SUITE_P(
         return std::string(printHashAlgo(std::get<HashAlgorithm>(info.param)));
     });
 
+#endif
+
 /* Tests that the path info cache agrees with the database. */
 class LocalStorePathInfoCacheTest : public ::testing::Test
 {
@@ -309,7 +311,5 @@ TEST_F(LocalStorePathInfoCacheTest, addSignaturesToInvalidPath)
     EXPECT_THROW(store->addSignatures(path, {}), InvalidPath);
     EXPECT_FALSE(store->isValidPath(path));
 }
-
-#endif
 
 } // namespace nix
