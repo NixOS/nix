@@ -53,7 +53,10 @@ Result<AutoCloseFD, NTSTATUS> maybeNtOpenAt(
         nullptr // No security descriptor
     );
 
-    /* Open using NT API */
+    /* Open using NT API. `FILE_SYNCHRONOUS_IO_NONALERT` is always asked
+       for, so `desiredAccess` must include `SYNCHRONIZE`, or this fails
+       with `STATUS_INVALID_PARAMETER`. */
+    assert(desiredAccess & SYNCHRONIZE);
     IO_STATUS_BLOCK ioStatus;
     HANDLE h;
     NTSTATUS status = NtCreateFile(
@@ -284,9 +287,13 @@ void createFileSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsStr
 
     assert(!path.empty());
 
-    /* Create the file that will become the symlink */
-    auto handle = ntOpenAt(
-        dirFd, path.c_str(), GENERIC_WRITE | DELETE, FILE_NON_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT, FILE_CREATE);
+    /* Create the file that will become the symlink. Not
+       `FILE_NON_DIRECTORY_FILE`: `FILE_CREATE` makes a file anyway, and
+       with it, an existing directory would fail with
+       `STATUS_FILE_IS_A_DIRECTORY` (access denied) rather than as already
+       existing. */
+    auto handle =
+        ntOpenAt(dirFd, path.c_str(), GENERIC_WRITE | DELETE | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT, FILE_CREATE);
 
     writeSymlinkTarget(handle.get(), target);
 }
@@ -299,7 +306,11 @@ void createDirectorySymlinkAt(Descriptor dirFd, const OsCanonPath & path, const 
 
     /* Create the directory that will become the symlink */
     auto handle = ntOpenAt(
-        dirFd, path.c_str(), GENERIC_WRITE | DELETE, FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT, FILE_CREATE);
+        dirFd,
+        path.c_str(),
+        GENERIC_WRITE | DELETE | SYNCHRONIZE,
+        FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT,
+        FILE_CREATE);
 
     writeSymlinkTarget(handle.get(), target);
 }
@@ -497,7 +508,8 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
         auto result = maybeNtOpenAt(
             getParentFd(),
             wcomponent,
-            FILE_TRAVERSE | SYNCHRONIZE,                  // Just need traversal rights
+            /* `FILE_READ_ATTRIBUTES` for `isReparsePoint` below. */
+            FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
             FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT // Open directory, don't follow symlinks
         );
         if (!result) {
@@ -530,7 +542,9 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     auto finalResult = maybeNtOpenAt(
         getParentFd(),
         finalComponent,
-        desiredAccess,
+        /* `FILE_READ_ATTRIBUTES` for `isReparsePoint` below, whatever
+           the caller asked for. */
+        desiredAccess | FILE_READ_ATTRIBUTES,
         createOptions | FILE_OPEN_REPARSE_POINT, // Don't follow symlinks on final component either
         createDisposition);
     if (!finalResult) {

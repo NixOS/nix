@@ -599,8 +599,10 @@ void PosixDirectorySourceAccessor::readFile(const CanonPath & path, Sink & sink,
                 osBaseNameOf(path),
 #ifdef _WIN32
                 /* No `FILE_NON_DIRECTORY_FILE`, so that a directory is
-                   reported as `NotARegularFile` below, like on Unix. */
-                GENERIC_READ,
+                   reported as `NotARegularFile` below, like on Unix.
+                   `SYNCHRONIZE` is needed for the synchronous I/O
+                   that every open asks for. */
+                GENERIC_READ | SYNCHRONIZE,
                 0
 #else
                 O_RDONLY | O_CLOEXEC
