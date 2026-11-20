@@ -33,7 +33,7 @@ This operation deletes the specified generations of the current profile.
 
 - <span id="generations-time">[`<number>d`](#generations-time)</span>
 
-  The last *number* days
+  Delete generations older than *number* days.
 
   *Example*: `30d`
 
@@ -42,7 +42,7 @@ This operation deletes the specified generations of the current profile.
 
 - <span id="generations-count">[`+<number>`](#generations-count)</span>
 
-  The last *number* generations up to the present
+  Delete generations more than *number* iterations older than current.
 
   *Example*: `+5`
 
