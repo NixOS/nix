@@ -298,6 +298,19 @@ This operator is [strict](@docroot@/language/evaluation.md#strictness) in *bool1
 > 7
 > ```
 
+- A lambda expression whose body covers the whole pipe chain extends to the end of the chain.
+- A lambda expression at the right side of a pipe operator have its body end before the next pipe operator.
+
+> **Example**
+>
+> ```
+> nix-repl> (a: b: c: c |> x: x * a |> x: x + b) 10 3 4
+> 43
+>
+> nix-repl> (a: b: c: (x: x + b) <| f: f c <| x: x * a) 10 3 4
+> 43
+> ```
+
 > **Warning**
 >
 > This syntax is part of an
