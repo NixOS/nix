@@ -26,6 +26,8 @@
 #include <variant>
 #include <utility>
 
+#include <nlohmann/json.hpp>
+
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 #  include "nix/util/monitor-fd.hh"
 #endif
@@ -940,6 +942,14 @@ static void performOp(
         logger->stopWork();
         conn.to << 1;
         break;
+
+    case WorkerProto::Op::QueryStoreStats: {
+        logger->startWork();
+        auto stats = store->queryStoreStats();
+        logger->stopWork();
+        conn.to << (stats ? stats->dump() : "null");
+        break;
+    }
 
     case WorkerProto::Op::VerifyStore: {
         bool checkContents, repair;

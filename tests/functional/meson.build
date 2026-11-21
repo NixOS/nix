@@ -175,6 +175,7 @@ suites = [
       'ssh-relay.sh',
       'store-info.sh',
       'store-print-env.sh',
+      'store-stats.sh',
       'structured-attrs.sh',
       'substitute-with-invalid-ca.sh',
       'suggestions.sh',
