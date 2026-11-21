@@ -840,6 +840,13 @@ public:
     virtual void optimiseStore() {};
 
     /**
+     * Statistics about the contents of the store, as the JSON object
+     * described in `nix store stats --help`, or `std::nullopt` if the
+     * store does not provide them.
+     */
+    virtual std::optional<nlohmann::json> queryStoreStats();
+
+    /**
      * Check the integrity of the Nix store.
      *
      * @return true if errors remain.

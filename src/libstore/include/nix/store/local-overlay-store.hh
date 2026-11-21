@@ -215,6 +215,12 @@ private:
     void optimiseStore() override;
 
     /**
+     * Not provided: `LocalStore::queryStoreStats` predicts hard-linking,
+     * which `optimiseStore` above does not do.
+     */
+    std::optional<nlohmann::json> queryStoreStats() override;
+
+    /**
      * Check all paths registered in the upper DB.
      *
      * Note that this includes store objects that reside in either overlayfs layer;
