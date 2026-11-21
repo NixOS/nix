@@ -6,7 +6,15 @@ namespace {
 
 class TeeLogger final : public Logger
 {
+    /**
+     * Never empty: the main logger, then the extra loggers.
+     */
     std::vector<std::unique_ptr<Logger>> loggers;
+
+    Logger & mainLogger()
+    {
+        return *loggers.front();
+    }
 
 public:
     TeeLogger(std::vector<std::unique_ptr<Logger>> && loggers)
@@ -70,14 +78,7 @@ public:
 
     void writeToStdout(std::string_view s) override
     {
-        for (auto & logger : loggers) {
-            /* Let only the first logger write to stdout to avoid
-               duplication. This means that the first logger needs to
-               be the one managing stdout/stderr
-               (e.g. `ProgressBar`). */
-            logger->writeToStdout(s);
-            break;
-        }
+        mainLogger().writeToStdout(s);
     }
 
     std::optional<char> ask(std::string_view s) override
