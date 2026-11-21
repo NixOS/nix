@@ -43,7 +43,7 @@ struct CmdDumpPath2 : Command
 
     CmdDumpPath2()
     {
-        expectArgs({.label = "path", .handler = {&path}, .completer = completePath});
+        expectArg("path", &path);
     }
 
     std::string description() override

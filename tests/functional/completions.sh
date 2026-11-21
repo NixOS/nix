@@ -43,6 +43,28 @@ EOF
 [[ "$(NIX_GET_COMPLETIONS=2 nix build ./f)" == $'filenames\n./foo\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=2 nix build ./nonexistent)" == $'filenames' ]]
 
+# TODO: Fix completion handling for commands with multiple fixed positional arguments.
+# [[ "$(NIX_GET_COMPLETIONS=3 nix nar ls ./f)" == $'filenames\n./foo\t' ]]
+# [[ "$(NIX_GET_COMPLETIONS=3 nix nar ls ./nonexistent)" == $'filenames' ]]
+
+# [[ "$(NIX_GET_COMPLETIONS=3 nix nar cat ./f)" == $'filenames\n./foo\t' ]]
+# [[ "$(NIX_GET_COMPLETIONS=3 nix nar cat ./nonexistent)" == $'filenames' ]]
+
+[[ "$(NIX_GET_COMPLETIONS=3 nix flake new ./f)" == $'filenames\n./foo\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=3 nix flake new ./nonexistent)" == $'filenames' ]]
+
+[[ "$(NIX_GET_COMPLETIONS=5 nix eval --expr 'true' --write-to ./f)" == $'filenames\n./foo\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=5 nix eval --expr 'true' --write-to ./nonexistent)" == $'filenames' ]]
+
+[[ "$(NIX_GET_COMPLETIONS=4 nix develop --redirect test ./f)" == $'filenames\n./foo\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=4 nix develop --redirect test ./nonexistent)" == $'filenames' ]]
+
+[[ "$(NIX_GET_COMPLETIONS=3 nix store add ./f)" == $'filenames\n./foo\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=3 nix store add ./nonexistent)" == $'filenames' ]]
+
+[[ "$(NIX_GET_COMPLETIONS=3 nix store dump-path ./f)" == $'filenames\n./foo\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=3 nix store dump-path ./nonexistent)" == $'filenames' ]]
+
 # Input override completion
 [[ "$(NIX_GET_COMPLETIONS=4 nix build ./foo --override-input '')" == $'normal\na\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=5 nix flake show ./foo --override-input '')" == $'normal\na\t' ]]
@@ -69,6 +91,7 @@ NIX_GET_COMPLETIONS=2 nix build --log-form | grep -- "--log-format"
 NIX_GET_COMPLETIONS=3 nix build --option allow-import-from | grep -- "allow-import-from-derivation"
 ## As a cli flag – not working atm
 # NIX_GET_COMPLETIONS=2 nix build --allow-import-from | grep -- "allow-import-from-derivation"
+NIX_GET_COMPLETIONS=3 nix config show allow-import-from | grep -- "allow-import-from-derivation"
 
 # Attr path completions
 [[ "$(NIX_GET_COMPLETIONS=2 nix eval ./foo\#sam)" == $'attrs\n./foo#sampleOutput\t' ]]
