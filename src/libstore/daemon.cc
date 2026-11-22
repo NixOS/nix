@@ -844,7 +844,8 @@ static void performOp(
         clientSettings.maxBuildJobs = readInt(conn.from);
         clientSettings.maxSilentTime = readInt(conn.from);
         readInt(conn.from); // obsolete useBuildHook
-        clientSettings.verboseBuild = (readInt(conn.from) == 0);
+        // See RemoteStore::setOptions
+        clientSettings.verboseBuild = (readInt(conn.from) == std::to_underlying(lvlError));
         readInt(conn.from); // obsolete logType
         readInt(conn.from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(conn.from);
