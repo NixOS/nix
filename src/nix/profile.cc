@@ -237,6 +237,7 @@ struct ProfileManifest
     StorePath build(ref<Store> store)
     {
         auto tempDir = createTempDir();
+        AutoDelete tempDirCleanup(tempDir);
 
         StorePathSet references;
 
