@@ -72,10 +72,23 @@ struct TunnelLogger : public Logger
 
     WorkerProto::Version clientVersion;
 
+    /**
+     * Whether the client shows build logs.
+     *
+     * May be wrongly false for client Nix 2.4 until 2.37;
+     * see `featureClientSendsVerboseBuildFlag`.
+     */
+    bool clientShowsBuildLogs = false;
+
     TunnelLogger(FdSink & to, WorkerProto::Version clientVersion)
         : to(to)
         , clientVersion(clientVersion)
     {
+    }
+
+    bool isVerbose() override
+    {
+        return clientShowsBuildLogs;
     }
 
     void enqueueMsg(const std::string & s) noexcept
@@ -857,6 +870,9 @@ static void performOp(
             auto value = readString(conn.from);
             clientSettings.overrides.emplace(name, value);
         }
+
+        if (conn.protoVersion.features.contains(WorkerProto::featureClientSendsVerboseBuildFlag))
+            logger->clientShowsBuildLogs = clientSettings.verboseBuild;
 
         logger->startWork();
 

@@ -41,17 +41,70 @@ if [[ "$NIX_REMOTE" != "daemon" ]]; then
     (( $(grep -c '{"action":"msg","level":5,"msg":"executing builder .*"}' "$TEST_ROOT/log.json" ) == 5 ))
 fi
 
-# A failed build prints the log tail unless --print-build-logs already showed
-# the log. An extra JSON logger from json-log-path does not change that.
-clearStore
-expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link \
-    --json-log-path "$TEST_ROOT/log.json" | grepQuiet 'Last 25 log lines'
+# A failed build prints the log tail unless the client already showed the log.
+# An extra JSON logger from json-log-path does not change that, and neither
+# does a daemon, which learns from the client whether it shows the log.
+testLogTail() {
+    local expectedNixBuildStatus=100
+    # work around the daemon not returning a 100 status correctly:
+    # https://github.com/NixOS/nix/issues/4813
+    if [[ "$NIX_REMOTE" == "daemon" ]]; then
+        expectedNixBuildStatus=1
+    fi
 
-# The daemon worker does not receive --print-build-logs and still prints the
-# tail: https://github.com/NixOS/nix/issues/16128
+    clearStore
+    # The tail leaves out the first log line.
+    local out
+    out=$(expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link \
+        --json-log-path "$TEST_ROOT/log.json")
+    grepQuiet 'Last 25 log lines' <<< "$out"
+    grepQuietInverse -w error_line_1 <<< "$out"
+    out=$(expectStderr "$expectedNixBuildStatus" nix-build ./logging/fail-with-30-lines.nix --no-out-link --no-build-output)
+    grepQuiet 'Last 25 log lines' <<< "$out"
+    grepQuietInverse -w error_line_1 <<< "$out"
+
+    # From 2.4 until 2.37, the daemon worker did not learn that the client
+    # shows the log: https://github.com/NixOS/nix/issues/16128
+    if isDaemonNewer "2.37.0pre"; then
+        # Each check sees the first log line, which is not part of the tail, so
+        # the full log was printed.
+        out=$(expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link --print-build-logs)
+        grepQuiet -w error_line_1 <<< "$out"
+        grepQuietInverse 'Last 25 log lines' <<< "$out"
+
+        rm -f "$TEST_ROOT/log.json"
+        out=$(expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link --print-build-logs \
+            --json-log-path "$TEST_ROOT/log.json")
+        grepQuiet -w error_line_1 <<< "$out"
+        grepQuietInverse 'Last 25 log lines' <<< "$out"
+        grepQuiet -w error_line_1 "$TEST_ROOT/log.json"
+        grepQuietInverse 'Last 25 log lines' "$TEST_ROOT/log.json"
+
+        out=$(expectStderr "$expectedNixBuildStatus" nix-build ./logging/fail-with-30-lines.nix --no-out-link)
+        grepQuiet -w error_line_1 <<< "$out"
+        grepQuietInverse 'Last 25 log lines' <<< "$out"
+    else
+        # The older daemon prints the tail after the full log.
+        out=$(expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link --print-build-logs)
+        grepQuiet -w error_line_1 <<< "$out"
+        grepQuiet 'Last 25 log lines' <<< "$out"
+    fi
+}
+
+testLogTail
+
+# With NIX_DAEMON_PACKAGE, common.sh has started a daemon and testLogTail ran
+# against it. Otherwise, repeat the checks against a daemon of this version,
+# so that this test runs as part of the regular build.
 if [[ "$NIX_REMOTE" != "daemon" ]]; then
-    expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link --print-build-logs \
-        | grepQuietInverse 'Last 25 log lines'
-    expectStderr 1 nix build -f ./logging/fail-with-30-lines.nix --no-link --print-build-logs \
-        --json-log-path "$TEST_ROOT/log.json" | grepQuietInverse 'Last 25 log lines'
+    startDaemon
+    testLogTail
+    killDaemon
+
+    # With json-log-path set for the daemon, its worker tees the logger that
+    # talks to the client with a JSON logger.
+    NIX_CONFIG="json-log-path = $TEST_ROOT/daemon-log.json" startDaemon
+    testLogTail
+    grepQuiet -w error_line_1 "$TEST_ROOT/daemon-log.json"
+    killDaemon
 fi
