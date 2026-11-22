@@ -1,10 +1,7 @@
 #include "parser.hh"
-
 #include "parser-scanner-decls.hh"
-#include "lexer-helpers.hh"
 #include "parser-state.hh"
 
-#include "nix/util/finally.hh"
 #include "nix/util/source-accessor.hh"
 
 namespace nix {
@@ -36,7 +33,6 @@ Expr * parseExprFromBuf(
     DocCommentMap & docComments,
     const ref<SourceAccessor> rootFS)
 {
-    yyscan_t scanner;
     LexerState lexerState{
         .positionToDocComment = docComments,
         .positions = positions,
@@ -53,11 +49,8 @@ Expr * parseExprFromBuf(
         .settings = settings,
     };
 
-    yylex_init_extra(&lexerState, &scanner);
-    Finally _destroy([&] { yylex_destroy(scanner); });
-
-    yy_scan_buffer(text, length, scanner);
-    Parser parser(scanner, &state);
+    lexer::Lexer lexer(lexerState, text, length);
+    Parser parser(&lexer, &state);
     parser.parse();
 
     return state.result;
@@ -75,7 +68,6 @@ ExprAttrs * parseReplBindingsFromBuf(
     DocCommentMap & docComments,
     const ref<SourceAccessor> rootFS)
 {
-    yyscan_t scanner;
     LexerState lexerState{
         .positionToDocComment = docComments,
         .positions = positions,
@@ -92,12 +84,9 @@ ExprAttrs * parseReplBindingsFromBuf(
         .settings = settings,
     };
 
-    yylex_init_extra(&lexerState, &scanner);
-    Finally _destroy([&] { yylex_destroy(scanner); });
-
-    yy_scan_buffer(text, length, scanner);
-    lexer::internal::setReplBindingsMode(scanner);
-    Parser parser(scanner, &state);
+    lexer::Lexer lexer(lexerState, text, length);
+    lexer.setReplBindingsMode();
+    Parser parser(&lexer, &state);
     parser.parse();
 
     assert(state.result);

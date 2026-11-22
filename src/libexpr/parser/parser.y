@@ -5,10 +5,9 @@
 %locations
 %define parse.error detailed
 %defines
-/* %no-lines */
-%parse-param { void * scanner }
+%parse-param { nix::lexer::Lexer * scanner }
 %parse-param { nix::ParserState * state }
-%lex-param { void * scanner }
+%lex-param { nix::lexer::Lexer * scanner }
 %lex-param { nix::ParserState * state }
 %expect 0
 
@@ -22,13 +21,6 @@
 #include "nix/expr/nixexpr.hh"
 
 #include "parser-state.hh"
-
-#define YY_DECL                                    \
-    int yylex(                                     \
-        nix::Parser::value_type * yylval_param,    \
-        nix::Parser::location_type * yylloc_param, \
-        yyscan_t yyscanner,                        \
-        nix::ParserState * state)
 
 // For efficiency, we only track offsets; not line,column coordinates
 # define YYLLOC_DEFAULT(Current, Rhs, N)                                \
@@ -45,10 +37,11 @@
         }                                                               \
     while (0)
 
-// Forward declaration for flex scanner type.
-// lexer-tab.hh is large; avoid including it just for this type.
-// Asserted with static_assert in lexer.l.
-typedef void * yyscan_t;
+namespace nix::lexer {
+/* Forward declaration because we want to untangle header dependency between parser-tab.hh
+   and the lexer. */
+class Lexer;
+} // namespace nix::lexer
 
 #endif
 
@@ -70,8 +63,6 @@ typedef void * yyscan_t;
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/diagnose.hh"
-
-YY_DECL;
 
 using namespace nix;
 
@@ -539,3 +530,6 @@ formal
 %%
 
 NIX_INCOMPLETE_SWITCH_END
+
+#undef CUR_POS
+#undef SET_DOC_POS

@@ -12,35 +12,27 @@ parser_tab = custom_target(
     '@INPUT@',
     '-d',
   ],
-  # NOTE(Qyriad): Meson doesn't support installing only part of a custom target, so we add
-  # an install script below which removes parser-tab.cc.
-  install : true,
-  install_dir : get_option('includedir') / 'nix',
+  install : false,
 )
 
 lexer_tab = custom_target(
   input : [
-    'lexer.l',
+    'lexer.cc',
     parser_tab,
   ],
   output : [
     'lexer-tab.cc',
-    'lexer-tab.hh',
   ],
   command : [
-    'flex',
-    '-Cf', # Use full scanner tables
-    '--outfile', '@OUTPUT0@',
-    '--header-file=' + '@OUTPUT1@',
+    're2c',
+    '--conditions',
+    '--output', '@OUTPUT0@',
     '@INPUT0@',
   ],
-  # NOTE(Qyriad): Meson doesn't support installing only part of a custom target, so we add
-  # an install script below which removes lexer-tab.cc.
-  install : true,
-  install_dir : get_option('includedir') / 'nix',
+  install : false,
 )
 
-# Turns out that Bison/Flex are particularly sensitive to compilers
+# Turns out that Bison is particularly sensitive to compilers
 # failing to inline functions. For that reason we crank up the inlining
 # threshold manually for optimized builds. Yes, this can be considered 'ricing'
 # the compiler, but it does pay off.
@@ -71,7 +63,6 @@ parser_library = static_library(
   'nixexpr-parser',
   parser_tab,
   lexer_tab,
-  'lexer-helpers.cc',
   'parser.cc',
   cpp_args : parser_library_cpp_args,
   dependencies : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
@@ -83,8 +74,6 @@ parser_library = static_library(
   override_options : [
     'b_ndebug=@0@'.format(not get_option('debug')),
     'b_lto=@0@'.format(get_option('b_lto') and cxx.get_id() != 'gcc'),
-    # Unity builds mess up the recursive header dependency between flex and bison generated code.
-    'unity=off',
   ],
 )
 

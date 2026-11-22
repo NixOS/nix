@@ -77,7 +77,7 @@ std::ostream & printLiteralBool(std::ostream & str, bool boolean)
 // Returns `true' is a string is a reserved keyword which requires quotation
 // when printing attribute set field names.
 //
-// This list should generally be kept in sync with `./lexer.l'.
+// This list should generally be kept in sync with `parser/lexer.cc'.
 // You can test if a keyword needs to be added by running:
 //   $ nix eval --expr '{ <KEYWORD> = 1; }'
 // For example `or' doesn't need to be quoted.

@@ -4,7 +4,7 @@
   mkMesonLibrary,
 
   bison,
-  flex,
+  re2c,
   cmake, # for resolving toml11 dep
 
   nix-util,
@@ -54,14 +54,13 @@ mkMesonLibrary (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
     ./parser/meson.build
-    ./parser/lexer.l
     ./parser/parser.y
     (fileset.difference (fileset.fileFilter (file: file.hasExt "nix") ./.) ./package.nix)
   ];
 
   nativeBuildInputs = [
     bison
-    flex
+    re2c
     cmake
   ];
 
