@@ -52,4 +52,4 @@ The Nix Archive (NAR) format is also formally described using [Kaitai Struct](ht
 {{#include nar.ksy}}
 ```
 
-The source of the spec can be found [here](https://github.com/nixos/nix/blob/master/src/nix-manual/source/protocols/nix-archive/nar.ksy). Contributions and improvements to the spec are welcomed.
+The source of the spec can be found [here](https://github.com/nixos/nix/blob/master/doc/manual/source/protocols/nix-archive/nar.ksy). Contributions and improvements to the spec are welcomed.
