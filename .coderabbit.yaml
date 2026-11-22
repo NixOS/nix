@@ -4,8 +4,8 @@
 # "Review skipped" or other automated comments.
 reviews:
   auto_review:
-    enabled: false
-  review_status: false
+    enabled: true
+  review_status: ()
   high_level_summary: false
   poem: false
   sequence_diagrams: false
