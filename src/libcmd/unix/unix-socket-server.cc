@@ -80,9 +80,11 @@ PeerInfo getPeerInfo(Descriptor remote)
             throw Error("unexpected systemd environment variables");
 
         auto fdNames = tokenizeString<std::vector<std::string>>(getEnv("LISTEN_FDNAMES").value_or(""), ":");
-        auto count = string2Int<unsigned int>(*listenFds);
-        assert(count);
-        for (unsigned int i = 0; i < count; ++i) {
+        auto count = string2Int<unsigned>(*listenFds);
+        if (!count)
+            throw Error("unexpected systemd environment variables");
+
+        for (unsigned i = 0; i < count; ++i) {
             // Not all implementations of LISTEN_FDS will implement names,
             // listen anyway if we do not have enough names
             if (i < fdNames.size() && options.activationName != "" && fdNames[i] != options.activationName)
@@ -91,6 +93,16 @@ PeerInfo getPeerInfo(Descriptor remote)
             AutoCloseFD fdSocket(SD_LISTEN_FDS_START + i);
             closeOnExec(fdSocket.get());
             listeningSockets.push_back(std::move(fdSocket));
+        }
+
+        if (listeningSockets.empty()) {
+            if (!options.activationName.empty())
+                throw Error(
+                    "no sockets with the name '%1%' to listen on; set FileDescriptorName=%2% in the socket unit",
+                    options.activationName,
+                    Uncolored(options.activationName));
+
+            throw Error("no sockets to listen on", options.activationName);
         }
     }
 
