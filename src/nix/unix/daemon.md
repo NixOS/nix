@@ -75,4 +75,8 @@ ListenStream=/nix/var/nix/daemon-socket/socket
 ListenStream=/nix/var/nix/daemon-socket/socket-2
 ```
 
+If the socket unit is named differently, e.g. `nix-daemon-ci.socket`,
+you should set `FileDescriptorName=nix-daemon.socket` option to help nix identify the
+file descriptors that should be listened on.
+
 )""
