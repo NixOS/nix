@@ -154,10 +154,7 @@ MixFlakeOptions::MixFlakeOptions()
         .description = "Read the given lock file instead of `flake.lock` within the top-level flake.",
         .category = category,
         .labels = {"flake-lock-path"},
-        .handler = {[&](std::string lockFilePath) {
-            /* If there is no such file, that means there is no lock file. */
-            lockFlags.referenceLockFilePath = selfContainedHostFileOrError(lockFilePath);
-        }},
+        .handler = {[&](std::string lockFilePath) { lockFlags.referenceLockFilePath = absPath(lockFilePath); }},
         .completer = completePath,
     });
 

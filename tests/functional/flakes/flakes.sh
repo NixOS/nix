@@ -474,16 +474,25 @@ nix flake lock "$flake2Dir" --output-lock-file "$TEST_ROOT"/flake2-overridden.lo
 expectStderr 1 cmp "$flake2Dir/flake.lock" "$TEST_ROOT"/flake2-overridden.lock
 nix flake metadata "$flake2Dir" --reference-lock-file "$TEST_ROOT"/flake2-overridden.lock | grepQuiet "$flake1OriginalCommit"
 
-# A symlinked reference lock file works too.
-ln -sfn flake2-overridden.lock "$TEST_ROOT/ref-link.lock"
-nix flake metadata "$flake2Dir" --reference-lock-file "$TEST_ROOT"/ref-link.lock | grepQuiet "$flake1OriginalCommit"
-rm "$TEST_ROOT/ref-link.lock"
+    # A symlinked reference lock file works too.
+    ln -sfn flake2-overridden.lock "$TEST_ROOT/ref-link.lock"
+    nix flake metadata "$flake2Dir" --reference-lock-file "$TEST_ROOT"/ref-link.lock | grepQuiet "$flake1OriginalCommit"
+    rm "$TEST_ROOT/ref-link.lock"
 
-# A nonexistent reference lock file, even beneath a nonexistent or
-# non-directory parent, means there is no lock file, not an error.
-expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/no-such.lock | grepQuiet "requires lock file changes"
-expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/no-such-dir/flake.lock | grepQuiet "requires lock file changes"
-expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/flake2.lock/flake.lock | grepQuiet "requires lock file changes"
+    # Reference lock file through a symlinked parent directory and process substitution (https://github.com/NixOS/nix/issues/16843).
+    mkdir -p "$TEST_ROOT"/lockdir
+    cp "$TEST_ROOT"/flake2-overridden.lock "$TEST_ROOT"/lockdir/flake.lock
+    ln -s "$TEST_ROOT"/lockdir "$TEST_ROOT"/lockdir-symlink
+    nix flake metadata "$flake2Dir" --reference-lock-file "$TEST_ROOT"/lockdir-symlink/flake.lock | grepQuiet "$flake1OriginalCommit"
+    rm -rf "$TEST_ROOT"/lockdir "$TEST_ROOT"/lockdir-symlink
+
+    nix flake metadata "$flake2Dir" --reference-lock-file <(cat "$TEST_ROOT"/flake2-overridden.lock) | grepQuiet "$flake1OriginalCommit"
+
+    # A nonexistent reference lock file, even beneath a nonexistent or
+    # non-directory parent, means there is no lock file, not an error.
+    expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/no-such.lock | grepQuiet "requires lock file changes"
+    expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/no-such-dir/flake.lock | grepQuiet "requires lock file changes"
+    expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/flake2.lock/flake.lock | grepQuiet "requires lock file changes"
 
 # reference-lock-file can only be used if allow-dirty is set.
 expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock-file "$TEST_ROOT"/flake2-overridden.lock
