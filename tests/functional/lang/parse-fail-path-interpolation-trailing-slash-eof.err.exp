@@ -1,0 +1,4 @@
+error: path has a trailing slash
+       at «stdin»:1:10:
+            1| a/${"b"}/
+             |          ^

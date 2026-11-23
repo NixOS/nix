@@ -5,10 +5,9 @@
 %locations
 %define parse.error detailed
 %defines
-/* %no-lines */
-%parse-param { void * scanner }
+%parse-param { nix::lexer::Lexer * scanner }
 %parse-param { nix::ParserState * state }
-%lex-param { void * scanner }
+%lex-param { nix::lexer::Lexer * scanner }
 %lex-param { nix::ParserState * state }
 %expect 0
 
@@ -19,22 +18,9 @@
 
 #include <variant>
 
-#include "nix/util/finally.hh"
-#include "nix/util/util.hh"
-#include "nix/util/users.hh"
-
 #include "nix/expr/nixexpr.hh"
-#include "nix/expr/eval.hh"
-#include "nix/expr/eval-settings.hh"
-#include "nix/expr/diagnose.hh"
-#include "nix/expr/parser-state.hh"
 
-#define YY_DECL                                    \
-    int yylex(                                     \
-        nix::Parser::value_type * yylval_param,    \
-        nix::Parser::location_type * yylloc_param, \
-        yyscan_t yyscanner,                        \
-        nix::ParserState * state)
+#include "parser-state.hh"
 
 // For efficiency, we only track offsets; not line,column coordinates
 # define YYLLOC_DEFAULT(Current, Rhs, N)                                \
@@ -51,44 +37,11 @@
         }                                                               \
     while (0)
 
-// Forward declaration for flex scanner type.
-// lexer-tab.hh is large; avoid including it just for this type.
-// Asserted with static_assert in lexer.l.
-typedef void * yyscan_t;
-
-namespace nix {
-
-typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
-
-Expr * parseExprFromBuf(
-    char * text,
-    size_t length,
-    Pos::Origin origin,
-    const SourcePath & basePath,
-    Exprs & exprs,
-    SymbolTable & symbols,
-    const EvalSettings & settings,
-    PosTable & positions,
-    DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS);
-
-/**
- * Parse REPL bindings from a buffer.
- * Returns ExprAttrs with bindings to add to scope.
- */
-ExprAttrs * parseReplBindingsFromBuf(
-    char * text,
-    size_t length,
-    Pos::Origin origin,
-    const SourcePath & basePath,
-    Exprs & exprs,
-    SymbolTable & symbols,
-    const EvalSettings & settings,
-    PosTable & positions,
-    DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS);
-
-}
+namespace nix::lexer {
+/* Forward declaration because we want to untangle header dependency between parser-tab.hh
+   and the lexer. */
+class Lexer;
+} // namespace nix::lexer
 
 #endif
 
@@ -105,7 +58,11 @@ ExprAttrs * parseReplBindingsFromBuf(
 
 #include "parser-scanner-decls.hh"
 
-YY_DECL;
+#include "nix/util/util.hh"
+#include "nix/util/users.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/diagnose.hh"
 
 using namespace nix;
 
@@ -572,96 +529,7 @@ formal
 
 %%
 
-#include "nix/expr/eval.hh"
-
-#include "lexer-helpers.hh"
-
-namespace nix {
-
-Expr * parseExprFromBuf(
-    char * text,
-    size_t length,
-    Pos::Origin origin,
-    const SourcePath & basePath,
-    Exprs & exprs,
-    SymbolTable & symbols,
-    const EvalSettings & settings,
-    PosTable & positions,
-    DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS)
-{
-    yyscan_t scanner;
-    LexerState lexerState {
-        .positionToDocComment = docComments,
-        .positions = positions,
-        .origin = positions.addOrigin(origin, length),
-    };
-    ParserState state {
-        .lexerState = lexerState,
-        .exprs = exprs,
-        .symbols = symbols,
-        .positions = positions,
-        .basePath = basePath,
-        .origin = lexerState.origin,
-        .rootFS = rootFS,
-        .settings = settings,
-    };
-
-    yylex_init_extra(&lexerState, &scanner);
-    Finally _destroy([&] { yylex_destroy(scanner); });
-
-    yy_scan_buffer(text, length, scanner);
-    Parser parser(scanner, &state);
-    parser.parse();
-
-    return state.result;
-}
-
-ExprAttrs * parseReplBindingsFromBuf(
-    char * text,
-    size_t length,
-    Pos::Origin origin,
-    const SourcePath & basePath,
-    Exprs & exprs,
-    SymbolTable & symbols,
-    const EvalSettings & settings,
-    PosTable & positions,
-    DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS)
-{
-    yyscan_t scanner;
-    LexerState lexerState {
-        .positionToDocComment = docComments,
-        .positions = positions,
-        .origin = positions.addOrigin(origin, length),
-    };
-    ParserState state {
-        .lexerState = lexerState,
-        .exprs = exprs,
-        .symbols = symbols,
-        .positions = positions,
-        .basePath = basePath,
-        .origin = lexerState.origin,
-        .rootFS = rootFS,
-        .settings = settings,
-    };
-
-    yylex_init_extra(&lexerState, &scanner);
-    Finally _destroy([&] { yylex_destroy(scanner); });
-
-    yy_scan_buffer(text, length, scanner);
-    lexer::internal::setReplBindingsMode(scanner);
-    Parser parser(scanner, &state);
-    parser.parse();
-
-    assert(state.result);
-    // state.result is Expr *, but the REPL_BINDINGS grammar rule
-    // always produces an ExprAttrs via the binds1 production.
-    auto bindings = dynamic_cast<ExprAttrs *>(state.result);
-    assert(bindings);
-    return bindings;
-}
-
-}
-
 NIX_INCOMPLETE_SWITCH_END
+
+#undef CUR_POS
+#undef SET_DOC_POS

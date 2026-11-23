@@ -28,9 +28,7 @@
 #include "nix/fetchers/input-cache.hh"
 #include "nix/util/current-process.hh"
 
-NIX_INCOMPLETE_SWITCH_BEGIN
-#include "parser-tab.hh"
-NIX_INCOMPLETE_SWITCH_END
+#include "parser/parser.hh"
 
 #include <algorithm>
 #include <cstddef>
@@ -3282,8 +3280,6 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
 Expr * EvalState::parseExprFromFile(const SourcePath & path, const std::shared_ptr<StaticEnv> & staticEnv)
 {
     auto buffer = path.resolveSymlinks().readFile();
-    // readFile hopefully have left some extra space for terminators
-    buffer.append("\0\0", 2);
     return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
 }
 
@@ -3294,7 +3290,6 @@ Expr * EvalState::parseExprFromString(
     // into their respective Pos::Origin until the parser stops overwriting its input
     // data.
     auto s = make_ref<std::string>(s_);
-    s_.append("\0\0", 2);
     return parse(s_.data(), s_.size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
@@ -3313,8 +3308,6 @@ ExprAttrs * EvalState::parseReplBindings(
     std::string s_, std::string errorSource, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv)
 {
     auto s = make_ref<std::string>(std::move(errorSource));
-    // flex requires two NUL terminators for yy_scan_buffer
-    s_.append("\0\0", 2);
     return parseReplBindings(s_.data(), s_.size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
@@ -3325,8 +3318,6 @@ Expr * EvalState::parseStdin()
     // input data.
     // Activity act(*logger, lvlTalkative, "parsing standard input");
     auto buffer = drainFD(0);
-    // drainFD should have left some extra space for terminators
-    buffer.append("\0\0", 2);
     auto s = make_ref<std::string>(buffer);
     return parse(buffer.data(), buffer.size(), Pos::Stdin{.source = s}, rootPath("."), staticBaseEnv);
 }
