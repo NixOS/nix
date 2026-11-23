@@ -1,4 +1,4 @@
-{{#include ../derivation-options-v1-fixed.md}}
+{{#include ../derivation-top-options-v1-fixed.md}}
 
 ## Examples
 
@@ -7,43 +7,61 @@
 #### Default options
 
 ```json
-{{#include ../schema/derivation-options-v1/ia/derivation-options/defaults.json}}
+{{#include ../schema/derivation-top-options-v1/ia/derivation-top-options/defaults.json}}
 ```
 
 #### All options set
 
 ```json
-{{#include ../schema/derivation-options-v1/ia/derivation-options/all_set.json}}
+{{#include ../schema/derivation-top-options-v1/ia/derivation-top-options/all_set.json}}
 ```
 
 #### Default options (structured attributes)
 
 ```json
-{{#include ../schema/derivation-options-v1/ia/derivation-options/structuredAttrs_defaults.json}}
+{{#include ../schema/derivation-top-options-v1/ia/derivation-top-options/structuredAttrs_defaults.json}}
 ```
 
 #### All options set (structured attributes)
 
 ```json
-{{#include ../schema/derivation-options-v1/ia/derivation-options/structuredAttrs_all_set.json}}
+{{#include ../schema/derivation-top-options-v1/ia/derivation-top-options/structuredAttrs_all_set.json}}
 ```
 
-### Content-addressed derivations
+### Content-addressing derivations
 
 #### All options set
 
 ```json
-{{#include ../schema/derivation-options-v1/ca/derivation-options/all_set.json}}
+{{#include ../schema/derivation-top-options-v1/ca/derivation-top-options/all_set.json}}
 ```
 
 #### All options set (structured attributes)
 
 ```json
-{{#include ../schema/derivation-options-v1/ca/derivation-options/structuredAttrs_all_set.json}}
+{{#include ../schema/derivation-top-options-v1/ca/derivation-top-options/structuredAttrs_all_set.json}}
 ```
 
-<!-- need to convert YAML to JSON first
+## Per-output checks
+
+{{#include ../derivation-output-checks-v1-fixed.md}}
+
+### Examples
+
+#### Default options
+
+```json
+{{#include ../schema/derivation-output-checks-v1/ia/derivation-output-checks/defaults.json}}
+```
+
+#### All options set
+
+```json
+{{#include ../schema/derivation-output-checks-v1/ia/derivation-output-checks/all_set.json}}
+```
+
 ## Raw Schema
 
-[JSON Schema for Derivation Options v1](schema/derivation-options-v1.json)
--->
+[JSON Schema for Derivation Options v1](schema/derivation-top-options-v1.json)
+
+[JSON Schema for Derivation Output Checks v1](schema/derivation-output-checks-v1.json)

@@ -12,6 +12,7 @@
 namespace nix {
 
 struct StoreDirConfig;
+struct WorkerSettings;
 
 namespace derivation {
 
