@@ -236,7 +236,7 @@ struct ProfileManifest
 
     StorePath build(ref<Store> store)
     {
-        auto tempDir = createTempDir();
+        AutoDelete tempDir(createTempDir(), true);
 
         StorePathSet references;
 
@@ -251,7 +251,7 @@ struct ProfileManifest
 
         buildProfile(tempDir, std::move(pkgs));
 
-        writeFile(tempDir / "manifest.json", toJSON(*store).dump());
+        writeFile(tempDir.path() / "manifest.json", toJSON(*store).dump());
 
         /* Add the symlink tree to the store. */
         StringSink sink;

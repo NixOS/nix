@@ -296,3 +296,18 @@ git -C "$gitFlakeDir" add .
 git -C "$gitFlakeDir" commit -m 'Add flake'
 nix profile add "git+file://$gitFlakeDir"
 nix profile upgrade --all 2>&1 | grepQuietInverse upgrading
+
+# Ensure nix profile operations do not leak temporary profile trees in TMPDIR.
+# Regression test for https://github.com/NixOS/nix/issues/16809
+profileTmpDir=$TEST_ROOT/profile-tmpdir
+profilePath=$TEST_ROOT/tmpdir-profile
+mkdir -p "$profileTmpDir"
+TMPDIR="$profileTmpDir" nix profile add --profile "$profilePath" "$flake1Dir"
+[[ -z $(ls -A "$profileTmpDir") ]]
+expect 1 env TMPDIR="$profileTmpDir" nix profile add --profile "$profilePath" "$flake2Dir"
+[[ -z $(ls -A "$profileTmpDir") ]]
+printf 5.0 > "$flake1Dir"/version
+TMPDIR="$profileTmpDir" nix profile upgrade --profile "$profilePath" flake1
+[[ -z $(ls -A "$profileTmpDir") ]]
+TMPDIR="$profileTmpDir" nix profile remove --profile "$profilePath" flake1
+[[ -z $(ls -A "$profileTmpDir") ]]
