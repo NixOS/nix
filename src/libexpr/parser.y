@@ -133,9 +133,9 @@ NIX_INCOMPLETE_SWITCH_BEGIN
 
 %define api.value.type variant
 
-%type <Expr *> start expr expr_function expr_if expr_op
+%type <Expr *> start expr expr_function expr_if expr_lambda_short expr_op
 %type <Expr *> expr_select expr_simple expr_app
-%type <Expr *> expr_pipe_from expr_pipe_into
+%type <Expr *> expr_pipe_from expr_pipe_from_tail expr_pipe_into
 %type <std::pmr::vector<Expr *>> list
 %type <ExprAttrs *> binds binds1
 %type <FormalsBuilder> formals formal_set
@@ -264,13 +264,49 @@ expr_if
   ;
 
 expr_pipe_from
-  : expr_op PIPE_FROM expr_pipe_from { $$ = makeCall(state->exprs, state->at(@2), $1, $3); }
-  | expr_op PIPE_FROM expr_op        { $$ = makeCall(state->exprs, state->at(@2), $1, $3); }
+  : expr_op PIPE_FROM expr_pipe_from_tail           { $$ = makeCall(state->exprs, state->at(@2), $1, $3); }
+  ;
+
+expr_pipe_from_tail
+  : expr_lambda_short PIPE_FROM expr_pipe_from_tail { $$ = makeCall(state->exprs, state->at(@2), $1, $3); }
+  | expr_lambda_short
   ;
 
 expr_pipe_into
-  : expr_pipe_into PIPE_INTO expr_op { $$ = makeCall(state->exprs, state->at(@2), $3, $1); }
-  | expr_op        PIPE_INTO expr_op { $$ = makeCall(state->exprs, state->at(@2), $3, $1); }
+  : expr_pipe_into PIPE_INTO expr_lambda_short { $$ = makeCall(state->exprs, state->at(@2), $3, $1); }
+  | expr_op        PIPE_INTO expr_lambda_short { $$ = makeCall(state->exprs, state->at(@2), $3, $1); }
+  ;
+
+expr_lambda_short
+  : ID ':' expr_lambda_short
+    { auto me = state->exprs.add<ExprLambda>(CUR_POS, state->symbols.create($1), $3);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
+  | formal_set ':' expr_lambda_short[body]
+    {
+      state->validateFormals($formal_set);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, $formal_set, $body);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
+  | formal_set '@' ID ':' expr_lambda_short[body]
+    {
+      auto arg = state->symbols.create($ID);
+      state->validateFormals($formal_set, CUR_POS, arg);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, $formal_set, $body);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
+  | ID '@' formal_set ':' expr_lambda_short[body]
+    {
+      auto arg = state->symbols.create($ID);
+      state->validateFormals($formal_set, CUR_POS, arg);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, $formal_set, $body);
+      $$ = me;
+      SET_DOC_POS(me, @1);
+    }
+  | expr_op
   ;
 
 expr_op
