@@ -209,8 +209,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             inodesSeen);
 
         bool discardReferences = false;
-        if (auto udr = get(drvOptions.unsafeDiscardReferences, outputName)) {
-            discardReferences = *udr;
+        if (auto * outputWithOpts = get(drv.outputs, outputName)) {
+            discardReferences = outputWithOpts->options.unsafeDiscardReferences;
         }
 
         StorePathSet references;
@@ -511,7 +511,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 },
 
             },
-            output->raw);
+            output->output.raw);
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
@@ -535,7 +535,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
            derivations. */
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
-        auto optFixedPath = output->path(*store, drv.name, outputName);
+        auto optFixedPath = output->output.path(*store, drv.name, outputName);
         if (!optFixedPath || store->printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
 
@@ -552,7 +552,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                     PathFmt(store->toRealPath(newInfo.path)));
                 deletePath(actualPath);
                 /* Trigger the hash-mismatch error. */
-                checkCAOutput(*store, drvPath, *output, newInfo, outputName);
+                checkCAOutput(*store, drvPath, output->output, newInfo, outputName);
                 unreachable();
             }
         }
@@ -666,7 +666,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
-    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(localStore, drvPath, drv, infos);
 
     if (buildMode == bmCheck) {
         return {};
@@ -728,7 +728,7 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs(LocalStore & local
 
     // checkOutputs only performs checks that make sense for both submitting and non-submitting derivations,
     // more verification steps needed afterward
-    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(localStore, drvPath, drv, infos);
 
     for (auto & [outputName, output] : drv.outputs) {
         // For some reason cannot be moved to checkOutputs, needs debugging
@@ -744,8 +744,8 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs(LocalStore & local
         // and that the outputs of a content-addressing derivation is content-addressed in checkOutputs.
         // Add an assert here just in case, but it should never trigger.
         assert(
-            std::get_if<DerivationOutput::CAFloating>(&output.raw)
-            || std::get_if<DerivationOutput::CAFixed>(&output.raw));
+            std::get_if<DerivationOutput::CAFloating>(&output.output.raw)
+            || std::get_if<DerivationOutput::CAFixed>(&output.output.raw));
 
         // No need to sign CA outputs, only the realisation matters
         auto realisation = Realisation{

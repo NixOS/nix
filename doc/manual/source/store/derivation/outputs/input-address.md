@@ -6,7 +6,10 @@
 That is to say, an input-addressed output's store path is a function not of the output itself, but of the derivation that produced it.
 Even if two store paths have the same contents, if they are produced in different ways, and one is input-addressed, then they will have different store paths, and thus guaranteed to not be the same store object.
 
-## Masking content addressed derivation outputs {#input-masked-drv}
+There are two ways the store path of an input-addressed output is computed, one for each [version] of derivation:
+[version 1] derivations are [masked](#input-masked-drv), and [version 2] derivations are [resolved](#resolution-based).
+
+## Version 1: masking {#input-masked-drv}
 
 A naive implementation of an output hash computation for input-addressed outputs would be to hash the derivation hash and output together.
 This clearly has the uniqueness properties we want for input-addressed outputs, but suffers from an inefficiency.
@@ -35,7 +38,7 @@ So how do we compute the [hash part](@docroot@/store/store-path.md#digest) of th
 This is done by the function `hashInputMaskedDerivation`, shown below, which does the input masking itself; its callers do any output masking.
 
 First, a word on inputs.
-`hashInputMaskedDerivation` is only defined on derivations whose [inputs](@docroot@/store/derivation/index.md#inputs) take the first-order form:
+The [inputs](@docroot@/store/derivation/index.md#inputs) of version 1 derivations are always first-order:
 ```typescript
 type ConstantPath = {
   path: StorePath;
@@ -61,10 +64,6 @@ type Derivation = {
 };
 ```
 
-In the [currently-experimental][xp-feature-dynamic-derivations] higher-order case where outputs of outputs are allowed as [deriving paths][deriving-path] and thus derivation inputs, derivations using that generalization are not valid arguments to this function.
-Those derivations must be (partially) [resolved](@docroot@/store/resolution.md) enough first, to the point where no such higher-order inputs remain.
-Then, and only then, can input addresses be assigned.
-
 ```
 function hashInputMaskedDerivation(drv) -> Hash:
     assert(drv.outputs are input-addressed)
@@ -82,16 +81,16 @@ function hashInputMaskedDerivation(drv) -> Hash:
     return hashSHA256(printDrv(drv′))
 
 function hashOutputsOrInputMaskedDerivation(drv) -> Map[String, Hash] | Hash:
-    if drv.outputs are content-addressed:
+    if drv.outputs are fixed content-addressed:
         return {
             outputName ↦ hashSHA256(
                 "fixed:out:" + ca.printMethodAlgo() +
                 ":" + ca.hash.toBase16() +
                 ":" + ca.makeFixedOutputPath(drv.name, outputName))
             | (outputName ↦ output) ∈ drv.outputs
-            , ca = output.contentAddress // or get from build trace if floating
+            , ca = output.contentAddress
         }
-    else: // drv.outputs are input-addressed
+    else: // drv.outputs are input-addressed, with known paths
         return hashInputMaskedDerivation(drv)
 ```
 
@@ -102,7 +101,7 @@ When `hashOutputsOrInputMaskedDerivation` returns a single drv hash (because the
 When `hashOutputsOrInputMaskedDerivation` returns a map of content addresses per-output, we look up the output in question, and pair it with the output name `out`.
 
 That rewriting is the input masking.
-The resulting pseudo-derivation (with hashes instead of store paths in `inputDrvs`) is then printed (in the ["ATerm" format](@docroot@/protocols/derivation-aterm.md#input-address-encoding)) and hashed, and this becomes the hash of the input-masked derivation.
+The resulting pseudo-derivation (with hashes instead of store paths in `inputDrvs`) is then printed (in the ["ATerm" format](@docroot@/protocols/derivation-aterm/v1.md#input-address-encoding)) and hashed, and this becomes the hash of the input-masked derivation.
 
 When calculating output hashes, `hashInputMaskedDerivation` is called on an almost-complete input-addressing derivation, which is just missing its input-addressed outputs paths --- that is, one that is already output masked, making it fully masked.
 The derivation hash is then used to calculate output paths for each output, as the [complete store path calculation](@docroot@/protocols/store-path.md#fingerprint) specifies: it is the digest of the hashed ATerm that specification calls for, under the `"output:" id` case, where `id` is the output name.
@@ -111,12 +110,6 @@ The store object's name is the derivation's name, with `-` and the output name a
 Note that one derivation hash serves every output; what distinguishes their paths is only the output name, which enters twice over, as both `id` and part of the name.
 
 Those output paths can then be substituted into the almost-complete input-addressed derivation to complete it.
-
-> **Note**
->
-> There may be an unintentional deviation from specification currently implemented in the `(outputHashes[output].toBase16(), "out")` case.
-> This is not fatal because the deviation would only apply for content-addressing derivations with more than one output, and that only occurs in the floating case, which is [experimental][xp-feature-ca-derivations].
-> Once this bug is fixed, this note will be removed.
 
 ### `hashOutputsOrInputMaskedDerivation`
 
@@ -132,44 +125,12 @@ This makes `hashInputMaskedDerivation` and `hashOutputsOrInputMaskedDerivation` 
 > In this case, `hashInputMaskedDerivation` is being called on a *complete* input-addressing derivation that already has its output paths calculated: it is not output masked, so it is input-masked only, not fully masked.
 > The input masking takes place anyways.
 
-#### Content-addressed outputs case
+#### Fixed content-addressed outputs case
 
-If the outputs are [content-addressed](./content-address.md), then it computes a hash for each output derived from the content-address of that output.
+If the outputs are [fixed content-addressed](./content-address.md#fixed), then it computes a hash for each output derived from the content address of that output.
 
-> **Note**
->
-> In the [fixed](./content-address.md#fixed) content-addressing case, the outputs' content addresses are statically specified in advance, so this always just works.
-> (The fixed case is what the pseudo-code shows.)
->
-> In the [floating](./content-address.md#floating) case, the content addresses are not specified in advance.
-> This is what the "or get from [build trace](@docroot@/store/build-trace.md) if floating" comment refers to.
-> In this case, the algorithm is *stuck* until the input in question is built, and we know what the actual contents of the output in question is.
->
-> That is OK however, because there is no problem with delaying the assigning of input addresses (which, remember, is what `hashInputMaskedDerivation` is ultimately for) until all inputs are known.
-
-### Deferring input-addressing when downstream of unknown CA store objects {#deferred}
-
-As the previous note says, the algorithm is *stuck* when an input is a [floating content-addressed](./content-address.md#floating) output that has not been built yet: there is no content address to substitute for it, so the input masking cannot be completed and no input address can be computed.
-
-The derivation is still written to the store, with its outputs *deferred*: an output in this state has no store path at all, and the environment variable named after it is empty.
-This costs nothing, because a derivation's own store path is [content-addressed](@docroot@/store/store-object/content-address.md#method-text) on the bytes of its serialization, which do not depend on its output paths being known.
-
-A deferred output does not use a third kind of addressing alongside input- and content-addressing.
-It is input-addressed; it just does not know its path yet.
-
-Being stuck is contagious.
-A derivation with deferred outputs has, for this purpose, unknown outputs of its own, so `hashOutputsOrInputMaskedDerivation` is stuck on it in turn, and anything depending on it must also defer.
-The condition therefore propagates downstream from the floating output that caused it.
-
-Deferral is resolved by building, not by revisiting the same derivation.
-Once the offending inputs are built, their content addresses are known, and the derivation can be [resolved](@docroot@/store/resolution.md): its inputs are replaced by the plain store paths they turned out to denote.
-The resolved derivation is a *different* derivation, with its own store path --- necessarily so, since it has different bytes.
-It has no input derivations left to be stuck on, so its input addresses are computable, and it is what actually gets built.
-
-> **Note**
->
-> Nothing gates deferred outputs themselves.
-> They only *arise* downstream of [floating content-addressed](./content-address.md#floating) outputs.
+The content addresses are specified in advance, so this always just works: the algorithm is never stuck waiting for an input to be built.
+Version 1 derivations never have [floating content-addressed](./content-address.md#floating) inputs, whose content addresses are not known in advance, because they only ever depend on version 1 derivations, which have no floating content-addressed outputs.
 
 ### Performance
 
@@ -270,6 +231,63 @@ where \\(\\mathrm{caInputs}(d)\\) returns the content-addressed inputs of \\(d\\
 > That is the same "identify an input by what it is, rather than by how it was made" move as \\(\\sim_\mathrm{Drv}\\).
 > The difference is that \\(\\sim_\mathrm{Drv}\\) makes it unconditionally, whereas here it falls out for content-addressed inputs always, and for the rest only where deferral forced a resolution first.
 
-[deriving-path]: @docroot@/store/derivation/index.md#deriving-path
-[xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
-[xp-feature-ca-derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
+## Version 2: resolution {#resolution-based}
+
+[Version 2] derivations are input-addressed by [resolving][resolution] them, rather than by masking.
+
+A resolved derivation names each of its inputs by the store path it denotes, rather than by the derivation that produced it.
+That already identifies each input by *what it is* rather than *how it was made* --- the very thing masking exists to achieve --- so no masking of inputs is needed.
+In particular, a fixed-output input is named by its output path, which depends only on its content address, so changing where it is fetched from changes nothing downstream.
+
+The output paths of a version 2 input-addressed derivation are computed from its resolved form:
+
+1. The derivation is resolved: each input deriving path is replaced by the store path it denotes.
+
+2. Its own output paths are left empty.
+   This is all the masking of outputs that is needed, because a version 2 derivation only ever refers to its own outputs by [reference][references], never by store path.
+
+3. The result is serialized in the [version 2 "ATerm" format][aterm v2] and hashed with SHA-256.
+
+4. That hash is used, as for version 1 derivations, as the digest of the [complete store path calculation](@docroot@/protocols/store-path.md#fingerprint) under the `"output:" id` case, where `id` is the output name; and the store object's name is the derivation's name, with `-` and the output name appended unless the output is named `out`.
+
+### Static speculation {#static}
+
+Resolving a derivation requires knowing the store paths of its inputs.
+An output's store path is *static* if it is known without building anything:
+
+- the output of a [fixed content-addressed](./content-address.md#fixed) derivation, which is determined by its content address;
+- the output of a version 1 input-addressed derivation, which is always recorded in it;
+- the output of a version 2 input-addressed derivation, if it is recorded in it, as described next.
+
+If every input of a version 2 input-addressed derivation has a static store path, resolution needs no building, so it is done ahead of time, when the derivation is created: the derivation is *pre-resolved*, its output paths are computed as above, and they are recorded in the derivation.
+Its outputs then have static store paths in turn, so this propagates down the derivation graph exactly as far as it can.
+
+The recorded paths are redundant --- they are a function of the rest of the derivation --- but they must be recorded whenever they can be, and must agree with what pre-resolution computes, which is checked when a derivation is read.
+Otherwise the same derivation would have two encodings, with and without them, and so two store paths.
+
+> **Note**
+>
+> Because every version 2 input-addressed derivation records its own output paths whenever they can be known, computing the output paths of a derivation only requires the recorded paths of its direct inputs.
+> The derivations memoize themselves:
+> unlike [masking](#input-masked-drv), which recurses through the whole input graph and needs a separate cache to be [efficient](#performance), nothing is recursed into and nothing need be cached.
+
+### Deferred outputs {#deferred}
+
+If some input does not have a static store path --- it is the output of a [floating content-addressed](./content-address.md#floating) or [impure](./index.md#types-of-derivations) derivation, or of a version 2 input-addressed derivation whose own outputs are deferred --- the output paths cannot be computed ahead of time.
+They are *deferred*: no store path is recorded, and the paths are computed in exactly the same way once the derivation is actually resolved, after the inputs in question have been built.
+
+A deferred output does not use a third kind of addressing alongside input- and content-addressing.
+It is input-addressed; it just does not know its path yet.
+This costs nothing, because a derivation's own store path is [content-addressed](@docroot@/store/store-object/content-address.md#method-text) on the bytes of its serialization, which do not depend on its output paths being known.
+
+Deferral is resolved by building, not by revisiting the same derivation.
+The resolved derivation is a *different* derivation, with its own store path --- necessarily so, since it has different bytes.
+It has no input derivations left, so its output paths are static, and it is what actually gets built.
+
+
+[version 1]: ../versions.md#version-1
+[version 2]: ../versions.md#version-2
+[version]: ../versions.md
+[resolution]: @docroot@/store/resolution.md
+[references]: @docroot@/protocols/derivation-aterm/v2.md#interpolated
+[aterm v2]: @docroot@/protocols/derivation-aterm/v2.md

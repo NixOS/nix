@@ -98,20 +98,21 @@ protected:
     Full makeSource(Written & written, std::string_view builder)
     {
         Full drv{
+            .name = "source",
             .outputs{
                 {
                     "out",
-                    Output::CAFixed{
-                        .ca{
-                            .method = ContentAddressMethod::Raw::NixArchive,
-                            .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
-                        },
-                    },
+                    {.output =
+                         Output::CAFixed{
+                             .ca{
+                                 .method = ContentAddressMethod::Raw::NixArchive,
+                                 .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+                             },
+                         }},
                 },
             },
             .platform = "x86_64-linux",
             .builder = std::string{builder},
-            .name = "source",
         };
         auto readDerivation = readDrv(written);
         fillInOutputPaths(drv, store, readDerivation);
@@ -126,6 +127,7 @@ protected:
     makeIntermediate(Written & written, const Full & source, std::string_view builder = "/bin/intermediate")
     {
         FullDeferred drv{
+            .name = "intermediate",
             .outputs{
                 {"dev", {}},
                 {"out", {}},
@@ -138,7 +140,6 @@ protected:
             },
             .platform = "x86_64-linux",
             .builder = std::string{builder},
-            .name = "intermediate",
         };
         auto readDerivation = readDrv(written);
         auto filledIn = fillInOutputPaths(std::move(drv), store, readDerivation);
@@ -154,11 +155,11 @@ protected:
     Full makeParent(std::set<SingleDerivedPath> inputs)
     {
         return Full{
-            .outputs = {{"out", Output::Deferred{}}},
+            .name = "parent",
+            .outputs = {{"out", {.output = Output::Deferred{}}}},
             .inputs = std::move(inputs),
             .platform = "x86_64-linux",
             .builder = "/bin/parent",
-            .name = "parent",
         };
     }
 
@@ -187,7 +188,7 @@ protected:
      * Every caller wants the same store directory and the same lookup,
      * so that convenience belongs here rather than in the library.
      */
-    std::optional<Drv<Output::Deferred>> bothMasked(Written & written, const Full & drv)
+    std::optional<Drv<Output::Deferred>> fullyMasked(Written & written, const Full & drv)
     {
         auto readDerivation = readDrv(written);
         return fullyMaskDerivation(store, readDerivation, drv);
@@ -299,9 +300,9 @@ struct MaskedHashFullyMaskedTest : MaskedHashTest, ::testing::WithParamInterface
 TEST_P(MaskedHashFullyMaskedTest, to_aterm)
 {
     Written written;
-    auto m = bothMasked(written, named(written, GetParam()));
+    auto m = fullyMasked(written, named(written, GetParam()));
     ASSERT_TRUE(m);
-    writeTest(std::string{GetParam()} + "-fully-masked.drv", [&] { return unparse(*m, store); });
+    writeTest(std::string{GetParam()} + "-fully-masked.drv", [&] { return m->to_string(store, /*name=*/""); });
 }
 
 /**
@@ -317,10 +318,10 @@ TEST_P(MaskedHashFullyMaskedTest, to_aterm)
 TEST_P(MaskedHashFullyMaskedTest, from_aterm)
 {
     Written written;
-    auto expected = bothMasked(written, named(written, GetParam()));
+    auto expected = fullyMasked(written, named(written, GetParam()));
     ASSERT_TRUE(expected);
     readTest(std::string{GetParam()} + "-fully-masked.drv", [&](auto encoded) {
-        EXPECT_EQ((parse<masked::HashInputs, Output::Deferred>(store, std::move(encoded), expected->name)), *expected);
+        EXPECT_EQ(Drv<Output::Deferred>::parse(store, std::move(encoded), /*name=*/""), *expected);
     });
 }
 
@@ -342,7 +343,7 @@ struct MaskedHashFullyMaskedJsonTest : MaskedHashTest,
 TEST_P(MaskedHashFullyMaskedJsonTest, from_json)
 {
     Written written;
-    auto expected = bothMasked(written, named(written, GetParam()));
+    auto expected = fullyMasked(written, named(written, GetParam()));
     ASSERT_TRUE(expected);
     readJsonTest(std::string{GetParam()} + "-fully-masked", *expected);
 }
@@ -350,7 +351,7 @@ TEST_P(MaskedHashFullyMaskedJsonTest, from_json)
 TEST_P(MaskedHashFullyMaskedJsonTest, to_json)
 {
     Written written;
-    auto m = bothMasked(written, named(written, GetParam()));
+    auto m = fullyMasked(written, named(written, GetParam()));
     ASSERT_TRUE(m);
     writeJsonTest(std::string{GetParam()} + "-fully-masked", *m);
 }
@@ -376,7 +377,7 @@ TEST_P(MaskedHashInputMaskedTest, to_aterm)
     Written written;
     auto m = inputMasked(written, named(written, GetParam()));
     ASSERT_TRUE(m);
-    writeTest(std::string{GetParam()} + "-input-masked.drv", [&] { return unparse(*m, store); });
+    writeTest(std::string{GetParam()} + "-input-masked.drv", [&] { return m->to_string(store, /*name=*/""); });
 }
 
 TEST_P(MaskedHashInputMaskedTest, from_aterm)
@@ -385,7 +386,7 @@ TEST_P(MaskedHashInputMaskedTest, from_aterm)
     auto expected = inputMasked(written, named(written, GetParam()));
     ASSERT_TRUE(expected);
     readTest(std::string{GetParam()} + "-input-masked.drv", [&](auto encoded) {
-        EXPECT_EQ((parse<HashInputs, Output::InputAddressed>(store, std::move(encoded), expected->name)), *expected);
+        EXPECT_EQ(Drv<Output::InputAddressed>::parse(store, std::move(encoded), /*name=*/""), *expected);
     });
 }
 
@@ -418,7 +419,7 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_F(MaskedHashTest, nonCanonicalInputDrvHashRejected)
 {
     Written written;
-    auto m = bothMasked(written, named(written, "parent-split"));
+    auto m = fullyMasked(written, named(written, "parent-split"));
     ASSERT_TRUE(m);
     ASSERT_EQ(m->inputs.drvs.map.size(), 1u);
     auto & hash = m->inputs.drvs.map.begin()->first;
@@ -427,14 +428,13 @@ TEST_F(MaskedHashTest, nonCanonicalInputDrvHashRejected)
     auto upper = canonical;
     std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char c) { return std::toupper(c); });
 
-    auto aterm = unparse(*m, store);
+    auto aterm = m->to_string(store, /*name=*/"");
     nlohmann::json json = *m;
 
     for (auto & other : {upper, hash.to_string(HashFormat::Nix32, false)}) {
         SCOPED_TRACE(other);
 
-        EXPECT_THROW(
-            (parse<HashInputs, Output::Deferred>(store, replaceStrings(aterm, canonical, other), m->name)), Error);
+        EXPECT_THROW(Drv<Output::Deferred>::parse(store, replaceStrings(aterm, canonical, other), /*name=*/""), Error);
 
         auto bad = json;
         auto & drvs = bad["inputs"]["drvs"];
@@ -452,7 +452,7 @@ TEST_F(MaskedHashTest, nonCanonicalInputDrvHashRejected)
 TEST_F(MaskedHashTest, inputDrvWithoutOutputsRejectedInJson)
 {
     Written written;
-    auto m = bothMasked(written, named(written, "parent-split"));
+    auto m = fullyMasked(written, named(written, "parent-split"));
     ASSERT_TRUE(m);
     nlohmann::json json = *m;
     auto & drvs = json["inputs"]["drvs"];
@@ -479,7 +479,7 @@ TEST_F(MaskedHashTest, collidingInputDrvsMergeOutputNames)
     EXPECT_NE(computeStorePath(store, first), computeStorePath(store, second));
 
     /* ...and so the same masked derivation, hence the same hash. */
-    EXPECT_EQ(bothMasked(written, first), bothMasked(written, second));
+    EXPECT_EQ(fullyMasked(written, first), fullyMasked(written, second));
 
     /* `out` from one and `dev` from the other therefore gives the same
        masked derivation as both outputs from a single one of them:
@@ -487,14 +487,14 @@ TEST_F(MaskedHashTest, collidingInputDrvsMergeOutputNames)
        the structure rather than the hash means a regression here says
        which output names went missing. */
     EXPECT_EQ(
-        bothMasked(written, named(written, "parent-split")), bothMasked(written, named(written, "parent-joined")));
+        fullyMasked(written, named(written, "parent-split")), fullyMasked(written, named(written, "parent-joined")));
 
     /* ...and symmetrically, with the roles of the two swapped. */
     auto splitOther = makeParent({
         SingleDerivedPath::Built{.drvPath = drvRef(written, first), .output = "dev"},
         SingleDerivedPath::Built{.drvPath = drvRef(written, second), .output = "out"},
     });
-    EXPECT_EQ(bothMasked(written, splitOther), bothMasked(written, named(written, "parent-joined")));
+    EXPECT_EQ(fullyMasked(written, splitOther), fullyMasked(written, named(written, "parent-joined")));
 }
 
 /**
@@ -514,7 +514,7 @@ TEST_F(MaskedHashTest, differingOutputNamesDiffer)
         SingleDerivedPath::Built{.drvPath = intermediate, .output = "dev"},
     });
 
-    EXPECT_NE(bothMasked(written, justOut), bothMasked(written, both));
+    EXPECT_NE(fullyMasked(written, justOut), fullyMasked(written, both));
 }
 
 /**
@@ -553,7 +553,7 @@ TEST_F(MaskedHashTest, differingInputDrvsDiffer)
         },
     });
 
-    EXPECT_NE(bothMasked(written, a), bothMasked(written, b));
+    EXPECT_NE(fullyMasked(written, a), fullyMasked(written, b));
 }
 
 } // namespace nix::derivation::masked

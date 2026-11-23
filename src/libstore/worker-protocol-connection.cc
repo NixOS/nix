@@ -274,7 +274,7 @@ void WorkerProto::BasicClientConnection::putBuildDerivationRequest(
     BuildMode buildMode)
 {
     to << WorkerProto::Op::BuildDerivation << store.printStorePath(drvPath);
-    derivation::write(to, store, drv);
+    derivation::write(to, store, derivation::lower(drv), drv.name);
     to << buildMode;
 }
 

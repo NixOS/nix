@@ -1,5 +1,6 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/masked.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
@@ -230,11 +231,11 @@ void derivationToValue(EvalState & state, const SourcePath & path, const StorePa
                 NixStringContextElem::DrvDeep{.drvPath = storePath},
             },
             state.mem);
-    attrs.alloc(state.s.name).mkString(drv.env["name"], state.mem);
+    attrs.alloc(state.s.name).mkString(drv.env["name"].value, state.mem);
 
     auto list = state.buildList(drv.outputs.size());
     for (const auto & [i, o] : enumerate(drv.outputs)) {
-        mkOutputString(state, attrs, storePath, o);
+        mkOutputString(state, attrs, storePath, {o.first, o.second.output});
         (list[i] = state.allocValue())->mkString(o.first, state.mem);
     }
     attrs.alloc(state.s.outputs).mkList(list);
@@ -1855,8 +1856,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         };
 
         if (!isSubmittingOutputs)
-            drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
-        drv.outputs.insert_or_assign("out", std::move(dof));
+            drv.env["out"] = {.value = state.store->printStorePath(dof.path(*state.store, drvName, "out"))};
+        drv.outputs.insert_or_assign("out", decltype(drv.outputs)::mapped_type{.output = std::move(dof)});
     }
 
     else if (contentAddressed || isImpure) {
@@ -1868,21 +1869,23 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
         for (auto & i : outputs) {
             if (!isSubmittingOutputs)
-                drv.env[i] = hashPlaceholder(i);
+                drv.env[i] = {.value = hashPlaceholder(i)};
             if (isImpure)
                 drv.outputs.insert_or_assign(
                     i,
-                    DerivationOutput::Impure{
-                        .method = method,
-                        .hashAlgo = ha,
-                    });
+                    decltype(drv.outputs)::mapped_type{
+                        .output = DerivationOutput::Impure{
+                            .method = method,
+                            .hashAlgo = ha,
+                        }});
             else
                 drv.outputs.insert_or_assign(
                     i,
-                    DerivationOutput::CAFloating{
-                        .method = method,
-                        .hashAlgo = ha,
-                    });
+                    decltype(drv.outputs)::mapped_type{
+                        .output = DerivationOutput::CAFloating{
+                            .method = method,
+                            .hashAlgo = ha,
+                        }});
         }
     }
 
@@ -1894,12 +1897,22 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
            that changes in the set of output names do get reflected in
            the hash. */
         for (auto & i : outputs) {
-            drv.env[i] = "";
-            drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
+            drv.env[i] = {};
+            drv.outputs.insert_or_assign(i, decltype(drv.outputs)::mapped_type{.output = DerivationOutput::Deferred{}});
         }
-
-        fillInOutputPaths(drv, *state.store);
     }
+
+    /* Parse the legacy environment-variable (and structured-attributes)
+       encodings of the derivation options into their first-class
+       fields, so that the two are in sync (which the ATerm
+       serialization requires). Must happen after the outputs are
+       populated, so per-output checks have somewhere to land, and
+       before output paths are filled in, which consults the options.
+       The warnings for dubious values were already emitted above. */
+    elaborateLegacyOptions(*state.store, drv, /*shouldWarn=*/false);
+
+    if (!outputHash && !contentAddressed && !isImpure)
+        fillInOutputPaths(drv, *state.store);
 
     /* Write the resulting term into the Nix store directory.
 
@@ -1929,7 +1942,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             },
             state.mem);
     for (auto & i : drv.outputs)
-        mkOutputString(state, result, drvPath, i);
+        mkOutputString(state, result, drvPath, {i.first, i.second.output});
 
     v.mkAttrs(result);
 }
@@ -1961,7 +1974,7 @@ static RegisterPrimOp primop_placeholder({
     .args = {"output"},
     .doc = R"(
       Return an
-      [output placeholder string](@docroot@/store/derivation/index.md#output-placeholder)
+      [output placeholder string](@docroot@/language/string-context.md#output-placeholder)
       for the specified *output* that will be substituted by the corresponding
       [output path](@docroot@/glossary.md#gloss-output-path)
       at build time.
@@ -2555,7 +2568,7 @@ static RegisterPrimOp primop_outputOf({
     .args = {"derivation-reference", "output-name"},
     .doc = R"(
       Return the output path of a derivation, literally or using an
-      [input placeholder string](@docroot@/store/derivation/index.md#input-placeholder)
+      [input placeholder string](@docroot@/language/string-context.md#input-placeholder)
       if needed.
 
       If the derivation has a statically-known output path (i.e. the derivation output is input-addressed, or fixed content-addressed), the output path is returned.

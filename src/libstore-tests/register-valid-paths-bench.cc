@@ -37,11 +37,11 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
             auto drvPath = StorePath::random(drvName + ".drv");
 
             Derivation drv{
-                .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+                .name = drvName,
+                .outputs = {{"out", {.output = DerivationOutput{DerivationOutput::Deferred{}}}}},
                 .platform = "x86_64-linux",
                 .builder = "foo",
-                .env = {{"out", ""}},
-                .name = drvName,
+                .env = {{"out", {.value = ""}}},
             };
             fillInOutputPaths(drv, *localStore);
 

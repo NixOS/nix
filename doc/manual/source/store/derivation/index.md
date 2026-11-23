@@ -32,7 +32,12 @@ A derivation consists of:
 
  - The [process creation fields]: to spawn the arbitrary process which will perform the build step.
 
+ - The [options], influencing how the derivation is built and scheduled.
+
+How these are represented depends on the [version](./versions.md) of the derivation.
+
 [store derivation]: #store-derivation
+[options]: #options
 [inputs]: #inputs
 [input]: #inputs
 [outputs]: ./outputs/index.md
@@ -44,6 +49,11 @@ A derivation consists of:
 [system]: #system
 [content-addressed store]: @docroot@/glossary.md#gloss-content-addressed-store
 [build system]: @docroot@/glossary.md#gloss-build-system
+
+### Derivation versions {#versions}
+
+There are two [versions](./versions.md) of derivations: [version 1], the stable one, which encodes its [options] in its environment variables or structured attributes, and [version 2], which represents them directly.
+Some of the parts below differ between them.
 
 ### Referencing derivations {#derivation-path}
 
@@ -143,14 +153,18 @@ When it is set, rather than passing the value directly in the environment, the v
 For example, a variable `big` with *pass as file* set results in an environment variable `bigPath` pointing to a file containing the value of `big`.
 This is useful for large values, since most operating systems impose a limit on the size of the process environment (typically a few hundred kilobytes).
 
-This flag has no effect when [structured attributes](#structured-attrs) are used, as attributes are then not passed through the environment in the first place, so there is no size constraint to avoid.
+In [version 2] derivations the flag is part of each environment variable.
+In [version 1] derivations it is encoded: the environment variable `passAsFile` holds a space-separated list of the names of the environment variables to pass as files.
+Version 1 derivations using [structured attributes](#structured-attrs) cannot set the flag at all, as attributes are then not passed through the environment in the first place, so there is no size constraint to avoid.
 
 #### Structured Attributes {#structured-attrs}
 
-Nix also has special support for embedding JSON in the derivations.
+[Version 1] derivations can embed JSON, rather than consisting only of strings.
+[Version 2] derivations do not support structured attributes.
 
 Structured attributes obviate the need for the [*pass as file*](#pass-as-file) flag, since JSON files have no size restrictions, unlike process environments.
-They also allow [options](#options) and [output checks](outputs/index.md#output-checks) to be expressed in a structured way, rather than string-encoded in environment variables.
+They also allow [options](#options) and [output checks](outputs/index.md#output-checks) to be encoded in a structured way, rather than string-encoded in environment variables; some options can only be encoded this way.
+Version 2 derivations have all of these options as fields of their own, so they do not need structured attributes for this.
 
 The environment variable `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build and a [`nix-shell`](@docroot@/command-ref/nix-shell.md).
 
@@ -162,7 +176,12 @@ For example, the attribute `hardening.format = true` ends up as the Bash associa
 ### Options {#options}
 
 Derivations carry a number of *options* influencing how they are built and scheduled.
-Historically, these were encoded with specially-named [environment variables](#env) or [structured attributes](#structured-attrs); they are, however, fields of the derivation in their own right.
+
+In [version 2] derivations they are fields of the derivation in their own right.
+In [version 1] derivations they are encoded with specially-named [environment variables](#env), or attributes in [structured attributes](#structured-attrs), as described in [Advanced Attributes](@docroot@/language/advanced-attributes.md); the encoding is what the derivation actually contains, and the options are read from it.
+Version 1 derivations without structured attributes can only encode some options:
+output checks can only be given once for all outputs, not separately per output,
+and [*unsafe discard references*](outputs/index.md#unsafe-discard-references) cannot be encoded at all.
 
 Options that apply to individual outputs — [output checks](outputs/index.md#output-checks) and [reference scanning](outputs/index.md#reference-scanning) — are documented with [derivation outputs](outputs/index.md).
 The remaining options apply to the derivation as a whole:
@@ -229,27 +248,13 @@ The remaining options apply to the derivation as a whole:
 [closure]: @docroot@/glossary.md#gloss-closure
 [fixed-output derivation]: @docroot@/glossary.md#gloss-fixed-output-derivation
 
-### Placeholders
+### Placeholders and references {#placeholders}
 
-Placeholders are opaque values used within the [process creation fields] to [store objects] for which we don't yet know [store path]s.
-They are strings in the form `/<hash>` that are embedded anywhere within the strings of those fields, and we are [considering](https://github.com/NixOS/nix/issues/12361) to add store-path-like placeholders.
+The [process creation fields] need to refer to [store objects][store object] for which we don't yet know [store path]s, in two cases:
 
-> **Note**
->
-> Output Deriving Path exist to solve the same problem as placeholders --- that is, referring to store objects for which we don't yet know a store path.
-> They also have a string syntax with `^`, [described in the encoding section](#deriving-path-encoding).
-> We could use that syntax instead of `/<hash>` for placeholders, but its human-legibility would cause problems.
+- A derivation's own outputs.
 
-There are two types of placeholder, corresponding to the two cases where this problem arises:
-
-- [Output placeholder]{#output-placeholder}:
-
-  This is a placeholder for a derivation's own output.
-
-- [Input placeholder]{#input-placeholder}:
-
-  This is a placeholder to a derivation's non-constant [input],
-  i.e. an input that is an [output derived path].
+- A derivation's non-constant [inputs][input], i.e. inputs that are [output deriving paths][deriving path].
 
 > **Explanation**
 >
@@ -258,11 +263,31 @@ There are two types of placeholder, corresponding to the two cases where this pr
 >
 > - In the output case this is impossible:
 >
->   We cannot build the output until we have a correct derivation, and we cannot have a correct derivation (without using placeholders) until we have the output path.
+>   We cannot build the output until we have a correct derivation, and we cannot have a correct derivation (without some way to refer to the output) until we have the output path.
 >
 > - In the input case this is impractical:
 >
 >   If we always build a dependency first, and then refer to its output by store path, we would lose the ability for a derivation graph to describe an entire build plan consisting of multiple build steps.
+
+How this is done depends on the [version](./versions.md) of the derivation.
+
+- [Version 2] derivations use *references*.
+  Their process creation fields are not plain strings, but [lists of literal text and references](@docroot@/protocols/derivation-aterm/v2.md#interpolated), each reference naming either one of the derivation's own outputs or one of its inputs.
+  When the derivation is [resolved](@docroot@/store/resolution.md) or built, the references are replaced by the store paths they stand for.
+
+- [Version 1] derivations need no way to refer to inputs whose store paths are not known, since they [cannot depend on version 2 derivations](./versions.md#version-1), and the outputs of version 1 derivations always have known store paths.
+  So they only ever refer to their own outputs indirectly, and do so with [*output placeholders*]{#output-placeholder}: opaque strings of the form `/<hash>`, computed from an output's name.
+  When the derivation is built, every occurrence of an output placeholder in an [argument][args] or an [environment variable][env] value --- including the files written from them, for [*pass as file*](#pass-as-file) and [structured attributes](#structured-attrs) --- is replaced by the store path of that output.
+  This is a legacy of version 1 derivations, kept because derivations using it already exist.
+
+Placeholders for inputs whose store paths are not known never appear in a derivation of either version; they exist only in the [Nix language](@docroot@/language/string-context.md#placeholders).
+
+> **Rationale**
+>
+> Placeholders encode a reference *inside* a string, so replacing them means searching every string for anything that looks like one.
+> Literal text that happens to look like a placeholder is then replaced too --- the same kind of mistake as an SQL injection, where data is mistaken for code.
+> References are kept separate from literal text, so nothing is ever searched for, and literal text is never mistaken for a reference.
+> That is why version 2 derivations use references, and version 1 derivations keep placeholders only where they always have.
 
 ## Encoding
 
@@ -277,10 +302,11 @@ There are two formats, documented separately:
 Every derivation has a canonical choice of encoding used to serialize it to a store object.
 This ensures that there is a canonical [store path] used to refer to the derivation, as described in [Referencing derivations](#derivation-path).
 
+The canonical encoding is the "ATerm" format, which has a separate form for each [version](./versions.md) of derivation.
+
 > **Note**
 >
-> Currently, the canonical encoding for every derivation is the "ATerm" format,
-> but this is subject to change for the types of derivations which are not yet stable.
+> The canonical encoding of [version 2] derivations is subject to change while they are experimental.
 
 Regardless of the format used, when serializing a derivation to a store object, that store object will be content-addressed.
 
@@ -391,3 +417,6 @@ The result of this is that it is possible to have a chain of `^<output-name>` at
 > ```
 
 [Nix instance]: @docroot@/glossary.md#gloss-nix-instance
+
+[version 1]: ./versions.md#version-1
+[version 2]: ./versions.md#version-2
