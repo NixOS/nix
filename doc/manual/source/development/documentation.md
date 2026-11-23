@@ -126,7 +126,7 @@ While the table of contents can provide guidance and full-text search can help, 
 
     This is especially important when moving information out of the Nix manual to other resources.
 
-  - When changing anchors, update [client-side redirects](https://github.com/NixOS/nix/blob/master/doc/manual/redirects.js)
+  - When changing anchors, update [client-side redirects](https://github.com/NixOS/nix/blob/master/doc/manual/redirects.json)
 
   The current setup is cumbersome, and help making better automation is appreciated.
 
