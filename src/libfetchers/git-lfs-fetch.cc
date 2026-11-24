@@ -1,5 +1,6 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
+#include "fetchers-config-private.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
@@ -13,12 +14,16 @@
 #include "nix/store/ssh.hh"
 #include "nix/util/deleter.hh"
 
+#include "nix/util/base-n.hh"
+
 #include <git2/attr.h>
 #include <git2/config.h>
 #include <git2/errors.h>
-#include <git2/remote.h>
 
 #include <nlohmann/json.hpp>
+
+#include <array>
+#include <span>
 
 namespace nix::lfs {
 
@@ -136,7 +141,7 @@ typedef std::unique_ptr<git_config_entry, Deleter<git_config_entry_free>> GitCon
 static std::string getLfsEndpointUrl(git_repository * repo)
 {
     GitConfig config;
-    if (git_repository_config(Setter(config), repo)) {
+    if (!git_repository_config(Setter(config), repo)) {
         GitConfigEntry entry;
         if (!git_config_get_entry(Setter(entry), config.get(), "lfs.url")) {
             auto value = std::string(entry->value);
@@ -145,17 +150,76 @@ static std::string getLfsEndpointUrl(git_repository * repo)
                 return value;
             }
         }
+
+        // Preserve the configured remote URL verbatim. git_remote_url() expands
+        // url.*.insteadOf rules, which may rewrite Git transport URLs to an
+        // endpoint that does not serve the repository's LFS API.
+        if (!git_config_get_entry(Setter(entry), config.get(), "remote.origin.url"))
+            return std::string(entry->value);
     }
 
-    git_remote * remote = nullptr;
-    if (git_remote_lookup(&remote, repo, "origin"))
-        return "";
+    return "";
+}
 
-    const char * url_c_str = git_remote_url(remote);
-    if (!url_c_str)
-        return "";
+static std::optional<std::string> getGitCredentialAuthHeader(const ParsedURL & url)
+{
+    if (!url.authority)
+        return std::nullopt;
 
-    return std::string(url_c_str);
+    Pipe input;
+    Pipe output;
+    input.create();
+    output.create();
+
+    const std::array<FdRedirection, 2> redirects = {{
+        {.from = input.readSide.get(), .to = FdRedirection::stdInput},
+        {.from = output.writeSide.get(), .to = FdRedirection::stdOut},
+    }};
+    auto pid = spawnProgram(
+        {.program = GIT_PROGRAM, .args = {OS_STR("credential"), OS_STR("fill")}}, redirects);
+
+    input.readSide.close();
+    output.writeSide.close();
+
+    auto host = url.authority->host;
+    if (url.authority->port)
+        host += fmt(":%d", *url.authority->port);
+
+    auto credentialRequest = fmt("protocol=%s\nhost=%s\n", url.scheme, host);
+    auto path = url.renderPath(/*encode=*/false);
+    if (!path.empty()) {
+        if (path.front() == '/')
+            path.erase(0, 1);
+        credentialRequest += fmt("path=%s\n", path);
+    }
+    credentialRequest += '\n';
+    writeFull(input.writeSide.get(), credentialRequest);
+    input.writeSide.close();
+
+    auto credentials = drainFD(output.readSide.get());
+    if (!statusOk(pid.wait()))
+        return std::nullopt;
+
+    std::optional<std::string> username;
+    std::optional<std::string> password;
+    for (const auto & line : tokenizeString<Strings>(credentials, "\n")) {
+        const auto separator = line.find('=');
+        if (separator == std::string::npos)
+            continue;
+        const auto key = std::string_view(line).substr(0, separator);
+        const auto value = line.substr(separator + 1);
+        if (key == "username")
+            username = value;
+        else if (key == "password")
+            password = value;
+    }
+    if (!username || !password)
+        return std::nullopt;
+
+    const auto userpass = fmt("%s:%s", *username, *password);
+    return fmt(
+        "Basic %s",
+        base64::encode(std::as_bytes(std::span<const char>{userpass.data(), userpass.size()})));
 }
 
 static std::optional<Pointer> parseLfsPointer(std::string_view content, std::string_view filename)
@@ -246,23 +310,41 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     auto api = lfs::getLfsApi(this->url);
     auto url = api.endpoint + "/objects/batch";
     const auto & authHeader = api.authHeader;
-    FileTransferRequest request(parseURL(url));
-    request.method = HttpMethod::Post;
-    Headers headers;
-    if (authHeader.has_value())
-        headers.push_back({"Authorization", *authHeader});
-    headers.push_back({"Content-Type", "application/vnd.git-lfs+json"});
-    headers.push_back({"Accept", "application/vnd.git-lfs+json"});
-    request.headers = headers;
     nlohmann::json oidList = pointerToPayload(pointers);
     nlohmann::json data = {{"operation", "download"}};
     data["objects"] = oidList;
     auto payload = data.dump();
-    StringSource source{payload};
-    request.data = {source};
+    auto uploadBatch = [&](const std::optional<std::string> & authorization) {
+        FileTransferRequest request(parseURL(url));
+        request.method = HttpMethod::Post;
+        Headers headers;
+        if (authorization.has_value())
+            headers.push_back({"Authorization", *authorization});
+        headers.push_back({"Content-Type", "application/vnd.git-lfs+json"});
+        headers.push_back({"Accept", "application/vnd.git-lfs+json"});
+        request.headers = headers;
+        StringSource source{payload};
+        request.data = {source};
+        return getFileTransfer()->upload(request);
+    };
 
-    FileTransferResult result = getFileTransfer()->upload(request);
-    auto responseString = result.data;
+    std::optional<FileTransferResult> result;
+    try {
+        result = uploadBatch(authHeader);
+    } catch (const FileTransferError & error) {
+        if (authHeader.has_value() || error.error != FileTransfer::Unauthorized)
+            throw;
+
+        if (!credentialHelperTried) {
+            credentialHelperTried = true;
+            credentialAuthHeader = getGitCredentialAuthHeader(this->url);
+        }
+        if (!credentialAuthHeader)
+            throw;
+
+        result = uploadBatch(credentialAuthHeader);
+    }
+    auto responseString = result->data;
 
     std::vector<nlohmann::json> objects;
     // example resp here:
