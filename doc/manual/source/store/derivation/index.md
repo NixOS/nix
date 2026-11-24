@@ -148,6 +148,9 @@ See [Wikipedia](https://en.wikipedia.org/wiki/Argv) for details.
 
 Environment variables which will be passed to the [builder](#builder) executable.
 
+In [version 2] derivations, environment variables are uninterpreted: Nix passes them to the builder, and never gives any of them a meaning of its own.
+In [version 1] derivations, by contrast, some environment variables [encode](#options) options, *pass as file* flags, or [structured attributes](#structured-attrs).
+
 Each environment variable additionally has a [*pass as file*]{#pass-as-file} flag.
 When it is set, rather than passing the value directly in the environment, the value is written to a temporary file in the build directory, and an environment variable named like the original but with a `Path` suffix is set to the path of that file.
 For example, a variable `big` with *pass as file* set results in an environment variable `bigPath` pointing to a file containing the value of `big`.
