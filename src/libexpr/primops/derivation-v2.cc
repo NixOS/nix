@@ -59,25 +59,16 @@ struct Interpolator
                             keys.emplace(state.store->printStorePath(*path), Reference<SingleDerivedPath>{p});
                     },
                     [&](const NixStringContextElem::DrvDeep & d) {
-                        /* The whole closure of the derivation, outputs
-                           included, is made an input, as for version 1
-                           derivations; the derivation's own path is
-                           referred to as the constant input it is. */
-                        StorePathSet refs;
-                        state.store->computeFSClosure(d.drvPath, refs);
-                        for (auto & j : refs) {
-                            inputs.insert(SingleDerivedPath::Opaque{.path = j});
-                            if (j.isDerivation())
-                                for (auto & outputName : state.store->readDerivation(j).outputNames())
-                                    inputs.insert(
-                                        SingleDerivedPath::Built{
-                                            .drvPath = makeConstantStorePathRef(j),
-                                            .output = outputName,
-                                        });
-                        }
-                        keys.emplace(
-                            state.store->printStorePath(d.drvPath),
-                            Reference<SingleDerivedPath>{SingleDerivedPath{SingleDerivedPath::Opaque{.path = d.drvPath}}});
+                        /* A version 2 derivation says exactly what it depends
+                           on, so there is no depending on a derivation's whole
+                           closure, outputs included, in one go. */
+                        state
+                            .error<EvalError>(
+                                "string refers to the derivation '%s' together with its whole closure, which "
+                                "version 2 derivations cannot depend on; depend on the outputs needed instead, "
+                                "or on the derivation alone with 'builtins.unsafeDiscardOutputDependency'",
+                                state.store->printStorePath(d.drvPath))
+                            .debugThrow();
                     },
                 },
                 c.raw);
@@ -360,12 +351,14 @@ static void prim_derivationStrictV2(EvalState & state, CallSite callSite, Value 
                                          : writeDerivation(*state.store, drv, state.repair);
     auto outputPaths = staticOutputPaths(*state.store, drv, staticPathOf(*state.store));
 
+    /* The derivation path refers to just the derivation, not to its
+       closure with outputs as the `drvPath` of `derivation` does. */
     auto result = state.buildBindings(1 + drv.outputs.size());
     result.alloc(state.s.drvPath)
         .mkString(
             state.store->printStorePath(drvPath),
             {
-                NixStringContextElem::DrvDeep{.drvPath = drvPath},
+                NixStringContextElem::Opaque{.path = drvPath},
             },
             state.mem);
     for (auto & [outputName, output] : drv.outputs) {

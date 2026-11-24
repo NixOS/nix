@@ -98,3 +98,24 @@ in builtins.derivationStrictV2 {
 graphDrv=$(nix-instantiate --read-write-mode --eval --raw -E "($graphExpr).drvPath")
 graphOut=$(nix-store --realise "$graphDrv")
 grepQuiet '"narHash"' "$graphOut"
+
+# A version 2 derivation cannot depend on a derivation's whole closure at
+# once, as a derivation-deep string context element would have it.
+
+deepExpr="
+with import ${config_nix};
+
+let
+  dep = derivation { name = \"deep-dep\"; inherit system; builder = shell; args = [ \"-c\" \"echo > \$out\" ]; };
+in builtins.derivationStrictV2 {
+  name = \"derivation-v2-deep\";
+  inherit system;
+  builder = shell;
+  args = [ \"-c\" \"echo \${builtins.addDrvOutputDependencies dep.drvPath} > \$out\" ];
+  env.out = builtins.placeholder \"out\";
+  outputs.out = {};
+}
+"
+
+expectStderr 1 nix-instantiate --read-write-mode --eval --raw -E "($deepExpr).drvPath" \
+    | grepQuiet "together with its whole closure"

@@ -73,9 +73,13 @@ nix build -f multiple-outputs.nix --json 'e.a_a.outPath' --no-link | jq --exit-s
     (.outputs | keys == ["a_a"]))
 '
 
-# Illegal type of string context
-expectStderr 1 nix build -f multiple-outputs.nix 'e.a_a.drvPath' \
-  | grepQuiet "has a context which refers to a complete source and binary closure."
+# Illegal type of string context. Only the `drvPath` of a version 1
+# derivation has it; that of a version 2 derivation refers to just the
+# derivation.
+if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    expectStderr 1 nix build -f multiple-outputs.nix 'e.a_a.drvPath' \
+      | grepQuiet "has a context which refers to a complete source and binary closure."
+fi
 
 # No string context
 expectStderr 1 nix build --expr '""' --no-link \
