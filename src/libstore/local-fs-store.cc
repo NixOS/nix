@@ -3,6 +3,8 @@
 #include "nix/util/compression.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/path-iterator.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 
 namespace nix {
 
@@ -29,6 +31,22 @@ LocalFSStore::LocalFSStore(const Config & config)
     : Store{static_cast<const Store::Config &>(*this)}
     , config{config}
 {
+}
+
+void LocalFSStore::init()
+{
+    if (realStoreDirFd)
+        return;
+    auto dir = getRealStoreDir();
+    realStoreDirFd = valueOr(
+        openDirectory(dir, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening store directory %s", PathFmt(dir)));
+}
+
+Descriptor LocalFSStore::getRealStoreDirFd()
+{
+    assert(realStoreDirFd && "`LocalFSStore::init()` must be called first");
+    return realStoreDirFd.get();
 }
 
 namespace {
