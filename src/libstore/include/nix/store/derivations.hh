@@ -237,6 +237,16 @@ struct EnvValue
     bool operator==(const EnvValue &) const = default;
 };
 
+/**
+ * Which [version](@docroot@/store/derivation/versions.md) of derivation
+ * a `Derivation` is the elaborated form of, and so which form it is
+ * written in.
+ */
+enum struct Version {
+    V1,
+    V2,
+};
+
 template<typename Input, typename Out>
 struct Derivation
 {
@@ -260,6 +270,8 @@ struct Derivation
     std::optional<StructuredAttrs> structuredAttrs;
 
     TopOptions<Input> options;
+
+    Version version = Version::V1;
 
     bool operator==(const Derivation &) const = default;
 
@@ -302,6 +314,7 @@ struct Derivation
             .args = args,
             .env = env,
             .structuredAttrs = structuredAttrs,
+            .version = version,
         };
         for (auto & [outputName, output] : outputs)
             res.outputs.insert_or_assign(
@@ -329,6 +342,7 @@ struct Derivation
             .env = env,
             .structuredAttrs = structuredAttrs,
             .options = options,
+            .version = version,
         };
         for (auto & [outputName, output] : outputs)
             res.outputs.insert_or_assign(

@@ -1,4 +1,6 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/v2/aterm.hh"
+#include "nix/store/derivation/v2/convert.hh"
 #include "nix/store/derivation/options.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivation/masked.hh"
@@ -102,7 +104,15 @@ static auto infoForDerivation(const StoreDirConfig & store, const Derivation & d
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
-    auto contents = unparse(drv, store);
+    auto contents = [&] {
+        if (drv.version != derivation::Version::V2)
+            return unparse(drv, store);
+        std::map<OutputName, StorePath, std::less<>> outputPaths;
+        for (auto & [outputName, output] : drv.outputs)
+            if (auto * ia = std::get_if<DerivationOutput::InputAddressed>(&output.output.raw))
+                outputPaths.emplace(outputName, ia->path);
+        return derivation::v2::unparse(derivation::v2::fromElaborated(store, drv), store, outputPaths);
+    }();
     auto hash = hashString(HashAlgorithm::SHA256, contents);
     auto ca = TextInfo{.hash = hash, .references = references};
     return std::tuple{
@@ -373,6 +383,48 @@ static void processDerivationOutputPaths(
     auto && drv,
     std::string_view drvName)
 {
+    /* Version 2 derivations are input-addressed by static speculation
+       rather than by masking. */
+    if (drv.version == derivation::Version::V2) {
+        derivation::v2::StaticPathOf staticPathOf = [&](const SingleDerivedPath::Built & b) -> std::optional<StorePath> {
+            if constexpr (std::is_same_v<std::decay_t<decltype(drv)>, derivation::Basic>) {
+                return std::nullopt;
+            } else {
+                auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&b.drvPath->raw());
+                if (!opaque)
+                    return std::nullopt;
+                auto input = readDerivation(opaque->path);
+                auto i = input.outputs.find(b.output);
+                if (i == input.outputs.end())
+                    return std::nullopt;
+                return std::visit(
+                    overloaded{
+                        [&](const DerivationOutput::InputAddressed & ia) -> std::optional<StorePath> { return ia.path; },
+                        [&](const DerivationOutput::CAFixed & f) -> std::optional<StorePath> {
+                            return f.path(store, input.name, b.output);
+                        },
+                        [&](const auto &) -> std::optional<StorePath> { return std::nullopt; },
+                    },
+                    i->second.output.raw);
+            }
+        };
+        auto paths =
+            derivation::v2::staticOutputPaths(store, derivation::v2::fromElaborated(store, drv), staticPathOf);
+        for (auto & [outputName, output] : drv.outputs) {
+            bool ia = std::holds_alternative<DerivationOutput::InputAddressed>(output.output.raw)
+                      || std::holds_alternative<DerivationOutput::Deferred>(output.output.raw);
+            if (!ia)
+                continue;
+            DerivationOutput expected = paths ? DerivationOutput{DerivationOutput::InputAddressed{.path = paths->at(outputName)}}
+                                              : DerivationOutput{DerivationOutput::Deferred{}};
+            if constexpr (fillIn)
+                output.output = std::move(expected);
+            else if (output.output != expected)
+                throw Error("derivation '%s' has incorrect output '%s'", drvName, outputName);
+        }
+        return;
+    }
+
     /* output optional is for whether we set it yet. Inner optional is
        for whether the input-addressed derivation has an input address
        now or is deferred --- can only calculate input address later. */
