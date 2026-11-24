@@ -219,7 +219,7 @@ nix registry list --flake-registry "file://$registry" --refresh | grepQuiet flak
 mv "$registry.tmp" "$registry"
 
 # A symlinked registry file should work even when the symlink target is
-# an absolute path. The source accessor needs to be rooted at `/` for this.
+# an absolute path.
 ln -sfn "$registry" "$TEST_ROOT/registry-symlink.json"
 nix registry list --flake-registry "$TEST_ROOT/registry-symlink.json" | grepQuiet flake1
 rm "$TEST_ROOT/registry-symlink.json"
@@ -230,6 +230,25 @@ ln -sfn "$registry" "$TEST_HOME/.config/nix/registry.json"
 nix flake metadata --flake-registry '' flake1
 expectStderr 1 nix flake update --flake-registry '' --flake "$flake3Dir" | grepQuiet "cannot find flake 'flake:flake1' in the flake registries"
 rm "$TEST_HOME/.config/nix/registry.json"
+
+# A registry that exists but cannot be read is a warning, not an error.
+if [[ $(id -u) -ne 0 ]]; then
+    cp "$registry" "$TEST_HOME/.config/nix/registry.json"
+    chmod 000 "$TEST_HOME/.config/nix/registry.json"
+    nix registry list 2>&1 | grepQuiet "warning: cannot read flake registry"
+    rm -f "$TEST_HOME/.config/nix/registry.json"
+fi
+nix registry list --flake-registry /dev/null 2>&1 | grepQuiet "warning: cannot read flake registry"
+
+# A relative `--registry` path is relative to the current directory.
+(
+    cd "$TEST_ROOT"
+    nix registry add --registry rel-registry.json flake1 "git+file://$flake1Dir"
+    nix registry add --registry rel-registry.json flake3 "git+file://$percentEncodedFlake3Dir"
+    grepQuiet flake1 rel-registry.json
+    grepQuiet flake3 rel-registry.json
+)
+rm "$TEST_ROOT/rel-registry.json"
 
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
@@ -454,6 +473,17 @@ cmp "$flake2Dir/flake.lock" "$TEST_ROOT"/flake2.lock >/dev/null # lockfiles shou
 nix flake lock "$flake2Dir" --output-lock-file "$TEST_ROOT"/flake2-overridden.lock --override-input flake1 git+file://"$flake1Dir"?rev="$flake1OriginalCommit"
 expectStderr 1 cmp "$flake2Dir/flake.lock" "$TEST_ROOT"/flake2-overridden.lock
 nix flake metadata "$flake2Dir" --reference-lock-file "$TEST_ROOT"/flake2-overridden.lock | grepQuiet "$flake1OriginalCommit"
+
+# A symlinked reference lock file works too.
+ln -sfn flake2-overridden.lock "$TEST_ROOT/ref-link.lock"
+nix flake metadata "$flake2Dir" --reference-lock-file "$TEST_ROOT"/ref-link.lock | grepQuiet "$flake1OriginalCommit"
+rm "$TEST_ROOT/ref-link.lock"
+
+# A nonexistent reference lock file, even beneath a nonexistent or
+# non-directory parent, means there is no lock file, not an error.
+expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/no-such.lock | grepQuiet "requires lock file changes"
+expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/no-such-dir/flake.lock | grepQuiet "requires lock file changes"
+expectStderr 1 nix flake metadata "$flake2Dir" --no-update-lock-file --reference-lock-file "$TEST_ROOT"/flake2.lock/flake.lock | grepQuiet "requires lock file changes"
 
 # reference-lock-file can only be used if allow-dirty is set.
 expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock-file "$TEST_ROOT"/flake2-overridden.lock
