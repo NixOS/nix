@@ -12,6 +12,7 @@ suites += {
     'dep-built-drv-submitted.sh',
     'submit-failure.sh',
     'submit-reference.sh',
+    'submit-instantiate.sh',
   ],
   'workdir' : meson.current_source_dir(),
 }

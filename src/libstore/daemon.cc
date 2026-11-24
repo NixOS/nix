@@ -341,6 +341,9 @@ static void performOp(
             WorkerProto::Op::AddTempRoot,
             // Used by nix cli, restricted store will prevent it from seeing derivations it shouldn't
             WorkerProto::Op::IsValidPath,
+            WorkerProto::Op::QueryValidPaths,
+            WorkerProto::Op::QueryPathInfo,
+            WorkerProto::Op::SetOptions,
         };
         if (std::ranges::find(validOperations, op) == validOperations.end()) {
             throw Error("Operation %d not allowed inside derivation", op);
