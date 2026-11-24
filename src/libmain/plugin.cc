@@ -29,7 +29,7 @@ struct PluginFilesSetting : public BaseSetting<std::list<std::filesystem::path>>
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {})
-        : BaseSetting<std::list<std::filesystem::path>>(def, true, name, description, aliases)
+        : BaseSetting(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
@@ -42,7 +42,7 @@ std::list<std::filesystem::path> PluginFilesSetting::parse(const std::string & s
     if (pluginsLoaded != LoadState::NotLoaded)
         throw UsageError(
             "plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<std::list<std::filesystem::path>>::parse(str);
+    return BaseSetting::parse(str);
 }
 
 struct PluginSettings : Config
