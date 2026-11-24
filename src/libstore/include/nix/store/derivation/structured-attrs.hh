@@ -5,6 +5,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/store/path.hh"
+#include "nix/util/fun.hh"
 
 namespace nix {
 
@@ -64,11 +65,17 @@ struct StructuredAttrs
      */
     static void checkKeyNotInUse(const StringPairs & env);
 
+    /**
+     * @param exportReferencesGraph Each key gets the references graph
+     * of its store paths.
+     * @param renderOutput How to write out the path of each output.
+     */
     nlohmann::json::object_t prepareStructuredAttrs(
         Store & store,
-        const BasicDerivation & drv,
+        const std::map<std::string, StorePathSet, std::less<>> & exportReferencesGraph,
         const StorePathSet & inputPaths,
-        const StringSet & outputNames) const;
+        const StringSet & outputNames,
+        const fun<std::string(const std::string &)> & renderOutput) const;
 
     /**
      * As a convenience to bash scripts, write a shell file that

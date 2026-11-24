@@ -22,7 +22,8 @@ DesugaredEnv DesugaredEnv::create(Store & store, const BasicDerivation & drv, co
     DesugaredEnv res;
 
     if (drv.structuredAttrs) {
-        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, drv, inputPaths, drv.outputNames());
+        auto json = drv.structuredAttrs->prepareStructuredAttrs(
+            store, drv.options.exportReferencesGraph, inputPaths, drv.outputNames(), hashPlaceholder);
         res.atFileEnvPair("NIX_ATTRS_SH_FILE", ".attrs.sh") = derivation::StructuredAttrs::writeShell(json);
         res.atFileEnvPair("NIX_ATTRS_JSON_FILE", ".attrs.json") = static_cast<nlohmann::json>(std::move(json)).dump();
     } else {

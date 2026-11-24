@@ -591,7 +591,8 @@ static void main_nix_build(int argc, char ** argv)
                     return std::nullopt;
                 });
             assert(resolvedOptions);
-            auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvResolvedOpts, inputs, drv.outputNames());
+            auto json = drv.structuredAttrs->prepareStructuredAttrs(
+                *store, drvResolvedOpts.options.exportReferencesGraph, inputs, drv.outputNames(), hashPlaceholder);
 
             structuredAttrsRC = derivation::StructuredAttrs::writeShell(json);
 

@@ -120,7 +120,11 @@ nlohmann::json exportReferencesGraphToJSON(Store & store, const StorePathSet & s
 }
 
 nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
-    Store & store, const BasicDerivation & drv, const StorePathSet & inputPaths, const StringSet & outputNames) const
+    Store & store,
+    const std::map<std::string, StorePathSet, std::less<>> & exportReferencesGraph,
+    const StorePathSet & inputPaths,
+    const StringSet & outputNames,
+    const fun<std::string(const std::string &)> & renderOutput) const
 {
     /* Copy to then modify */
     auto json = structuredAttrs;
@@ -128,11 +132,11 @@ nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
     /* Add an "outputs" object containing the output paths. */
     nlohmann::json outputsJson;
     for (auto & outputName : outputNames)
-        outputsJson[outputName] = hashPlaceholder(outputName);
+        outputsJson[outputName] = renderOutput(outputName);
     json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
-    for (auto & [key, storePaths] : drv.options.exportReferencesGraph) {
+    for (auto & [key, storePaths] : exportReferencesGraph) {
         json[key] = exportReferencesGraphToJSON(store, store.exportReferences(storePaths, inputPaths));
     }
 
