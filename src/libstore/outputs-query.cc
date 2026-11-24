@@ -89,6 +89,11 @@ static std::pair<Derivation, StorePath> resolveDerivation(
     auto & evalStore = evalStore_ ? *evalStore_ : store;
 
     Derivation drv = evalStore.readInvalidDerivation(drvPath);
+    /* Unless it is resolved below, the derivation is the one at
+       `drvPath` itself, so there is no need to compute its path again
+       --- which, for a version 2 derivation, could not be done from its
+       elaborated form. */
+    StorePath resolvedDrvPath = drvPath;
     if (shouldResolve(drv)) {
         /* Without a custom queryRealisation, we could just use
            tryResolve(drv, store, &evalStore). But we need to use the
@@ -106,11 +111,12 @@ static std::pair<Derivation, StorePath> resolveDerivation(
                 return deepQueryPartialDerivationOutputImpl(
                     store, *concreteDrvPath, depOutputName, evalStore_, queryRealisation, cache, resCache);
             });
-        if (resolvedDrv)
+        if (resolvedDrv) {
             drv = unresolve(*resolvedDrv);
+            resolvedDrvPath = computeStorePath(store, drv);
+        }
     }
 
-    auto resolvedDrvPath = computeStorePath(store, drv);
     auto result = std::make_pair(drv, resolvedDrvPath);
     cache.emplace(drvPath, result);
     return result;

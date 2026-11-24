@@ -21,8 +21,63 @@ rec {
   # different derivations for distinct tests.
   testSalt = builtins.hashFile "sha256" __curPos.file;
 
+  # Like `derivation`, but making a version 2 derivation from the same
+  # arguments: plain attributes become environment variables, the
+  # content-addressing and impurity attributes become the outputs'
+  # addressing, and the legacy option attributes become options.
+  derivationV2 = drvAttrs@{ outputs ? [ "out" ], ... }:
+    let
+      toEnv1 = v:
+        if v == true then "1"
+        else if v == false || v == null then ""
+        else if builtins.isPath v || builtins.isAttrs v then "${v}"
+        else toString v;
+      toEnv = v: if builtins.isList v then builtins.concatStringsSep " " (map toEnv1 v) else toEnv1 v;
+      method = {
+        recursive = "nar"; nar = "nar"; flat = "flat"; text = "text"; git = "git";
+      }.${drvAttrs.outputHashMode or "recursive"};
+      addressing =
+        if !(drvAttrs.__contentAddressed or contentAddressedByDefault) && !(drvAttrs.__impure or false) then {}
+        else if drvAttrs.__impure or false then { inherit method; hashAlgo = drvAttrs.outputHashAlgo or "sha256"; impure = true; }
+        else if drvAttrs.__contentAddressed or false then { inherit method; hashAlgo = drvAttrs.outputHashAlgo or "sha256"; }
+        else {};
+      checkNames = [ "allowedReferences" "allowedRequisites" "disallowedReferences" "disallowedRequisites" ];
+      checks = builtins.intersectAttrs (builtins.listToAttrs (map (n: { name = n; value = null; }) checkNames)) drvAttrs;
+      topOptionNames = [ "preferLocalBuild" "allowSubstitutes" "requiredSystemFeatures" "impureEnvVars" ];
+      topOptions = builtins.intersectAttrs (builtins.listToAttrs (map (n: { name = n; value = null; }) topOptionNames)) drvAttrs;
+      passAsFile = drvAttrs.passAsFile or [];
+      special = [ "name" "system" "builder" "args" "outputs" "__contentAddressed" "__impure" "outputHashMode" "outputHashAlgo" "passAsFile" ];
+      env =
+        builtins.mapAttrs (n: v: if builtins.elem n passAsFile then { value = toEnv v; passAsFile = true; } else toEnv v)
+          (removeAttrs drvAttrs special)
+        // builtins.listToAttrs (map (o: { name = o; value = builtins.placeholder o; }) outputs);
+      strict = builtins.derivationStrictV2 {
+        inherit (drvAttrs) name system builder;
+        args = drvAttrs.args or [];
+        inherit env;
+        outputs = builtins.listToAttrs (map (o: {
+          name = o;
+          value = addressing // { options = builtins.mapAttrs (_: v: map toEnv1 v) checks; };
+        }) outputs);
+        options = topOptions;
+      };
+      commonAttrs = drvAttrs // (builtins.listToAttrs outputsList) // {
+        all = map (x: x.value) outputsList;
+        inherit drvAttrs;
+      };
+      outputsList = map (outputName: {
+        name = outputName;
+        value = commonAttrs // {
+          outPath = strict.${outputName};
+          drvPath = strict.drvPath;
+          type = "derivation";
+          inherit outputName;
+        };
+      }) outputs;
+    in (builtins.head outputsList).value;
+
   mkDerivation = args:
-    derivation ({
+    (if contentAddressedByDefault || args.__contentAddressed or false || args.__impure or false then derivationV2 else derivation) ({
       inherit system testSalt;
       builder = shell;
       args = ["-e" args.builder or (builtins.toFile "builder-${args.name}.sh" ''

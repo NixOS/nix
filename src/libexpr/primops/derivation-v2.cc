@@ -59,11 +59,25 @@ struct Interpolator
                             keys.emplace(state.store->printStorePath(*path), Reference<SingleDerivedPath>{p});
                     },
                     [&](const NixStringContextElem::DrvDeep & d) {
-                        state
-                            .error<EvalError>(
-                                "string context with the whole closure of derivation '%s' cannot be used in a version 2 derivation",
-                                state.store->printStorePath(d.drvPath))
-                            .debugThrow();
+                        /* The whole closure of the derivation, outputs
+                           included, is made an input, as for version 1
+                           derivations; the derivation's own path is
+                           referred to as the constant input it is. */
+                        StorePathSet refs;
+                        state.store->computeFSClosure(d.drvPath, refs);
+                        for (auto & j : refs) {
+                            inputs.insert(SingleDerivedPath::Opaque{.path = j});
+                            if (j.isDerivation())
+                                for (auto & outputName : state.store->readDerivation(j).outputNames())
+                                    inputs.insert(
+                                        SingleDerivedPath::Built{
+                                            .drvPath = makeConstantStorePathRef(j),
+                                            .output = outputName,
+                                        });
+                        }
+                        keys.emplace(
+                            state.store->printStorePath(d.drvPath),
+                            Reference<SingleDerivedPath>{SingleDerivedPath{SingleDerivedPath::Opaque{.path = d.drvPath}}});
                     },
                 },
                 c.raw);
