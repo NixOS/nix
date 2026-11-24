@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 static void require_symbol(void * handle, const char * symbol)
 {
@@ -21,8 +22,18 @@ static void require_symbol(void * handle, const char * symbol)
     abort();
 }
 
+static bool entry_called = false;
+
 void nix_plugin_entry()
 {
+    if (entry_called) {
+        fprintf(stderr, "nix_plugin_entry called twice\n");
+        fflush(stderr);
+        abort();
+    }
+
+    entry_called = true;
+
     void * handle = dlopen(NULL, RTLD_LAZY);
     if (!handle) {
         fprintf(stderr, "failed to access main executable symbols");
@@ -45,5 +56,30 @@ void nix_plugin_entry()
     for (int i = 0; i < sizeof(symbols) / sizeof(symbols[0]); ++i) {
         const char * symbol = symbols[i];
         require_symbol(handle, symbol);
+    }
+
+    /* We don't need headers where we are going... */
+    int (*nix_init_plugins)(void *) = (int (*)(void *)) dlsym(handle, "nix_init_plugins");
+    void * (*nix_c_context_create)(void) = (void * (*) (void) ) dlsym(handle, "nix_c_context_create");
+
+    if (!nix_c_context_create || !nix_init_plugins) {
+        fprintf(stderr, "failed to look up nix_init_plugins or nix_c_context_create symbols\n");
+        fflush(stderr);
+        abort();
+    }
+
+    void * context = nix_c_context_create();
+    if (!context) {
+        fprintf(stderr, "failed create a new nix_c_context\n");
+        fflush(stderr);
+        abort();
+    }
+
+    /* This must fail. */
+    int err = nix_init_plugins(context);
+    if (err == 0) {
+        fprintf(stderr, "nix_init_plugins should fail inside nix_plugin_entry\n");
+        fflush(stderr);
+        abort();
     }
 }
