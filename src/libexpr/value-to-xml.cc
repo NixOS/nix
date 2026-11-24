@@ -215,4 +215,17 @@ void printValueAsXML(
     printValueAsXML(state, strict, location, v, doc, context, drvsSeen, pos);
 }
 
+void printValueAsXML(
+    EvalState & state,
+    bool strict,
+    bool location,
+    Value & v,
+    XMLWriter & doc,
+    NixStringContext & context,
+    const PosIdx pos)
+{
+    StringSet drvsSeen;
+    printValueAsXML(state, strict, location, v, doc, context, drvsSeen, pos);
+}
+
 } // namespace nix
