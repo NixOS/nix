@@ -385,12 +385,15 @@ static void prim_derivationStrictV2(EvalState & state, CallSite callSite, Value 
 }
 
 static RegisterPrimOp primop_derivationStrictV2({
-    .name = "derivationStrictV2",
+    .name = "__derivationStrictV2",
     .args = {"attrs"},
     .doc = R"(
       Create a [version 2 derivation](@docroot@/language/derivations/v2.md).
     )",
     .impl = prim_derivationStrictV2,
+    /* FIXME: the feature combining `ca-derivations` and
+       `dynamic-derivations`, once it has a name. */
+    .experimentalFeature = Xp::CaDerivations,
 });
 
 } // namespace nix

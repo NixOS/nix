@@ -2,6 +2,8 @@
 
 source common.sh
 
+enableFeatures "ca-derivations"
+
 # A version 2 derivation: its strings refer to its own output by
 # reference, and an environment variable is passed as a file.
 
@@ -66,12 +68,12 @@ rec {
 }
 "
 
-downstreamDrv=$(nix-instantiate --extra-experimental-features ca-derivations --read-write-mode --eval --raw -E "($caExpr).downstream.drvPath")
+downstreamDrv=$(nix-instantiate --read-write-mode --eval --raw -E "($caExpr).downstream.drvPath")
 
 # Deferred: no output path is recorded.
 grepQuiet -F '[("out","","","",' "$downstreamDrv"
 
-downstreamOut=$(nix-store --extra-experimental-features ca-derivations --realise "$downstreamDrv")
+downstreamOut=$(nix-store --realise "$downstreamDrv")
 [[ "$(cat "$downstreamOut")" = ca ]]
 
 # The export references graph of a version 2 derivation is JSON, in a
