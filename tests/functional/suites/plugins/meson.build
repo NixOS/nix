@@ -1,4 +1,4 @@
-add_languages('cpp', native : false)
+add_languages('cpp', 'c', native : false)
 cpp = meson.get_compiler('cpp')
 dl_dep = cpp.find_library('dl', required : false)
 
@@ -20,7 +20,7 @@ plugin_test_deps += [ libplugintest ]
 if get_option('plugin-c-api') and not host_machine.system().startswith('windows')
   libplugintest_dlsym = shared_module(
     'plugintest_dlsym',
-    'src/plugintest_dlsym.cc',
+    'src/plugintest_dlsym.c',
     dependencies : [ dl_dep ],
     build_by_default : false,
   )
