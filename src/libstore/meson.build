@@ -287,7 +287,6 @@ sources = files(
   'derivation/traditional/json.cc',
   'derivation/v2/aterm.cc',
   'derivation/v2/convert.cc',
-  'derivation/v2/derivation.cc',
   'derivations.cc',
   'derived-path-map.cc',
   'derived-path.cc',

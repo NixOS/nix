@@ -206,34 +206,53 @@ static StringSet asStrings(const Term & term, std::string_view what)
     return res;
 }
 
-static Term derivingPathTerm(const StoreDirConfig & store, const SingleDerivedPath & p)
+/* --------------------------------------------------------------------------
+   Inputs and references, which differ between full and basic derivations
+   -------------------------------------------------------------------------- */
+
+static Term inputTerm(const StoreDirConfig & store, const SingleDerivedPath & p)
 {
     return Term{p.to_string(store)};
 }
 
-static SingleDerivedPath asDerivingPath(
-    const StoreDirConfig & store, const Term & term, std::string_view what, const ExperimentalFeatureSettings & xp)
+static Term inputTerm(const StoreDirConfig & store, const StorePath & p)
 {
-    auto & s = asString(term, what);
-    auto p = SingleDerivedPath::parse(store, s, xp);
-    if (p.to_string(store) != s)
-        throw FormatError("deriving path '%s' in %s is not in canonical form", s, what);
-    return p;
+    return Term{store.printStorePath(p)};
 }
 
-static Term referenceTerm(const StoreDirConfig & store, const Reference & ref)
+template<typename Input>
+static Input
+asInput(const StoreDirConfig & store, const Term & term, std::string_view what, const ExperimentalFeatureSettings & xp)
+{
+    auto & s = asString(term, what);
+    if constexpr (std::is_same_v<Input, SingleDerivedPath>) {
+        auto p = SingleDerivedPath::parse(store, s, xp);
+        if (p.to_string(store) != s)
+            throw FormatError("deriving path '%s' in %s is not in canonical form", s, what);
+        return p;
+    } else {
+        return store.parseStorePathCanonical(s);
+    }
+}
+
+static Term outputReferenceTerm(const OutputName & name)
+{
+    return Term{Term::Tuple{{Term{"output"}, Term{name}}}};
+}
+
+template<typename Input>
+static Term referenceTerm(const StoreDirConfig & store, const Reference<Input> & ref)
 {
     return std::visit(
         overloaded{
-            [&](const OutputName & name) { return Term{Term::Tuple{{Term{"output"}, Term{name}}}}; },
-            [&](const SingleDerivedPath & p) {
-                return Term{Term::Tuple{{Term{"input"}, derivingPathTerm(store, p)}}};
-            },
+            [&](const OutputName & name) { return outputReferenceTerm(name); },
+            [&](const Input & p) { return Term{Term::Tuple{{Term{"input"}, inputTerm(store, p)}}}; },
         },
         ref);
 }
 
-static Reference asReference(
+template<typename Input>
+static Reference<Input> asReference(
     const StoreDirConfig & store, const Term & term, std::string_view what, const ExperimentalFeatureSettings & xp)
 {
     auto & items = asTuple(term, 2, what);
@@ -241,25 +260,54 @@ static Reference asReference(
     if (tag == "output")
         return OutputName{asString(items[1], what)};
     if (tag == "input")
-        return asDerivingPath(store, items[1], what, xp);
+        return asInput<Input>(store, items[1], what, xp);
     throw FormatError("%s must be tagged \"input\" or \"output\", not '%s'", what, tag);
 }
 
-static Term referencesTerm(const StoreDirConfig & store, const std::set<Reference> & refs)
+template<typename Input>
+static Term referencesTerm(const StoreDirConfig & store, const std::set<Reference<Input>> & refs)
 {
     std::vector<Term> items;
     for (auto & r : refs)
-        items.push_back(referenceTerm(store, r));
+        items.push_back(referenceTerm<Input>(store, r));
     return sortedList(std::move(items));
 }
 
-static std::set<Reference> asReferences(
+template<typename Input>
+static std::set<Reference<Input>> asReferences(
     const StoreDirConfig & store, const Term & term, std::string_view what, const ExperimentalFeatureSettings & xp)
 {
-    std::set<Reference> res;
+    std::set<Reference<Input>> res;
     for (auto & item : asSortedList(term, what))
-        res.insert(asReference(store, item, what, xp));
+        res.insert(asReference<Input>(store, item, what, xp));
     return res;
+}
+
+/**
+ * A reference in an interpolated string: to an input or an output in a
+ * full derivation, and only to an output in a basic one.
+ */
+template<typename Input>
+static Term stringReferenceTerm(const StoreDirConfig & store, const typename StringReferenceOf<Input>::type & ref)
+{
+    if constexpr (std::is_same_v<Input, SingleDerivedPath>)
+        return referenceTerm<Input>(store, ref);
+    else
+        return outputReferenceTerm(ref.name);
+}
+
+template<typename Input>
+static typename StringReferenceOf<Input>::type asStringReference(
+    const StoreDirConfig & store, const Term & term, std::string_view what, const ExperimentalFeatureSettings & xp)
+{
+    if constexpr (std::is_same_v<Input, SingleDerivedPath>)
+        return asReference<Input>(store, term, what, xp);
+    else {
+        auto & items = asTuple(term, 2, what);
+        if (asString(items[0], what) != "output")
+            throw FormatError("%s in a basic derivation can only refer to an output", what);
+        return OutputReference{asString(items[1], what)};
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -314,11 +362,12 @@ static void encodeOption(RawOptions & res, std::string name, const T & field, co
         res.emplace(std::move(name), encode());
 }
 
-static TopOptions
+template<typename Input>
+static TopOptions<Input>
 decodeTopOptions(const StoreDirConfig & store, RawOptions raw, const ExperimentalFeatureSettings & xp)
 {
-    const TopOptions d;
-    TopOptions o;
+    const TopOptions<Input> d;
+    TopOptions<Input> o;
     for (auto & [name, term] : raw) {
         auto & t = term;
         if (name == "nix:additionalSandboxProfile")
@@ -334,9 +383,9 @@ decodeTopOptions(const StoreDirConfig & store, RawOptions raw, const Experimenta
                 decltype(o.exportReferencesGraph) res;
                 for (auto & entry : asSortedList(t, name)) {
                     auto & pair = asTuple(entry, 2, name);
-                    std::set<SingleDerivedPath> paths;
+                    std::set<Input> paths;
                     for (auto & p : asSortedList(pair[1], name))
-                        paths.insert(asDerivingPath(store, p, name, xp));
+                        paths.insert(asInput<Input>(store, p, name, xp));
                     res.emplace(asString(pair[0], name), std::move(paths));
                 }
                 return res;
@@ -357,9 +406,10 @@ decodeTopOptions(const StoreDirConfig & store, RawOptions raw, const Experimenta
     return o;
 }
 
-static RawOptions encodeTopOptions(const StoreDirConfig & store, const TopOptions & o)
+template<typename Input>
+static RawOptions encodeTopOptions(const StoreDirConfig & store, const TopOptions<Input> & o)
 {
-    const TopOptions d;
+    const TopOptions<Input> d;
     RawOptions res{o.unknown.begin(), o.unknown.end()};
     encodeOption(res, "nix:additionalSandboxProfile", o.additionalSandboxProfile, d.additionalSandboxProfile, [&] {
         return Term{o.additionalSandboxProfile};
@@ -375,7 +425,7 @@ static RawOptions encodeTopOptions(const StoreDirConfig & store, const TopOption
         for (auto & [fileName, paths] : o.exportReferencesGraph) {
             std::vector<Term> ps;
             for (auto & p : paths)
-                ps.push_back(derivingPathTerm(store, p));
+                ps.push_back(inputTerm(store, p));
             entries.push_back(Term{Term::Tuple{{Term{fileName}, sortedList(std::move(ps))}}});
         }
         return sortedList(std::move(entries));
@@ -394,45 +444,40 @@ static RawOptions encodeTopOptions(const StoreDirConfig & store, const TopOption
     return res;
 }
 
-static OutputOptions
+template<typename Input>
+static OutputOptions<Input>
 decodeOutputOptions(const StoreDirConfig & store, RawOptions raw, const ExperimentalFeatureSettings & xp)
 {
-    const OutputOptions d;
-    OutputOptions o;
+    const OutputOptions<Input> d;
+    OutputOptions<Input> o;
     auto & c = o.checks;
     auto & dc = d.checks;
     for (auto & [name, term] : raw) {
         auto & t = term;
-        auto optRefs = [&] -> std::optional<std::set<Reference>> {
+        auto optInner = [&] {
             auto inner = asOptional(t, name);
             if (!inner)
                 throw FormatError("option '%s' must be omitted when it has its default value", name);
-            return asReferences(store, *inner, name, xp);
-        };
-        auto optNat = [&] -> std::optional<uint64_t> {
-            auto inner = asOptional(t, name);
-            if (!inner)
-                throw FormatError("option '%s' must be omitted when it has its default value", name);
-            return asNatural(*inner, name);
+            return *inner;
         };
         if (name == "nix:allowedReferences")
-            c.allowedReferences = optRefs();
+            c.allowedReferences = asReferences<Input>(store, optInner(), name, xp);
         else if (name == "nix:allowedRequisites")
-            c.allowedRequisites = optRefs();
+            c.allowedRequisites = asReferences<Input>(store, optInner(), name, xp);
         else if (name == "nix:disallowedReferences")
             decodeOption(c.disallowedReferences, dc.disallowedReferences, name, [&] {
-                return asReferences(store, t, name, xp);
+                return asReferences<Input>(store, t, name, xp);
             });
         else if (name == "nix:disallowedRequisites")
             decodeOption(c.disallowedRequisites, dc.disallowedRequisites, name, [&] {
-                return asReferences(store, t, name, xp);
+                return asReferences<Input>(store, t, name, xp);
             });
         else if (name == "nix:ignoreSelfRefs")
             decodeOption(c.ignoreSelfRefs, dc.ignoreSelfRefs, name, [&] { return asBool(t, name); });
         else if (name == "nix:maxClosureSize")
-            c.maxClosureSize = optNat();
+            c.maxClosureSize = asNatural(optInner(), name);
         else if (name == "nix:maxSize")
-            c.maxSize = optNat();
+            c.maxSize = asNatural(optInner(), name);
         else if (name == "nix:unsafeDiscardReferences")
             decodeOption(o.unsafeDiscardReferences, d.unsafeDiscardReferences, name, [&] { return asBool(t, name); });
         else
@@ -441,14 +486,15 @@ decodeOutputOptions(const StoreDirConfig & store, RawOptions raw, const Experime
     return o;
 }
 
-static RawOptions encodeOutputOptions(const StoreDirConfig & store, const OutputOptions & o)
+template<typename Input>
+static RawOptions encodeOutputOptions(const StoreDirConfig & store, const OutputOptions<Input> & o)
 {
-    const OutputOptions d;
+    const OutputOptions<Input> d;
     auto & c = o.checks;
     auto & dc = d.checks;
     RawOptions res{o.unknown.begin(), o.unknown.end()};
-    auto optRefs = [&](const std::optional<std::set<Reference>> & refs) {
-        return optionalTerm(refs ? std::optional{referencesTerm(store, *refs)} : std::nullopt);
+    auto optRefs = [&](const std::optional<std::set<Reference<Input>>> & refs) {
+        return optionalTerm(refs ? std::optional{referencesTerm<Input>(store, *refs)} : std::nullopt);
     };
     auto optNat = [&](const std::optional<uint64_t> & n) {
         return optionalTerm(n ? std::optional{naturalTerm(*n)} : std::nullopt);
@@ -460,10 +506,10 @@ static RawOptions encodeOutputOptions(const StoreDirConfig & store, const Output
         return optRefs(c.allowedRequisites);
     });
     encodeOption(res, "nix:disallowedReferences", c.disallowedReferences, dc.disallowedReferences, [&] {
-        return referencesTerm(store, c.disallowedReferences);
+        return referencesTerm<Input>(store, c.disallowedReferences);
     });
     encodeOption(res, "nix:disallowedRequisites", c.disallowedRequisites, dc.disallowedRequisites, [&] {
-        return referencesTerm(store, c.disallowedRequisites);
+        return referencesTerm<Input>(store, c.disallowedRequisites);
     });
     encodeOption(
         res, "nix:ignoreSelfRefs", c.ignoreSelfRefs, dc.ignoreSelfRefs, [&] { return boolTerm(c.ignoreSelfRefs); });
@@ -480,10 +526,11 @@ static RawOptions encodeOutputOptions(const StoreDirConfig & store, const Output
    Interpolated strings
    -------------------------------------------------------------------------- */
 
-static Interpolated
+template<typename Input>
+static Interpolated<Input>
 parseInterpolated(const StoreDirConfig & store, StringViewStream & str, const ExperimentalFeatureSettings & xp)
 {
-    Interpolated res;
+    Interpolated<Input> res;
     bool lastWasLiteral = false;
     parseList(str, [&] {
         if (str.peek() == '"') {
@@ -495,22 +542,21 @@ parseInterpolated(const StoreDirConfig & store, StringViewStream & str, const Ex
             res.append(std::move(literal));
             lastWasLiteral = true;
         } else {
-            res.append(asReference(store, parseTerm(str), "interpolated string reference", xp));
+            res.append(asStringReference<Input>(store, parseTerm(str), "interpolated string reference", xp));
             lastWasLiteral = false;
         }
     });
     return res;
 }
 
-static void printInterpolated(const StoreDirConfig & store, std::string & res, const Interpolated & s)
+template<typename Input>
+static void printInterpolated(const StoreDirConfig & store, std::string & res, const Interpolated<Input> & s)
 {
-    printList(res, s.pieces(), [&](const Interpolated::Piece & piece) {
-        std::visit(
-            overloaded{
-                [&](const std::string & literal) { printString(res, literal); },
-                [&](const Reference & ref) { printTerm(res, referenceTerm(store, ref)); },
-            },
-            piece);
+    printList(res, s.pieces(), [&](const auto & piece) {
+        if (auto * literal = std::get_if<std::string>(&piece))
+            printString(res, *literal);
+        else
+            printTerm(res, stringReferenceTerm<Input>(store, std::get<1>(piece)));
     });
 }
 
@@ -532,10 +578,11 @@ static std::string printMethodAlgo(const ContentAddressMethod & method, HashAlgo
     return std::string{method.renderPrefix()} + std::string{printHashAlgo(algo)};
 }
 
-static DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode
-parseNode(StringViewStream & str, const ExperimentalFeatureSettings & xp)
+using Node = DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode;
+
+static Node parseNode(StringViewStream & str, const ExperimentalFeatureSettings & xp)
 {
-    DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode node;
+    Node node;
     expect(str, '(');
     parseList(str, [&] {
         auto name = parseUnquotedString(str).toOwned();
@@ -558,7 +605,7 @@ parseNode(StringViewStream & str, const ExperimentalFeatureSettings & xp)
     return node;
 }
 
-static void printNode(std::string & res, const DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode & node)
+static void printNode(std::string & res, const Node & node)
 {
     res += '(';
     printUnquotedStrings(res, node.value);
@@ -571,33 +618,45 @@ static void printNode(std::string & res, const DerivedPathMap<std::set<OutputNam
     res += ')';
 }
 
+static std::set<SingleDerivedPath> inputSet(const FullInputs & inputs)
+{
+    return inputs.toSet();
+}
+
+static const StorePathSet & inputSet(const StorePathSet & inputs)
+{
+    return inputs;
+}
+
 /**
  * Every input reference --- in a string, an output check, or the export
  * references graph --- must be one of the inputs, and every output
  * reference must name an output.
  */
-static void checkReferences(const StoreDirConfig & store, const Derivation & drv)
+template<typename Input>
+static void checkReferences(const StoreDirConfig & store, const DerivationT<Input> & drv)
 {
-    auto inputs = drv.inputs.toSet();
-    auto check = [&](const Reference & ref) {
-        std::visit(
-            overloaded{
-                [&](const OutputName & name) {
-                    if (!drv.outputs.contains(name))
-                        throw FormatError("reference to output '%s', which the derivation does not have", name);
-                },
-                [&](const SingleDerivedPath & p) {
-                    if (!inputs.contains(p))
-                        throw FormatError(
-                            "reference to '%s', which is not one of the derivation's inputs", p.to_string(store));
-                },
-            },
-            ref);
+    auto inputs = inputSet(drv.inputs);
+    auto checkOutput = [&](const OutputName & name) {
+        if (!drv.outputs.contains(name))
+            throw FormatError("reference to output '%s', which the derivation does not have", name);
     };
-    auto checkString = [&](const Interpolated & s) {
+    auto checkInput = [&](const Input & p) {
+        if (!inputs.contains(p))
+            throw FormatError(
+                "reference to '%s', which is not one of the derivation's inputs", encode(inputTerm(store, p)));
+    };
+    auto check = [&](const Reference<Input> & ref) {
+        std::visit(overloaded{checkOutput, checkInput}, ref);
+    };
+    auto checkString = [&](const Interpolated<Input> & s) {
         for (auto & piece : s.pieces())
-            if (auto * ref = std::get_if<Reference>(&piece))
-                check(*ref);
+            if (piece.index() == 1) {
+                if constexpr (std::is_same_v<Input, SingleDerivedPath>)
+                    check(std::get<1>(piece));
+                else
+                    checkOutput(std::get<1>(piece).name);
+            }
     };
     checkString(drv.builder);
     for (auto & a : drv.args)
@@ -606,7 +665,7 @@ static void checkReferences(const StoreDirConfig & store, const Derivation & drv
         checkString(var.value);
     for (auto & [_, paths] : drv.options.exportReferencesGraph)
         for (auto & p : paths)
-            check(p);
+            checkInput(p);
     for (auto & [_, output] : drv.outputs) {
         auto & c = output.options.checks;
         for (auto * refs : {c.allowedReferences ? &*c.allowedReferences : nullptr,
@@ -623,13 +682,14 @@ static void checkReferences(const StoreDirConfig & store, const Derivation & drv
    The derivation
    -------------------------------------------------------------------------- */
 
-Parsed parse(
+template<typename Input>
+Parsed<Input> parse(
     const StoreDirConfig & store, std::string_view s, std::string_view name, const ExperimentalFeatureSettings & xp)
 {
     StringViewStream str{s};
     expect(str, header);
 
-    Parsed res;
+    Parsed<Input> res;
     auto & drv = res.drv;
     drv.name = name;
 
@@ -645,9 +705,9 @@ Parsed parse(
             expect(str, ',');
             auto hash = parseUnquotedString(str).toOwned();
             expect(str, ',');
-            Output output{
+            Output<Input> output{
                 .raw = InputAddressed{},
-                .options = decodeOutputOptions(store, parseOptions(str), xp),
+                .options = decodeOutputOptions<Input>(store, parseOptions(str), xp),
             };
             if (hashAlgo.empty() && hash.empty()) {
                 if (pathS.empty())
@@ -681,21 +741,28 @@ Parsed parse(
         throw FormatError("either all input-addressed output paths must be recorded, or none");
 
     expect(str, ',');
-    parseMap(
-        str,
-        drv.inputs.drvs.map,
-        [&] { return DerivationPath::require(parseStorePath(store, str, defaultSupportWindowsStoreDir)); },
-        [&](const auto &) { return parseNode(str, xp); },
-        [&](const auto & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
-
-    expect(str, ',');
-    drv.inputs.srcs = parseStorePaths(store, str, defaultSupportWindowsStoreDir);
+    if constexpr (std::is_same_v<Input, SingleDerivedPath>) {
+        parseMap(
+            str,
+            drv.inputs.drvs.map,
+            [&] { return DerivationPath::require(parseStorePath(store, str, defaultSupportWindowsStoreDir)); },
+            [&](const auto &) { return parseNode(str, xp); },
+            [&](const auto & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
+        expect(str, ',');
+        drv.inputs.srcs = parseStorePaths(store, str, defaultSupportWindowsStoreDir);
+    } else {
+        /* A basic derivation has been resolved, and so has no input
+           derivations. */
+        expect(str, "[]");
+        expect(str, ',');
+        drv.inputs = parseStorePaths(store, str, defaultSupportWindowsStoreDir);
+    }
     expect(str, ',');
     drv.platform = parseUnquotedString(str).toOwned();
     expect(str, ',');
-    drv.builder = parseInterpolated(store, str, xp);
+    drv.builder = parseInterpolated<Input>(store, str, xp);
     expect(str, ',');
-    parseList(str, [&] { drv.args.push_back(parseInterpolated(store, str, xp)); });
+    parseList(str, [&] { drv.args.push_back(parseInterpolated<Input>(store, str, xp)); });
     expect(str, ',');
     parseMap(
         str,
@@ -703,7 +770,7 @@ Parsed parse(
         [&] { return parseString(str).toOwned(); },
         [&](const auto &) {
             expect(str, '(');
-            EnvVar var{.value = parseInterpolated(store, str, xp)};
+            EnvVar<Input> var{.value = parseInterpolated<Input>(store, str, xp)};
             expect(str, ',');
             var.passAsFile = asBool(parseTerm(str), "pass as file flag");
             expect(str, ')');
@@ -711,7 +778,7 @@ Parsed parse(
         },
         [](const auto & name) { return fmt("environment variable '%s'", name); });
     expect(str, ',');
-    drv.options = decodeTopOptions(store, parseOptions(str), xp);
+    drv.options = decodeTopOptions<Input>(store, parseOptions(str), xp);
     expect(str, ')');
     if (!str.remaining.empty())
         throw FormatError("expected end of file, found '%s'", str.remaining);
@@ -720,8 +787,9 @@ Parsed parse(
     return res;
 }
 
+template<typename Input>
 std::string unparse(
-    const Derivation & drv,
+    const DerivationT<Input> & drv,
     const StoreDirConfig & store,
     const std::map<OutputName, StorePath, std::less<>> & outputPaths)
 {
@@ -732,7 +800,7 @@ std::string unparse(
         s,
         drv.outputs,
         [&](const auto & outputName) { printUnquotedString(s, outputName); },
-        [&](const auto & outputName, const Output & output) {
+        [&](const auto & outputName, const Output<Input> & output) {
             std::visit(
                 overloaded{
                     [&](const InputAddressed &) {
@@ -755,44 +823,58 @@ std::string unparse(
                 },
                 output.raw);
             s += ',';
-            printOptions(s, encodeOutputOptions(store, output.options));
+            printOptions(s, encodeOutputOptions<Input>(store, output.options));
         });
 
     s += ',';
-    printMap(
-        s,
-        drv.inputs.drvs.map,
-        [&](const auto & drvPath) {
-            printStorePathString(s, store.printStorePath(drvPath), defaultSupportWindowsStoreDir);
-        },
-        [&](const auto &, const auto & node) { printNode(s, node); });
-
-    s += ',';
-    printList(s, drv.inputs.srcs, [&](const StorePath & p) {
-        printStorePathString(s, store.printStorePath(p), defaultSupportWindowsStoreDir);
-    });
+    auto printPaths = [&](const StorePathSet & paths) {
+        printList(s, paths, [&](const StorePath & p) {
+            printStorePathString(s, store.printStorePath(p), defaultSupportWindowsStoreDir);
+        });
+    };
+    if constexpr (std::is_same_v<Input, SingleDerivedPath>) {
+        printMap(
+            s,
+            drv.inputs.drvs.map,
+            [&](const auto & drvPath) {
+                printStorePathString(s, store.printStorePath(drvPath), defaultSupportWindowsStoreDir);
+            },
+            [&](const auto &, const auto & node) { printNode(s, node); });
+        s += ',';
+        printPaths(drv.inputs.srcs);
+    } else {
+        s += "[],";
+        printPaths(drv.inputs);
+    }
     s += ',';
     printUnquotedString(s, drv.platform);
     s += ',';
-    printInterpolated(store, s, drv.builder);
+    printInterpolated<Input>(store, s, drv.builder);
     s += ',';
-    printList(s, drv.args, [&](const Interpolated & a) { printInterpolated(store, s, a); });
+    printList(s, drv.args, [&](const Interpolated<Input> & a) { printInterpolated<Input>(store, s, a); });
     s += ',';
     printMap(
         s,
         drv.env,
         [&](const auto & name) { printString(s, name); },
-        [&](const auto &, const EnvVar & var) {
+        [&](const auto &, const EnvVar<Input> & var) {
             s += '(';
-            printInterpolated(store, s, var.value);
+            printInterpolated<Input>(store, s, var.value);
             s += ',';
             printTerm(s, boolTerm(var.passAsFile));
             s += ')';
         });
     s += ',';
-    printOptions(s, encodeTopOptions(store, drv.options));
+    printOptions(s, encodeTopOptions<Input>(store, drv.options));
     s += ')';
     return s;
 }
+
+template Parsed<SingleDerivedPath>
+parse(const StoreDirConfig &, std::string_view, std::string_view, const ExperimentalFeatureSettings &);
+template Parsed<StorePath>
+parse(const StoreDirConfig &, std::string_view, std::string_view, const ExperimentalFeatureSettings &);
+template std::string unparse(const Full &, const StoreDirConfig &, const std::map<OutputName, StorePath, std::less<>> &);
+template std::string unparse(const Basic &, const StoreDirConfig &, const std::map<OutputName, StorePath, std::less<>> &);
 
 } // namespace nix::derivation::v2

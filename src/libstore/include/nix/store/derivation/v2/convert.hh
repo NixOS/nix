@@ -1,33 +1,51 @@
 #pragma once
 ///@file
 ///
-/// Version 2 derivations' input addressing, and their conversion to and
-/// from the elaborated `derivation::Full` that the rest of Nix works on.
+/// Version 2 derivations' resolution and input addressing, and their
+/// conversion to and from the elaborated `derivation::Full` /
+/// `derivation::Basic` that the rest of Nix works on.
 
 #include "nix/store/derivation/v2.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/repair-flag.hh"
 
+namespace nix {
+class Store;
+}
+
 namespace nix::derivation::v2 {
+
+/**
+ * The store path of an output of an input derivation, if it is known.
+ */
+using PathOf = fun<std::optional<StorePath>(const SingleDerivedPath::Built &)>;
+
+/**
+ * [Resolve](@docroot@/store/resolution.md) a derivation: replace each
+ * input deriving path by the store path it denotes, wherever it is
+ * referred to.
+ *
+ * This is the same algorithm whether the store paths come from static
+ * speculation or from the build trace; only `pathOf` differs.
+ *
+ * @return `std::nullopt` if `pathOf` does not know some input's store
+ * path.
+ */
+std::optional<Basic> resolve(const StoreDirConfig & store, const Full & drv, PathOf pathOf);
 
 /**
  * The store path of an output of an input derivation, if it is static:
  * known without building anything. See [static
  * speculation](@docroot@/store/derivation/outputs/input-address.md#static).
  */
-using StaticPathOf = fun<std::optional<StorePath>(const SingleDerivedPath::Built &)>;
+PathOf staticPathOf(Store & store);
 
 /**
- * [Resolve](@docroot@/store/resolution.md) each input whose store path
- * `pathOf` knows: replace it, wherever it is referred to, by a constant
- * input for that store path.
+ * The output paths of an input-addressed basic derivation.
  *
- * This is the same algorithm whether the store paths come from static
- * speculation or from the build trace; only `pathOf` differs.
- *
- * @return Whether every input was resolved.
+ * @return an empty map if it is not input-addressed.
  */
-bool resolve(Derivation & drv, StaticPathOf staticPathOf);
+std::map<OutputName, StorePath, std::less<>> outputPaths(const StoreDirConfig & store, const Basic & drv);
 
 /**
  * The output paths of an input-addressed derivation, computed by static
@@ -38,7 +56,7 @@ bool resolve(Derivation & drv, StaticPathOf staticPathOf);
  * derivation is not input-addressed.
  */
 std::optional<std::map<OutputName, StorePath, std::less<>>>
-staticOutputPaths(const StoreDirConfig & store, const Derivation & drv, StaticPathOf staticPathOf);
+staticOutputPaths(const StoreDirConfig & store, const Full & drv, PathOf staticPathOf);
 
 /**
  * The elaborated form of a version 2 derivation, for building and the
@@ -51,42 +69,27 @@ staticOutputPaths(const StoreDirConfig & store, const Derivation & drv, StaticPa
  * @throws Error if the derivation has options this version of Nix does
  * not know, since then it cannot be built faithfully.
  */
-Full toFull(const StoreDirConfig & store, const Derivation & drv, StaticPathOf staticPathOf);
+derivation::Full toElaborated(const StoreDirConfig & store, const Full & drv, PathOf staticPathOf);
 
 /**
- * The version 2 derivation an elaborated derivation whose `version` is
- * `Version::V2` is the form of: for a resolved derivation, which the
- * build machinery produces in elaborated form, the inverse of `toFull`.
+ * The basic version 2 derivation that an elaborated derivation whose
+ * `version` is `Version::V2` is the form of. Only resolved derivations
+ * are converted back, as those are what the build machinery produces.
+ *
+ * @throws Error if `drv` has an input that is not a constant.
  */
 template<typename Input>
-Derivation fromElaborated(const StoreDirConfig & store, const derivation::Derivation<Input> & drv);
-
-} // namespace nix::derivation::v2
-
-namespace nix {
-class Store;
-}
-
-namespace nix::derivation::v2 {
+Basic fromElaborated(const StoreDirConfig & store, const derivation::Derivation<Input> & drv);
 
 /**
- * `StaticPathOf` for input derivations in `store`.
+ * Write a full version 2 derivation to the store, recording the output
+ * paths static speculation computes for it.
  */
-StaticPathOf staticPathOfStore(Store & store);
+StorePath writeDerivation(Store & store, const Full & drv, RepairFlag repair = NoRepair);
 
 /**
- * The store path of a version 2 derivation, whose own recorded output
- * paths are `outputPaths` (see `unparse`).
+ * The store path a full version 2 derivation would be written to.
  */
-StorePath computeStorePath(
-    const StoreDirConfig & store,
-    const Derivation & drv,
-    const std::map<OutputName, StorePath, std::less<>> & outputPaths);
-
-/**
- * Write a version 2 derivation to the store, recording the output paths
- * static speculation computes for it.
- */
-StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair = NoRepair);
+StorePath computeStorePath(Store & store, const Full & drv);
 
 } // namespace nix::derivation::v2

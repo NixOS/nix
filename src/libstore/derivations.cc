@@ -107,11 +107,8 @@ static auto infoForDerivation(const StoreDirConfig & store, const Derivation & d
     auto contents = [&] {
         if (drv.version != derivation::Version::V2)
             return unparse(drv, store);
-        std::map<OutputName, StorePath, std::less<>> outputPaths;
-        for (auto & [outputName, output] : drv.outputs)
-            if (auto * ia = std::get_if<DerivationOutput::InputAddressed>(&output.output.raw))
-                outputPaths.emplace(outputName, ia->path);
-        return derivation::v2::unparse(derivation::v2::fromElaborated(store, drv), store, outputPaths);
+        auto basic = derivation::v2::fromElaborated(store, drv);
+        return derivation::v2::unparse(basic, store, derivation::v2::outputPaths(store, basic));
     }();
     auto hash = hashString(HashAlgorithm::SHA256, contents);
     auto ca = TextInfo{.hash = hash, .references = references};
@@ -386,30 +383,18 @@ static void processDerivationOutputPaths(
     /* Version 2 derivations are input-addressed by static speculation
        rather than by masking. */
     if (drv.version == derivation::Version::V2) {
-        derivation::v2::StaticPathOf staticPathOf = [&](const SingleDerivedPath::Built & b) -> std::optional<StorePath> {
-            if constexpr (std::is_same_v<std::decay_t<decltype(drv)>, derivation::Basic>) {
-                return std::nullopt;
-            } else {
-                auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&b.drvPath->raw());
-                if (!opaque)
-                    return std::nullopt;
-                auto input = readDerivation(opaque->path);
-                auto i = input.outputs.find(b.output);
-                if (i == input.outputs.end())
-                    return std::nullopt;
-                return std::visit(
-                    overloaded{
-                        [&](const DerivationOutput::InputAddressed & ia) -> std::optional<StorePath> { return ia.path; },
-                        [&](const DerivationOutput::CAFixed & f) -> std::optional<StorePath> {
-                            return f.path(store, input.name, b.output);
-                        },
-                        [&](const auto &) -> std::optional<StorePath> { return std::nullopt; },
-                    },
-                    i->second.output.raw);
-            }
-        };
-        auto paths =
-            derivation::v2::staticOutputPaths(store, derivation::v2::fromElaborated(store, drv), staticPathOf);
+        /* Only a resolved derivation, whose inputs are all constants,
+           has its output paths computed here; an unresolved one had
+           them computed, or deferred, when it was elaborated. */
+        bool resolved = true;
+        if constexpr (!std::is_same_v<std::decay_t<decltype(drv)>, derivation::Basic>)
+            for (auto & input : drv.inputs)
+                if (!std::holds_alternative<SingleDerivedPath::Opaque>(input.raw()))
+                    resolved = false;
+        if (!resolved)
+            return;
+        std::optional<std::map<OutputName, StorePath, std::less<>>> paths =
+            derivation::v2::outputPaths(store, derivation::v2::fromElaborated(store, drv));
         for (auto & [outputName, output] : drv.outputs) {
             bool ia = std::holds_alternative<DerivationOutput::InputAddressed>(output.output.raw)
                       || std::holds_alternative<DerivationOutput::Deferred>(output.output.raw);

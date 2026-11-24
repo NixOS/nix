@@ -1214,36 +1214,14 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
     return readDerivation(drvPath);
 }
 
-static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath);
-
 /**
  * A version 2 derivation's elaborated form, after checking the output
  * paths it records against static speculation.
  */
-static Derivation
-readV2Derivation(Store & store, std::string_view contents, std::string_view name, bool requireValidPath)
+static Derivation readV2Derivation(Store & store, std::string_view contents, std::string_view name)
 {
-    auto parsed = derivation::v2::parse(store, contents, name);
-
-    derivation::v2::StaticPathOf staticPathOf = [&](const SingleDerivedPath::Built & b) -> std::optional<StorePath> {
-        auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&b.drvPath->raw());
-        if (!opaque)
-            return std::nullopt;
-        auto input = readDerivationCommon(store, opaque->path, requireValidPath);
-        auto i = input.outputs.find(b.output);
-        if (i == input.outputs.end())
-            throw Error(
-                "derivation '%s' has no output '%s'", store.printStorePath(opaque->path), b.output);
-        return std::visit(
-            overloaded{
-                [&](const DerivationOutput::InputAddressed & ia) -> std::optional<StorePath> { return ia.path; },
-                [&](const DerivationOutput::CAFixed & f) -> std::optional<StorePath> {
-                    return f.path(store, input.name, b.output);
-                },
-                [&](const auto &) -> std::optional<StorePath> { return std::nullopt; },
-            },
-            i->second.output.raw);
-    };
+    auto parsed = derivation::v2::parse<SingleDerivedPath>(store, contents, name);
+    auto staticPathOf = derivation::v2::staticPathOf(store);
 
     auto computed = derivation::v2::staticOutputPaths(store, parsed.drv, staticPathOf);
     if (parsed.recordedOutputPaths != computed.value_or(decltype(parsed.recordedOutputPaths){}))
@@ -1252,7 +1230,7 @@ readV2Derivation(Store & store, std::string_view contents, std::string_view name
                 ? "output paths that can be known in advance are not recorded"
                 : "recorded output paths do not agree with static speculation");
 
-    return derivation::v2::toFull(store, parsed.drv, staticPathOf);
+    return derivation::v2::toElaborated(store, parsed.drv, staticPathOf);
 }
 
 static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
@@ -1266,7 +1244,7 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
             throw FormatError("file is empty (possible filesystem corruption)");
 
         if (derivation::v2::isV2(contents))
-            return readV2Derivation(store, contents, Derivation::nameFromPath(drvPath), requireValidPath);
+            return readV2Derivation(store, contents, Derivation::nameFromPath(drvPath));
 
         return derivation::parse(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {

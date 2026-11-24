@@ -8,6 +8,10 @@
 ///
 /// The types admit exactly what the [version 2 "ATerm"
 /// format](@docroot@/protocols/derivation-aterm/v2.md) can encode.
+///
+/// As for version 1, there is a *full* form, whose inputs are deriving
+/// paths, and a *basic* form, whose inputs are store paths: the form a
+/// full derivation takes once it is resolved.
 
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derivation/options.hh"
@@ -23,11 +27,48 @@
 namespace nix::derivation::v2 {
 
 /**
- * What an `"input"` or `"output"` piece of an interpolated string, or
- * an element of an output check, refers to: one of the derivation's
- * own outputs, by name, or one of its inputs, by deriving path.
+ * What an output check element, or an export references graph entry,
+ * of a derivation whose inputs are `Input`s refers to: one of the
+ * derivation's own outputs, by name, or one of its inputs.
  */
-using Reference = DrvRef<SingleDerivedPath>;
+template<typename Input>
+using Reference = DrvRef<Input>;
+
+/**
+ * What a reference in an interpolated string of a derivation whose
+ * inputs are `Input`s can refer to.
+ *
+ * A full derivation's strings may refer to its inputs as well as its
+ * outputs. A basic derivation's may only refer to its outputs: its
+ * inputs are store paths, which are written literally.
+ */
+template<typename Input>
+struct StringReferenceOf;
+
+template<>
+struct StringReferenceOf<SingleDerivedPath>
+{
+    using type = Reference<SingleDerivedPath>;
+};
+
+/**
+ * A reference to one of the derivation's own outputs, from an
+ * interpolated string of a basic derivation. A type of its own, rather
+ * than the bare `OutputName`, so that it cannot be confused with the
+ * literal text it sits among.
+ */
+struct OutputReference
+{
+    OutputName name;
+
+    auto operator<=>(const OutputReference &) const = default;
+};
+
+template<>
+struct StringReferenceOf<StorePath>
+{
+    using type = OutputReference;
+};
 
 /**
  * A string of literal text and references.
@@ -37,21 +78,35 @@ using Reference = DrvRef<SingleDerivedPath>;
  * `append`, so that each interpolated string has exactly one
  * representation, as it has exactly one encoding.
  */
-class Interpolated
+template<typename Ref>
+class InterpolatedT
 {
 public:
-    using Piece = std::variant<std::string, Reference>;
+    using Piece = std::variant<std::string, Ref>;
 
-    Interpolated() = default;
+    InterpolatedT() = default;
 
-    explicit Interpolated(std::string literal)
+    explicit InterpolatedT(std::string literal)
     {
         append(std::move(literal));
     }
 
-    void append(std::string literal);
+    void append(std::string literal)
+    {
+        if (literal.empty())
+            return;
+        if (!pieces_.empty())
+            if (auto * last = std::get_if<std::string>(&pieces_.back())) {
+                *last += literal;
+                return;
+            }
+        pieces_.emplace_back(std::move(literal));
+    }
 
-    void append(Reference reference);
+    void append(Ref reference)
+    {
+        pieces_.emplace_back(std::move(reference));
+    }
 
     const std::vector<Piece> & pieces() const
     {
@@ -62,20 +117,33 @@ public:
      * Replace each reference by the string `resolve` gives for it, and
      * concatenate.
      */
-    std::string render(fun<std::string(const Reference &)> resolve) const;
+    std::string render(auto resolve) const
+    {
+        std::string res;
+        for (auto & piece : pieces_)
+            if (auto * literal = std::get_if<std::string>(&piece))
+                res += *literal;
+            else
+                res += resolve(std::get<Ref>(piece));
+        return res;
+    }
 
-    bool operator==(const Interpolated &) const = default;
+    bool operator==(const InterpolatedT &) const = default;
 
 private:
     std::vector<Piece> pieces_;
 };
 
+template<typename Input>
+using Interpolated = InterpolatedT<typename StringReferenceOf<Input>::type>;
+
 /**
  * An environment variable's value, with its *pass as file* flag.
  */
+template<typename Input>
 struct EnvVar
 {
-    Interpolated value;
+    Interpolated<Input> value;
     bool passAsFile = false;
 
     bool operator==(const EnvVar &) const = default;
@@ -119,9 +187,10 @@ using UnknownOptions = std::map<std::string, Term, std::less<>>;
  * derivations, so unlike version 1 there is no "no checks given" state
  * distinct from checking nothing.
  */
+template<typename Input>
 struct OutputOptions
 {
-    OutputChecks<SingleDerivedPath> checks;
+    OutputChecks<Input> checks;
     bool unsafeDiscardReferences = false;
     UnknownOptions unknown;
 
@@ -132,7 +201,8 @@ struct OutputOptions
  * The options of the derivation as a whole. Version 2 derivations have
  * no checks for all outputs at once.
  */
-struct TopOptions : CommonTopOptions<SingleDerivedPath>
+template<typename Input>
+struct TopOptions : CommonTopOptions<Input>
 {
     UnknownOptions unknown;
 
@@ -152,26 +222,51 @@ struct InputAddressed
     bool operator==(const InputAddressed &) const = default;
 };
 
+template<typename Input>
 struct Output
 {
     std::variant<InputAddressed, derivation::Output::CAFloating, derivation::Output::Impure> raw;
-    OutputOptions options;
+    OutputOptions<Input> options;
 
     bool operator==(const Output &) const = default;
 };
 
-struct Derivation
+/**
+ * How the inputs of a derivation whose inputs are `Input`s are held:
+ * as nested input derivations and sources for a full derivation, and
+ * as just store paths for a basic one.
+ */
+template<typename Input>
+struct InputsOf;
+
+template<>
+struct InputsOf<SingleDerivedPath>
+{
+    using type = FullInputs;
+};
+
+template<>
+struct InputsOf<StorePath>
+{
+    using type = StorePathSet;
+};
+
+template<typename Input>
+struct DerivationT
 {
     std::string name;
-    std::map<OutputName, Output, std::less<>> outputs;
-    FullInputs inputs;
+    std::map<OutputName, Output<Input>, std::less<>> outputs;
+    typename InputsOf<Input>::type inputs;
     std::string platform;
-    Interpolated builder;
-    std::vector<Interpolated> args;
-    std::map<std::string, EnvVar, std::less<>> env;
-    TopOptions options;
+    Interpolated<Input> builder;
+    std::vector<Interpolated<Input>> args;
+    std::map<std::string, EnvVar<Input>, std::less<>> env;
+    TopOptions<Input> options;
 
-    bool operator==(const Derivation &) const = default;
+    bool operator==(const DerivationT &) const = default;
 };
+
+using Full = DerivationT<SingleDerivedPath>;
+using Basic = DerivationT<StorePath>;
 
 } // namespace nix::derivation::v2
