@@ -241,10 +241,26 @@ static void prim_derivationStrictV2(EvalState & state, CallSite callSite, Value 
             Output<SingleDerivedPath> output{.raw = InputAddressed{}};
             auto * method = field("method");
             auto * hashAlgo = field("hashAlgo");
-            if (field("hash"))
-                state.error<EvalError>("fixed content-addressed outputs are not yet supported by version 2 derivations")
-                    .debugThrow();
-            if (method || hashAlgo) {
+            if (auto * hash = field("hash")) {
+                if (!method)
+                    state.error<EvalError>("output '%s' needs 'method' as well as 'hash'", outputName).debugThrow();
+                if (outputName != "out" || outputsV.attrs()->size() != 1)
+                    state
+                        .error<EvalError>(
+                            "a derivation with a fixed content-addressed output must have just the one output 'out'")
+                        .debugThrow();
+                auto m = ContentAddressMethod::parse(state.forceStringNoCtx(*method, noPos, "while evaluating 'method'"));
+                std::optional<HashAlgorithm> h;
+                if (hashAlgo)
+                    h = parseHashAlgo(state.forceStringNoCtx(*hashAlgo, noPos, "while evaluating 'hashAlgo'"));
+                output.raw = derivation::Output::CAFixed{
+                    .ca =
+                        {
+                            .method = std::move(m),
+                            .hash = Hash::parseAny(state.forceStringNoCtx(*hash, noPos, "while evaluating 'hash'"), h),
+                        },
+                };
+            } else if (method || hashAlgo) {
                 if (!method || !hashAlgo)
                     state.error<EvalError>("output '%s' needs both 'method' and 'hashAlgo'", outputName).debugThrow();
                 auto m = ContentAddressMethod::parse(state.forceStringNoCtx(*method, noPos, "while evaluating 'method'"));

@@ -364,10 +364,7 @@ Basic fromElaborated(const StoreDirConfig & store, const derivation::Derivation<
                         [&](const derivation::Output::Deferred &) -> Raw { return InputAddressed{}; },
                         [&](const derivation::Output::CAFloating & o) -> Raw { return o; },
                         [&](const derivation::Output::Impure & o) -> Raw { return o; },
-                        [&](const derivation::Output::CAFixed &) -> Raw {
-                            throw Error(
-                                "version 2 derivation '%s' cannot yet have fixed content-addressed outputs", drv.name);
-                        },
+                        [&](const derivation::Output::CAFixed & o) -> Raw { return o; },
                     },
                     output.output.raw),
                 .options =

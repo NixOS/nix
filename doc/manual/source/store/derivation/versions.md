@@ -60,7 +60,7 @@ Not every combination is supported yet:
 | --- | --- | --- |
 | [input-addressed][input-addressing], output paths known in advance | yes | yes, by [static speculation] |
 | [input-addressed][input-addressing], output paths [deferred] | no | yes |
-| [fixed content-addressed] | yes | planned |
+| [fixed content-addressed] | yes | yes |
 | [floating content-addressed] (experimental feature [`ca-derivations`][xp-feature-ca-derivations]) | no | yes |
 | [impure][types of derivations] (experimental feature [`impure-derivations`][xp-feature-impure-derivations]) | no | yes |
 

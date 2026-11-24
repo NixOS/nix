@@ -50,6 +50,7 @@ testRemoteCache () {
     testRemoteCacheFor rootCA
     testRemoteCacheFor dependentCA
     testRemoteCacheFor dependentNonCA
+    testRemoteCacheFor dependentFixedOutput
     testRemoteCacheFor dependentForBuildCA
     testRemoteCacheFor dependentForBuildNonCA
 }

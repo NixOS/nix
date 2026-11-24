@@ -34,14 +34,14 @@ rec {
   };
 
   # This is not allowed.
-  inputAddressed = mkDerivation {
+  inputAddressed = mkDerivationV2 {
     name = "input-addressed";
     buildCommand = ''
       cat ${impure} > $out
     '';
   };
 
-  contentAddressed = mkDerivation {
+  contentAddressed = mkDerivationV2 {
     name = "content-addressed";
     buildCommand = ''
       echo content-addressed
@@ -52,7 +52,7 @@ rec {
     outputHash = "sha256-eBYxcgkuWuiqs4cKNgKwkb3vY/HR0vVsJnqe8itJGcQ=";
   };
 
-  inputAddressedAfterCA = mkDerivation {
+  inputAddressedAfterCA = mkDerivationV2 {
     name = "input-addressed-after-ca";
     buildCommand = ''
       cat ${contentAddressed} > $out

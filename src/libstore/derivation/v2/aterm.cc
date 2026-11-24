@@ -693,7 +693,7 @@ Parsed<Input> parse(
     auto & drv = res.drv;
     drv.name = name;
 
-    bool anyRecorded = false, anyUnrecorded = false;
+    bool anyRecorded = false, anyUnrecorded = false, anyFixed = false;
     parseMap(
         str,
         drv.outputs,
@@ -730,15 +730,22 @@ Parsed<Input> parse(
                 auto [method, algo] = parseMethodAlgo(hashAlgo, xp);
                 output.raw = derivation::Output::Impure{.method = std::move(method), .hashAlgo = algo};
             } else {
-                throw FormatError(
-                    "output '%s' is fixed content-addressed, which version 2 derivations do not yet support",
-                    outputName);
+                auto [method, algo] = parseMethodAlgo(hashAlgo, xp);
+                output.raw = derivation::Output::CAFixed{
+                    .ca = ContentAddress{
+                        .method = std::move(method),
+                        .hash = Hash::parseNonSRIUnprefixed(hash, algo),
+                    },
+                };
+                anyFixed = true;
             }
             return output;
         },
         [](const auto & outputName) { return fmt("output name '%s'", outputName); });
     if (anyRecorded && anyUnrecorded)
         throw FormatError("either all input-addressed output paths must be recorded, or none");
+    if (anyFixed && (drv.outputs.size() != 1 || !drv.outputs.contains("out")))
+        throw FormatError("a derivation with a fixed content-addressed output must have just the one output 'out'");
 
     expect(str, ',');
     if constexpr (std::is_same_v<Input, SingleDerivedPath>) {
@@ -819,6 +826,12 @@ std::string unparse(
                         s += "\"\",";
                         printUnquotedString(s, printMethodAlgo(o.method, o.hashAlgo));
                         s += ",\"impure\"";
+                    },
+                    [&](const derivation::Output::CAFixed & o) {
+                        s += "\"\",";
+                        printUnquotedString(s, printMethodAlgo(o.ca.method, o.ca.hash.algo));
+                        s += ',';
+                        printUnquotedString(s, o.ca.hash.to_string(HashFormat::Base16, false));
                     },
                 },
                 output.raw);

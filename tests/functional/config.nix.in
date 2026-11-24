@@ -38,7 +38,11 @@ rec {
         recursive = "nar"; nar = "nar"; flat = "flat"; text = "text"; git = "git";
       }.${drvAttrs.outputHashMode or "recursive"};
       addressing =
-        if !(drvAttrs.__contentAddressed or contentAddressedByDefault) && !(drvAttrs.__impure or false) then {}
+        # As for `derivation`, the method of a fixed output defaults to flat.
+        if drvAttrs ? outputHash then
+          { method = if drvAttrs ? outputHashMode then method else "flat"; hash = drvAttrs.outputHash; }
+          // (if drvAttrs ? outputHashAlgo then { hashAlgo = drvAttrs.outputHashAlgo; } else {})
+        else if !(drvAttrs.__contentAddressed or contentAddressedByDefault) && !(drvAttrs.__impure or false) then {}
         else if drvAttrs.__impure or false then { inherit method; hashAlgo = drvAttrs.outputHashAlgo or "sha256"; impure = true; }
         else if drvAttrs.__contentAddressed or false then { inherit method; hashAlgo = drvAttrs.outputHashAlgo or "sha256"; }
         else {};
@@ -47,7 +51,7 @@ rec {
       topOptionNames = [ "preferLocalBuild" "allowSubstitutes" "requiredSystemFeatures" "impureEnvVars" ];
       topOptions = builtins.intersectAttrs (builtins.listToAttrs (map (n: { name = n; value = null; }) topOptionNames)) drvAttrs;
       passAsFile = drvAttrs.passAsFile or [];
-      special = [ "name" "system" "builder" "args" "outputs" "__contentAddressed" "__impure" "outputHashMode" "outputHashAlgo" "passAsFile" ];
+      special = [ "name" "system" "builder" "args" "outputs" "__contentAddressed" "__impure" "outputHash" "outputHashMode" "outputHashAlgo" "passAsFile" ];
       env =
         builtins.mapAttrs (n: v: if builtins.elem n passAsFile then { value = toEnv v; passAsFile = true; } else toEnv v)
           (removeAttrs drvAttrs special)

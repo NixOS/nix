@@ -225,7 +225,8 @@ struct InputAddressed
 template<typename Input>
 struct Output
 {
-    std::variant<InputAddressed, derivation::Output::CAFloating, derivation::Output::Impure> raw;
+    std::variant<InputAddressed, derivation::Output::CAFixed, derivation::Output::CAFloating, derivation::Output::Impure>
+        raw;
     OutputOptions<Input> options;
 
     bool operator==(const Output &) const = default;

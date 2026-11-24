@@ -27,6 +27,6 @@ testOneCopy () {
         --no-check-sigs
 }
 
-for attrPath in rootCA dependentCA transitivelyDependentCA dependentNonCA; do
+for attrPath in rootCA dependentCA transitivelyDependentCA dependentNonCA dependentFixedOutput; do
     testOneCopy "$attrPath"
 done
