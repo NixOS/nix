@@ -965,7 +965,7 @@ public:
          * Unlike the other `doc` fields in this file, this one should never be
          * `null`.
          */
-        const char * doc;
+        const char * content;
     };
 
     /**
