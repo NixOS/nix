@@ -1,5 +1,6 @@
 #include <atomic>
 #include "nix/util/source-accessor.hh"
+#include "nix/util/path-iterator.hh"
 
 namespace nix {
 
@@ -97,7 +98,12 @@ std::string SourceAccessor::showPath(const CanonPath & path)
     return displayPrefix + path.abs() + displaySuffix;
 }
 
-CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolution mode)
+/**
+ * Resolve the symlinks in @p path, and any `..` along with them, as they
+ * are reached: so `link/..` is the parent of the link's target, not the
+ * directory containing the link.
+ */
+static CanonPath resolveComponents(SourceAccessor & accessor, const UnresolvedPath & path, SymlinkResolution mode)
 {
     auto res = CanonPath::root;
 
@@ -121,11 +127,13 @@ CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolut
                (and so no symlink targets they came from) contain NUL. */
             res.push(FilenameView::fromStringUnchecked(c));
             if (mode == SymlinkResolution::Full || !todo.empty()) {
-                if (auto st = maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
+                if (auto st = accessor.maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
                     if (!linksAllowed--)
-                        throw Error("infinite symlink recursion in path '%s'", showPath(path));
-                    auto target = readLink(res);
-                    if (std::filesystem::path(target).is_absolute()) {
+                        throw Error("infinite symlink recursion at '%s'", accessor.showPath(res));
+                    auto target = accessor.readLink(res);
+                    /* Not `std::filesystem::path::is_absolute`, which on
+                       Windows requires a drive letter too. */
+                    if (target.starts_with('/')) {
                         res = CanonPath::root;
                     } else {
                         res.pop();
@@ -137,6 +145,42 @@ CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolut
     }
 
     return res;
+}
+
+CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolution mode)
+try {
+    return resolveComponents(*this, path, mode);
+} catch (Error & e) {
+    e.addTrace({}, "while resolving the symlinks in '%s'", showPath(path));
+    throw;
+}
+
+CanonPath SourceAccessor::resolvePath(const UnresolvedPath & path)
+try {
+    /* Split it after the last `..`: what comes before needs its symlinks
+       resolved to find what the `..` is the parent of, what comes after
+       is kept as given. Without any `..`, the first part is just `/`,
+       which resolves without looking at anything. */
+    auto & s = path.abs();
+    /* Where the last `..` ends, or 0 if there is none. */
+    size_t split = 0;
+    for (size_t start = 1; start < s.size();) {
+        auto end = std::min(s.find('/', start), s.size());
+        if (std::string_view{s}.substr(start, end - start) == "..")
+            split = end;
+        start = end + 1;
+    }
+
+    auto res = resolveComponents(
+        *this, UnresolvedPath::fromUnchecked(s.substr(0, std::max(split, (size_t) 1))), SymlinkResolution::Full);
+    /* Neither `.` nor `..`, which `UnresolvedPath` removed or the
+       first part took. */
+    if (split < s.size())
+        res.extend(CanonPath::fromUnchecked(UnresolvedPath::fromUnchecked(s.substr(split))));
+    return res;
+} catch (Error & e) {
+    e.addTrace({}, "while resolving '%s'", path.abs());
+    throw;
 }
 
 } // namespace nix

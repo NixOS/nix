@@ -26,6 +26,16 @@ diff -u baz.cat-nar "$storePath/foo/baz"
 nix nar cat /dev/stdin /foo/baz < "$narFile" > baz.cat-nar-pipe
 expect 1 nix nar cat "$narFile" /foo/baz/doesntexist 2>&1 | grep "NAR does not contain regular file '/foo/baz/doesntexist'"
 
+# `..` in a path inside a NAR. `nix nar ls` resolves it through the symlinks
+# in the NAR, so `/link/..` is the parent of the link's target, `/a`, not
+# the root. `nix nar cat`, which streams the NAR, rejects it.
+mkdir -p "$TEST_ROOT/dotdot/a/b"
+echo hello > "$TEST_ROOT/dotdot/a/b/file"
+ln -s a/b "$TEST_ROOT/dotdot/link"
+nix-store --dump "$TEST_ROOT/dotdot" > "$TEST_ROOT/dotdot.nar"
+[[ "$(nix nar ls "$TEST_ROOT/dotdot.nar" /link/..)" == ./b ]]
+expect 1 nix nar cat "$TEST_ROOT/dotdot.nar" /a/../a/b/file 2>&1 | grep "must not contain '..' components"
+
 nix store cat "$storePath/foo/baz" > baz.cat-nar
 diff -u baz.cat-nar "$storePath/foo/baz"
 

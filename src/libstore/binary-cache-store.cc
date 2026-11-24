@@ -212,7 +212,7 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
        specify the NAR file and member containing the debug info. */
     if (config.writeDebugInfo) {
 
-        CanonPath buildIdDir("lib/debug/.build-id");
+        auto buildIdDir = "/lib/debug/.build-id"_canonPath;
 
         if (auto st = narAccessor->maybeLstat(buildIdDir); st && st->type == SourceAccessor::tDirectory) {
 

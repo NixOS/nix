@@ -166,7 +166,8 @@ CanonPath getCurrentCgroup()
     auto ourCgroup = ourCgroups[""];
     if (ourCgroup == "")
         throw Error("cannot determine cgroup name from /proc/self/cgroup");
-    return CanonPath{ourCgroup};
+    /* The kernel gives a canonical path. */
+    return CanonPath::fromAsserting(UnresolvedPath(ourCgroup));
 }
 
 static std::optional<CanonPath> rootCgroupOverride;

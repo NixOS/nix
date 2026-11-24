@@ -2,6 +2,7 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/compression.hh"
 #include "nix/store/derivations.hh"
+#include "nix/util/path-iterator.hh"
 
 namespace nix {
 

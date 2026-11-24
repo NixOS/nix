@@ -1,5 +1,6 @@
 #include "nix/util/os-canon-path.hh"
 #include "nix/util/os-string.hh"
+#include "nix/util/path-iterator.hh"
 
 #include <algorithm>
 #include <cassert>

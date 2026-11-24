@@ -63,25 +63,25 @@ TEST(fchmodatTryNoFollow, works)
        The `ASSERT_EQ`/`EXPECT_EQ` below run in every branch and enforce the
        invariant that the *target* file's mode is unchanged, which is the
        property we actually care about. */
-    auto expectSymlinkChmod = [&](std::string_view path, mode_t mode) {
+    auto expectSymlinkChmod = [&](const CanonPath & path, mode_t mode) {
 #if defined(__linux__)
-        EXPECT_THAT([&] { fchmodatTryNoFollow(dirFd.get(), CanonPath(path), mode); }, ThrowsSysError(EOPNOTSUPP));
+        EXPECT_THAT([&] { fchmodatTryNoFollow(dirFd.get(), path, mode); }, ThrowsSysError(EOPNOTSUPP));
 #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) \
     || defined(__DragonFly__)
-        EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), CanonPath(path), mode));
+        EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), path, mode));
 #else
         GTEST_LOG_(WARNING) << "unknown platform: chmod-on-symlink behaviour is not verified for this OS";
         try {
-            fchmodatTryNoFollow(dirFd.get(), CanonPath(path), mode);
+            fchmodatTryNoFollow(dirFd.get(), path, mode);
         } catch (SysError &) {
         }
 #endif
     };
 
-    expectSymlinkChmod("filelink", 0777);
+    expectSymlinkChmod("/filelink"_canonPath, 0777);
     ASSERT_EQ(stat(tmpDir / "file").st_mode & 0777, 0644);
 
-    expectSymlinkChmod("dirlink", 0777);
+    expectSymlinkChmod("/dirlink"_canonPath, 0777);
     ASSERT_EQ(stat(tmpDir / "dir").st_mode & 0777, 0755);
 
     /* Check fchmodatTryNoFollow works on regular files and directories. */

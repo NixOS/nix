@@ -88,7 +88,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                     /* If the path happens to be mounted on the storeFS, that means it's lazy path string and would get
                        copied to the store on-demand (when referenced in a derivation). The string is equal to final
                        store path where the store object would end up (the path is hashed before mounting). */
-                    if (!storeFS->getMount(CanonPath(store->printStorePath(o.path))))
+                    if (!storeFS->getMount(this->storePath(o.path).path))
                         ensureValid(o.path);
                     if (maybePathsOut)
                         maybePathsOut->emplace(o.path);
@@ -171,7 +171,7 @@ SourcePath EvalState::realisePath(
             auto rewrites = realiseContext(context);
             if (copyLazyPaths == CopyLazyPaths::Copy)
                 ensureLazyPathsCopied(context);
-            path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
+            path = {path.accessor, CanonPath::fromAsserting(UnresolvedPath(rewriteStrings(path.path.abs(), rewrites)))};
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
@@ -2022,7 +2022,7 @@ static void prim_storePath(EvalState & state, CallSite callSite, Value * const *
     if (!state.store->isInStore(sourcePath.path.abs()))
         state.error<EvalError>("path '%1%' is not in the Nix store", sourcePath).atPos(noPos).debugThrow();
     auto storePath = state.store->toStorePath(sourcePath.path.abs()).first;
-    if (!state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath))) && !settings.readOnlyMode)
+    if (!state.storeFS->getMount(state.storePath(storePath).path) && !settings.readOnlyMode)
         state.store->getBuilder()->ensurePath(storePath);
     context.insert(NixStringContextElem::Opaque{.path = storePath});
     v.mkString(sourcePath.path.abs(), context, state.mem);
@@ -2907,7 +2907,7 @@ static void addPath(
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
             auto rewrites = state.realiseContext(context);
-            path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
+            path = {path.accessor, CanonPath::fromAsserting(UnresolvedPath(rewriteStrings(path.path.abs(), rewrites)))};
             auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
             try {
                 refs = state.store->queryPathInfo(storePath)->references;
@@ -2918,7 +2918,8 @@ static void addPath(
         std::unique_ptr<PathFilter> filter;
         if (filterFun)
             filter = std::make_unique<PathFilter>([&](const std::string & p) {
-                auto p2 = CanonPath(p);
+                /* `dumpPath` gives the filter `CanonPath`s, as strings. */
+                auto p2 = CanonPath::fromAsserting(UnresolvedPath(p));
                 return state.callPathFilter(filterFun, {path.accessor, p2}, noPos);
             });
 

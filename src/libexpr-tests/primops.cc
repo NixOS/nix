@@ -151,7 +151,7 @@ TEST_F(PrimOpTest, getAttrNotFound)
 
 TEST_F(PrimOpTest, unsafeGetAttrPos)
 {
-    state.corepkgsFS->addFile(CanonPath("foo.nix"), "\n\r\n\r{ y = \"x\"; }");
+    state.corepkgsFS->addFile("foo.nix"_filename, "\n\r\n\r{ y = \"x\"; }");
 
     auto expr = "builtins.unsafeGetAttrPos \"y\" (import <nix/foo.nix>)";
     auto v = eval(expr);

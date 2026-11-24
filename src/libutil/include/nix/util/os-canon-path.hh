@@ -21,10 +21,26 @@ namespace nix {
  * - Has no empty components (no `//`)
  * - The empty path `""` is valid and represents the identity
  *
- * Unlike `CanonPath`, which normalizes its input, `OsCanonPath` asserts
- * that the input is already canonical. Unlike `CanonPath` which is a
- * virtual Unix-style path wrapping `std::string`, `OsCanonPath` wraps
+ * It is the OS-native counterpart of the portable `CanonPath`, as
+ * `OsFilename` is of `Filename`; see `PathView` for how all the path
+ * types relate.
+ *
+ * Like `CanonPath`, which only normalises its input when asked to with
+ * `CanonPath::viaLexical`, `OsCanonPath` asserts that the input is
+ * already canonical. Unlike `CanonPath` which is a virtual Unix-style
+ * path wrapping `std::string`, `OsCanonPath` wraps
  * `std::filesystem::path` and respects OS-native directory separators.
+ *
+ * The biggest difference between `OsCanonPath` and `CanonPath` beyond the
+ * expected OS-specific vs portability differences is that `OsCanonPath` is
+ * always a relative path, while `CanonPath` is an absolute path, starting with
+ * `/`. But in practice the difference is small, as `CanonPath::rel` returns a
+ * relative path merely by advancing the starting position one character.
+ *
+ * The reason for this discrepancy is that OS absolute paths (on Windows) do
+ * not, in fact, start with `/` (or `\`), so we would be incurring a lot more
+ * complexity to support the absolute path case in addition. Also, we simply
+ * don't need it, as we try to work file-descriptor-relative wherever possible.
  */
 class OsCanonPath
 {

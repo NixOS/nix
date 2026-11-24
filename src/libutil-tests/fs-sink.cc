@@ -18,13 +18,13 @@ ref<MemorySourceAccessor> makeTree(bool withSymlink = true)
 {
     auto accessor = make_ref<MemorySourceAccessor>();
     accessor->addDirectory(CanonPath::root);
-    accessor->addFile(CanonPath("file"), "contents");
-    accessor->addFile(CanonPath("script"), "#!/bin/sh\n", /*executable=*/true);
-    accessor->addDirectory(CanonPath("dir"));
-    accessor->addFile(CanonPath("dir/nested"), "nested contents");
-    accessor->addDirectory(CanonPath("dir/empty"));
+    accessor->addFile("file"_filename, "contents");
+    accessor->addFile("script"_filename, "#!/bin/sh\n", /*executable=*/true);
+    accessor->addDirectory("dir"_filename);
+    accessor->addFile("/dir/nested"_canonPath, "nested contents");
+    accessor->addDirectory("/dir/empty"_canonPath);
     if (withSymlink)
-        accessor->addSymlink(CanonPath("link"), "dir/nested");
+        accessor->addSymlink("link"_filename, "dir/nested");
     return accessor;
 }
 
@@ -59,9 +59,9 @@ TEST(copyRecursive, copiesSubtree)
     auto from = makeTree();
     auto to = make_ref<MemorySourceAccessor>();
     MemorySink sink{*to};
-    copyRecursive(*from, CanonPath("dir"), sink);
+    copyRecursive(*from, "dir"_filename, sink);
     EXPECT_THAT(to, testing::HasDirectory(CanonPath::root, std::set<std::string>{"nested", "empty"}));
-    EXPECT_EQ(toNar(*to), toNar(*from, CanonPath("dir")));
+    EXPECT_EQ(toNar(*to), toNar(*from, "dir"_filename));
 }
 
 /* ----------------------------------------------------------------------------
@@ -96,8 +96,8 @@ TEST_F(RestoreSinkTest, restoresTree)
 #ifndef _WIN32
     EXPECT_EQ(toNar(*makeFSSourceAccessor(dst)), toNar(*from));
 #else
-    EXPECT_THAT(makeFSSourceAccessor(dst), testing::HasContents(CanonPath("file"), "contents"));
-    EXPECT_THAT(makeFSSourceAccessor(dst), testing::HasContents(CanonPath("dir/nested"), "nested contents"));
+    EXPECT_THAT(makeFSSourceAccessor(dst), testing::HasContents("file"_filename, "contents"));
+    EXPECT_THAT(makeFSSourceAccessor(dst), testing::HasContents("/dir/nested"_canonPath, "nested contents"));
 #endif
 }
 
@@ -107,7 +107,7 @@ TEST_F(RestoreSinkTest, restoresSingleFile)
     auto dst = tempDir.path() / "out";
     {
         auto sink = RestoreSink::forPath(dst, /*startFsync=*/false);
-        copyRecursive(*from, CanonPath("file"), sink);
+        copyRecursive(*from, "file"_filename, sink);
     }
     EXPECT_EQ(readFile(dst), "contents");
 }
@@ -120,7 +120,7 @@ TEST_F(RestoreSinkTest, refusesExisting)
     EXPECT_THROW(
         {
             auto sink = RestoreSink::forPath(dst, /*startFsync=*/false);
-            copyRecursive(*makeTree(), CanonPath("file"), sink);
+            copyRecursive(*makeTree(), "file"_filename, sink);
         },
         SystemError);
     EXPECT_EQ(readFile(dst), "already here");
@@ -134,17 +134,17 @@ TEST(RegularFileSink, passesOnContents)
 {
     StringSink contents;
     RegularFileSink sink{contents};
-    copyRecursive(*makeTree(), CanonPath("file"), sink);
+    copyRecursive(*makeTree(), "file"_filename, sink);
     EXPECT_TRUE(sink.regular);
     EXPECT_EQ(contents.s, "contents");
 }
 
 TEST(RegularFileSink, notesOtherObjects)
 {
-    for (auto path : {"dir", "link"}) {
+    for (auto path : {"dir"_filename, "link"_filename}) {
         StringSink contents;
         RegularFileSink sink{contents};
-        copyRecursive(*makeTree(), CanonPath(path), sink);
+        copyRecursive(*makeTree(), path, sink);
         EXPECT_FALSE(sink.regular) << path;
         EXPECT_EQ(contents.s, "") << path;
     }

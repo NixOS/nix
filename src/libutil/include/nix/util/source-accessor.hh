@@ -224,10 +224,32 @@ public:
      * Resolve any symlinks in `path` according to the given
      * resolution mode.
      *
+     * A `CanonPath` has no `..`; for a path that may, first make it one
+     * with `resolvePath`, rather than removing them lexically.
+     *
      * @param mode might only be a temporary solution for this.
      * See the discussion in https://github.com/NixOS/nix/pull/9985.
      */
     CanonPath resolveSymlinks(const CanonPath & path, SymlinkResolution mode = SymlinkResolution::Full);
+
+    /**
+     * Make `path` a `CanonPath`, resolving only the symlinks that its
+     * `..` components need: those up to the last `..`. The components
+     * after it are kept as given, symlinks or not. Without any `..`,
+     * `path` is kept as it is, without looking at anything.
+     *
+     * So `link/../foo` is `foo` in the parent of the link's target, but
+     * `dir/link` stays `dir/link`.
+     *
+     * This represents the minimal amount of symlink resolution needed to
+     * convert an `UnresolvedPath` into a `CanonPath` without any
+     * potentially-improper lexical `foo/..` -> `` canonicalisations.
+     *
+     * Therefore resolving the symlinks of the resulting `CanonPath` is
+     * sound: `resolveSymlinks(resolvePath(p), mode)` resolves `p`, `..`
+     * and all, as if it had been resolved one component at a time.
+     */
+    CanonPath resolvePath(const UnresolvedPath & path);
 
     /**
      * A string that uniquely represents the contents of this

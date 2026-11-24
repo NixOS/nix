@@ -281,7 +281,9 @@ EvalState::EvalState(
              exception, and make union source accessor
              catch it, so we don't need to do this hack.
            */
-          {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
+          {/* `storeDir` has no `..`. */
+           CanonPath::fromAsserting(UnresolvedPath(store->storeDir)),
+           store->getFSAccessor(settings.pureEval)},
       }))
     , rootFS([&] {
         /* In pure eval mode, we provide a filesystem that only
@@ -317,7 +319,7 @@ EvalState::EvalState(
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{[&] {
-        CanonPath path{"derivation-internal.nix"};
+        CanonPath path = "derivation-internal.nix"_filename;
         internalFS->addFile(
             path,
             {
@@ -326,7 +328,7 @@ EvalState::EvalState(
         return SourcePath{internalFS, std::move(path)};
     }()}
     , importedDrvToDerivation{[&] {
-        CanonPath path{"imported-drv-to-derivation.nix"};
+        CanonPath path = "imported-drv-to-derivation.nix"_filename;
         internalFS->addFile(
             path,
             {
@@ -400,7 +402,7 @@ EvalState::EvalState(
             resolveLookupPathPath(i.path, true);
 
     corepkgsFS->addFile(
-        CanonPath("fetchurl.nix"),
+        "fetchurl.nix"_filename,
         {
 #embed "fetchurl.nix"
         });
@@ -434,13 +436,13 @@ EvalState::~EvalState() {}
 void EvalState::allowPathLegacy(const std::string & path)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-        rootFS2->allowPrefix(CanonPath(path));
+        rootFS2->allowPrefix(CanonPath::viaLexical(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-        rootFS2->allowPrefix(CanonPath(store->printStorePath(storePath)));
+        rootFS2->allowPrefix(this->storePath(storePath).path);
 }
 
 void EvalState::allowClosure(const StorePath & storePath)
@@ -503,7 +505,7 @@ void EvalState::checkURI(const std::string & uri0)
         std::filesystem::path path(uri0);
         if (path.is_absolute()) {
             if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-                rootFS2->checkAccess(CanonPath(path.string()));
+                rootFS2->checkAccess(CanonPath::viaLexical(path.string()));
             return;
         }
     }
@@ -512,7 +514,7 @@ void EvalState::checkURI(const std::string & uri0)
         ParsedURL uri = parseURL(uri0);
         if (uri.scheme == "file") {
             if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-                rootFS2->checkAccess(CanonPath(urlPathToPath(uri.path).string()));
+                rootFS2->checkAccess(CanonPath::viaLexical(urlPathToPath(uri.path).string()));
             return;
         }
     } catch (BadURL &) {
@@ -2257,7 +2259,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         for (const auto & part : strings) {
             resultStr += *part;
         }
-        v.mkPath(state.rootPath(CanonPath(resultStr)), state.mem);
+        v.mkPath(state.rootPath(CanonPath::viaLexical(resultStr)), state.mem);
     } else {
         auto & resultStr = StringData::alloc(state.mem, sSize);
         auto * tmp = resultStr.data();
@@ -2705,7 +2707,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
                 error<EvalError>("string '%1%' doesn't represent an absolute path", path)
                     .withTrace(pos, errorCtx)
                     .debugThrow();
-            return rootPath(CanonPath(path));
+            return rootPath(CanonPath::viaLexical(path));
         });
 }
 
@@ -3264,10 +3266,12 @@ SourcePath resolveExprPath(SourcePath path, bool addDefaultNix)
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
             throw Error("too many symbolic links encountered while traversing the path '%s'", path);
-        auto p = path.parent().resolveSymlinks() / path.baseName();
+        auto p = path.parent().resolveSymlinks() / *path.path.baseName();
         if (p.lstat().type != SourceAccessor::tSymlink)
             break;
-        path = {path.accessor, CanonPath(p.readLink(), path.path.parent().value_or(CanonPath::root))};
+        path = {
+            path.accessor,
+            CanonPath::viaLexical(UnresolvedPath(p.readLink(), path.path.parent().value_or(CanonPath::root)))};
     }
 
     /* If `path' refers to a directory, append `/default.nix'. */
@@ -3346,7 +3350,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
             continue;
         auto r = *rOpt;
 
-        auto suffixPath = CanonPath(suffix);
+        auto suffixPath = CanonPath::viaLexical(suffix);
         if (auto cachedRes = getConcurrent(*rOpt->resolvedPaths, suffixPath)) {
             if (*cachedRes)
                 return **cachedRes;
@@ -3371,7 +3375,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
     }
 
     if (hasPrefix(path, "nix/"))
-        return {corepkgsFS, CanonPath(path.substr(3))};
+        return {corepkgsFS, CanonPath::viaLexical(path.substr(3))};
 
     error<ThrownError>(
         settings.pureEval ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"

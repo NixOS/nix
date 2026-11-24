@@ -139,11 +139,11 @@ TEST_F(GitUtilsTest, sink_basic)
                 "links",
             }));
 
-    ASSERT_THAT(accessor, testing::HasContents(CanonPath("hello"), "hello world"));
-    ASSERT_THAT(accessor, testing::HasContents(CanonPath("bye"), "thanks for all the fish"));
-    ASSERT_THAT(accessor, testing::HasSymlink(CanonPath("bye-link"), "bye"));
-    ASSERT_THAT(accessor, testing::HasDirectory(CanonPath("empty"), std::set<std::string>{}));
-    ASSERT_THAT(accessor, testing::HasContents(CanonPath("links/foo"), "hello world"));
+    ASSERT_THAT(accessor, testing::HasContents("hello"_filename, "hello world"));
+    ASSERT_THAT(accessor, testing::HasContents("bye"_filename, "thanks for all the fish"));
+    ASSERT_THAT(accessor, testing::HasSymlink("bye-link"_filename, "bye"));
+    ASSERT_THAT(accessor, testing::HasDirectory("empty"_filename, std::set<std::string>{}));
+    ASSERT_THAT(accessor, testing::HasContents("/links/foo"_canonPath, "hello world"));
 }
 
 TEST_F(GitUtilsTest, peel_reference)
@@ -331,21 +331,37 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
     auto throwCorruptedTree = ::testing::ThrowsMessage<Error>(
         testing::HasSubstrIgnoreANSIMatcher("duplicated or incorrectly ordered tree entries"));
     ASSERT_THAT([&] { accessor1->readDirectory(CanonPath::root); }, throwCorruptedTree);
-    ASSERT_THAT([&] { accessor1->readFile(CanonPath("a.txt")); }, throwCorruptedTree);
+    ASSERT_THAT([&] { accessor1->readFile("a.txt"_filename); }, throwCorruptedTree);
     /* The cache should be nuked on corrupted tree errors. */
-    ASSERT_THAT([&] { accessor1->readFile(CanonPath("a.txt")); }, throwCorruptedTree);
+    ASSERT_THAT([&] { accessor1->readFile("a.txt"_filename); }, throwCorruptedTree);
 
     auto accessor2 = repo->getAccessor(tree2, {}, getRepoName());
     ASSERT_THAT(
-        [&] { accessor2->readFile(CanonPath("a.txt")); },
+        [&] { accessor2->readFile("a.txt"_filename); },
         ::testing::ThrowsMessage<Error>(
             testing::HasSubstrIgnoreANSIMatcher("'test-git-repo/a.txt' is not a regular file")));
 
     auto accessor3 = repo->getAccessor(tree3, {}, getRepoName());
     ASSERT_THAT(
-        [&] { accessor3->readDirectory(CanonPath("fake-dir")); },
+        [&] { accessor3->readDirectory("fake-dir"_filename); },
         ::testing::ThrowsMessage<Error>(
             testing::HasSubstrIgnoreANSIMatcher("'test-git-repo/fake-dir' is not a directory")));
+}
+
+TEST(GitUtils, submodulePathWithDotDot)
+{
+    AutoDelete tmpDir{createTempDir()};
+    auto repoDir = tmpDir.path() / "repo";
+    auto repo = GitRepo::openRepo(repoDir, {.create = true});
+    writeFile(repoDir / ".gitmodules", "[submodule \"x\"]\n\tpath = ../x\n\turl = https://example.org/x\n");
+
+    /* Rejected rather than removed lexically, saying which submodule
+       it was. */
+    EXPECT_THAT(
+        [&] { repo->getWorkdirInfo(); },
+        ::testing::ThrowsMessage<Error>(::testing::AllOf(
+            testing::HasSubstrIgnoreANSIMatcher("must not contain '..' components"),
+            testing::HasSubstrIgnoreANSIMatcher("in the path of submodule 'x'"))));
 }
 
 TEST(GitUtils, isLegalRefName)

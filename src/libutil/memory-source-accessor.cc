@@ -1,4 +1,5 @@
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/path-iterator.hh"
 
 #include <ranges>
 

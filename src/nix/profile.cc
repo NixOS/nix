@@ -182,7 +182,9 @@ struct ProfileManifest
             state.allowPath(state.store->followLinksToStorePath(profile.string()));
             state.allowPath(state.store->followLinksToStorePath((profile / "manifest.nix").string()));
 
-            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
+            auto [storePath, subPath] =
+                state.store->toStorePath(state.store->followLinksToStore(profile.string()).string());
+            auto packageInfos = queryInstalled(state, state.storePath(storePath) / subPath);
 
             for (auto & packageInfo : packageInfos) {
                 ProfileElement element;
@@ -249,7 +251,7 @@ struct ProfileManifest
 
         auto profile = buildProfile(std::move(pkgs));
 
-        profile->addFile(CanonPath("manifest.json"), toJSON(*store).dump());
+        profile->addFile("manifest.json"_filename, toJSON(*store).dump());
 
         /* Add the symlink tree to the store. */
         return store->addToStore(

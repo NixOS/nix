@@ -84,6 +84,7 @@ sources = files(
   'tarfile.cc',
   'terminal.cc',
   'topo-sort.cc',
+  'unresolved-path.cc',
   'url.cc',
   'util.cc',
   'xml-writer.cc',

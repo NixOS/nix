@@ -7,6 +7,7 @@
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/util/path-iterator.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -66,7 +67,7 @@ class WholeStoreViewAccessor : public SourceAccessor
         MemorySourceAccessor * res = nullptr;
 
         subdirs.cvisit(baseName, [&](const auto & kv) {
-            path = path.removePrefix(CanonPath{baseName});
+            path = path.removePrefix(CanonPath{*path.begin()});
             res = &*kv.second;
         });
 

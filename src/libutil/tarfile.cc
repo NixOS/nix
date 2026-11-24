@@ -233,8 +233,21 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
         auto path = archive_entry_pathname(entry);
         if (!path)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
-        /* TODO: Reject `..` components like the above ARCHIVE_EXTRACT_SECURE_NODOTDOT. */
-        auto cpath = CanonPath{path};
+        /* Reject `..` components, like `ARCHIVE_EXTRACT_SECURE_NODOTDOT`
+           does for `unpackTarfile` above.
+
+           TODO: Someday, they could be supported instead, by having the sink
+           resolve them against what it has created so far, as unpacking
+           onto a file system would --- like it already does for the
+           targets of hard links. */
+        auto cpath = [&] {
+            try {
+                return CanonPath::fromThrowing(UnresolvedPath(path));
+            } catch (Error & e) {
+                e.addTrace({}, "in archive member '%s'", path);
+                throw;
+            }
+        }();
         if (r == ARCHIVE_WARN)
             warn("getting archive member '%1%': %2%", path, archive_error_string(archive.archive));
         else
@@ -243,7 +256,15 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
         lastModified = std::max(lastModified, archive_entry_mtime(entry));
 
         if (auto target = archive_entry_hardlink(entry)) {
-            parseSink.createHardlink(cpath, CanonPath(target));
+            auto ctarget = [&] {
+                try {
+                    return CanonPath::fromThrowing(UnresolvedPath(target));
+                } catch (Error & e) {
+                    e.addTrace({}, "in the target of hard link '%s'", path);
+                    throw;
+                }
+            }();
+            parseSink.createHardlink(cpath, ctarget);
             continue;
         }
 

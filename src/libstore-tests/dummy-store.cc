@@ -42,8 +42,14 @@ TEST(DummyStore, storeDir_absolutePath)
 
 TEST(DummyStore, storeDir_canonicalized)
 {
-    DummyStoreConfig config{{{"store", "/my//store/../store"}}};
+    DummyStoreConfig config{{{"store", "/my//store/./"}}};
     EXPECT_EQ(config.storeDir, "/my/store");
+}
+
+TEST(DummyStore, storeDir_dotDot_rejected)
+{
+    /* Not removed lexically, as `store` could be a symlink. */
+    EXPECT_THROW((DummyStoreConfig{{{"store", "/my/store/../store"}}}), UsageError);
 }
 
 TEST(DummyStore, storeDir_relativePath_rejected)

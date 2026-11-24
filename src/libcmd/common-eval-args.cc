@@ -200,7 +200,14 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
     }
 
     else
-        return state.rootPath(absPath(std::filesystem::path{s}, baseDir).string());
+        return lookupHostPath(state, std::filesystem::path{s}, baseDir);
+}
+
+SourcePath lookupHostPath(EvalState & state, const std::filesystem::path & path, const std::filesystem::path * baseDir)
+{
+    /* Not `absPath`, which would remove any `..` lexically. */
+    auto abs = path.is_absolute() ? path : (baseDir ? *baseDir : std::filesystem::current_path()) / path;
+    return state.rootPath(state.rootFS->resolvePath(UnresolvedPath{abs.string()}));
 }
 
 } // namespace nix

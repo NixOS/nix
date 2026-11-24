@@ -5,6 +5,7 @@
 #include "nix/util/canon-path.hh"
 #include "nix/util/util.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/path-iterator.hh"
 
 #include <cassert>
 #include <map>
