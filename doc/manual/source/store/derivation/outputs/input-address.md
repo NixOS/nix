@@ -227,9 +227,8 @@ where \\(\\mathrm{caInputs}(d)\\) returns the content-addressed inputs of \\(d\\
 >
 > Input-addressing downstream of content addressing, as described above, anticipates this.
 > Since a content-addressed input contributes only its content address, and not the derivation that produced it, derivations differing only in *how* an identical content-addressed input was produced are already \\(\\sim_\mathrm{IADrv}\\)-equivalent.
-> And since a deferred derivation is completely resolved before it is input-addressed, its input-addressed `inputDrvOutputs` are normalized to `inputSrcs` as well --- so derivations differing only in how an identical *input-addressed* input was produced are \\(\\sim_\mathrm{IADrv}\\)-equivalent too.
-> That is the same "identify an input by what it is, rather than by how it was made" move as \\(\\sim_\mathrm{Drv}\\).
-> The difference is that \\(\\sim_\mathrm{Drv}\\) makes it unconditionally, whereas here it falls out for content-addressed inputs always, and for the rest only where deferral forced a resolution first.
+> That is the same "identify an input by what it is, rather than by how it was made" move as \\(\\sim_\mathrm{Drv}\\), but masking only makes it for content-addressed inputs, not input-addressed ones.
+> [Version 2](#resolution-based) input addressing, which resolves derivations before computing their input addresses, makes it for every input.
 
 ## Version 2: resolution {#resolution-based}
 
