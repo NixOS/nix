@@ -867,6 +867,13 @@ masked::Drv<Output::InputAddressed>::to_string(const StoreDirConfig &, std::stri
 template<typename Inputs, typename Input>
 static TraditionalParsedT<Inputs> lowerCommon(const Derivation<Input, Output> & drv)
 {
+    /* Only version 1 derivations have the traditional shape. This is
+       also what keeps version 2 derivations from being sent over the
+       protocols that use it, which would silently lose their options. */
+    if (drv.version != Version::V1)
+        throw Error(
+            "version 2 derivation '%s' cannot be represented in the version 1 (traditional) form", drv.name);
+
     StringPairs env;
     for (auto & [name, var] : drv.env)
         env.insert_or_assign(name, var.value);
