@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/traditional.hh"
 
 namespace nix {
 
@@ -23,3 +24,27 @@ void elaborateLegacyOptions(
     const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
 
 } // namespace nix
+
+namespace nix::derivation {
+
+/**
+ * Decode the options and structured attributes a traditional-shape
+ * derivation encodes in its environment, producing the shared view
+ * directly.
+ *
+ * This is the decoding the version 1 derivation types (see
+ * `nix/store/derivation/v1.hh`) are built on; everything else should go
+ * through them, or `elaborate`, instead.
+ */
+Full decodeTraditional(
+    const TraditionalParsed & aterm,
+    const StoreDirConfig & store,
+    std::string_view name,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+Basic decodeTraditional(
+    const BasicTraditionalParsed & aterm,
+    const StoreDirConfig & store,
+    std::string_view name,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+} // namespace nix::derivation

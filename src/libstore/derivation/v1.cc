@@ -1,5 +1,6 @@
 #include "nix/store/derivation/v1.hh"
 #include "nix/store/derivation/structured-attrs.hh"
+#include "nix/store/derivation/elaborate.hh"
 
 namespace nix::derivation::v1 {
 
@@ -14,7 +15,7 @@ static auto decode(
     const StoreDirConfig & store,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    return derivation::elaborate(parsed, store, name, xpSettings);
+    return decodeTraditional(parsed, store, name, xpSettings);
 }
 
 template<typename Inputs>
@@ -142,3 +143,25 @@ template Basic
 fromParsed(BasicTraditionalParsed, std::string, const StoreDirConfig &, const ExperimentalFeatureSettings &);
 
 } // namespace nix::derivation::v1
+
+namespace nix::derivation {
+
+Full elaborate(
+    const TraditionalParsed & aterm,
+    const StoreDirConfig & store,
+    std::string_view name,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    return v1::elaborated(v1::fromParsed(aterm, std::string{name}, store, xpSettings));
+}
+
+Basic elaborate(
+    const BasicTraditionalParsed & aterm,
+    const StoreDirConfig & store,
+    std::string_view name,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    return v1::elaborated(v1::fromParsed(aterm, std::string{name}, store, xpSettings));
+}
+
+} // namespace nix::derivation

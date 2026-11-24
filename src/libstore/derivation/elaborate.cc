@@ -345,7 +345,7 @@ elaborateCommon(const derivation::TraditionalParsedT<Inputs> & aterm, std::strin
 
 namespace derivation {
 
-Full elaborate(
+Full decodeTraditional(
     const TraditionalParsed & aterm,
     const StoreDirConfig & store,
     std::string_view name,
@@ -357,7 +357,7 @@ Full elaborate(
     return drv;
 }
 
-Basic elaborate(
+Basic decodeTraditional(
     const BasicTraditionalParsed & aterm,
     const StoreDirConfig & store,
     std::string_view name,
