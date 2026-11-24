@@ -4,6 +4,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/registry.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -25,24 +26,20 @@ public:
         });
     }
 
-    std::shared_ptr<fetchers::Registry> getRegistry()
+    ref<fetchers::Registry> getRegistry()
     {
-        if (registry)
-            return registry;
-        if (registry_path.empty()) {
-            registry = fetchers::getUserRegistry(fetchSettings);
-        } else {
-            registry = fetchers::getCustomRegistry(fetchSettings, registry_path);
-        }
-        return registry;
+        if (!registry)
+            registry = registry_path.empty() ? fetchers::getUserRegistry(fetchSettings)
+                                             : fetchers::getCustomRegistry(fetchSettings, registry_path);
+        return ref{registry};
     }
 
     std::filesystem::path getRegistryPath()
     {
         if (registry_path.empty()) {
-            return fetchers::getUserRegistryPath().string();
+            return fetchers::getUserRegistryPath();
         } else {
-            return registry_path;
+            return absPath(registry_path);
         }
     }
 };

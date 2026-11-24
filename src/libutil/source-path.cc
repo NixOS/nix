@@ -85,4 +85,14 @@ std::ostream & operator<<(std::ostream & str, const SourcePath & path)
     return str;
 }
 
+SourcePath selfContainedHostFileOrError(const std::filesystem::path & path)
+{
+    return SourcePath{makeFSSourceAccessorOrError(
+        path,
+        {
+            .finalSymlink = FinalSymlink::Follow,
+            .requireAbsolute = false,
+        })};
+}
+
 } // namespace nix

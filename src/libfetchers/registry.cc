@@ -10,16 +10,18 @@
 
 namespace nix::fetchers {
 
-std::shared_ptr<Registry> Registry::read(const Settings & settings, const SourcePath & path, RegistryType type)
+static ref<Registry> readRegistry(const Settings & settings, const SourcePath & path, Registry::RegistryType type)
 {
     debug("reading registry '%s'", path);
 
-    auto registry = std::make_shared<Registry>(type);
-
-    if (!path.pathExists())
-        return std::make_shared<Registry>(type);
+    auto registry = make_ref<Registry>(type);
 
     try {
+
+        /* Checked inside the `try`, as for a host file this is where any
+           error opening it first shows up. */
+        if (!path.pathExists())
+            return registry;
 
         auto json = nlohmann::json::parse(path.readFile());
 
@@ -35,12 +37,12 @@ std::shared_ptr<Registry> Registry::read(const Settings & settings, const Source
                     toAttrs.erase(j);
                 }
                 auto exact = i.find("exact");
-                registry->entries.push_back(
-                    Entry{
-                        .from = Input::fromAttrs(jsonToAttrs(i["from"])),
-                        .to = Input::fromAttrs(std::move(toAttrs)),
-                        .extraAttrs = extraAttrs,
-                        .exact = exact != i.end() && exact.value()});
+                registry->entries.push_back({
+                    .from = Input::fromAttrs(jsonToAttrs(i["from"])),
+                    .to = Input::fromAttrs(std::move(toAttrs)),
+                    .extraAttrs = extraAttrs,
+                    .exact = exact != i.end() && exact.value(),
+                });
             }
         }
 
@@ -95,12 +97,12 @@ static std::filesystem::path getSystemRegistryPath()
     return nixConfDir() / "registry.json";
 }
 
-static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
+static ref<Registry> getSystemRegistry(const Settings & settings)
 {
-    static auto systemRegistry = Registry::read(
-        settings,
-        SourcePath{getFSSourceAccessor(), CanonPath{getSystemRegistryPath().string()}}.resolveSymlinks(),
-        Registry::System);
+    /* Registries are often symlinks into the store, which
+       `selfContainedHostFileOrError` follows. */
+    static auto systemRegistry =
+        readRegistry(settings, selfContainedHostFileOrError(getSystemRegistryPath()), Registry::System);
     return systemRegistry;
 }
 
@@ -109,25 +111,22 @@ std::filesystem::path getUserRegistryPath()
     return getConfigDir() / "registry.json";
 }
 
-std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
+ref<Registry> getUserRegistry(const Settings & settings)
 {
-    static auto userRegistry = Registry::read(
-        settings,
-        SourcePath{getFSSourceAccessor(), CanonPath{getUserRegistryPath().string()}}.resolveSymlinks(),
-        Registry::User);
+    static auto userRegistry =
+        readRegistry(settings, selfContainedHostFileOrError(getUserRegistryPath()), Registry::User);
     return userRegistry;
 }
 
-std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
+ref<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
 {
-    static auto customRegistry = Registry::read(
-        settings, SourcePath{getFSSourceAccessor(), CanonPath{p.string()}}.resolveSymlinks(), Registry::Custom);
+    static auto customRegistry = readRegistry(settings, selfContainedHostFileOrError(p), Registry::Custom);
     return customRegistry;
 }
 
-std::shared_ptr<Registry> getFlagRegistry()
+ref<Registry> getFlagRegistry()
 {
-    static auto flagRegistry = std::make_shared<Registry>(Registry::Flag);
+    static auto flagRegistry = make_ref<Registry>(Registry::Flag);
     return flagRegistry;
 }
 
@@ -136,15 +135,15 @@ void overrideRegistry(const Input & from, const Input & to, const Attrs & extraA
     getFlagRegistry()->add(from, to, extraAttrs);
 }
 
-static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, Store & store)
+static ref<Registry> getGlobalRegistry(const Settings & settings, Store & store)
 {
     static auto reg = [&]() {
         auto path = settings.flakeRegistry.get();
         if (path == "") {
-            return std::make_shared<Registry>(Registry::Global); // empty registry
+            return make_ref<Registry>(Registry::Global); // empty registry
         }
 
-        return Registry::read(
+        return readRegistry(
             settings,
             [&] -> SourcePath {
                 std::filesystem::path fsPath{path};
@@ -154,7 +153,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, St
                         store2->addPermRoot(storePath, (getCacheDir() / "flake-registry.json").string());
                     return {store.requireStoreObjectAccessor(storePath)};
                 } else {
-                    return SourcePath{getFSSourceAccessor(), CanonPath{fsPath.string()}}.resolveSymlinks();
+                    return selfContainedHostFileOrError(fsPath);
                 }
             }(),
             Registry::Global);

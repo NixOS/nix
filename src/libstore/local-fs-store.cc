@@ -189,13 +189,17 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
            member of the store. */
         if (!isValidPath(path))
             return nullptr;
+        /* A valid store object exists on disk, so opening it is
+           expected to succeed. */
+        return makeFSSourceAccessor(std::move(absPath));
     } else {
-        /* Return non-null as long as the some file system data exists,
+        /* Return non-null as long as some file system data exists,
            even if the store object is not fully registered. */
-        if (!pathExists(absPath))
+        auto accessor = makeFSSourceAccessorOrError(std::move(absPath));
+        if (!accessor->pathExists(CanonPath::root))
             return nullptr;
+        return accessor;
     }
-    return makeFSSourceAccessor(std::move(absPath));
 }
 
 const std::filesystem::path LocalFSStore::drvsLogDir = "drvs";

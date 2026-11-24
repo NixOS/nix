@@ -126,6 +126,31 @@ struct SourcePath
 
 std::ostream & operator<<(std::ostream & str, const SourcePath & path);
 
+/**
+ * Get @p path on the host file system as a self-contained file. "File"
+ * is meant in the broad sense: a regular file or a directory (tree), and
+ * the accessor is rooted at it, so it can read just that.
+ *
+ * "Self-contained" means nothing in it refers outside it. A symlink
+ * escaping it and a relative reference to a sibling (such as a Nix file
+ * importing `./foo.nix`) are the same thing in this respect: either would
+ * be resolved within the accessor, not the host file system, and so
+ * would reach the wrong file, or none at all. A JSON document such as a
+ * registry or lock file is self-contained; a Nix file generally is not,
+ * and would need its directory.
+ *
+ * Symlinks on the way to @p path, including @p path itself, are
+ * followed, and @p path may be relative, as it is typically given by the
+ * user. If there is no such file, the result is a path that does not
+ * exist either; see `makeFSSourceAccessorOrError`.
+ *
+ * This is a tiny wrapper around `makeFSSourceAccessorOrError`, and exists
+ * mainly so users can "cite" this documentation by virtue of using it, rather
+ * than repeating the same justification for their
+ * `makeFSSourceAccessorOrError` usage over and over again.
+ */
+SourcePath selfContainedHostFileOrError(const std::filesystem::path & path);
+
 inline std::size_t hash_value(const SourcePath & path)
 {
     std::size_t hash = 0;

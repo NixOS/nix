@@ -262,7 +262,7 @@ EvalState::EvalState(
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
     , storeFS(makeMountedSourceAccessor({
-          {CanonPath::root, makeEmptySourceAccessor()},
+          {CanonPath::root, makeEmptyDirectorySourceAccessor()},
           /* In the pure eval case, we can simply require
              valid paths. However, in the *impure* eval
              case this gets in the way of the union
@@ -292,9 +292,14 @@ EvalState::EvalState(
            underlying directory available. This is necessary for
            instance if we're evaluating a file from the physical
            /nix/store while using a chroot store, and also for lazy
-           mounted fetchTree. */
+           mounted fetchTree.
+
+           This is the only place where we should allow ourselves to
+           read arbitrarily within the host file system. Anything else
+           should use `makeFSSourceAccessor` for just what it needs to
+           read. */
         auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
+                                          : makeUnionSourceAccessor({makeFSSourceAccessor("/"), storeFS});
         /* Cache positive lstat/readlink results to speed up resolveSymlinks. */
         accessor = makeCachingSourceAccessor(accessor);
 
