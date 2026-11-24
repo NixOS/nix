@@ -1499,7 +1499,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
-    std::optional<StructuredAttrs> jsonObject;
+    std::optional<derivation::StructuredAttrs> jsonObject;
     auto pos = v.determinePos(noPos);
     auto attr = attrs->get(state.s.structuredAttrs);
     if (attr
@@ -1508,7 +1508,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             pos,
             "while evaluating the `__structuredAttrs` "
             "attribute passed to builtins.derivationStrict"))
-        jsonObject = StructuredAttrs{};
+        jsonObject = derivation::StructuredAttrs{};
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
@@ -1712,7 +1712,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     if (i->name == state.s.json) {
                         warnAttr(HintFmt(
                             "setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead."));
-                        drv.structuredAttrs = StructuredAttrs::parse(s);
+                        drv.structuredAttrs = derivation::StructuredAttrs::parse(s);
                     } else {
                         drv.env.emplace(key, s);
                         switch (i->name.getId()) {

@@ -3,9 +3,9 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derived-path.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/util/types.hh"
 
 #include "nix/store/tests/libstore.hh"
@@ -38,7 +38,7 @@ public:
                 "foo",
                 derivation::defaultSupportWindowsStoreDir,
                 this->mockXpSettings);
-            auto options = derivationOptionsFromStructuredAttrs(
+            auto options = derivation::optionsFromStructuredAttrs(
                 *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedFeatures);
         });
@@ -59,7 +59,7 @@ public:
                 "foo",
                 derivation::defaultSupportWindowsStoreDir,
                 this->mockXpSettings);
-            auto options = derivationOptionsFromStructuredAttrs(
+            auto options = derivation::optionsFromStructuredAttrs(
                 *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
             EXPECT_EQ(options, expected);
@@ -207,7 +207,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
         auto got = derivation::parse(
             *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
+        auto options = derivation::optionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
@@ -252,7 +252,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
         auto got = derivation::parse(
             *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
+        auto options = derivation::optionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
@@ -349,7 +349,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
         auto got = derivation::parse(
             *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
+        auto options = derivation::optionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);
@@ -399,7 +399,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
         auto got = derivation::parse(
             *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
+        auto options = derivation::optionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);

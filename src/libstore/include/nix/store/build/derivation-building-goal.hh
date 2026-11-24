@@ -3,8 +3,8 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/local-store.hh"
-#include "nix/store/parsed-derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/structured-attrs.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"

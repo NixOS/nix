@@ -6,10 +6,10 @@
 
 #include "nix/store/build-result.hh"
 #include "nix/store/daemon.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/muxable-pipe.hh"
 #include "nix/util/json-impls.hh"

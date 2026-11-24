@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/path-info.hh"
 
 namespace nix {

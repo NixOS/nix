@@ -10,8 +10,8 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/current-process.hh"
-#include "nix/store/parsed-derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/structured-attrs.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
@@ -566,7 +566,7 @@ static void main_nix_build(int argc, char ** argv)
 
         DerivationOptions<StorePath> drvOptions;
         try {
-            drvOptions = derivationOptionsFromStructuredAttrs(*store, drv.env, get(drv.structuredAttrs));
+            drvOptions = derivation::optionsFromStructuredAttrs(*store, drv.env, get(drv.structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
             throw;
@@ -593,7 +593,7 @@ static void main_nix_build(int argc, char ** argv)
 
             auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);
 
-            structuredAttrsRC = StructuredAttrs::writeShell(json);
+            structuredAttrsRC = derivation::StructuredAttrs::writeShell(json);
 
             auto attrsJSON = (tmpDir.path() / ".attrs.json").string();
             writeFile(attrsJSON, static_cast<nlohmann::json>(std::move(json)).dump());
