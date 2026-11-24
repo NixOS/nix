@@ -1,5 +1,5 @@
 #include "nix/store/derivation/v2/derivation.hh"
-#include "nix/util/overloaded.hh"
+#include "nix/util/util.hh"
 
 namespace nix::derivation::v2 {
 

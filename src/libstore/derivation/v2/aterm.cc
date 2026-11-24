@@ -2,7 +2,7 @@
 #include "nix/store/derivation/traditional.hh"
 #include "nix/store/content-address.hh"
 #include "nix/store/store-dir-config.hh"
-#include "nix/util/overloaded.hh"
+#include "nix/util/util.hh"
 
 #include "../aterm-combinators.hh"
 
