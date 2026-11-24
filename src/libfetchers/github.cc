@@ -3,7 +3,9 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/url-parts.hh"
+#include "nix/util/url.hh"
 #include "nix/util/git.hh"
+#include "nix/util/json-utils.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/tarball.hh"
@@ -494,28 +496,29 @@ struct GitLabInputScheme : GitArchiveInputScheme
     RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
+        auto ref = *input.getRef();
         // See rate limiting note below
         auto url =
-            fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
+            fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits/%s",
                 host,
                 getStrAttr(input.attrs, "owner"),
                 getStrAttr(input.attrs, "repo"),
-                *input.getRef());
+                percentEncode(ref));
 
         Headers headers = makeHeadersWithAuthTokens(settings, host, input);
 
-        auto downloadResult = downloadFile(store, settings, url, "source", headers);
+        std::optional<DownloadFileResult> downloadResult;
+        try {
+            downloadResult = downloadFile(store, settings, url, "source", headers);
+        } catch (FileTransferError & e) {
+            if (e.error == FileTransfer::NotFound)
+                throw Error("GitLab API found no commit for ref '%s' -- do the repository and the git ref exist?", ref);
+            throw;
+        }
         auto json = nlohmann::json::parse(
-            store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
+            store.requireStoreObjectAccessor(downloadResult->storePath)->readFile(CanonPath::root));
 
-        if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
-            return RefInfo{.rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)};
-        }
-        if (json.is_array() && json.size() == 0) {
-            throw Error("No commits returned by GitLab API -- does the git ref really exist?");
-        } else {
-            throw Error("Unexpected response received from GitLab: %s", json);
-        }
+        return RefInfo{.rev = Hash::parseAny(getString(valueAt(getObject(json), "id")), HashAlgorithm::SHA1)};
     }
 
     DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override
