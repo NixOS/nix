@@ -79,18 +79,20 @@ change_nixbld_uids(){
 	local existing_gid name next_id user_n
 
 	((next_id=NEW_NIX_FIRST_BUILD_UID))
-	((user_n=1))
-	name="$(nix_user_n "$user_n")"
 	existing_gid="$(dsclattr "/Groups/nixbld" "PrimaryGroupID")"
 
 	# we know that we have *some* nixbld users, but macOS may have
 	# already clobbered the first few users if this system has been
-	# upgraded
+	# upgraded. just try to recreate any missing ones.
 
 	echo ""
-	echo "Step 2: re-create missing early _nixbld# users."
+	echo "Step 2: re-create missing _nixbld# users."
 
-	until dscl . read "/Users/$name" &>/dev/null; do
+	for user_n in $(seq 1 32); do
+		name="$(nix_user_n "$user_n")"
+		if dscl . read "/Users/$name" &>/dev/null; then
+			continue
+		fi
 		# iterate for a clean ID
 		while id_unavailable "$next_id"; do
 			((next_id++))
