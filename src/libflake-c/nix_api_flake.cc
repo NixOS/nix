@@ -12,7 +12,7 @@
 
 extern "C" {
 
-nix_flake_settings * nix_flake_settings_new(nix_c_context * context)
+nix_flake_settings * nix_flake_settings_new(nix_c_context * context) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -22,13 +22,13 @@ nix_flake_settings * nix_flake_settings_new(nix_c_context * context)
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_flake_settings_free(nix_flake_settings * settings)
+void nix_flake_settings_free(nix_flake_settings * settings) NIXC_NOEXCEPT
 {
     delete settings;
 }
 
 nix_err nix_flake_settings_add_to_eval_state_builder(
-    nix_c_context * context, nix_flake_settings * settings, nix_eval_state_builder * builder)
+    nix_c_context * context, nix_flake_settings * settings, nix_eval_state_builder * builder) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -38,7 +38,7 @@ nix_err nix_flake_settings_add_to_eval_state_builder(
 }
 
 nix_flake_reference_parse_flags *
-nix_flake_reference_parse_flags_new(nix_c_context * context, nix_flake_settings * settings)
+nix_flake_reference_parse_flags_new(nix_c_context * context, nix_flake_settings * settings) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -49,7 +49,7 @@ nix_flake_reference_parse_flags_new(nix_c_context * context, nix_flake_settings 
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_flake_reference_parse_flags_free(nix_flake_reference_parse_flags * flags)
+void nix_flake_reference_parse_flags_free(nix_flake_reference_parse_flags * flags) NIXC_NOEXCEPT
 {
     delete flags;
 }
@@ -58,7 +58,7 @@ nix_err nix_flake_reference_parse_flags_set_base_directory(
     nix_c_context * context,
     nix_flake_reference_parse_flags * flags,
     const char * baseDirectory,
-    size_t baseDirectoryLen)
+    size_t baseDirectoryLen) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -77,7 +77,7 @@ nix_err nix_flake_reference_and_fragment_from_string(
     size_t strSize,
     nix_flake_reference ** flakeReferenceOut,
     nix_get_string_callback fragmentCallback,
-    void * fragmentCallbackUserData)
+    void * fragmentCallbackUserData) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     *flakeReferenceOut = nullptr;
@@ -91,12 +91,12 @@ nix_err nix_flake_reference_and_fragment_from_string(
     NIXC_CATCH_ERRS
 }
 
-void nix_flake_reference_free(nix_flake_reference * flakeReference)
+void nix_flake_reference_free(nix_flake_reference * flakeReference) NIXC_NOEXCEPT
 {
     delete flakeReference;
 }
 
-nix_flake_lock_flags * nix_flake_lock_flags_new(nix_c_context * context, nix_flake_settings * settings)
+nix_flake_lock_flags * nix_flake_lock_flags_new(nix_c_context * context, nix_flake_settings * settings) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -115,12 +115,12 @@ nix_flake_lock_flags * nix_flake_lock_flags_new(nix_c_context * context, nix_fla
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_flake_lock_flags_free(nix_flake_lock_flags * flags)
+void nix_flake_lock_flags_free(nix_flake_lock_flags * flags) NIXC_NOEXCEPT
 {
     delete flags;
 }
 
-nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake_lock_flags * flags)
+nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake_lock_flags * flags) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -132,7 +132,8 @@ nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, nix_flake_lock_flags * flags)
+nix_err
+nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, nix_flake_lock_flags * flags) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -144,7 +145,7 @@ nix_err nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, n
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_lock_flags * flags)
+nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_lock_flags * flags) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -158,6 +159,7 @@ nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_l
 
 nix_err nix_flake_lock_flags_add_input_override(
     nix_c_context * context, nix_flake_lock_flags * flags, const char * inputPath, nix_flake_reference * flakeRef)
+    NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -179,7 +181,7 @@ nix_locked_flake * nix_flake_lock(
     nix_flake_settings * flakeSettings,
     EvalState * eval_state,
     nix_flake_lock_flags * flags,
-    nix_flake_reference * flakeReference)
+    nix_flake_reference * flakeReference) NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {
@@ -191,13 +193,14 @@ nix_locked_flake * nix_flake_lock(
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_locked_flake_free(nix_locked_flake * lockedFlake)
+void nix_locked_flake_free(nix_locked_flake * lockedFlake) NIXC_NOEXCEPT
 {
     delete lockedFlake;
 }
 
 nix_value * nix_locked_flake_get_output_attrs(
     nix_c_context * context, nix_flake_settings * settings, EvalState * evalState, nix_locked_flake * lockedFlake)
+    NIXC_NOEXCEPT
 {
     nix_clear_err(context);
     try {

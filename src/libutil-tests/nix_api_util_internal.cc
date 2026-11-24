@@ -49,7 +49,7 @@ TEST_F(nix_api_util_context, nix_err_info_msg)
     std::string err_info;
 
     // no error
-    EXPECT_THROW(nix_err_info_msg(NULL, ctx, OBSERVE_STRING(err_info)), nix::Error);
+    EXPECT_DEATH(nix_err_info_msg(NULL, ctx, OBSERVE_STRING(err_info)), "nix_set_err_msg called without context");
 
     try {
         throw nix::Error("testing error");
@@ -66,7 +66,7 @@ TEST_F(nix_api_util_context, nix_err_name)
     std::string err_name;
 
     // no error
-    EXPECT_THROW(nix_err_name(NULL, ctx, OBSERVE_STRING(err_name)), nix::Error);
+    EXPECT_DEATH(nix_err_name(NULL, ctx, OBSERVE_STRING(err_name)), "nix_set_err_msg called without context");
 
     try {
         throw nix::Error("testing error");

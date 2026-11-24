@@ -66,12 +66,12 @@ typedef struct nix_locked_flake nix_locked_flake;
  * @return A new nix_flake_settings or NULL on failure.
  * @see nix_flake_settings_free
  */
-nix_flake_settings * nix_flake_settings_new(nix_c_context * context);
+nix_flake_settings * nix_flake_settings_new(nix_c_context * context) NIXC_NOEXCEPT;
 
 /**
  * @brief Release the resources associated with a nix_flake_settings.
  */
-void nix_flake_settings_free(nix_flake_settings * settings);
+void nix_flake_settings_free(nix_flake_settings * settings) NIXC_NOEXCEPT;
 
 /**
  * @brief Initialize a `nix_flake_settings` to contain `builtins.getFlake` and
@@ -84,20 +84,20 @@ void nix_flake_settings_free(nix_flake_settings * settings);
  * @param[in] builder The builder to modify
  */
 nix_err nix_flake_settings_add_to_eval_state_builder(
-    nix_c_context * context, nix_flake_settings * settings, nix_eval_state_builder * builder);
+    nix_c_context * context, nix_flake_settings * settings, nix_eval_state_builder * builder) NIXC_NOEXCEPT;
 
 /**
  * @brief A new `nix_flake_reference_parse_flags` with defaults
  */
 nix_flake_reference_parse_flags *
-nix_flake_reference_parse_flags_new(nix_c_context * context, nix_flake_settings * settings);
+nix_flake_reference_parse_flags_new(nix_c_context * context, nix_flake_settings * settings) NIXC_NOEXCEPT;
 
 /**
  * @brief Deallocate and release the resources associated with a `nix_flake_reference_parse_flags`.
  * Does not fail.
  * @param[in] flags the `nix_flake_reference_parse_flags *` to free
  */
-void nix_flake_reference_parse_flags_free(nix_flake_reference_parse_flags * flags);
+void nix_flake_reference_parse_flags_free(nix_flake_reference_parse_flags * flags) NIXC_NOEXCEPT;
 
 /**
  * @brief Provide a base directory for parsing relative flake references
@@ -111,20 +111,20 @@ nix_err nix_flake_reference_parse_flags_set_base_directory(
     nix_c_context * context,
     nix_flake_reference_parse_flags * flags,
     const char * baseDirectory,
-    size_t baseDirectoryLen);
+    size_t baseDirectoryLen) NIXC_NOEXCEPT;
 
 /**
  * @brief A new `nix_flake_lock_flags` with defaults
  * @param[in] settings Flake settings that may affect the defaults
  */
-nix_flake_lock_flags * nix_flake_lock_flags_new(nix_c_context * context, nix_flake_settings * settings);
+nix_flake_lock_flags * nix_flake_lock_flags_new(nix_c_context * context, nix_flake_settings * settings) NIXC_NOEXCEPT;
 
 /**
  * @brief Deallocate and release the resources associated with a `nix_flake_lock_flags`.
  * Does not fail.
  * @param[in] settings the `nix_flake_lock_flags *` to free
  */
-void nix_flake_lock_flags_free(nix_flake_lock_flags * settings);
+void nix_flake_lock_flags_free(nix_flake_lock_flags * settings) NIXC_NOEXCEPT;
 
 /**
  * @brief Put the lock flags in a mode that checks whether the lock is up to date.
@@ -134,7 +134,7 @@ void nix_flake_lock_flags_free(nix_flake_lock_flags * settings);
  *
  * This causes `nix_flake_lock` to fail if the lock needs to be updated.
  */
-nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_lock_flags * flags);
+nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_lock_flags * flags) NIXC_NOEXCEPT;
 
 /**
  * @brief Put the lock flags in a mode that updates the lock file in memory, if needed.
@@ -143,7 +143,7 @@ nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_l
  *
  * This will cause `nix_flake_lock` to update the lock file in memory, if needed.
  */
-nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake_lock_flags * flags);
+nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake_lock_flags * flags) NIXC_NOEXCEPT;
 
 /**
  * @brief Put the lock flags in a mode that updates the lock file on disk, if needed.
@@ -152,7 +152,8 @@ nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake
  *
  * This will cause `nix_flake_lock` to update the lock file on disk, if needed.
  */
-nix_err nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, nix_flake_lock_flags * flags);
+nix_err
+nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, nix_flake_lock_flags * flags) NIXC_NOEXCEPT;
 
 /**
  * @brief Add input overrides to the lock flags
@@ -166,7 +167,8 @@ nix_err nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, n
  * `nix_flake_lock_flags_set_mode_check`.
  */
 nix_err nix_flake_lock_flags_add_input_override(
-    nix_c_context * context, nix_flake_lock_flags * flags, const char * inputPath, nix_flake_reference * flakeRef);
+    nix_c_context * context, nix_flake_lock_flags * flags, const char * inputPath, nix_flake_reference * flakeRef)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief Lock a flake, if not already locked.
@@ -181,14 +183,14 @@ nix_locked_flake * nix_flake_lock(
     nix_flake_settings * settings,
     EvalState * eval_state,
     nix_flake_lock_flags * flags,
-    nix_flake_reference * flake);
+    nix_flake_reference * flake) NIXC_NOEXCEPT;
 
 /**
  * @brief Deallocate and release the resources associated with a `nix_locked_flake`.
  * Does not fail.
  * @param[in] locked_flake the `nix_locked_flake *` to free
  */
-void nix_locked_flake_free(nix_locked_flake * locked_flake);
+void nix_locked_flake_free(nix_locked_flake * locked_flake) NIXC_NOEXCEPT;
 
 /**
  * @brief Parse a URL-like string into a `nix_flake_reference`.
@@ -216,7 +218,7 @@ nix_err nix_flake_reference_and_fragment_from_string(
     size_t strLen,
     nix_flake_reference ** flakeReferenceOut,
     nix_get_string_callback fragmentCallback,
-    void * fragmentCallbackUserData);
+    void * fragmentCallbackUserData) NIXC_NOEXCEPT;
 
 /**
  * @brief Deallocate and release the resources associated with a `nix_flake_reference`.
@@ -225,7 +227,7 @@ nix_err nix_flake_reference_and_fragment_from_string(
  *
  * @param[in] store the `nix_flake_reference *` to free
  */
-void nix_flake_reference_free(nix_flake_reference * store);
+void nix_flake_reference_free(nix_flake_reference * store) NIXC_NOEXCEPT;
 
 /**
  * @brief Get the output attributes of a flake.
@@ -235,7 +237,8 @@ void nix_flake_reference_free(nix_flake_reference * store);
  * @return A new nix_value or NULL on failure. Release the `nix_value` with `nix_value_decref`.
  */
 nix_value * nix_locked_flake_get_output_attrs(
-    nix_c_context * context, nix_flake_settings * settings, EvalState * evalState, nix_locked_flake * lockedFlake);
+    nix_c_context * context, nix_flake_settings * settings, EvalState * evalState, nix_locked_flake * lockedFlake)
+    NIXC_NOEXCEPT;
 
 #ifdef __cplusplus
 } // extern "C"

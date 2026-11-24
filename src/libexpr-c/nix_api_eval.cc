@@ -20,8 +20,8 @@ static const nix::Bindings & get_bindings_or_empty(nix::EvalState & state, nix_v
 
 extern "C" {
 
-StorePath *
-nix_get_derivation(nix_c_context * context, EvalState * state, nix_value * value, bool ignoreAssertionFailures)
+StorePath * nix_get_derivation(
+    nix_c_context * context, EvalState * state, nix_value * value, bool ignoreAssertionFailures) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -39,6 +39,7 @@ nix_get_derivation(nix_c_context * context, EvalState * state, nix_value * value
 
 nix_err nix_value_auto_call_function(
     nix_c_context * context, EvalState * state, nix_value * auto_args, nix_value * fn_val, nix_value * result)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;

@@ -21,9 +21,9 @@ extern "C" {
  */
 typedef struct nix_fetchers_settings nix_fetchers_settings;
 
-nix_fetchers_settings * nix_fetchers_settings_new(nix_c_context * context);
+nix_fetchers_settings * nix_fetchers_settings_new(nix_c_context * context) NIXC_NOEXCEPT;
 
-void nix_fetchers_settings_free(nix_fetchers_settings * settings);
+void nix_fetchers_settings_free(nix_fetchers_settings * settings) NIXC_NOEXCEPT;
 
 #ifdef __cplusplus
 } // extern "C"

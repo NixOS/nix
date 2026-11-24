@@ -81,7 +81,7 @@ NIX_DEPRECATED("use nix_value instead") typedef nix_value Value;
  * @param[out] context Optional, stores error information
  * @return NIX_OK if the initialization was successful, an error code otherwise.
  */
-nix_err nix_libexpr_init(nix_c_context * context);
+nix_err nix_libexpr_init(nix_c_context * context) NIXC_NOEXCEPT;
 
 /**
  * @brief Parses and evaluates a Nix expression from a string.
@@ -98,7 +98,7 @@ nix_err nix_libexpr_init(nix_c_context * context);
  * @return NIX_OK if the evaluation was successful, an error code otherwise.
  */
 nix_err nix_expr_eval_from_string(
-    nix_c_context * context, EvalState * state, const char * expr, const char * path, nix_value * value);
+    nix_c_context * context, EvalState * state, const char * expr, const char * path, nix_value * value) NIXC_NOEXCEPT;
 
 /**
  * @brief Calls a Nix function with an argument.
@@ -113,7 +113,8 @@ nix_err nix_expr_eval_from_string(
  * @see nix_init_apply() for a similar function that does not performs the call immediately, but stores it as a thunk.
  *      Note the different argument order.
  */
-nix_err nix_value_call(nix_c_context * context, EvalState * state, nix_value * fn, nix_value * arg, nix_value * value);
+nix_err nix_value_call(nix_c_context * context, EvalState * state, nix_value * fn, nix_value * arg, nix_value * value)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief Calls a Nix function with multiple arguments.
@@ -133,7 +134,8 @@ nix_err nix_value_call(nix_c_context * context, EvalState * state, nix_value * f
  * @see NIX_VALUE_CALL           For a macro that wraps this function for convenience.
  */
 nix_err nix_value_call_multi(
-    nix_c_context * context, EvalState * state, nix_value * fn, size_t nargs, nix_value ** args, nix_value * value);
+    nix_c_context * context, EvalState * state, nix_value * fn, size_t nargs, nix_value ** args, nix_value * value)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief Calls a Nix function with multiple arguments.
@@ -174,7 +176,7 @@ nix_err nix_value_call_multi(
  * @return NIX_OK if the force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * value);
+nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * value) NIXC_NOEXCEPT;
 
 /**
  * @brief Forces the deep evaluation of a Nix value.
@@ -190,7 +192,7 @@ nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * 
  * @return NIX_OK if the deep force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_value * value);
+nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_value * value) NIXC_NOEXCEPT;
 
 /**
  * @brief Create a new nix_eval_state_builder
@@ -203,7 +205,7 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_val
  * @param[in] store The Nix store to use.
  * @return A new nix_eval_state_builder or NULL on failure. Call nix_eval_state_builder_free() when you're done.
  */
-nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Store * store);
+nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Store * store) NIXC_NOEXCEPT;
 
 /**
  * @brief Read settings from the ambient environment
@@ -216,7 +218,7 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
  * @param[out] builder The builder to modify.
  * @return NIX_OK if successful, an error code otherwise.
  */
-nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder);
+nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder) NIXC_NOEXCEPT;
 
 /**
  * @brief Set the lookup path for `<...>` expressions
@@ -227,7 +229,7 @@ nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_buil
  * @param[in] lookupPath Null-terminated array of strings corresponding to entries in NIX_PATH.
  */
 nix_err nix_eval_state_builder_set_lookup_path(
-    nix_c_context * context, nix_eval_state_builder * builder, const char ** lookupPath);
+    nix_c_context * context, nix_eval_state_builder * builder, const char ** lookupPath) NIXC_NOEXCEPT;
 
 /**
  * @brief Set an evaluator setting on the builder
@@ -242,7 +244,7 @@ nix_err nix_eval_state_builder_set_lookup_path(
  * @return NIX_OK if successful, NIX_ERR_KEY if the setting does not exist, an error code otherwise.
  */
 nix_err nix_eval_state_builder_set_setting(
-    nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value);
+    nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value) NIXC_NOEXCEPT;
 
 /**
  * @brief Create a new Nix language evaluator state
@@ -256,7 +258,7 @@ nix_err nix_eval_state_builder_set_setting(
  * @return A new Nix state or NULL on failure. Call nix_state_free() when you're done.
  * @see nix_eval_state_builder_new, nix_eval_state_builder_free
  */
-EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder);
+EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder) NIXC_NOEXCEPT;
 
 /**
  * @brief Free a nix_eval_state_builder
@@ -266,7 +268,7 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
  *
  * @param[in] builder The builder to free.
  */
-void nix_eval_state_builder_free(nix_eval_state_builder * builder);
+void nix_eval_state_builder_free(nix_eval_state_builder * builder) NIXC_NOEXCEPT;
 
 /**
  * @brief Create a new Nix language evaluator state
@@ -280,7 +282,7 @@ void nix_eval_state_builder_free(nix_eval_state_builder * builder);
  * @return A new Nix state or NULL on failure. Call nix_state_free() when you're done.
  * @see nix_state_builder_new
  */
-EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, Store * store);
+EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, Store * store) NIXC_NOEXCEPT;
 
 /**
  * @brief Frees a Nix state.
@@ -290,7 +292,7 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, 
  *
  * @param[in] state The state to free.
  */
-void nix_state_free(EvalState * state);
+void nix_state_free(EvalState * state) NIXC_NOEXCEPT;
 
 /** @addtogroup GC
  * @ingroup libexpr
@@ -320,7 +322,7 @@ void nix_state_free(EvalState * state);
  * @param[out] context Optional, stores error information
  * @param[in] object The object to keep alive
  */
-nix_err nix_gc_incref(nix_c_context * context, const void * object);
+nix_err nix_gc_incref(nix_c_context * context, const void * object) NIXC_NOEXCEPT;
 /**
  * @brief Decrement the garbage collector reference counter for the given object
  *
@@ -335,14 +337,14 @@ nix_err nix_gc_incref(nix_c_context * context, const void * object);
  * @param[out] context Optional, stores error information
  * @param[in] object The object to stop referencing
  */
-nix_err nix_gc_decref(nix_c_context * context, const void * object);
+nix_err nix_gc_decref(nix_c_context * context, const void * object) NIXC_NOEXCEPT;
 
 /**
  * @brief Trigger the garbage collector manually
  *
  * You should not need to do this, but it can be useful for debugging.
  */
-void nix_gc_now();
+void nix_gc_now() NIXC_NOEXCEPT;
 
 /**
  * @brief Register a callback that gets called when the object is garbage
@@ -353,7 +355,7 @@ void nix_gc_now();
  * @param[in] cd the data to pass to the finalizer
  * @param[in] finalizer the callback function, called with obj and cd
  */
-void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd));
+void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd)) NIXC_NOEXCEPT;
 
 /** @} */ // doxygen group GC
 
@@ -388,8 +390,8 @@ void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * o
  * @return A newly allocated StorePath holding the derivation path, or NULL.
  *  Free a non-NULL result with nix_store_path_free().
  */
-StorePath *
-nix_get_derivation(nix_c_context * context, EvalState * state, nix_value * value, bool ignoreAssertionFailures);
+StorePath * nix_get_derivation(
+    nix_c_context * context, EvalState * state, nix_value * value, bool ignoreAssertionFailures) NIXC_NOEXCEPT;
 
 /**
  * @brief Call a function, drawing its arguments from an attribute set.
@@ -416,7 +418,8 @@ nix_get_derivation(nix_c_context * context, EvalState * state, nix_value * value
  * @return NIX_OK if the call was successful, an error code otherwise.
  */
 nix_err nix_value_auto_call_function(
-    nix_c_context * context, EvalState * state, nix_value * auto_args, nix_value * fn_val, nix_value * result);
+    nix_c_context * context, EvalState * state, nix_value * auto_args, nix_value * fn_val, nix_value * result)
+    NIXC_NOEXCEPT;
 
 /** @} */ // doxygen group libexpr_eval
 

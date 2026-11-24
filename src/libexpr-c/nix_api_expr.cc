@@ -21,7 +21,7 @@
 
 extern "C" {
 
-nix_err nix_libexpr_init(nix_c_context * context)
+nix_err nix_libexpr_init(nix_c_context * context) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -42,7 +42,7 @@ nix_err nix_libexpr_init(nix_c_context * context)
 }
 
 nix_err nix_expr_eval_from_string(
-    nix_c_context * context, EvalState * state, const char * expr, const char * path, nix_value * value)
+    nix_c_context * context, EvalState * state, const char * expr, const char * path, nix_value * value) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -54,7 +54,8 @@ nix_err nix_expr_eval_from_string(
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, nix_value * arg, nix_value * value)
+nix_err
+nix_value_call(nix_c_context * context, EvalState * state, Value * fn, nix_value * arg, nix_value * value) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -67,6 +68,7 @@ nix_err nix_value_call(nix_c_context * context, EvalState * state, Value * fn, n
 
 nix_err nix_value_call_multi(
     nix_c_context * context, EvalState * state, nix_value * fn, size_t nargs, nix_value ** args, nix_value * value)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -83,7 +85,7 @@ nix_err nix_value_call_multi(
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * value)
+nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * value) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -93,7 +95,7 @@ nix_err nix_value_force(nix_c_context * context, EvalState * state, nix_value * 
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_value * value)
+nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_value * value) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -103,7 +105,7 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_val
     NIXC_CATCH_ERRS
 }
 
-nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Store * store)
+nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Store * store) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -119,12 +121,12 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_eval_state_builder_free(nix_eval_state_builder * builder)
+void nix_eval_state_builder_free(nix_eval_state_builder * builder) NIXC_NOEXCEPT
 {
     delete builder;
 }
 
-nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder)
+nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -138,7 +140,7 @@ nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_buil
 }
 
 nix_err nix_eval_state_builder_set_lookup_path(
-    nix_c_context * context, nix_eval_state_builder * builder, const char ** lookupPath_c)
+    nix_c_context * context, nix_eval_state_builder * builder, const char ** lookupPath_c) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -153,7 +155,7 @@ nix_err nix_eval_state_builder_set_lookup_path(
 }
 
 nix_err nix_eval_state_builder_set_setting(
-    nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value)
+    nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -164,7 +166,7 @@ nix_err nix_eval_state_builder_set_setting(
     NIXC_CATCH_ERRS
 }
 
-EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder)
+EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -180,7 +182,7 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
     NIXC_CATCH_ERRS_NULL
 }
 
-EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c, Store * store)
+EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c, Store * store) NIXC_NOEXCEPT
 {
     auto builder = nix_eval_state_builder_new(context, store);
     if (builder == nullptr)
@@ -197,7 +199,7 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
     return state;
 }
 
-void nix_state_free(EvalState * state)
+void nix_state_free(EvalState * state) NIXC_NOEXCEPT
 {
     if (state)
         state->~EvalState();
@@ -213,7 +215,7 @@ boost::concurrent_flat_map<
     gc_root_allocator<std::pair<const void * const, unsigned int>>>
     nix_refcounts{};
 
-nix_err nix_gc_incref(nix_c_context * context, const void * p)
+nix_err nix_gc_incref(nix_c_context * context, const void * p) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -223,7 +225,7 @@ nix_err nix_gc_incref(nix_c_context * context, const void * p)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_gc_decref(nix_c_context * context, const void * p)
+nix_err nix_gc_decref(nix_c_context * context, const void * p) NIXC_NOEXCEPT
 {
 
     if (context)
@@ -240,40 +242,40 @@ nix_err nix_gc_decref(nix_c_context * context, const void * p)
     NIXC_CATCH_ERRS
 }
 
-void nix_gc_now()
+void nix_gc_now() NIXC_NOEXCEPT
 {
     GC_gcollect();
 }
 
 #else
-nix_err nix_gc_incref(nix_c_context * context, const void *)
+nix_err nix_gc_incref(nix_c_context * context, const void *) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
     return NIX_OK;
 }
 
-nix_err nix_gc_decref(nix_c_context * context, const void *)
+nix_err nix_gc_decref(nix_c_context * context, const void *) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
     return NIX_OK;
 }
 
-void nix_gc_now() {}
+void nix_gc_now() NIXC_NOEXCEPT {}
 #endif
 
-nix_err nix_value_incref(nix_c_context * context, nix_value * x)
+nix_err nix_value_incref(nix_c_context * context, nix_value * x) NIXC_NOEXCEPT
 {
     return nix_gc_incref(context, (const void *) x);
 }
 
-nix_err nix_value_decref(nix_c_context * context, nix_value * x)
+nix_err nix_value_decref(nix_c_context * context, nix_value * x) NIXC_NOEXCEPT
 {
     return nix_gc_decref(context, (const void *) x);
 }
 
-void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd))
+void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd)) NIXC_NOEXCEPT
 {
 #if NIX_USE_BOEHMGC
     GC_REGISTER_FINALIZER(obj, finalizer, cd, 0, 0);

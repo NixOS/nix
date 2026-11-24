@@ -4,7 +4,7 @@
 
 extern "C" {
 
-nix_fetchers_settings * nix_fetchers_settings_new(nix_c_context * context)
+nix_fetchers_settings * nix_fetchers_settings_new(nix_c_context * context) NIXC_NOEXCEPT
 {
     try {
         auto fetchersSettings = nix::make_ref<nix::fetchers::Settings>();
@@ -15,7 +15,7 @@ nix_fetchers_settings * nix_fetchers_settings_new(nix_c_context * context)
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_fetchers_settings_free(nix_fetchers_settings * settings)
+void nix_fetchers_settings_free(nix_fetchers_settings * settings) NIXC_NOEXCEPT
 {
     delete settings;
 }

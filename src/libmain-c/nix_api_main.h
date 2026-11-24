@@ -28,7 +28,7 @@ extern "C" {
  * @param[out] context Optional, stores error information
  * @return NIX_OK if the initialization was successful, an error code otherwise.
  */
-nix_err nix_init_plugins(nix_c_context * context);
+nix_err nix_init_plugins(nix_c_context * context) NIXC_NOEXCEPT;
 
 /**
  * @brief Sets the log format
@@ -36,7 +36,7 @@ nix_err nix_init_plugins(nix_c_context * context);
  * @param[out] context Optional, stores error information
  * @param[in] format The string name of the format.
  */
-nix_err nix_set_log_format(nix_c_context * context, const char * format);
+nix_err nix_set_log_format(nix_c_context * context, const char * format) NIXC_NOEXCEPT;
 
 // cffi end
 #ifdef __cplusplus

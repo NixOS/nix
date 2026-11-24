@@ -29,14 +29,14 @@ typedef struct StorePath StorePath;
  * @param[in] p the path to copy
  * @return a new StorePath
  */
-StorePath * nix_store_path_clone(const StorePath * p);
+StorePath * nix_store_path_clone(const StorePath * p) NIXC_NOEXCEPT;
 
 /** @brief Deallocate a StorePath
  *
  * Does not fail.
  * @param[in] p the path to free
  */
-void nix_store_path_free(StorePath * p);
+void nix_store_path_free(StorePath * p) NIXC_NOEXCEPT;
 
 /**
  * @brief Get the path name (e.g. "<name>" in /nix/store/<hash>-<name>)
@@ -45,7 +45,8 @@ void nix_store_path_free(StorePath * p);
  * @param[in] callback called with the name
  * @param[in] user_data arbitrary data, passed to the callback when it's called.
  */
-void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data);
+void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief A store path hash
@@ -67,8 +68,8 @@ typedef struct nix_store_path_hash_part
  * @param[out] hash_part_out the decoded hash as 20 raw bytes
  * @return NIX_OK on success, error code on failure
  */
-nix_err
-nix_store_path_hash(nix_c_context * context, const StorePath * store_path, nix_store_path_hash_part * hash_part_out);
+nix_err nix_store_path_hash(
+    nix_c_context * context, const StorePath * store_path, nix_store_path_hash_part * hash_part_out) NIXC_NOEXCEPT;
 
 /**
  * @brief Create a StorePath from its constituent parts (hash and name)
@@ -84,7 +85,8 @@ nix_store_path_hash(nix_c_context * context, const StorePath * store_path, nix_s
  * @return owned store path, NULL on error
  */
 StorePath * nix_store_create_from_parts(
-    nix_c_context * context, const nix_store_path_hash_part * hash, const char name[/*name_len*/], size_t name_len);
+    nix_c_context * context, const nix_store_path_hash_part * hash, const char name[/*name_len*/], size_t name_len)
+    NIXC_NOEXCEPT;
 
 // cffi end
 #ifdef __cplusplus
