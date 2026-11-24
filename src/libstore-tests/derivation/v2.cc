@@ -131,6 +131,56 @@ TEST_F(V2Test, roundTripBasic)
     EXPECT_EQ(parsed.recordedOutputPaths, paths);
 }
 
+TEST_F(V2Test, interfaceBasic)
+{
+    Basic data{
+        .name = "hello",
+        .inputs = {src},
+        .platform = "x86_64-linux",
+        .builder = Interpolated<StorePath>{store.printStorePath(src) + "/bin/sh"},
+    };
+    Interpolated<StorePath> out;
+    out.append(std::string{"to "});
+    out.append(OutputReference{"out"});
+    data.env.emplace("out", EnvVar<StorePath>{.value = std::move(out), .passAsFile = true});
+    data.outputs.emplace("out", Output<StorePath>{.raw = InputAddressed{}});
+    auto paths = outputPaths(store, data);
+
+    Derivation<StorePath> drv{data, paths};
+    const BasicInterface & i = drv;
+
+    EXPECT_EQ(i.name(), "hello");
+    EXPECT_EQ(i.inputs(), StorePathSet{src});
+    EXPECT_EQ(
+        i.outputs().at("out").output,
+        derivation::Output{derivation::Output::InputAddressed{.path = paths.at("out")}});
+    EXPECT_FALSE(i.isBuiltin());
+
+    auto render = [](const OutputName & name) { return "<" + name + ">"; };
+    EXPECT_EQ(i.builder(render), store.printStorePath(src) + "/bin/sh");
+    EXPECT_EQ(
+        i.env(render).at("out"),
+        (RenderedEnvVar{
+            .value = "to <out>",
+            .passAsFile = true,
+        }));
+}
+
+TEST_F(V2Test, interfaceFullDeferred)
+{
+    /* Without the output paths, as when some input's are not static,
+       the input-addressed outputs are deferred. */
+    auto full = fullDerivation();
+    full.outputs.at("out").raw = InputAddressed{};
+    full.outputs.erase("dev");
+    Derivation<SingleDerivedPath> drv{full, {}};
+    const FullInterface & i = drv;
+
+    EXPECT_EQ(i.outputs().at("out").output, derivation::Output{derivation::Output::Deferred{}});
+    EXPECT_EQ(i.outputs().at("out").options.unsafeDiscardReferences, true);
+    EXPECT_EQ(i.getRequiredSystemFeatures(), (StringSet{"big-parallel", "ca-derivations", "kvm"}));
+}
+
 TEST_F(V2Test, staticSpeculation)
 {
     /* With every input static, the output paths are those of the

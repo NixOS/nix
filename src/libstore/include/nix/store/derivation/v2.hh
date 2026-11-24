@@ -14,6 +14,7 @@
 /// full derivation takes once it is resolved.
 
 #include "nix/store/derivation/full-inputs.hh"
+#include "nix/store/derivation/interface.hh"
 #include "nix/store/derivation/options.hh"
 #include "nix/store/derivation/output.hh"
 #include "nix/store/derived-path.hh"
@@ -269,5 +270,82 @@ struct DerivationT
 
 using Full = DerivationT<SingleDerivedPath>;
 using Basic = DerivationT<StorePath>;
+
+/**
+ * A version 2 derivation as the rest of Nix sees it: one implementing
+ * the shared `Interface`, by being what was parsed, plus the paths of
+ * its input-addressed outputs where they are known.
+ *
+ * (This nests the other way round from version 1, whose derivations
+ * hold what was parsed plus what is decoded from it. That is not a
+ * mistake: it is just how each format relates to the derivations it
+ * encodes.)
+ */
+template<typename Input>
+class DerivationCommon : public Interface<Input>
+{
+public:
+    using typename Interface<Input>::Render;
+
+    /**
+     * @param outputPaths The paths of the input-addressed outputs, if
+     * they are known: for a full derivation, by static speculation, and
+     * for a basic one, always.
+     */
+    DerivationCommon(DerivationT<Input> drv, std::map<OutputName, StorePath, std::less<>> outputPaths);
+
+    const DerivationT<Input> & drv() const
+    {
+        return drv_;
+    }
+
+    const std::map<OutputName, StorePath, std::less<>> & outputPaths() const
+    {
+        return outputPaths_;
+    }
+
+    const std::string & name() const override;
+    const std::string & platform() const override;
+    InputSet<Input> inputs() const override;
+    std::map<OutputName, OutputInfo<Input>, std::less<>> outputs() const override;
+    const CommonTopOptions<Input> & options() const override;
+    std::string builder(const Render & render) const override;
+    Strings args(const Render & render) const override;
+    std::map<std::string, RenderedEnvVar, std::less<>> env(const Render & render) const override;
+
+    bool operator==(const DerivationCommon & other) const
+    {
+        return drv_ == other.drv_ && outputPaths_ == other.outputPaths_;
+    }
+
+protected:
+    DerivationT<Input> drv_;
+    std::map<OutputName, StorePath, std::less<>> outputPaths_;
+};
+
+template<typename Input>
+class Derivation;
+
+template<>
+class Derivation<SingleDerivedPath> final : public DerivationCommon<SingleDerivedPath>
+{
+public:
+    using DerivationCommon::DerivationCommon;
+};
+
+template<>
+class Derivation<StorePath> final : public DerivationCommon<StorePath>
+{
+public:
+    using DerivationCommon::DerivationCommon;
+
+    /**
+     * @throws Error if the derivation has options this version of Nix
+     * does not know, since then it cannot be built faithfully.
+     */
+    DesugaredEnv desugarEnv(
+        Store & store, const fun<std::string(const OutputName &)> & render, const StorePathSet & inputPaths)
+        const override;
+};
 
 } // namespace nix::derivation::v2
