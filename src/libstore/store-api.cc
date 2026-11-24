@@ -1270,9 +1270,11 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         return path;
 
     auto drv = readDerivation(path);
-    if (!type(drv).hasKnownOutputPaths()) {
+    if (!type(drv).hasKnownOutputPaths() && shouldResolve(drv)) {
         // The build log is actually attached to the corresponding
-        // resolved derivation, so we need to get it first
+        // resolved derivation, so we need to get it first. That is
+        // only so if the derivation is built resolved at all, as
+        // `shouldResolve` decides.
         auto resolvedDrv = tryResolve(drv, *this);
         if (resolvedDrv) {
             // TODO check options compatibility with ATerm.
