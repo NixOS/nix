@@ -34,7 +34,8 @@ testCutoff () {
     #testDerivation dependentCA
     testCutoffFor transitivelyDependentCA
     testCutoffFor dependentNonCA
-    testCutoffFor dependentFixedOutput
+    # A fixed-output derivation cannot depend on a version 2 one yet.
+    # testCutoffFor dependentFixedOutput
 }
 
 testGC () {

@@ -77,7 +77,16 @@ rec {
     in (builtins.head outputsList).value;
 
   mkDerivation = args:
-    (if contentAddressedByDefault || args.__contentAddressed or false || args.__impure or false then derivationV2 else derivation) ({
+    mkDerivationWith
+      (if contentAddressedByDefault || args.__contentAddressed or false || args.__impure or false then derivationV2 else derivation)
+      args;
+
+  # A version 2 derivation even if not content-addressed: needed, for
+  # example, for anything depending on a content-addressed derivation.
+  mkDerivationV2 = mkDerivationWith derivationV2;
+
+  mkDerivationWith = drvFn: args:
+    drvFn ({
       inherit system testSalt;
       builder = shell;
       args = ["-e" args.builder or (builtins.toFile "builder-${args.name}.sh" ''
