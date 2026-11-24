@@ -79,7 +79,10 @@ rec {
 
   mkDerivation = args:
     mkDerivationWith
-      (if contentAddressedByDefault || args.__contentAddressed or false || args.__impure or false then derivationV2 else derivation)
+      # Fixed-output derivations are only version 1 for now.
+      (if args ? outputHash then derivation
+       else if contentAddressedByDefault || args.__contentAddressed or false || args.__impure or false then derivationV2
+       else derivation)
       args;
 
   # A version 2 derivation even if not content-addressed: needed, for
