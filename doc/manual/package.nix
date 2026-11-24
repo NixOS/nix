@@ -136,6 +136,16 @@ mkMesonDerivation (finalAttrs: {
               chmod -R u+w $out
               cp ${redirect-targets}/redirect-targets.html $out/redirect-targets.html
             '';
+          remap = {
+            "^https://github\\.com/(?i:nixos/nix)/blob/master/" = "${
+              builtins.path {
+                name = "source";
+                path = ../..;
+                # GitHub does not follow directory symlinks
+                filter = path: type: type != "symlink" || !builtins.pathExists "${path}/.";
+              }
+            }/";
+          };
           extraConfig = {
             exclude = [
               # Exclude auto-generated JSON schema documentation which has

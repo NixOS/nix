@@ -126,16 +126,14 @@ While the table of contents can provide guidance and full-text search can help, 
 
     This is especially important when moving information out of the Nix manual to other resources.
 
-  - When changing anchors, update [client-side redirects](https://github.com/NixOS/nix/blob/master/doc/manual/redirects.js)
+  - When changing anchors, update [client-side redirects](https://github.com/NixOS/nix/blob/master/doc/manual/redirects.json)
 
   The current setup is cumbersome, and help making better automation is appreciated.
 
-The build checks for broken internal links with.
+The `nix-manual-linkcheck` flake check finds broken internal links with [lychee].
 This happens late in the process, so [building the whole manual](#building-the-manual) is not suitable for iterating quickly.
-[`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
 
-[`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
-[URI fragments]: https://en.wikipedia.org/wiki/URI_fragment
+[lychee]: https://github.com/lycheeverse/lychee
 
 ### Markdown conventions
 
@@ -196,7 +194,7 @@ Please observe these guidelines to ease reviews:
 
 If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/source` directory.
 
-If the `@docroot@` literal appears in an error message from the [`mdbook-linkcheck`] tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
+If the `@docroot@` literal appears in an error message from [lychee], the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
 See existing `@docroot@` logic in the [Makefile for the manual].
 Regular markdown files used for the manual have a base path of their own and they can use relative paths instead of `@docroot@`.
 
