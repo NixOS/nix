@@ -7,6 +7,7 @@
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivation/v1/aterm.hh"
+#include "nix/store/derivation/v2/convert.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -310,6 +311,21 @@ public:
             if (config->readOnly)
                 unsupported("writeDerivation");
             derivations.insert({drvPath, drv});
+        }
+
+        return drvPath;
+    }
+
+    StorePath writeDerivation(const derivation::v2::Full & drv, RepairFlag repair = NoRepair) override
+    {
+        auto drvPath = derivation::v2::computeStorePath(*this, drv);
+
+        /* Kept in its elaborated form, which is what reading it back
+           gives. */
+        if (!derivations.contains(drvPath) || repair) {
+            if (config->readOnly)
+                unsupported("writeDerivation");
+            derivations.insert({drvPath, derivation::v2::toElaborated(*this, drv, derivation::v2::staticPathOf(*this))});
         }
 
         return drvPath;

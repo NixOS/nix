@@ -40,6 +40,11 @@ namespace derivation {
 template<typename Inputs, typename Out>
 struct Derivation;
 struct Output;
+
+namespace v2 {
+template<typename Input>
+struct DerivationT;
+} // namespace v2
 } // namespace derivation
 
 using BasicDerivation = derivation::Derivation<StorePath, derivation::Output>;
@@ -913,6 +918,14 @@ public:
      * Write a derivation to the Nix store, and return its path.
      */
     virtual StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair);
+
+    /**
+     * Write a version 2 derivation to the Nix store, recording the
+     * output paths static speculation computes for it, and return its
+     * path.
+     */
+    virtual StorePath
+    writeDerivation(const derivation::v2::DerivationT<SingleDerivedPath> & drv, RepairFlag repair = NoRepair);
 
     /**
      * Read a derivation (which must already be valid).

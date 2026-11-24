@@ -409,14 +409,23 @@ StorePath computeStorePath(Store & store, const Full & drv)
 
 StorePath writeDerivation(Store & store, const Full & drv, RepairFlag repair)
 {
-    auto [suffix, contents, references, path] = infoFor(store, drv);
+    return store.writeDerivation(drv, repair);
+}
 
-    store.addTempRoot(path);
-    if (store.isValidPath(path) && !repair)
+} // namespace nix::derivation::v2
+
+namespace nix {
+
+StorePath Store::writeDerivation(const derivation::v2::Full & drv, RepairFlag repair)
+{
+    auto [suffix, contents, references, path] = derivation::v2::infoFor(*this, drv);
+
+    addTempRoot(path);
+    if (isValidPath(path) && !repair)
         return path;
 
     StringSource s{contents};
-    auto path2 = store.addToStoreFromDump(
+    auto path2 = addToStoreFromDump(
         s,
         suffix,
         FileSerialisationMethod::Flat,
@@ -428,4 +437,4 @@ StorePath writeDerivation(Store & store, const Full & drv, RepairFlag repair)
     return path;
 }
 
-} // namespace nix::derivation::v2
+} // namespace nix
