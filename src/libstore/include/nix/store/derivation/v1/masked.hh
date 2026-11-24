@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/traditional.hh"
+#include "nix/store/derivation/v1/traditional.hh"
 #include "nix/util/fun.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>

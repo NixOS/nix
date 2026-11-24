@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/store/derivation/traditional.hh"
+#include "nix/store/derivation/v1/traditional.hh"
 
 namespace nix {
 

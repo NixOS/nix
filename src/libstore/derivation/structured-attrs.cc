@@ -1,7 +1,7 @@
 #include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/elaborate.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 
 #include <nlohmann/json.hpp>
 #include <cassert>

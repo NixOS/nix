@@ -1,8 +1,8 @@
-#include "nix/store/derivation/masked.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/masked.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/derivation/elaborate.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 #include "nix/util/util.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>

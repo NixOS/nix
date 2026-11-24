@@ -2,7 +2,7 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 #include "nix/util/logging.hh"
 
 namespace nix {

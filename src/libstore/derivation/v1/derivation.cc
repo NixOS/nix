@@ -1,6 +1,6 @@
 #include "nix/store/derivation/v1.hh"
 #include "nix/store/derivation/structured-attrs.hh"
-#include "nix/store/derivation/elaborate.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 
 namespace nix::derivation::v1 {
 

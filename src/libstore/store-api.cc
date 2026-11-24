@@ -9,7 +9,7 @@
 #include "nix/store/derivation/v2/aterm.hh"
 #include "nix/store/derivation/v2/convert.hh"
 #include "nix/store/derivation/resolution.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"
 #include "nix/store/store-open.hh"

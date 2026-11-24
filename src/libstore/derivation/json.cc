@@ -1,7 +1,7 @@
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 #include "nix/store/derivation/full-inputs.hh"
-#include "nix/store/derivation/masked.hh"
+#include "nix/store/derivation/v1/masked.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
 

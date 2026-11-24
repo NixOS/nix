@@ -4,8 +4,8 @@
 #include <cctype>
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
-#include "nix/store/derivation/masked.hh"
+#include "nix/store/derivation/v1/aterm.hh"
+#include "nix/store/derivation/v1/masked.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/json-characterization.hh"

@@ -13,7 +13,7 @@
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/traditional.hh"
+#include "nix/store/derivation/v1/traditional.hh"
 
 #ifndef _WIN32 // TODO re-enable on Windows
 #  include "run.hh"

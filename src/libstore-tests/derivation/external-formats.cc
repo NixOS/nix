@@ -2,8 +2,8 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
-#include "nix/store/derivation/elaborate.hh"
+#include "nix/store/derivation/v1/aterm.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"

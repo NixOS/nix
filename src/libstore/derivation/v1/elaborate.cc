@@ -1,5 +1,5 @@
-#include "nix/store/derivation/elaborate.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/derivation/structured-attrs.hh"

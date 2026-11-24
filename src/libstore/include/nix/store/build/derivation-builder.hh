@@ -6,7 +6,7 @@
 
 #include "nix/store/build-result.hh"
 #include "nix/store/daemon.hh"
-#include "nix/store/derivation/elaborate.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/structured-attrs.hh"

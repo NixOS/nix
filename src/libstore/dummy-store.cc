@@ -6,7 +6,7 @@
 #include "nix/util/json-utils.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 

@@ -1,5 +1,5 @@
 #include "nix/store/derivation/v2/aterm.hh"
-#include "nix/store/derivation/traditional.hh"
+#include "nix/store/derivation/v1/traditional.hh"
 #include "nix/store/content-address.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/util.hh"

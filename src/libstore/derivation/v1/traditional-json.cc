@@ -1,6 +1,6 @@
-#include "nix/store/derivation/traditional.hh"
+#include "nix/store/derivation/v1/traditional.hh"
 #include "nix/store/derivation/full-inputs.hh"
-#include "nix/store/derivation/masked.hh"
+#include "nix/store/derivation/v1/masked.hh"
 #include "nix/util/json-utils.hh"
 
 #include <nlohmann/json.hpp>
