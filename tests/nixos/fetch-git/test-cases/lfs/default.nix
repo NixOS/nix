@@ -226,6 +226,27 @@
     client.succeed(f"cmp {repo.path}/beeg {fetched_self_lfs}/beeg >&2")
 
 
+    with subtest("Check self.lfs without rev (issue #15350)"):
+      # Same as above, but without pinning a specific rev in the input URL.
+      # This matches the exact scenario from the bug report where
+      # narHash mismatch occurred.
+      with TemporaryDirectory() as tempdir:
+        client.succeed(f"mkdir -p {tempdir}")
+        client.succeed(f"""
+          printf '{{
+            inputs.foo = {{
+              url = "git+{repo.remote}?ref=main";
+            }};
+            outputs = {{ foo, self }}: {{ inherit (foo) outPath; }};
+          }}' >{tempdir}/flake.nix
+        """)
+        fetched_self_lfs_norev = client.succeed(f"""
+          nix eval --debug --raw {tempdir}#.outPath
+        """)
+
+      client.succeed(f"cmp {repo.path}/beeg {fetched_self_lfs_norev}/beeg >&2")
+
+
     with subtest("Ensure fetching with SSH generates the same output"):
       client.succeed(f"{repo.git} push origin-ssh main >&2")
       client.succeed("rm -rf ~/.cache/nix") # Avoid using the cached output of the http fetch
