@@ -164,6 +164,25 @@ nix_err nix_eval_state_builder_set_setting(
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_eval_state_builder_set_fetch_hook(
+    nix_c_context * context, nix_eval_state_builder * builder, nix_fetch_hook hook, void * user_data)
+{
+    nix_clear_err(context);
+    try {
+        builder->fetchSettings.fetchHook = [hook, user_data](const std::string & request) {
+            std::string response;
+            auto setResponse = [](const char * start, unsigned int n, void * data) {
+                static_cast<std::string *>(data)->assign(start, n);
+            };
+            nix_c_context hookContext;
+            if (hook(user_data, &hookContext, request.c_str(), setResponse, &response) != NIX_OK)
+                throw nix::Error("%s", hookContext.last_err.value_or("fetch hook failed"));
+            return response;
+        };
+    }
+    NIXC_CATCH_ERRS
+}
+
 EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder)
 {
     if (context)

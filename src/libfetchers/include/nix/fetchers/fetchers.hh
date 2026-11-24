@@ -299,6 +299,14 @@ const InputSchemeMap & getAllInputSchemes();
  */
 std::optional<ParsedURL> getLocalRepoURL(const std::filesystem::path & path);
 
+/**
+ * Hand `request` to `Settings::fetchHook` and return the store path of
+ * its response, rooted and checked to be valid, with the response. The
+ * path must be `expectedPath` when that is known.
+ */
+std::pair<StorePath, nlohmann::json> callFetchHook(
+    const Settings & settings, Store & store, nlohmann::json request, const std::optional<StorePath> & expectedPath);
+
 struct PublicKey
 {
     std::string type = "ssh-ed25519";
