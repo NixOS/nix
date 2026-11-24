@@ -1,0 +1,11 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-deep-context.nix:4:1:
+            3| in
+            4| builtins.derivationOf (
+             | ^
+            5|   builtins.appendContext path {
+
+       … while evaluating the argument passed to builtins.derivationOf
+
+       error: string '/nix/store/00000000000000000000000000000000-missing.drv' has a context which refers to a complete source and binary closure. This is not supported at this time
