@@ -167,11 +167,9 @@ MaskedHash hashInput(const StoreDirConfig & store, ReadDerivation & readDerivati
         if (!std::get_if<Output::InputAddressed>(&output.raw))
             return MaskedHash::DeferredDrv{};
 
-    auto inputAddressingMasked = maskInputDrvs(
-        store,
-        readDerivation,
-        drv.mapOutputs([](const Output & output) { return std::get<Output::InputAddressed>(output.raw); })
-            .mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
+    auto inputAddressingMasked = inputMaskDerivation(store, readDerivation, drv.mapOutputs([](const Output & output) {
+        return std::get<Output::InputAddressed>(output.raw);
+    }));
     if (!inputAddressingMasked)
         return MaskedHash::DeferredDrv{};
 
@@ -242,6 +240,14 @@ template std::optional<Drv<Output::Deferred>>
 fullyMaskDerivation(const StoreDirConfig & store, ReadDerivation & readDerivation, const FullDeferred & drv);
 template std::optional<Drv<Output::Deferred>>
 fullyMaskDerivation(const StoreDirConfig & store, ReadDerivation & readDerivation, const FullInputAddressed & drv);
+
+std::optional<Drv<Output::InputAddressed>>
+inputMaskDerivation(const StoreDirConfig & store, ReadDerivation & readDerivation, const FullInputAddressed & drv)
+{
+    return maskInputDrvs(store, readDerivation, drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) {
+        return FullInputs::fromSet(inputs);
+    }));
+}
 
 Drv<Output::Deferred> fullyMaskDerivation(const StoreDirConfig & store, const Basic & drv)
 {

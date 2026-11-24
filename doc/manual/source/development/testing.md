@@ -398,7 +398,7 @@ The macro name is a convention from [OSS-Fuzz](https://google.github.io/oss-fuzz
 Builds using an external `fuzzing-engine` are expected to pass it themselves, as OSS-Fuzz does.
 
 Anything gated this way is no longer exercised by the fuzzer, so it must be covered by a unit test instead.
-For an example of both halves, see the fixed-output derivation path check in `parseOutput` (`src/libstore/derivation/aterm.cc`) and its test `CAFixedPathMismatch`.
+For an example of both halves, see the fixed-output derivation path check in `ATermSerializer<Output::CAFixed>::parse` (`src/libstore/derivation/aterm.cc`) and its test `CAFixedPathMismatch`.
 
 ## Installer tests
 

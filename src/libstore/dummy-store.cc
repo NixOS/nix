@@ -252,7 +252,7 @@ public:
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override
     {
-        if (isDerivation(name))
+        if (isDerivationFileName(name))
             throw Error("Do not insert derivation into dummy store with `addToStoreFromDump`");
 
         if (config->readOnly)

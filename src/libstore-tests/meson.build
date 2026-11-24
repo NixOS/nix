@@ -42,6 +42,7 @@ sources = files(
   'derivation/full-inputs.cc',
   'derivation/invariants.cc',
   'derivation/masked.cc',
+  'derivation/path.cc',
   'derivation/resolution.cc',
   'derivation/write.cc',
   'derived-path.cc',

@@ -3,6 +3,7 @@
 
 #include "nix/store/path.hh"
 #include "nix/store/derived-path-map.hh"
+#include "nix/util/json-impls.hh"
 
 #include <set>
 
@@ -55,3 +56,5 @@ struct FullInputs
 bool hasDynamicDrvDep(const FullInputs & inputs);
 
 } // namespace nix::derivation
+
+JSON_IMPL_WITH_XP_FEATURES(nix::derivation::FullInputs)

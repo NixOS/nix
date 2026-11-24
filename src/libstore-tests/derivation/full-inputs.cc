@@ -39,7 +39,7 @@ TEST(FullInputs, fromSetRoundTripsDeeplyDynamicInputs)
 
     /* The innermost output level must end up nearest the root:
        map[root].childMap["a"].childMap["b"].value = {"c"} */
-    auto & rootNode = fullInputs.drvs.map.at(root);
+    auto & rootNode = fullInputs.drvs.map.at(DerivationPath::require(root));
     ASSERT_TRUE(rootNode.value.empty());
     auto & aNode = rootNode.childMap.at("a");
     ASSERT_TRUE(aNode.value.empty());

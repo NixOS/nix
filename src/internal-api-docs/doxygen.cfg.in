@@ -55,6 +55,9 @@ EXPAND_AS_DEFINED      =                    \
   SERVE_USE_LENGTH_PREFIX_SERIALISER        \
   SERVE_USE_LENGTH_PREFIX_SERIALISER_COMMA  \
   COMMON_USE_LENGTH_PREFIX_SERIALISER       \
+  ATERM_IMPL_KEY                            \
+  ATERM_IMPL_OUTPUT                         \
+  ATERM_IMPL_NODE                           \
   JSON_IMPL                                 \
   JSON_IMPL_WITH_XP_FEATURES                \
   JSON_IMPL_WITH_XP_FEATURES_INNER          \

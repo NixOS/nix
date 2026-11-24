@@ -441,11 +441,18 @@ using Derivation = derivation::Full;
 StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv);
 
 /**
- * \todo Remove.
+ * Whether a file name is a derivation's, which is to say ends in
+ * `.drv`.
  *
- * Use Path::isDerivation instead.
+ * For a store path, prefer `StorePath::isDerivation`, or better still
+ * `DerivationPath`, which requires it. This is for the cases with no
+ * store path to ask, such as:
+ *
+ * - the name of a store object being added
+ * - the `name` attribute of a derivation
+ * - the file name of a source.
  */
-bool isDerivation(std::string_view fileName);
+bool isDerivationFileName(std::string_view fileName);
 
 /**
  * Calculate the name that will be used for the store path for this
@@ -475,6 +482,10 @@ constexpr unsigned expectedJsonVersionDerivation = 4;
 } // namespace nix
 
 namespace nlohmann {
-template<typename Inputs>
-JSON_IMPL_WITH_XP_FEATURES_INNER(nix::derivation::Derivation<Inputs>);
+
+#define ARG nix::derivation::Derivation<Inputs, Out>
+template<typename Inputs, typename Out>
+JSON_IMPL_WITH_XP_FEATURES_INNER(ARG);
+#undef ARG
+
 } // namespace nlohmann

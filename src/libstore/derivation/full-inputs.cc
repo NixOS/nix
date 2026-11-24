@@ -47,7 +47,9 @@ FullInputs FullInputs::fromSet(const std::set<SingleDerivedPath> & inputs)
     auto nodeFor = [&](this auto && self, ref<const SingleDerivedPath> path) -> ChildNode & {
         return std::visit(
             overloaded{
-                [&](const SingleDerivedPath::Opaque & op) -> ChildNode & { return result.drvs.map[op.path]; },
+                [&](const SingleDerivedPath::Opaque & op) -> ChildNode & {
+                    return result.drvs.map[DerivationPath::require(op.path)];
+                },
                 [&](const SingleDerivedPath::Built & parentBuilt) -> ChildNode & {
                     return self(parentBuilt.drvPath).childMap[parentBuilt.output];
                 }},
