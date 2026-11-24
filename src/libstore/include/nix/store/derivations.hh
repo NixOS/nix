@@ -7,6 +7,7 @@
 #include "nix/store/content-address.hh"
 #include "nix/util/repair-flag.hh"
 #include "nix/store/derivation/output.hh"
+#include "nix/store/derivation/interface.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/derivation/output.hh"
@@ -361,6 +362,9 @@ struct Derivation
 template<typename Input>
 Type type(const Derivation<Input, Output> & drv);
 
+template<typename Input>
+Type type(const Interface<Input> & drv);
+
 /**
  * Calculates the maps that contains all the `Outputs`, but
  * augmented with knowledge of the Store paths they would be written
@@ -368,6 +372,9 @@ Type type(const Derivation<Input, Output> & drv);
  */
 template<typename Input>
 OutputsAndOptPaths outputsAndOptPaths(const Derivation<Input, Output> & drv, const StoreDirConfig & store);
+
+template<typename Input>
+OutputsAndOptPaths outputsAndOptPaths(const Interface<Input> & drv, const StoreDirConfig & store);
 
 /**
  * Does the derivation have a dependency on the output of a dynamic

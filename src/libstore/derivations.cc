@@ -172,8 +172,11 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName)
 
 namespace derivation {
 
-template<typename Inputs>
-Type type(const Derivation<Inputs, Output> & drv)
+/**
+ * The type of a derivation with these outputs, each of which has the
+ * `Output` it is as its `output`.
+ */
+static Type typeOfOutputs(const auto & outputs)
 {
     using namespace std::literals::string_view_literals;
 
@@ -190,7 +193,7 @@ Type type(const Derivation<Inputs, Output> & drv)
             throw Error("only one fixed output is allowed for now");
     };
 
-    for (auto & i : drv.outputs) {
+    for (auto & i : outputs) {
         std::visit(
             overloaded{
                 [&](const Output::InputAddressed &) {
@@ -236,8 +239,23 @@ Type type(const Derivation<Inputs, Output> & drv)
     return ty.value();
 }
 
+template<typename Inputs>
+Type type(const Derivation<Inputs, Output> & drv)
+{
+    return typeOfOutputs(drv.outputs);
+}
+
 template Type type(const Basic & drv);
 template Type type(const Full & drv);
+
+template<typename Input>
+Type type(const Interface<Input> & drv)
+{
+    return typeOfOutputs(drv.outputs());
+}
+
+template Type type(const FullInterface & drv);
+template Type type(const BasicInterface & drv);
 
 } // namespace derivation
 
@@ -284,6 +302,19 @@ OutputsAndOptPaths outputsAndOptPaths(const Derivation<Inputs, Output> & drv, co
 
 template OutputsAndOptPaths outputsAndOptPaths(const Basic & drv, const StoreDirConfig & store);
 template OutputsAndOptPaths outputsAndOptPaths(const Full & drv, const StoreDirConfig & store);
+
+template<typename Input>
+OutputsAndOptPaths outputsAndOptPaths(const Interface<Input> & drv, const StoreDirConfig & store)
+{
+    OutputsAndOptPaths outsAndOptPaths;
+    for (auto & [outputName, output] : drv.outputs())
+        outsAndOptPaths.insert(
+            std::make_pair(outputName, std::make_pair(output.output, output.output.path(store, drv.name(), outputName))));
+    return outsAndOptPaths;
+}
+
+template OutputsAndOptPaths outputsAndOptPaths(const FullInterface & drv, const StoreDirConfig & store);
+template OutputsAndOptPaths outputsAndOptPaths(const BasicInterface & drv, const StoreDirConfig & store);
 
 template<typename Inputs, typename Out>
 std::string_view Derivation<Inputs, Out>::nameFromPath(const StorePath & drvPath)
