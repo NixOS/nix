@@ -181,6 +181,11 @@ Currently the `type` attribute can be one of the following:
   entry in the registry; see [nix registry](./nix3-registry.md) for
   details.
 
+  > **Note**
+  >
+  > When used as inputs in a `flake.nix`, only the global registry is consulted.
+  > Read the note in [nix registry](./nix3-registry.md) for more details.
+
   For example, these are valid indirect flake references:
 
   * `nixpkgs`
