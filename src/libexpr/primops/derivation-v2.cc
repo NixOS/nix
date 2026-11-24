@@ -391,9 +391,7 @@ static RegisterPrimOp primop_derivationStrictV2({
       Create a [version 2 derivation](@docroot@/language/derivations/v2.md).
     )",
     .impl = prim_derivationStrictV2,
-    /* FIXME: the feature combining `ca-derivations` and
-       `dynamic-derivations`, once it has a name. */
-    .experimentalFeature = Xp::CaDerivations,
+    .experimentalFeature = Xp::DerivationsV2,
 });
 
 } // namespace nix
