@@ -170,6 +170,7 @@ std::optional<Basic> tryResolve(
         .args = drv.args,
         .env = drv.env,
         .structuredAttrs = drv.structuredAttrs,
+        .version = drv.version,
     };
     for (auto & [outputName, output] : drv.outputs)
         result.outputs.insert_or_assign(

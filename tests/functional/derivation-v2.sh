@@ -38,3 +38,38 @@ outPath=$(nix-store --realise "$drvPath")
 [[ "$outPath" = "$staticOutPath" ]]
 [[ "$(cat "$outPath")" = "hello
 xyzzy" ]]
+
+# A floating content-addressed version 2 derivation, and an
+# input-addressed one downstream of it, whose output paths are therefore
+# deferred until it is resolved.
+
+caExpr="
+with import ${config_nix};
+
+rec {
+  ca = builtins.derivationStrictV2 {
+    name = \"derivation-v2-ca\";
+    inherit system;
+    builder = shell;
+    args = [ \"-c\" \"echo ca > \$out\" ];
+    env = { out = builtins.placeholder \"out\"; PATH = path; salt = testSalt; };
+    outputs.out = { method = \"nar\"; hashAlgo = \"sha256\"; };
+  };
+  downstream = builtins.derivationStrictV2 {
+    name = \"derivation-v2-downstream\";
+    inherit system;
+    builder = shell;
+    args = [ \"-c\" \"cat \${ca.out} > \$out\" ];
+    env = { out = builtins.placeholder \"out\"; PATH = path; salt = testSalt; };
+    outputs.out = {};
+  };
+}
+"
+
+downstreamDrv=$(nix-instantiate --extra-experimental-features ca-derivations --read-write-mode --eval --raw -E "($caExpr).downstream.drvPath")
+
+# Deferred: no output path is recorded.
+grepQuiet -F '[("out","","","",' "$downstreamDrv"
+
+downstreamOut=$(nix-store --extra-experimental-features ca-derivations --realise "$downstreamDrv")
+[[ "$(cat "$downstreamOut")" = ca ]]

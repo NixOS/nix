@@ -373,6 +373,7 @@ static int main_build_remote(int argc, char ** argv)
                 .args = drv.args,
                 .env = drv.env,
                 .structuredAttrs = drv.structuredAttrs,
+                .version = drv.version,
             };
             for (auto & [outputName, output] : drv.outputs)
                 resolvedDrv.outputs.insert_or_assign(
