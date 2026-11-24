@@ -190,8 +190,7 @@ The remaining options apply to the derivation as a whole:
   A map from file names to sets of [deriving paths][deriving path].
   For each entry, the *references graph* of the given store objects — each store object in their [closure], along with its references — is made available to the builder, as JSON: a list of store object infos.
 
-  - In [version 2] derivations, it is written as a file of the given name in the build directory, containing just that JSON.
-    It is not mixed in with anything else, such as data of the user's, since version 2 derivations have no structured attributes to mix it into.
+  - In [version 2] derivations, it is written as a file of the given name in the build directory, containing that JSON.
 
   - In [version 1] derivations it depends on the mode.
     With [structured attributes](#structured-attrs), it is the value of the given key in the JSON attributes file, alongside the user's attributes.
