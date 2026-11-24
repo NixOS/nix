@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/v1.hh"
 #include "nix/store/derivation/masked.hh"
 #include "nix/store/derivation/elaborate.hh"
 #include "nix/store/downstream-placeholder.hh"
@@ -1902,14 +1903,15 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         }
     }
 
-    /* Parse the legacy environment-variable (and structured-attributes)
-       encodings of the derivation options into their first-class
-       fields, so that the two are in sync (which the ATerm
-       serialization requires). Must happen after the outputs are
-       populated, so per-output checks have somewhere to land, and
-       before output paths are filled in, which consults the options.
-       The warnings for dubious values were already emitted above. */
-    elaborateLegacyOptions(*state.store, drv, /*shouldWarn=*/false);
+    /* The options of a version 1 derivation are decoded from its
+       environment variables (or structured attributes), and are only a
+       cache of them: so construct it from that encoding. Must happen
+       after the outputs are populated, so per-output checks have
+       somewhere to land, and before output paths are filled in, which
+       consults the options. The warnings for dubious values were
+       already emitted above. */
+    drv = derivation::v1::elaborated(derivation::v1::fromParsed(
+        derivation::lower(drv), std::string{drvName}, *state.store, experimentalFeatureSettings, /*shouldWarn=*/false));
 
     if (!outputHash && !contentAddressed && !isImpure)
         fillInOutputPaths(drv, *state.store);

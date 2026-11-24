@@ -94,7 +94,8 @@ public:
         TraditionalParsedT<Inputs> parsed,
         std::string name,
         const StoreDirConfig & store,
-        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings,
+        bool shouldWarn = true);
 
     const CommonTopOptions<Input> & options() const
     {
@@ -137,7 +138,8 @@ public:
         TraditionalParsedT<Inputs> parsed,
         std::string name,
         const StoreDirConfig & store,
-        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings,
+        bool shouldWarn = true);
 
     const StructuredAttrs & structuredAttrs() const
     {
@@ -182,7 +184,8 @@ DerivationT<Inputs> fromParsed(
     TraditionalParsedT<Inputs> parsed,
     std::string name,
     const StoreDirConfig & store,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings,
+    bool shouldWarn = true);
 
 /**
  * The shared, version-independent view of a version 1 derivation, which

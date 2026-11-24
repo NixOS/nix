@@ -349,11 +349,12 @@ Full decodeTraditional(
     const TraditionalParsed & aterm,
     const StoreDirConfig & store,
     std::string_view name,
-    const ExperimentalFeatureSettings & xpSettings)
+    const ExperimentalFeatureSettings & xpSettings,
+    bool shouldWarn)
 {
     auto drv = elaborateCommon<SingleDerivedPath>(aterm, name);
     drv.inputs = aterm.inputs.toSet();
-    elaborateLegacyOptions(store, drv, true, xpSettings);
+    elaborateLegacyOptions(store, drv, shouldWarn, xpSettings);
     return drv;
 }
 
@@ -361,11 +362,12 @@ Basic decodeTraditional(
     const BasicTraditionalParsed & aterm,
     const StoreDirConfig & store,
     std::string_view name,
-    const ExperimentalFeatureSettings & xpSettings)
+    const ExperimentalFeatureSettings & xpSettings,
+    bool shouldWarn)
 {
     auto drv = elaborateCommon<StorePath>(aterm, name);
     drv.inputs = aterm.inputs;
-    elaborateLegacyOptions(store, drv, true, xpSettings);
+    elaborateLegacyOptions(store, drv, shouldWarn, xpSettings);
     return drv;
 }
 

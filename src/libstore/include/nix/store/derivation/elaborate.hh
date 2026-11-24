@@ -40,11 +40,13 @@ Full decodeTraditional(
     const TraditionalParsed & aterm,
     const StoreDirConfig & store,
     std::string_view name,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings,
+    bool shouldWarn = true);
 Basic decodeTraditional(
     const BasicTraditionalParsed & aterm,
     const StoreDirConfig & store,
     std::string_view name,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings,
+    bool shouldWarn = true);
 
 } // namespace nix::derivation

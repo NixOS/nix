@@ -13,9 +13,10 @@ static auto decode(
     const TraditionalParsedT<Inputs> & parsed,
     std::string_view name,
     const StoreDirConfig & store,
-    const ExperimentalFeatureSettings & xpSettings)
+    const ExperimentalFeatureSettings & xpSettings,
+    bool shouldWarn)
 {
-    return decodeTraditional(parsed, store, name, xpSettings);
+    return decodeTraditional(parsed, store, name, xpSettings, shouldWarn);
 }
 
 template<typename Inputs>
@@ -23,10 +24,11 @@ EnvDerivation<Inputs>::EnvDerivation(
     TraditionalParsedT<Inputs> parsed,
     std::string name,
     const StoreDirConfig & store,
-    const ExperimentalFeatureSettings & xpSettings)
+    const ExperimentalFeatureSettings & xpSettings,
+    bool shouldWarn)
     : Common<Inputs>(std::move(parsed), std::move(name))
 {
-    auto drv = decode(this->parsed_, this->name_, store, xpSettings);
+    auto drv = decode(this->parsed_, this->name_, store, xpSettings, shouldWarn);
     assert(!drv.structuredAttrs);
     options_ = drv.options;
     allOutputChecks_ = drv.options.allOutputChecks;
@@ -40,10 +42,11 @@ StructuredAttrsDerivation<Inputs>::StructuredAttrsDerivation(
     TraditionalParsedT<Inputs> parsed,
     std::string name,
     const StoreDirConfig & store,
-    const ExperimentalFeatureSettings & xpSettings)
+    const ExperimentalFeatureSettings & xpSettings,
+    bool shouldWarn)
     : Common<Inputs>(std::move(parsed), std::move(name))
 {
-    auto drv = decode(this->parsed_, this->name_, store, xpSettings);
+    auto drv = decode(this->parsed_, this->name_, store, xpSettings, shouldWarn);
     assert(drv.structuredAttrs);
     /* With structured attributes, the top-level check attributes have
        no effect, so there are no checks for all outputs at once. */
@@ -59,11 +62,12 @@ DerivationT<Inputs> fromParsed(
     TraditionalParsedT<Inputs> parsed,
     std::string name,
     const StoreDirConfig & store,
-    const ExperimentalFeatureSettings & xpSettings)
+    const ExperimentalFeatureSettings & xpSettings,
+    bool shouldWarn)
 {
     if (parsed.env.contains(std::string{StructuredAttrs::envVarName}))
-        return StructuredAttrsDerivation<Inputs>{std::move(parsed), std::move(name), store, xpSettings};
-    return EnvDerivation<Inputs>{std::move(parsed), std::move(name), store, xpSettings};
+        return StructuredAttrsDerivation<Inputs>{std::move(parsed), std::move(name), store, xpSettings, shouldWarn};
+    return EnvDerivation<Inputs>{std::move(parsed), std::move(name), store, xpSettings, shouldWarn};
 }
 
 static std::set<SingleDerivedPath> inputSet(const FullInputs & inputs)
@@ -138,9 +142,10 @@ template class EnvDerivation<StorePathSet>;
 template class StructuredAttrsDerivation<FullInputs>;
 template class StructuredAttrsDerivation<StorePathSet>;
 
-template Full fromParsed(TraditionalParsed, std::string, const StoreDirConfig &, const ExperimentalFeatureSettings &);
+template Full
+fromParsed(TraditionalParsed, std::string, const StoreDirConfig &, const ExperimentalFeatureSettings &, bool);
 template Basic
-fromParsed(BasicTraditionalParsed, std::string, const StoreDirConfig &, const ExperimentalFeatureSettings &);
+fromParsed(BasicTraditionalParsed, std::string, const StoreDirConfig &, const ExperimentalFeatureSettings &, bool);
 
 } // namespace nix::derivation::v1
 
