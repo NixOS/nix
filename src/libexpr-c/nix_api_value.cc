@@ -105,13 +105,23 @@ PrimOp * nix_alloc_primop(
     PrimOpFun fun,
     int arity,
     const char * name,
-    const char ** args,
+    const char * const * args,
     const char * doc,
     void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
+        std::vector<std::string> argNames;
+        if (args)
+            for (size_t i = 0; args[i]; i++)
+                argNames.emplace_back(args[i]);
+        // `RegisterPrimOp` raises the arity to `args.size()`, which would
+        // desync it from the arity bound into `nix_c_primop_wrapper`.
+        if (!argNames.empty() && argNames.size() != (size_t) arity)
+            throw nix::Error(
+                "primop '%s' has arity %d, but %d argument names were given", name, arity, argNames.size());
+
         using namespace std::placeholders;
         auto p = new
 #if NIX_USE_BOEHMGC
@@ -119,13 +129,10 @@ PrimOp * nix_alloc_primop(
 #endif
                 nix::PrimOp{
                     .name = name,
-                    .args = {},
+                    .args = std::move(argNames),
                     .arity = (size_t) arity,
                     .doc = doc ? std::optional<std::string>{doc} : std::nullopt,
                     .impl = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
-        if (args)
-            for (size_t i = 0; args[i]; i++)
-                p->args.emplace_back(*args);
         nix_gc_incref(nullptr, p);
         return (PrimOp *) p;
     }
