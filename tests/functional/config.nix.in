@@ -50,7 +50,8 @@ rec {
       env =
         builtins.mapAttrs (n: v: if builtins.elem n passAsFile then { value = toEnv v; passAsFile = true; } else toEnv v)
           (removeAttrs drvAttrs special)
-        // builtins.listToAttrs (map (o: { name = o; value = builtins.placeholder o; }) outputs);
+        // builtins.listToAttrs (map (o: { name = o; value = builtins.placeholder o; }) outputs)
+        // { outputs = builtins.concatStringsSep " " outputs; };
       strict = builtins.derivationStrictV2 {
         inherit (drvAttrs) name system builder;
         args = drvAttrs.args or [];

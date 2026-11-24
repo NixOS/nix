@@ -14,6 +14,8 @@
 #include "nix/store/outputs-query.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/v1/traditional.hh"
+#include "nix/store/derivation/v2/aterm.hh"
+#include "nix/store/derivation/v2/convert.hh"
 
 #ifndef _WIN32 // TODO re-enable on Windows
 #  include "run.hh"
@@ -228,6 +230,46 @@ static constexpr char getEnvSh[] = {
 #embed "get-env.sh"
 };
 
+static StorePath buildEnvDerivation(ref<Store> store, ref<Store> evalStore, const StorePath & shellDrvPath);
+
+/**
+ * The derivation at `drvPath`, if it is a version 2 one.
+ */
+static std::optional<derivation::v2::Full> readV2(Store & store, const StorePath & drvPath)
+{
+    auto contents = store.requireStoreObjectAccessor(drvPath)->readFile(CanonPath::root);
+    if (!derivation::v2::isV2(contents))
+        return std::nullopt;
+    return derivation::v2::parse<SingleDerivedPath>(store, contents, Derivation::nameFromPath(drvPath)).drv;
+}
+
+/**
+ * Write the version 2 derivation that writes the shell environment of
+ * `drv`.
+ *
+ * Version 2 derivations' options are fields in their own right, so the
+ * output checks can just be dropped, and the outputs, being
+ * input-addressed or floating, need no change: their paths are computed
+ * afresh, or deferred.
+ */
+static StorePath getV2EnvDerivation(Store & evalStore, derivation::v2::Full drv, const StorePath & getEnvShPath)
+{
+    using namespace derivation::v2;
+
+    Interpolated<SingleDerivedPath> getEnvShArg;
+    getEnvShArg.append(Reference<SingleDerivedPath>{SingleDerivedPath::Opaque{getEnvShPath}});
+    drv.args = {std::move(getEnvShArg)};
+    drv.inputs.srcs.insert(getEnvShPath);
+
+    for (auto & [_, output] : drv.outputs)
+        output.options.checks = {};
+
+    drv.name += "-env";
+    drv.env.insert_or_assign("name", EnvVar<SingleDerivedPath>{.value = Interpolated<SingleDerivedPath>{drv.name}});
+
+    return writeDerivation(evalStore, drv);
+}
+
 /**
  * Given an existing derivation, return the shell environment as
  * initialised by stdenv's setup script. We do this by building a
@@ -254,6 +296,9 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
             {});
     });
 
+    if (auto v2drv = readV2(*evalStore, drvPath))
+        return buildEnvDerivation(store, evalStore, getV2EnvDerivation(*evalStore, std::move(*v2drv), getEnvShPath));
+
     drv.args = {store->printStorePath(getEnvShPath)};
 
     /* Remove derivation checks from their encoding, in the environment
@@ -269,17 +314,10 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
         drv.env.erase("disallowedReferences");
         drv.env.erase("disallowedRequisites");
     }
-    if (drv.version == derivation::Version::V1) {
-        /* The options of a version 1 derivation are only a cache of
-           what they are decoded from, which was just edited; decode
-           them again. */
-        drv = derivation::elaborate(derivation::lower(drv), *store, drv.name);
-    } else {
-        /* Those of a version 2 derivation are fields in their own
-           right. */
-        for (auto & [_, output] : drv.outputs)
-            output.options.checks = std::nullopt;
-    }
+    /* The options of a version 1 derivation are only a cache of what
+       they are decoded from, which was just edited; decode them
+       again. */
+    drv = derivation::elaborate(derivation::lower(drv), *store, drv.name);
 
     drv.env.erase("name");
 
@@ -308,7 +346,15 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     fillInOutputPaths(drv, *evalStore);
 
     auto shellDrvPath = evalStore->writeDerivation(drv);
+    return buildEnvDerivation(store, evalStore, shellDrvPath);
+}
 
+/**
+ * Build the derivation that writes the shell environment, and return
+ * the path of the environment it wrote.
+ */
+static StorePath buildEnvDerivation(ref<Store> store, ref<Store> evalStore, const StorePath & shellDrvPath)
+{
     /* Build the derivation. */
     store->getBuilder(evalStore)->buildPaths(
         {DerivedPath::Built{
