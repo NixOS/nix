@@ -115,6 +115,33 @@ TEST(canonPath, removesDots2)
     ASSERT_EQ(p, std::filesystem::path{FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path"}.string());
 }
 
+TEST(canonPath, resolvesSymlinks)
+{
+    auto tmpDir = createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+
+    auto target = tmpDir / OS_STR("target");
+    createDir(target);
+    writeFile(target / OS_STR("file"), "contents");
+    createSymlink(OS_STR("target"), tmpDir / OS_STR("relative"));
+    /* On Windows, a target with a drive letter. */
+    createSymlink(target, tmpDir / OS_STR("absolute"));
+
+    auto expected = canonPath(target / OS_STR("file"), /*resolveSymlinks=*/true);
+    ASSERT_EQ(canonPath(tmpDir / OS_STR("relative") / OS_STR("file"), /*resolveSymlinks=*/true), expected);
+    ASSERT_EQ(canonPath(tmpDir / OS_STR("absolute") / OS_STR("file"), /*resolveSymlinks=*/true), expected);
+    ASSERT_EQ(readFile(expected), "contents");
+
+    /* Without resolving, the symlink is kept. */
+    ASSERT_EQ(
+        canonPath(tmpDir / OS_STR("relative") / OS_STR("file")),
+        canonPath(tmpDir) / OS_STR("relative") / OS_STR("file"));
+}
+
 TEST(canonPath, requiresAbsolutePath)
 {
     using namespace std::string_view_literals;

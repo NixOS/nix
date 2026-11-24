@@ -168,7 +168,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         // Chase symlinks until we find a path under a "profiles"
         // directory, or we run out of symlinks.
         auto resolved = profileDir;
-        while (!hasProfilesComponent(canonPath(resolved)) && std::filesystem::is_symlink(resolved))
+        while (!hasProfilesComponent(canonPath(resolved)) && isSymlink(resolved))
             // Note that operator/ replaces lhs when rhs is absolute.
             resolved = resolved.parent_path() / readLink(resolved);
         printInfo("found profile %s", PathFmt(resolved));

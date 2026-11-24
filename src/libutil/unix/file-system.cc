@@ -152,7 +152,7 @@ void setWriteTime(
     if (lutimes(path.c_str(), times) == -1)
         throw SysError("changing modification time of %s", PathFmt{path});
 #  else
-    bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
+    bool isSymlink = optIsSymlink ? *optIsSymlink : nix::isSymlink(path);
 
     if (!isSymlink) {
         if (utimes(path.c_str(), times) == -1)

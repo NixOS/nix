@@ -116,7 +116,7 @@ struct CmdConfigCheck : StoreCommand
                 };
 
                 if (store->isStorePath(userEnv.string()) && hasSuffix(userEnv.string(), "user-environment")) {
-                    while (noContainsProfiles() && std::filesystem::is_symlink(profileDir))
+                    while (noContainsProfiles() && isSymlink(profileDir))
                         profileDir = std::filesystem::weakly_canonical(profileDir.parent_path() / readLink(profileDir));
 
                     if (noContainsProfiles())

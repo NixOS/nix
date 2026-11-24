@@ -96,6 +96,7 @@ CheckOptions:
   bugprone-unsafe-functions.CustomFunctions: >
     ::std::filesystem::create_directories, nix::createDirs, "Use nix::createDirs (it wraps exceptions)";
     ::std::filesystem::permissions, nix::chmod, "Use nix::chmod (it throws nix::SystemError)";
+    ::std::filesystem::is_symlink, nix::isSymlink, "Use nix::isSymlink (libstdc++ never reports a symlink on Windows)";
     ::std::filesystem::read_symlink, nix::readLink, "Use nix::readLink (it throws nix::SystemError, and also works on Windows)";
     ::std::filesystem::remove_all, nix::deletePath, "Use nix::deletePath (remove_all is not TOCTOU safe)";
     ::std::unreachable, nix::unreachable, "Use nix::unreachable (it reports the source location instead of invoking undefined behaviour) or nixUnreachableWhenHardened";

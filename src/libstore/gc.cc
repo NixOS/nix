@@ -269,7 +269,7 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                         tryUnlink(path);
                     }
                 } else {
-                    if (!std::filesystem::is_symlink(target))
+                    if (!isSymlink(target))
                         return;
                     auto target2 = readLink(target);
                     if (isInStore(target2.string()))

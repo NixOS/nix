@@ -192,7 +192,7 @@ LocalStore::LocalStore(ref<const Config> config)
         std::filesystem::path path = config->realStoreDir.get();
         std::filesystem::path root = path.root_path();
         while (path != root) {
-            if (std::filesystem::is_symlink(path))
+            if (isSymlink(path))
                 throw Error(
                     "the path %1% is a symlink; "
                     "this is not allowed for the Nix store and its parent directories",

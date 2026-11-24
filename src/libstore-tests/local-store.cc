@@ -6,6 +6,11 @@
 #include "nix/util/archive.hh"
 #include "nix/util/memory-source-accessor.hh"
 
+#ifdef _WIN32
+#  include "nix/util/tests/wine.hh"
+#  include "nix/util/windows-environment.hh"
+#endif
+
 namespace nix {
 
 TEST(LocalStore, storeDir_absolutePath)
@@ -310,6 +315,31 @@ TEST_F(LocalStorePathInfoCacheTest, addSignaturesToInvalidPath)
 {
     EXPECT_THROW(store->addSignatures(path, {}), InvalidPath);
     EXPECT_FALSE(store->isValidPath(path));
+}
+
+/* Same set up: a fresh store in a temporary directory. */
+using LocalStoreGcRootTest = LocalStorePathInfoCacheTest;
+
+TEST_F(LocalStoreGcRootTest, addPermRootReplacesRoot)
+{
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tempStoreDir.path()))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+    /* Like `result` from `nix-build`, which a second build replaces. */
+    auto gcRoot = tempStoreDir.path() / OS_STR("result");
+    store->addPermRoot(path, gcRoot);
+    store->addPermRoot(StorePath{"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-bar"}, gcRoot);
+    EXPECT_EQ(readLink(gcRoot), store->printStorePath(StorePath{"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-bar"}));
+}
+
+TEST_F(LocalStoreGcRootTest, addPermRootKeepsOtherFiles)
+{
+    /* Something that is not a symlink into the store is not clobbered. */
+    auto gcRoot = tempStoreDir.path() / OS_STR("result");
+    writeFile(gcRoot, "not a root");
+    EXPECT_THROW(store->addPermRoot(path, gcRoot), Error);
+    EXPECT_EQ(readFile(gcRoot), "not a root");
 }
 
 } // namespace nix

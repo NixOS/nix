@@ -115,7 +115,7 @@ std::filesystem::path canonPath(const std::filesystem::path & path, bool resolve
     auto ret = canonPathInner<OsPathTrait<char>>(
         path.string(),
         [&followCount, &temp, maxFollow, resolveSymlinks](std::string & result, std::string_view & remaining) {
-            if (resolveSymlinks && std::filesystem::is_symlink(result)) {
+            if (resolveSymlinks && isSymlink(result)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%1%'", remaining);
                 remaining = (temp = concatStrings(readLink(result).string(), remaining));
@@ -201,6 +201,12 @@ std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 bool pathExists(const std::filesystem::path & path)
 {
     return maybeLstat(path).has_value();
+}
+
+bool isSymlink(const std::filesystem::path & path)
+{
+    auto st = maybeLstat(path);
+    return st && S_ISLNK(st->st_mode);
 }
 
 bool pathAccessible(const std::filesystem::path & path)
@@ -594,9 +600,11 @@ void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
 
 void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool contents)
 {
-    auto fromStatus = std::filesystem::symlink_status(from);
+    /* Not `std::filesystem::symlink_status`, which libstdc++ on Windows
+       never reports as a symlink. */
+    auto st = lstat(from);
 
-    if (std::filesystem::is_symlink(fromStatus) || std::filesystem::is_regular_file(fromStatus)) {
+    if (S_ISLNK(st.st_mode) || S_ISREG(st.st_mode)) {
         if (contents) {
             std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
         } else {
@@ -605,7 +613,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
                 to,
                 std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
         }
-    } else if (std::filesystem::is_directory(fromStatus)) {
+    } else if (S_ISDIR(st.st_mode)) {
         std::filesystem::create_directory(to);
         for (auto & entry : DirectoryIterator(from)) {
             copyFile(entry, to / entry.path().filename(), /*contents=*/false);
@@ -614,7 +622,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
         throw Error("file %s has an unsupported type", PathFmt(from));
     }
 
-    setWriteTime(to, lstat(from));
+    setWriteTime(to, st);
 }
 
 //////////////////////////////////////////////////////////////////////
