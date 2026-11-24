@@ -346,7 +346,7 @@ int handleExceptions(const std::string & programName, fun<void()> body);
    optimisations. */
 #  define nixUnreachableWhenHardened ::nix::unreachable
 #else
-#  define nixUnreachableWhenHardened std::unreachable
+#  define nixUnreachableWhenHardened std::unreachable // NOLINT(bugprone-unsafe-functions)
 #endif
 
 } // namespace nix

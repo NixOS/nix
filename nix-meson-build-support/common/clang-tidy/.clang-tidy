@@ -97,5 +97,6 @@ CheckOptions:
     ::std::filesystem::create_directories, nix::createDirs, "Use nix::createDirs (it wraps exceptions)";
     ::std::filesystem::remove_all, nix::deletePath, "Use nix::deletePath (remove_all is not TOCTOU safe)";
     ::std::filesystem::permissions, nix::chmod, "Use nix::chmod (it throws nix::SystemError)";
+    ::std::unreachable, nix::unreachable, "Use nix::unreachable (it reports the source location instead of invoking undefined behaviour) or nixUnreachableWhenHardened";
 
 ExtraArgs: ["-Werror=unnecessary-virtual-specifier"]
