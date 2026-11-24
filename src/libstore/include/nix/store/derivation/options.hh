@@ -78,22 +78,21 @@ struct OutputOptions
 };
 
 /**
- * Options that are for the derivation as a whole, rather than per-output;
+ * The options that are for the derivation as a whole, rather than
+ * per-output, which every kind of derivation has.
+ *
+ * A building block: each kind of derivation picks the options it can
+ * express from these and from `OutputChecks` / `OutputOptions`, so that
+ * its type admits exactly what its format can encode.
  */
 template<typename Input>
-struct TopOptions
+struct CommonTopOptions
 {
     /* Derivation options. Historically these are parsed from special
        environment variables and structured attributes; see
        `DerivationATerm::elaborate`.
        They no longer live in a separate structure because they are
        fields of the derivation like any other. */
-
-    /**
-     * Either one set of checks for all outputs, or separate checks
-     * per-output.
-     */
-    std::optional<OutputChecks<Input>> allOutputChecks;
 
     /**
      * The `exportReferencesGraph' feature allows the references graph
@@ -165,9 +164,26 @@ struct TopOptions
      */
     bool allowSubstitutes = true;
 
-    bool operator==(const TopOptions &) const = default;
+    bool operator==(const CommonTopOptions &) const = default;
 
     bool substitutesAllowed(const WorkerSettings & workerSettings) const;
+};
+
+/**
+ * The options of a version 1 derivation as a whole: the common ones,
+ * plus output checks given once for all outputs, which only version 1
+ * derivations without structured attributes have.
+ */
+template<typename Input>
+struct TopOptions : CommonTopOptions<Input>
+{
+    /**
+     * Either one set of checks for all outputs, or separate checks
+     * per-output.
+     */
+    std::optional<OutputChecks<Input>> allOutputChecks;
+
+    bool operator==(const TopOptions &) const = default;
 };
 
 } // namespace derivation

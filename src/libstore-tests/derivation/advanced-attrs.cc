@@ -266,20 +266,20 @@ using ExportReferencesMap = decltype(derivation::TopOptions<SingleDerivedPath>::
 
 static const ParsedOptions advancedAttributes_defaults = {
     .top =
-        {
-            /* Trivial legacy checks are canonicalized to no checks at
-               all, so the ATerm round-trip is stable. */
-            .allOutputChecks = std::nullopt,
-            .exportReferencesGraph = {},
-            .additionalSandboxProfile = "",
-            .noChroot = false,
-            .impureHostDeps = {},
-            .impureEnvVars = {},
-            .allowLocalNetworking = false,
-            .requiredSystemFeatures = {},
-            .preferLocalBuild = false,
-            .allowSubstitutes = true,
-        },
+        {{
+             /* Trivial legacy checks are canonicalized to no checks at
+                all, so the ATerm round-trip is stable. */
+             .exportReferencesGraph = {},
+             .additionalSandboxProfile = "",
+             .noChroot = false,
+             .impureHostDeps = {},
+             .impureEnvVars = {},
+             .allowLocalNetworking = false,
+             .requiredSystemFeatures = {},
+             .preferLocalBuild = false,
+             .allowSubstitutes = true,
+         },
+         std::nullopt},
 };
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
@@ -311,20 +311,19 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 {
     ParsedOptions expected = {
         .top =
-            {
-                .allOutputChecks =
-                    derivation::OutputChecks<SingleDerivedPath>{
-                        .ignoreSelfRefs = true,
-                    },
-                .additionalSandboxProfile = "sandcastle",
-                .noChroot = true,
-                .impureHostDeps = {"/usr/bin/ditto"},
-                .impureEnvVars = {"UNICORN"},
-                .allowLocalNetworking = true,
-                .requiredSystemFeatures = {"rainbow", "uid-range"},
-                .preferLocalBuild = true,
-                .allowSubstitutes = false,
-            },
+            {{
+                 .additionalSandboxProfile = "sandcastle",
+                 .noChroot = true,
+                 .impureHostDeps = {"/usr/bin/ditto"},
+                 .impureEnvVars = {"UNICORN"},
+                 .allowLocalNetworking = true,
+                 .requiredSystemFeatures = {"rainbow", "uid-range"},
+                 .preferLocalBuild = true,
+                 .allowSubstitutes = false,
+             },
+             derivation::OutputChecks<SingleDerivedPath>{
+                 .ignoreSelfRefs = true,
+             }},
     };
 
     this->readTest("advanced-attributes.drv", [&](auto encoded) {
@@ -346,28 +345,27 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 
 ParsedOptions advancedAttributes_ia = {
     .top =
-        {
-            .allOutputChecks =
-                derivation::OutputChecks<SingleDerivedPath>{
-                    .ignoreSelfRefs = true,
-                    .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
-                    .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
-                    .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
-                    .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
-                },
-            .exportReferencesGraph{
-                {"refs1", {pathFoo}},
-                {"refs2", {pathBarDrvIA}},
-            },
-            .additionalSandboxProfile = "sandcastle",
-            .noChroot = true,
-            .impureHostDeps = {"/usr/bin/ditto"},
-            .impureEnvVars = {"UNICORN"},
-            .allowLocalNetworking = true,
-            .requiredSystemFeatures = {"rainbow", "uid-range"},
-            .preferLocalBuild = true,
-            .allowSubstitutes = false,
-        },
+        {{
+             .exportReferencesGraph{
+                 {"refs1", {pathFoo}},
+                 {"refs2", {pathBarDrvIA}},
+             },
+             .additionalSandboxProfile = "sandcastle",
+             .noChroot = true,
+             .impureHostDeps = {"/usr/bin/ditto"},
+             .impureEnvVars = {"UNICORN"},
+             .allowLocalNetworking = true,
+             .requiredSystemFeatures = {"rainbow", "uid-range"},
+             .preferLocalBuild = true,
+             .allowSubstitutes = false,
+         },
+         derivation::OutputChecks<SingleDerivedPath>{
+             .ignoreSelfRefs = true,
+             .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
+             .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
+             .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
+             .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
+         }},
 };
 
 TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
@@ -377,28 +375,27 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
 
 ParsedOptions advancedAttributes_ca = {
     .top =
-        {
-            .allOutputChecks =
-                derivation::OutputChecks<SingleDerivedPath>{
-                    .ignoreSelfRefs = true,
-                    .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
-                    .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
-                    .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
-                    .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
-                },
-            .exportReferencesGraph{
-                {"refs1", {placeholderFoo}},
-                {"refs2", {pathBarDrvCA}},
-            },
-            .additionalSandboxProfile = "sandcastle",
-            .noChroot = true,
-            .impureHostDeps = {"/usr/bin/ditto"},
-            .impureEnvVars = {"UNICORN"},
-            .allowLocalNetworking = true,
-            .requiredSystemFeatures = {"rainbow", "uid-range"},
-            .preferLocalBuild = true,
-            .allowSubstitutes = false,
-        },
+        {{
+             .exportReferencesGraph{
+                 {"refs1", {placeholderFoo}},
+                 {"refs2", {pathBarDrvCA}},
+             },
+             .additionalSandboxProfile = "sandcastle",
+             .noChroot = true,
+             .impureHostDeps = {"/usr/bin/ditto"},
+             .impureEnvVars = {"UNICORN"},
+             .allowLocalNetworking = true,
+             .requiredSystemFeatures = {"rainbow", "uid-range"},
+             .preferLocalBuild = true,
+             .allowSubstitutes = false,
+         },
+         derivation::OutputChecks<SingleDerivedPath>{
+             .ignoreSelfRefs = true,
+             .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
+             .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
+             .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
+             .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
+         }},
 };
 
 TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
@@ -408,18 +405,18 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 
 ParsedOptions advancedAttributes_structuredAttrs_defaults = {
     .top =
-        {
-            .allOutputChecks = std::nullopt,
-            .exportReferencesGraph = {},
-            .additionalSandboxProfile = "",
-            .noChroot = false,
-            .impureHostDeps = {},
-            .impureEnvVars = {},
-            .allowLocalNetworking = false,
-            .requiredSystemFeatures = {},
-            .preferLocalBuild = false,
-            .allowSubstitutes = true,
-        },
+        {{
+             .exportReferencesGraph = {},
+             .additionalSandboxProfile = "",
+             .noChroot = false,
+             .impureHostDeps = {},
+             .impureEnvVars = {},
+             .allowLocalNetworking = false,
+             .requiredSystemFeatures = {},
+             .preferLocalBuild = false,
+             .allowSubstitutes = true,
+         },
+         std::nullopt},
 };
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_defaults)
@@ -451,18 +448,18 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 {
     ParsedOptions expected = {
         .top =
-            {
-                .allOutputChecks = std::nullopt,
-                .exportReferencesGraph = {},
-                .additionalSandboxProfile = "sandcastle",
-                .noChroot = true,
-                .impureHostDeps = {"/usr/bin/ditto"},
-                .impureEnvVars = {"UNICORN"},
-                .allowLocalNetworking = true,
-                .requiredSystemFeatures = {"rainbow", "uid-range"},
-                .preferLocalBuild = true,
-                .allowSubstitutes = false,
-            },
+            {{
+                 .exportReferencesGraph = {},
+                 .additionalSandboxProfile = "sandcastle",
+                 .noChroot = true,
+                 .impureHostDeps = {"/usr/bin/ditto"},
+                 .impureEnvVars = {"UNICORN"},
+                 .allowLocalNetworking = true,
+                 .requiredSystemFeatures = {"rainbow", "uid-range"},
+                 .preferLocalBuild = true,
+                 .allowSubstitutes = false,
+             },
+             std::nullopt},
         .perOutput =
             {
                 {"dev",
@@ -494,22 +491,21 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 };
 
 ParsedOptions advancedAttributes_structuredAttrs_ia = {
-    .top =
-        {
-            .exportReferencesGraph =
-                {
-                    {"refs1", {pathFoo}},
-                    {"refs2", {pathBarDrvIA}},
-                },
-            .additionalSandboxProfile = "sandcastle",
-            .noChroot = true,
-            .impureHostDeps = {"/usr/bin/ditto"},
-            .impureEnvVars = {"UNICORN"},
-            .allowLocalNetworking = true,
-            .requiredSystemFeatures = {"rainbow", "uid-range"},
-            .preferLocalBuild = true,
-            .allowSubstitutes = false,
-        },
+    .top = {{
+        .exportReferencesGraph =
+            {
+                {"refs1", {pathFoo}},
+                {"refs2", {pathBarDrvIA}},
+            },
+        .additionalSandboxProfile = "sandcastle",
+        .noChroot = true,
+        .impureHostDeps = {"/usr/bin/ditto"},
+        .impureEnvVars = {"UNICORN"},
+        .allowLocalNetworking = true,
+        .requiredSystemFeatures = {"rainbow", "uid-range"},
+        .preferLocalBuild = true,
+        .allowSubstitutes = false,
+    }},
     .perOutput =
         {
             {"out",
@@ -540,22 +536,21 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 };
 
 ParsedOptions advancedAttributes_structuredAttrs_ca = {
-    .top =
-        {
-            .exportReferencesGraph =
-                {
-                    {"refs1", {placeholderFoo}},
-                    {"refs2", {pathBarDrvCA}},
-                },
-            .additionalSandboxProfile = "sandcastle",
-            .noChroot = true,
-            .impureHostDeps = {"/usr/bin/ditto"},
-            .impureEnvVars = {"UNICORN"},
-            .allowLocalNetworking = true,
-            .requiredSystemFeatures = {"rainbow", "uid-range"},
-            .preferLocalBuild = true,
-            .allowSubstitutes = false,
-        },
+    .top = {{
+        .exportReferencesGraph =
+            {
+                {"refs1", {placeholderFoo}},
+                {"refs2", {pathBarDrvCA}},
+            },
+        .additionalSandboxProfile = "sandcastle",
+        .noChroot = true,
+        .impureHostDeps = {"/usr/bin/ditto"},
+        .impureEnvVars = {"UNICORN"},
+        .allowLocalNetworking = true,
+        .requiredSystemFeatures = {"rainbow", "uid-range"},
+        .preferLocalBuild = true,
+        .allowSubstitutes = false,
+    }},
     .perOutput =
         {
             {"out",
@@ -623,70 +618,73 @@ static const StorePath spFoo{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
     spBarDev{"9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"}, spBarDrv{"vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"};
 
 static const derivation::TopOptions<StorePath> advancedAttributes_sp_defaults = {
-    .allOutputChecks = std::nullopt,
-    .exportReferencesGraph = {},
-    .additionalSandboxProfile = "",
-    .noChroot = false,
-    .impureHostDeps = {},
-    .impureEnvVars = {},
-    .allowLocalNetworking = false,
-    .requiredSystemFeatures = {},
-    .preferLocalBuild = false,
-    .allowSubstitutes = true,
-};
+    {
+        .exportReferencesGraph = {},
+        .additionalSandboxProfile = "",
+        .noChroot = false,
+        .impureHostDeps = {},
+        .impureEnvVars = {},
+        .allowLocalNetworking = false,
+        .requiredSystemFeatures = {},
+        .preferLocalBuild = false,
+        .allowSubstitutes = true,
+    },
+    std::nullopt};
 
 static const derivation::TopOptions<StorePath> advancedAttributes_sp_all_set = {
-    .allOutputChecks =
-        derivation::OutputChecks<StorePath>{
-            .ignoreSelfRefs = true,
-            .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
-            .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
-            .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
-            .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
-        },
-    .exportReferencesGraph{
-        {"refs1", {spFoo}},
-        {"refs2", {spBarDrv}},
-    },
-    .additionalSandboxProfile = "sandcastle",
-    .noChroot = true,
-    .impureHostDeps = {"/usr/bin/ditto"},
-    .impureEnvVars = {"UNICORN"},
-    .allowLocalNetworking = true,
-    .requiredSystemFeatures = {"rainbow", "uid-range"},
-    .preferLocalBuild = true,
-    .allowSubstitutes = false,
-};
-
-static const derivation::TopOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
-    .allOutputChecks = std::nullopt,
-    .exportReferencesGraph = {},
-    .additionalSandboxProfile = "",
-    .noChroot = false,
-    .impureHostDeps = {},
-    .impureEnvVars = {},
-    .allowLocalNetworking = false,
-    .requiredSystemFeatures = {},
-    .preferLocalBuild = false,
-    .allowSubstitutes = true,
-};
-
-static const derivation::TopOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
-    .allOutputChecks = std::nullopt,
-    .exportReferencesGraph =
-        {
+    {
+        .exportReferencesGraph{
             {"refs1", {spFoo}},
             {"refs2", {spBarDrv}},
         },
-    .additionalSandboxProfile = "sandcastle",
-    .noChroot = true,
-    .impureHostDeps = {"/usr/bin/ditto"},
-    .impureEnvVars = {"UNICORN"},
-    .allowLocalNetworking = true,
-    .requiredSystemFeatures = {"rainbow", "uid-range"},
-    .preferLocalBuild = true,
-    .allowSubstitutes = false,
-};
+        .additionalSandboxProfile = "sandcastle",
+        .noChroot = true,
+        .impureHostDeps = {"/usr/bin/ditto"},
+        .impureEnvVars = {"UNICORN"},
+        .allowLocalNetworking = true,
+        .requiredSystemFeatures = {"rainbow", "uid-range"},
+        .preferLocalBuild = true,
+        .allowSubstitutes = false,
+    },
+    derivation::OutputChecks<StorePath>{
+        .ignoreSelfRefs = true,
+        .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
+        .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
+        .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
+        .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
+    }};
+
+static const derivation::TopOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
+    {
+        .exportReferencesGraph = {},
+        .additionalSandboxProfile = "",
+        .noChroot = false,
+        .impureHostDeps = {},
+        .impureEnvVars = {},
+        .allowLocalNetworking = false,
+        .requiredSystemFeatures = {},
+        .preferLocalBuild = false,
+        .allowSubstitutes = true,
+    },
+    std::nullopt};
+
+static const derivation::TopOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
+    {
+        .exportReferencesGraph =
+            {
+                {"refs1", {spFoo}},
+                {"refs2", {spBarDrv}},
+            },
+        .additionalSandboxProfile = "sandcastle",
+        .noChroot = true,
+        .impureHostDeps = {"/usr/bin/ditto"},
+        .impureEnvVars = {"UNICORN"},
+        .allowLocalNetworking = true,
+        .requiredSystemFeatures = {"rainbow", "uid-range"},
+        .preferLocalBuild = true,
+        .allowSubstitutes = false,
+    },
+    std::nullopt};
 
 /**
  * Same JSON characterization tests, but for `TopOptions<StorePath>`.

@@ -241,9 +241,9 @@ TEST_F(FillInOutputPathsTest, skipsEnvVarsWithBuilderRpc)
         .env =
             {{"__doc", {.value = "builder-rpc-v0 derivations have no output env vars"}},
              {"requiredSystemFeatures", {.value = "builder-rpc-v0"}}},
-        .options{
+        .options{{
             .requiredSystemFeatures = {"builder-rpc-v0"},
-        },
+        }},
     };
 
     auto drvBefore = drv;
@@ -268,9 +268,9 @@ TEST_F(FillInOutputPathsTest, rejectsBuilderRpcForInputAddressed)
             {{"__doc", {.value = "builder-rpc-v0 requires content addressing"}},
              {"requiredSystemFeatures", {.value = "builder-rpc-v0"}},
              {"out", {}}},
-        .options{
+        .options{{
             .requiredSystemFeatures = {"builder-rpc-v0"},
-        },
+        }},
     };
 
     /* `builder-rpc-v0` may only be used with content-addressing

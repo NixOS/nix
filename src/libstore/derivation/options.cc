@@ -14,13 +14,13 @@
 namespace nix::derivation {
 
 template<typename Input>
-bool TopOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
+bool CommonTopOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
 {
     return workerSettings.alwaysAllowSubstitutes ? true : allowSubstitutes;
 }
 
-template struct TopOptions<StorePath>;
-template struct TopOptions<SingleDerivedPath>;
+template struct CommonTopOptions<StorePath>;
+template struct CommonTopOptions<SingleDerivedPath>;
 
 } // namespace nix::derivation
 
@@ -33,9 +33,7 @@ static nix::derivation::TopOptions<Inputs> derivationOptionsFromJson(const nlohm
 
     auto & json = getObject(json_);
 
-    return {
-        .allOutputChecks = ptrToOwned<derivation::OutputChecks<Inputs>>(getNullable(valueAt(json, "allOutputChecks"))),
-
+    nix::derivation::TopOptions<Inputs> res{{
         .exportReferencesGraph = valueAt(json, "exportReferencesGraph"),
 
         .additionalSandboxProfile = getString(valueAt(json, "additionalSandboxProfile")),
@@ -47,7 +45,9 @@ static nix::derivation::TopOptions<Inputs> derivationOptionsFromJson(const nlohm
         .requiredSystemFeatures = getStringSet(valueAt(json, "requiredSystemFeatures")),
         .preferLocalBuild = getBoolean(valueAt(json, "preferLocalBuild")),
         .allowSubstitutes = getBoolean(valueAt(json, "allowSubstitutes")),
-    };
+    }};
+    res.allOutputChecks = ptrToOwned<derivation::OutputChecks<Inputs>>(getNullable(valueAt(json, "allOutputChecks")));
+    return res;
 }
 
 template<typename Inputs>
