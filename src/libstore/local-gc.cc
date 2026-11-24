@@ -22,12 +22,11 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
 {
     std::filesystem::path buf;
     try {
-        buf = std::filesystem::read_symlink(file);
-    } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::permission_denied
-            || e.code() == std::errc::no_such_process)
+        buf = readLink(file);
+    } catch (SystemError & e) {
+        if (e.is(std::errc::no_such_file_or_directory, std::errc::permission_denied, std::errc::no_such_process))
             return;
-        throw SystemError(e.code(), "reading symlink '%s'", PathFmt(file));
+        throw;
     }
     if (buf.is_absolute())
         roots[buf.string()].emplace(file.string());
