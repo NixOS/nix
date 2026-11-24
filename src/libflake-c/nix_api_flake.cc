@@ -7,8 +7,10 @@
 #include "nix_api_expr_internal.h"
 #include "nix_api_fetchers_internal.hh"
 #include "nix_api_fetchers.h"
+#include "nix_api_store_internal.h"
 
 #include "nix/flake/flake.hh"
+#include "nix/util/hash.hh"
 
 extern "C" {
 
@@ -206,6 +208,23 @@ nix_value * nix_locked_flake_get_output_attrs(
         return v;
     }
     NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_locked_flake_get_fingerprint(
+    nix_c_context * context,
+    Store * store,
+    nix_fetchers_settings * fetchSettings,
+    nix_locked_flake * lockedFlake,
+    nix_get_string_callback callback,
+    void * user_data)
+{
+    nix_clear_err(context);
+    try {
+        auto fingerprint = lockedFlake->lockedFlake->getFingerprint(*store->ptr, *fetchSettings->settings);
+        std::string result = fingerprint ? fingerprint->to_string(nix::HashFormat::Base16, false) : "";
+        return call_nix_get_string_callback(result, callback, user_data);
+    }
+    NIXC_CATCH_ERRS
 }
 
 } // extern "C"
