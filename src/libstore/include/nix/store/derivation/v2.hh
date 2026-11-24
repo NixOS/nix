@@ -331,6 +331,7 @@ class Derivation<SingleDerivedPath> final : public DerivationCommon<SingleDerive
 {
 public:
     using DerivationCommon::DerivationCommon;
+    ~Derivation() override;
 };
 
 template<>

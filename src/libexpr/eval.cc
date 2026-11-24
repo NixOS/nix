@@ -12,6 +12,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/interface.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/filetransfer.hh"
@@ -1075,14 +1076,15 @@ std::string EvalState::mkSingleDerivedPathStringRaw(const SingleDerivedPath & p)
                 auto optStaticOutputPath = std::visit(
                     overloaded{
                         [&](const SingleDerivedPath::Opaque & o) {
-                            auto drv = store->readDerivation(o.path);
-                            auto i = drv.outputs.find(b.output);
-                            if (i == drv.outputs.end())
+                            auto drv = store->readDerivationInterface(o.path);
+                            auto outputs = drv->outputs();
+                            auto i = outputs.find(b.output);
+                            if (i == outputs.end())
                                 throw Error(
                                     "derivation '%s' does not have output '%s'",
                                     b.drvPath->to_string(*store),
                                     b.output);
-                            return i->second.output.path(*store, drv.name, b.output);
+                            return i->second.output.path(*store, drv->name(), b.output);
                         },
                         [&](const SingleDerivedPath::Built & o) -> std::optional<StorePath> { return std::nullopt; },
                     },

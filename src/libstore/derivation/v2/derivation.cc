@@ -133,6 +133,8 @@ std::map<std::string, RenderedEnvVar, std::less<>> DerivationCommon<Input>::env(
 template class DerivationCommon<SingleDerivedPath>;
 template class DerivationCommon<StorePath>;
 
+Derivation<SingleDerivedPath>::~Derivation() = default;
+
 DesugaredEnv Derivation<StorePath>::desugarEnv(
     Store & store, const fun<std::string(const OutputName &)> & render, const StorePathSet & inputPaths) const
 {

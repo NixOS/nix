@@ -45,6 +45,9 @@ namespace v2 {
 template<typename Input>
 struct DerivationT;
 } // namespace v2
+
+template<typename Input>
+class Interface;
 } // namespace derivation
 
 using BasicDerivation = derivation::Derivation<StorePath, derivation::Output>;
@@ -936,6 +939,17 @@ public:
      * Read a derivation from a potentially invalid path.
      */
     virtual Derivation readInvalidDerivation(const StorePath & drvPath);
+
+    /**
+     * Read a derivation, as the version 1 or version 2 derivation it is.
+     *
+     * @param requireValidPath Whether the derivation must be valid.
+     *
+     * @todo Replaces `readDerivation` and `readInvalidDerivation` once
+     * their callers have moved to it.
+     */
+    ref<const derivation::Interface<SingleDerivedPath>>
+    readDerivationInterface(const StorePath & drvPath, bool requireValidPath = true);
 
     /**
      * @param [out] out Place in here the set of all store paths in the

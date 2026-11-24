@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/v2.hh"
 #include "nix/store/derivation/v1.hh"
 #include "nix/store/derivation/v1/masked.hh"
 #include "nix/store/derivation/v1/elaborate.hh"
@@ -1790,7 +1791,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     for (auto & j : refs) {
                         drv.inputs.insert(SingleDerivedPath::Opaque{j});
                         if (j.isDerivation()) {
-                            for (auto & outputName : state.store->readDerivation(j).outputNames()) {
+                            for (auto & outputName : state.store->readDerivationInterface(j)->outputNames()) {
                                 drv.inputs.insert(
                                     SingleDerivedPath::Built{
                                         .drvPath = makeConstantStorePathRef(j),
@@ -1842,12 +1843,16 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     .debugThrow();
             /* An input derivation that cannot be read, e.g. because it was
                only computed in read-only mode, is not checked here. */
-            std::optional<derivation::Version> version;
+            /* Which version a derivation is is just what this is about, so
+               this is one of the few places to look past the interface. */
+            bool isV2 = false;
             try {
-                version = state.store->readInvalidDerivation(opaque->path).version;
+                isV2 = dynamic_cast<const derivation::v2::Derivation<SingleDerivedPath> *>(
+                           &*state.store->readDerivationInterface(opaque->path, false))
+                       != nullptr;
             } catch (Error &) {
             }
-            if (version && *version != derivation::Version::V1)
+            if (isV2)
                 state
                     .error<EvalError>(
                         "a version 1 derivation cannot depend on the version 2 derivation '%s'",
