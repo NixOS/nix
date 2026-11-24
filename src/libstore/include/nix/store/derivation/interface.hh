@@ -74,17 +74,38 @@ struct OutputInfo
 };
 
 /**
- * What only a basic derivation can do: it is the kind that is built.
+ * The store path of an output of an input derivation, if it is known.
+ */
+using PathOf = fun<std::optional<StorePath>(const SingleDerivedPath::Built &)>;
+
+template<typename Input>
+class Interface;
+
+/**
+ * What only one form of derivation can do: a full derivation can be
+ * resolved, and a basic one built.
  */
 template<typename Input>
-class BasicOnly
+class FormOnly;
+
+template<>
+class FormOnly<SingleDerivedPath>
 {
+public:
+    /**
+     * [Resolve](@docroot@/store/resolution.md) the derivation: replace
+     * each input deriving path by the store path it denotes.
+     *
+     * @return `nullptr` if `pathOf` does not know some input's path.
+     */
+    virtual std::shared_ptr<const Interface<StorePath>> resolve(const StoreDirConfig & store, const PathOf & pathOf) const = 0;
+
 protected:
-    ~BasicOnly() = default;
+    virtual ~FormOnly();
 };
 
 template<>
-class BasicOnly<StorePath>
+class FormOnly<StorePath>
 {
 public:
     /**
@@ -101,7 +122,7 @@ public:
         const = 0;
 
 protected:
-    virtual ~BasicOnly();
+    virtual ~FormOnly();
 };
 
 /**
@@ -112,7 +133,7 @@ protected:
  * whose inputs are all store paths.
  */
 template<typename Input>
-class Interface : public BasicOnly<Input>
+class Interface : public FormOnly<Input>
 {
 public:
     using Render = typename RenderReference<Input>::type;

@@ -185,6 +185,54 @@ StructuredAttrsDerivationCommon<Inputs>::env(const Render & render) const
 EnvDerivation<FullInputs>::~EnvDerivation() = default;
 StructuredAttrsDerivation<FullInputs>::~StructuredAttrsDerivation() = default;
 
+/**
+ * What was parsed of a version 1 derivation, with each input derivation
+ * output replaced by its store path. Its strings already have those
+ * paths in them: a version 1 derivation only depends on outputs whose
+ * paths are known in advance.
+ */
+static std::optional<BasicTraditionalParsed> resolveParsed(const TraditionalParsed & parsed, const PathOf & pathOf)
+{
+    StorePathSet inputs;
+    for (auto & input : parsed.inputs.toSet()) {
+        auto path = std::visit(
+            overloaded{
+                [](const SingleDerivedPath::Opaque & o) -> std::optional<StorePath> { return o.path; },
+                [&](const SingleDerivedPath::Built & b) { return pathOf(b); },
+            },
+            input.raw());
+        if (!path)
+            return std::nullopt;
+        inputs.insert(std::move(*path));
+    }
+    return BasicTraditionalParsed{
+        .outputs = parsed.outputs,
+        .inputs = std::move(inputs),
+        .platform = parsed.platform,
+        .builder = parsed.builder,
+        .args = parsed.args,
+        .env = parsed.env,
+    };
+}
+
+std::shared_ptr<const Interface<StorePath>>
+EnvDerivation<FullInputs>::resolve(const StoreDirConfig & store, const PathOf & pathOf) const
+{
+    auto basic = resolveParsed(parsed_, pathOf);
+    if (!basic)
+        return nullptr;
+    return std::make_shared<const EnvDerivation<StorePathSet>>(std::move(*basic), name_, store);
+}
+
+std::shared_ptr<const Interface<StorePath>>
+StructuredAttrsDerivation<FullInputs>::resolve(const StoreDirConfig & store, const PathOf & pathOf) const
+{
+    auto basic = resolveParsed(parsed_, pathOf);
+    if (!basic)
+        return nullptr;
+    return std::make_shared<const StructuredAttrsDerivation<StorePathSet>>(std::move(*basic), name_, store);
+}
+
 DesugaredEnv EnvDerivation<StorePathSet>::desugarEnv(
     Store & store, const fun<std::string(const OutputName &)> & render, const StorePathSet & inputPaths) const
 {

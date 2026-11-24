@@ -18,7 +18,7 @@ namespace nix::derivation::v2 {
 /**
  * The store path of an output of an input derivation, if it is known.
  */
-using PathOf = fun<std::optional<StorePath>(const SingleDerivedPath::Built &)>;
+using derivation::PathOf;
 
 /**
  * [Resolve](@docroot@/store/resolution.md) a derivation: replace each

@@ -2,7 +2,8 @@
 
 namespace nix::derivation {
 
-BasicOnly<StorePath>::~BasicOnly() = default;
+FormOnly<SingleDerivedPath>::~FormOnly() = default;
+FormOnly<StorePath>::~FormOnly() = default;
 
 template<typename Input>
 StringSet Interface<Input>::outputNames() const

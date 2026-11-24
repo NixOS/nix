@@ -1,4 +1,5 @@
 #include "nix/store/derivation/v2.hh"
+#include "nix/store/derivation/v2/convert.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/store-api.hh"
@@ -134,6 +135,16 @@ template class DerivationCommon<SingleDerivedPath>;
 template class DerivationCommon<StorePath>;
 
 Derivation<SingleDerivedPath>::~Derivation() = default;
+
+std::shared_ptr<const Interface<StorePath>>
+Derivation<SingleDerivedPath>::resolve(const StoreDirConfig & store, const PathOf & pathOf) const
+{
+    auto basic = v2::resolve(store, drv_, pathOf);
+    if (!basic)
+        return nullptr;
+    auto paths = v2::outputPaths(store, *basic);
+    return std::make_shared<const Derivation<StorePath>>(std::move(*basic), std::move(paths));
+}
 
 DesugaredEnv Derivation<StorePath>::desugarEnv(
     Store & store, const fun<std::string(const OutputName &)> & render, const StorePathSet & inputPaths) const

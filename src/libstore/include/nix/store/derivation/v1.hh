@@ -221,6 +221,8 @@ class EnvDerivation<FullInputs> final : public EnvDerivationCommon<FullInputs>
 public:
     using EnvDerivationCommon::EnvDerivationCommon;
     ~EnvDerivation() override;
+
+    std::shared_ptr<const Interface<StorePath>> resolve(const StoreDirConfig & store, const PathOf & pathOf) const override;
 };
 
 template<>
@@ -247,6 +249,8 @@ class StructuredAttrsDerivation<FullInputs> final : public StructuredAttrsDeriva
 public:
     using StructuredAttrsDerivationCommon::StructuredAttrsDerivationCommon;
     ~StructuredAttrsDerivation() override;
+
+    std::shared_ptr<const Interface<StorePath>> resolve(const StoreDirConfig & store, const PathOf & pathOf) const override;
 };
 
 template<>

@@ -332,6 +332,8 @@ class Derivation<SingleDerivedPath> final : public DerivationCommon<SingleDerive
 public:
     using DerivationCommon::DerivationCommon;
     ~Derivation() override;
+
+    std::shared_ptr<const Interface<StorePath>> resolve(const StoreDirConfig & store, const PathOf & pathOf) const override;
 };
 
 template<>
