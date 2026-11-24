@@ -61,7 +61,9 @@ enum InternalType {
     tApp,
     tThunk,
     tLambda,
-    tLastPairOfPointers = tLambda,
+    /** @see IndexedCallThunk. */
+    tIndexedCall,
+    tLastPairOfPointers = tIndexedCall,
     /* layout: Single untaggable field */
     tFirstSingleUntaggable,
     tListN = tFirstSingleUntaggable,
@@ -416,6 +418,23 @@ struct ValueBase
         Value *left, *right;
     };
 
+    /** Shared by every attribute of one mapAttrs/zipAttrsWith call. */
+    struct IndexedCallDescriptor
+    {
+        Value * fun;
+        const Bindings * original;
+    };
+
+    /**
+     * `packedIndex` is `index << 3`: the low 3 bits of this slot are
+     * reserved for `ValueStorage`'s own discriminator.
+     */
+    struct IndexedCallThunk
+    {
+        IndexedCallDescriptor * descriptor;
+        void * packedIndex;
+    };
+
     /**
      * Like FunctionApplicationThunk, but must be a distinct type in order to
      * resolve overloads to `tPrimOpApp` instead of `tApp`.
@@ -512,6 +531,7 @@ struct PayloadTypeToInternalType
     MACRO(ValueBase::SmallList, smallList, tListSmall)              \
     MACRO(ValueBase::ClosureThunk, thunk, tThunk)                   \
     MACRO(ValueBase::FunctionApplicationThunk, app, tApp)           \
+    MACRO(ValueBase::IndexedCallThunk, indexedCall, tIndexedCall)   \
     MACRO(ValueBase::Lambda, lambda, tLambda)                       \
     MACRO(PrimOp *, primOp, tPrimOp)                                \
     MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
@@ -865,6 +885,7 @@ protected:
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(FunctionApplicationThunk, .left, .right)
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(ClosureThunk, .env, .expr)
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(Lambda, .env, .fun)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(ValueBase::IndexedCallThunk, .descriptor, .packedIndex)
 
 #undef NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS
 
@@ -1251,6 +1272,11 @@ public:
         return isa<tApp>();
     }
 
+    inline bool isIndexedCall() const
+    {
+        return isa<tIndexedCall>();
+    }
+
     inline bool isBlackhole() const;
 
     // type() == nFunction
@@ -1300,6 +1326,7 @@ public:
             t[tLambda] = nFunction;
             t[tPrimOpApp] = nFunction;
             t[tApp] = nThunk;
+            t[tIndexedCall] = nThunk;
             t[tThunk] = nThunk;
             t[tListSmall] = nList;
             t[tString] = nString;
@@ -1342,6 +1369,7 @@ public:
             panic("attempt to use uninitialized Value");
         case tFailed:
         case tApp:
+        case tIndexedCall:
         case tThunk:
             return false;
         case tInt:
@@ -1436,6 +1464,12 @@ public:
     inline void mkApp(Value * l, Value * r) noexcept
     {
         setStorage(FunctionApplicationThunk{.left = l, .right = r});
+    }
+
+    /** `descriptor` must outlive this Value. */
+    inline void mkIndexedCall(IndexedCallDescriptor * descriptor, uint32_t index) noexcept
+    {
+        setStorage(IndexedCallThunk{.descriptor = descriptor, .packedIndex = (void *) (uintptr_t(index) << 3)});
     }
 
     inline void mkLambda(Env * e, ExprLambda * f) noexcept
@@ -1578,6 +1612,11 @@ public:
     FunctionApplicationThunk app() const noexcept
     {
         return getStorage<FunctionApplicationThunk>();
+    }
+
+    IndexedCallThunk indexedCall() const noexcept
+    {
+        return getStorage<IndexedCallThunk>();
     }
 
     const char * pathStr() const noexcept
