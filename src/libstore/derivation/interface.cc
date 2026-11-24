@@ -5,9 +5,9 @@ namespace nix::derivation {
 BasicOnly<StorePath>::~BasicOnly() = default;
 
 template<typename Input>
-std::set<OutputName> Interface<Input>::outputNames() const
+StringSet Interface<Input>::outputNames() const
 {
-    std::set<OutputName> names;
+    StringSet names;
     for (auto & [name, _] : outputs())
         names.insert(name);
     return names;

@@ -146,7 +146,7 @@ public:
 
     /* Derived from the above, for every version alike. */
 
-    std::set<OutputName> outputNames() const;
+    StringSet outputNames() const;
 
     bool isBuiltin() const;
 

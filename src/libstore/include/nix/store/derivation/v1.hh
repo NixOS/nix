@@ -21,6 +21,8 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/v1/traditional.hh"
+#include "nix/store/derivation/interface.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 
 namespace nix::derivation::v1 {
 
@@ -43,27 +45,47 @@ struct InputOf<StorePathSet>
     using type = StorePath;
 };
 
+
 /**
  * What both modes of version 1 derivation have: what was parsed, and the
  * name the encoding leaves out.
+ *
+ * Its strings refer to the derivation's own outputs by their stable
+ * placeholders, and to its inputs by their store paths, which are all
+ * known: a version 1 derivation cannot depend on a version 2 one.
  */
 template<typename Inputs>
-class Common
+class Common : public Interface<typename InputOf<Inputs>::type>
 {
 public:
     using Input = typename InputOf<Inputs>::type;
+    using typename Interface<Input>::Render;
 
     const TraditionalParsedT<Inputs> & parsed() const
     {
         return parsed_;
     }
 
-    const std::string & name() const
+    const std::string & name() const override
     {
         return name_;
     }
 
-    bool operator==(const Common &) const = default;
+    const std::string & platform() const override
+    {
+        return parsed_.platform;
+    }
+
+    InputSet<Input> inputs() const override;
+
+    std::string builder(const Render & render) const override;
+
+    Strings args(const Render & render) const override;
+
+    bool operator==(const Common & other) const
+    {
+        return parsed_ == other.parsed_ && name_ == other.name_;
+    }
 
 protected:
     Common(TraditionalParsedT<Inputs> parsed, std::string name)
@@ -71,6 +93,11 @@ protected:
         , name_(std::move(name))
     {
     }
+
+    /**
+     * Write out the references to the derivation's own outputs in `s`.
+     */
+    std::string render(std::string s, const Render & render) const;
 
     TraditionalParsedT<Inputs> parsed_;
     std::string name_;
@@ -85,19 +112,20 @@ protected:
  * variables can be passed as files.
  */
 template<typename Inputs>
-class EnvDerivation : public Common<Inputs>
+class EnvDerivationCommon : public Common<Inputs>
 {
 public:
     using typename Common<Inputs>::Input;
+    using typename Common<Inputs>::Render;
 
-    EnvDerivation(
+    EnvDerivationCommon(
         TraditionalParsedT<Inputs> parsed,
         std::string name,
         const StoreDirConfig & store,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings,
         bool shouldWarn = true);
 
-    const CommonTopOptions<Input> & options() const
+    const CommonTopOptions<Input> & options() const override
     {
         return options_;
     }
@@ -112,7 +140,14 @@ public:
         return passAsFile_;
     }
 
-    bool operator==(const EnvDerivation &) const = default;
+    /**
+     * The checks given for all outputs are those of each.
+     */
+    std::map<OutputName, OutputInfo<Input>, std::less<>> outputs() const override;
+
+    std::map<std::string, RenderedEnvVar, std::less<>> env(const Render & render) const override;
+
+    bool operator==(const EnvDerivationCommon &) const = default;
 
 private:
     /* Decoded from `parsed_`, and only a cache of it. */
@@ -129,12 +164,13 @@ private:
  * references can be discarded; nothing is passed as a file.
  */
 template<typename Inputs>
-class StructuredAttrsDerivation : public Common<Inputs>
+class StructuredAttrsDerivationCommon : public Common<Inputs>
 {
 public:
     using typename Common<Inputs>::Input;
+    using typename Common<Inputs>::Render;
 
-    StructuredAttrsDerivation(
+    StructuredAttrsDerivationCommon(
         TraditionalParsedT<Inputs> parsed,
         std::string name,
         const StoreDirConfig & store,
@@ -146,7 +182,7 @@ public:
         return structuredAttrs_;
     }
 
-    const CommonTopOptions<Input> & options() const
+    const CommonTopOptions<Input> & options() const override
     {
         return options_;
     }
@@ -156,13 +192,76 @@ public:
         return outputOptions_;
     }
 
-    bool operator==(const StructuredAttrsDerivation &) const = default;
+    std::map<OutputName, OutputInfo<Input>, std::less<>> outputs() const override;
+
+    /**
+     * The environment variables other than the structured attributes
+     * themselves.
+     */
+    std::map<std::string, RenderedEnvVar, std::less<>> env(const Render & render) const override;
+
+    bool operator==(const StructuredAttrsDerivationCommon &) const = default;
 
 private:
     /* Decoded from `parsed_`, and only a cache of it. */
     StructuredAttrs structuredAttrs_;
     CommonTopOptions<Input> options_;
     std::map<OutputName, OutputOptions<Input>, std::less<>> outputOptions_;
+};
+
+/* The full and basic forms of each mode. Only a basic derivation is
+   built, so only it says how its builder's environment is made. */
+
+template<typename Inputs>
+class EnvDerivation;
+
+template<>
+class EnvDerivation<FullInputs> final : public EnvDerivationCommon<FullInputs>
+{
+public:
+    using EnvDerivationCommon::EnvDerivationCommon;
+    ~EnvDerivation() override;
+};
+
+template<>
+class EnvDerivation<StorePathSet> final : public EnvDerivationCommon<StorePathSet>
+{
+public:
+    using EnvDerivationCommon::EnvDerivationCommon;
+
+    /**
+     * Each environment variable is set directly or via a file, and each
+     * export references graph is in the legacy textual format.
+     */
+    DesugaredEnv desugarEnv(
+        Store & store, const fun<std::string(const OutputName &)> & render, const StorePathSet & inputPaths)
+        const override;
+};
+
+template<typename Inputs>
+class StructuredAttrsDerivation;
+
+template<>
+class StructuredAttrsDerivation<FullInputs> final : public StructuredAttrsDerivationCommon<FullInputs>
+{
+public:
+    using StructuredAttrsDerivationCommon::StructuredAttrsDerivationCommon;
+    ~StructuredAttrsDerivation() override;
+};
+
+template<>
+class StructuredAttrsDerivation<StorePathSet> final : public StructuredAttrsDerivationCommon<StorePathSet>
+{
+public:
+    using StructuredAttrsDerivationCommon::StructuredAttrsDerivationCommon;
+
+    /**
+     * The structured attributes, with the export references graphs in
+     * them, are given as JSON and shell files.
+     */
+    DesugaredEnv desugarEnv(
+        Store & store, const fun<std::string(const OutputName &)> & render, const StorePathSet & inputPaths)
+        const override;
 };
 
 /**
