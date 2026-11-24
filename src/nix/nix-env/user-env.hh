@@ -5,7 +5,10 @@
 
 namespace nix {
 
-PackageInfos queryInstalled(EvalState & state, const std::filesystem::path & userEnv);
+/**
+ * The packages installed in the user environment @p userEnv.
+ */
+PackageInfos queryInstalled(EvalState & state, const SourcePath & userEnv);
 
 bool createUserEnv(
     EvalState & state,

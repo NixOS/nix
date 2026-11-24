@@ -601,7 +601,7 @@ public:
      * backwards compat, but for Windows and maybe also pure eval, we'll
      * probably want to do something different.
      */
-    SourcePath storePath(const StorePath & path);
+    SourcePath storePath(const StorePath & path) const;
 
     /**
      * Allow access to a path.

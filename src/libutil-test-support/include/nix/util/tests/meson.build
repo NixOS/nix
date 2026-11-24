@@ -4,8 +4,10 @@ include_dirs = [ include_directories('../../..') ]
 
 headers = files(
   'assertions.hh',
+  'canon-path.hh',
   'capture-logging.hh',
   'characterization.hh',
+  'filename.hh',
   'gmock-matchers.hh',
   'gtest-with-params.hh',
   'hash.hh',
@@ -14,4 +16,5 @@ headers = files(
   'result.hh',
   'string_callback.hh',
   'test-data.hh',
+  'unresolved-path.hh',
 )

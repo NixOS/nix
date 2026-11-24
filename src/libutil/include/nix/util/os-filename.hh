@@ -20,6 +20,10 @@ namespace nix {
  *
  * This type is useful for APIs that expect a bare filename rather than
  * a full path, providing compile-time documentation and runtime validation.
+ *
+ * It is the OS-native counterpart of the portable `Filename`, as
+ * `OsCanonPath` is of `CanonPath`; see `PathView` for how all the path
+ * types relate.
  */
 class OsFilename
 {

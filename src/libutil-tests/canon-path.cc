@@ -1,13 +1,16 @@
 #include "nix/util/canon-path.hh"
+#include "nix/util/path-iterator.hh"
 
 #include <gtest/gtest.h>
+
+#include <type_traits>
 
 namespace nix {
 
 TEST(CanonPath, basic)
 {
     {
-        CanonPath p("/");
+        auto p = "/"_canonPath;
         ASSERT_EQ(p.abs(), "/");
         ASSERT_EQ(p.rel(), "");
         ASSERT_EQ(p.baseName(), std::nullopt);
@@ -16,7 +19,7 @@ TEST(CanonPath, basic)
     }
 
     {
-        CanonPath p("/foo//");
+        auto p = CanonPath::fromThrowing("/foo//");
         ASSERT_EQ(p.abs(), "/foo");
         ASSERT_EQ(p.rel(), "foo");
         ASSERT_EQ(*p.baseName(), "foo");
@@ -25,7 +28,7 @@ TEST(CanonPath, basic)
     }
 
     {
-        CanonPath p("foo/bar");
+        auto p = CanonPath::fromThrowing("foo/bar");
         ASSERT_EQ(p.abs(), "/foo/bar");
         ASSERT_EQ(p.rel(), "foo/bar");
         ASSERT_EQ(*p.baseName(), "bar");
@@ -34,12 +37,100 @@ TEST(CanonPath, basic)
     }
 
     {
-        CanonPath p("foo//bar/");
+        auto p = CanonPath::fromThrowing("foo//bar/");
         ASSERT_EQ(p.abs(), "/foo/bar");
         ASSERT_EQ(p.rel(), "foo/bar");
         ASSERT_EQ(*p.baseName(), "bar");
         ASSERT_EQ(*p.dirOf(), "/foo");
     }
+}
+
+TEST(CanonPath, maybeFromUnresolved)
+{
+    EXPECT_EQ(CanonPath::maybeFromUnresolved(UnresolvedPath("/a/./b/")), "/a/b"_canonPath);
+    EXPECT_EQ(CanonPath::maybeFromUnresolved(UnresolvedPath("/")), CanonPath::root);
+    /* Never removed lexically. */
+    EXPECT_EQ(CanonPath::maybeFromUnresolved(UnresolvedPath("/a/../b")), std::nullopt);
+    EXPECT_EQ(CanonPath::maybeFromUnresolved(UnresolvedPath("/..")), std::nullopt);
+}
+
+TEST(CanonPath, fromAsserting)
+{
+    EXPECT_EQ(CanonPath::fromAsserting(UnresolvedPath("/a/./b/")), "/a/b"_canonPath);
+    EXPECT_EQ(CanonPath::fromAsserting(UnresolvedPath("/")), CanonPath::root);
+}
+
+TEST(CanonPathDeathTest, fromAssertingDotDot)
+{
+    EXPECT_DEATH(CanonPath::fromAsserting(UnresolvedPath("/a/../b")), "hasDotDot");
+}
+
+TEST(CanonPath, fromThrowing)
+{
+    EXPECT_EQ(CanonPath::fromThrowing(UnresolvedPath("a/./b/")), "/a/b"_canonPath);
+    EXPECT_EQ(CanonPath::fromThrowing(UnresolvedPath("/")), CanonPath::root);
+    EXPECT_THROW(CanonPath::fromThrowing(UnresolvedPath("/a/../b")), BadCanonPath);
+    EXPECT_THROW(CanonPath::fromThrowing(UnresolvedPath("..")), BadCanonPath);
+}
+
+TEST(CanonPath, literal)
+{
+    EXPECT_EQ("/"_canonPath, CanonPath::root);
+    EXPECT_EQ("/foo/bar"_canonPath.abs(), "/foo/bar");
+    EXPECT_EQ("/foo/bar"_canonPath, CanonPath::improperlyResolveLexicallyFrom("foo/bar"));
+}
+
+/* Whether `L` may be written as `L_canonPath`, which is checked at
+   compile time. Nothing is normalised: the literal must already be
+   canonical. */
+template<CanonPathLiteral L>
+constexpr bool isCanonPathLiteral = requires { operator""_canonPath < L>(); };
+
+static_assert(isCanonPathLiteral<"/">);
+static_assert(isCanonPathLiteral<"/foo">);
+static_assert(isCanonPathLiteral<"/foo/bar">);
+static_assert(!isCanonPathLiteral<"">);
+static_assert(!isCanonPathLiteral<"foo">);
+static_assert(!isCanonPathLiteral<"/foo/">);
+static_assert(!isCanonPathLiteral<"//foo">);
+static_assert(!isCanonPathLiteral<"/foo//bar">);
+static_assert(!isCanonPathLiteral<"/foo/./bar">);
+static_assert(!isCanonPathLiteral<"/foo/../bar">);
+static_assert(!isCanonPathLiteral<"/..">);
+static_assert(!isCanonPathLiteral<"/a\0b">);
+
+/* A `CanonPath` can be used as an `UnresolvedPath`, but only `const`, so
+   that `..` cannot be pushed onto it that way, and it cannot be made from a
+   string without saying how. */
+static_assert(!std::is_convertible_v<CanonPath &, UnresolvedPath &>);
+static_assert(std::is_convertible_v<const CanonPath &, const UnresolvedPath &>);
+static_assert(!std::is_constructible_v<CanonPath, std::string_view>);
+static_assert(!std::is_constructible_v<CanonPath, const char *>);
+
+TEST(CanonPath, improperlyResolveLexicallyFrom)
+{
+    /* `..` removed lexically, whatever `a` is. */
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/a/../b"), "/b"_canonPath);
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/a/./b//"), "/a/b"_canonPath);
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/.."), CanonPath::root);
+    /* The rest are written over the input, as it is read. */
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/a/.."), "/"_canonPath);
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/../a"), "/a"_canonPath);
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/a/b/../../c"), "/c"_canonPath);
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/aa/b/../cc/../../../d/e"), "/d/e"_canonPath);
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/a/../bbb/c/../d"), "/bbb/d"_canonPath);
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom("/a/.../..b"), "/a/.../..b"_canonPath);
+
+    /* The same from an `UnresolvedPath`, borrowed or consumed. */
+    UnresolvedPath p{"/a/b/../c"};
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom(p), "/a/c"_canonPath);
+    EXPECT_EQ(p.abs(), "/a/b/../c");
+    EXPECT_EQ(CanonPath::improperlyResolveLexicallyFrom(std::move(p)), "/a/c"_canonPath);
+}
+
+TEST(CanonPath, fromUnchecked)
+{
+    EXPECT_EQ(CanonPath::fromUnchecked(UnresolvedPath::fromUnchecked("/a/b")).abs(), "/a/b");
 }
 
 TEST(CanonPath, nullBytes)
@@ -48,35 +139,35 @@ TEST(CanonPath, nullBytes)
     s[8] = '\0';
     /* `push` takes a `FilenameView`, which cannot contain a NUL byte. */
     ASSERT_THROW(FilenameView::fromStringThrowing(std::string(1, '\0')), Error);
-    ASSERT_THROW(CanonPath(std::string_view(s)), BadCanonPath);
-    ASSERT_THROW(CanonPath(s, CanonPath::root), BadCanonPath);
+    ASSERT_THROW(CanonPath::improperlyResolveLexicallyFrom(std::string_view(s)), BadCanonPath);
+    ASSERT_THROW(CanonPath::improperlyResolveLexicallyFrom(UnresolvedPath(s, CanonPath::root)), BadCanonPath);
 }
 
 TEST(CanonPath, fromFilename)
 {
-    ASSERT_THROW(CanonPath::fromFilename("."), BadCanonPath);
-    ASSERT_THROW(CanonPath::fromFilename(".."), BadCanonPath);
-    ASSERT_THROW(CanonPath::fromFilename(""), BadCanonPath);
-    ASSERT_THROW(CanonPath::fromFilename("/.."), BadCanonPath);
-    ASSERT_THROW(CanonPath::fromFilename("/."), BadCanonPath);
-    ASSERT_THROW(CanonPath::fromFilename("/abc"), BadCanonPath);
-    ASSERT_THROW(CanonPath::fromFilename("abc/d"), BadCanonPath);
-    ASSERT_THROW(CanonPath::fromFilename("/abc/d"), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename("."), BadFilename);
+    ASSERT_THROW(CanonPath::fromFilename(".."), BadFilename);
+    ASSERT_THROW(CanonPath::fromFilename(""), BadFilename);
+    ASSERT_THROW(CanonPath::fromFilename("/.."), BadFilename);
+    ASSERT_THROW(CanonPath::fromFilename("/."), BadFilename);
+    ASSERT_THROW(CanonPath::fromFilename("/abc"), BadFilename);
+    ASSERT_THROW(CanonPath::fromFilename("abc/d"), BadFilename);
+    ASSERT_THROW(CanonPath::fromFilename("/abc/d"), BadFilename);
     ASSERT_EQ(CanonPath::fromFilename("abc").rel(), "abc");
 }
 
 TEST(CanonPath, from_existing)
 {
-    CanonPath p0("foo//bar/");
+    auto p0 = CanonPath::improperlyResolveLexicallyFrom("foo//bar/");
     {
-        CanonPath p("/baz//quux/", p0);
+        auto p = CanonPath::fromThrowing(UnresolvedPath("/baz//quux/", p0));
         ASSERT_EQ(p.abs(), "/baz/quux");
         ASSERT_EQ(p.rel(), "baz/quux");
         ASSERT_EQ(*p.baseName(), "quux");
         ASSERT_EQ(*p.dirOf(), "/baz");
     }
     {
-        CanonPath p("baz//quux/", p0);
+        auto p = CanonPath::fromThrowing(UnresolvedPath("baz//quux/", p0));
         ASSERT_EQ(p.abs(), "/foo/bar/baz/quux");
         ASSERT_EQ(p.rel(), "foo/bar/baz/quux");
         ASSERT_EQ(*p.baseName(), "quux");
@@ -87,7 +178,7 @@ TEST(CanonPath, from_existing)
 TEST(CanonPath, iter)
 {
     {
-        CanonPath p("a//foo/bar//");
+        auto p = CanonPath::improperlyResolveLexicallyFrom("a//foo/bar//");
         std::vector<std::string_view> ss;
         for (auto & c : p)
             ss.push_back(c);
@@ -95,7 +186,7 @@ TEST(CanonPath, iter)
     }
 
     {
-        CanonPath p("/");
+        auto p = "/"_canonPath;
         std::vector<std::string_view> ss;
         for (auto & c : p)
             ss.push_back(c);
@@ -110,12 +201,12 @@ TEST(CanonPath, iter)
 TEST(CanonPath, concatComponent)
 {
     {
-        CanonPath p("/foo/bar");
+        auto p = "/foo/bar"_canonPath;
         ASSERT_EQ((p / "x"_filename).abs(), "/foo/bar/x");
     }
 
     {
-        CanonPath p("/");
+        auto p = "/"_canonPath;
         ASSERT_EQ((p / "foo"_filename / "bar"_filename).abs(), "/foo/bar");
     }
 }
@@ -123,38 +214,38 @@ TEST(CanonPath, concatComponent)
 TEST(CanonPath, allowed)
 {
     std::set<CanonPath> allowed{
-        CanonPath("foo/bar"),
-        CanonPath("foo!"),
-        CanonPath("xyzzy"),
-        CanonPath("a/b/c"),
+        "/foo/bar"_canonPath,
+        "/foo!"_canonPath,
+        "/xyzzy"_canonPath,
+        "/a/b/c"_canonPath,
     };
 
-    ASSERT_TRUE(CanonPath("foo/bar").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("foo/bar/bla").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("foo").isAllowed(allowed));
-    ASSERT_FALSE(CanonPath("bar").isAllowed(allowed));
-    ASSERT_FALSE(CanonPath("bar/a").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("a").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("a/b").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("a/b/c").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("a/b/c/d").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("a/b/c/d/e").isAllowed(allowed));
-    ASSERT_FALSE(CanonPath("a/b/a").isAllowed(allowed));
-    ASSERT_FALSE(CanonPath("a/b/d").isAllowed(allowed));
-    ASSERT_FALSE(CanonPath("aaa").isAllowed(allowed));
-    ASSERT_FALSE(CanonPath("zzz").isAllowed(allowed));
-    ASSERT_TRUE(CanonPath("/").isAllowed(allowed));
+    ASSERT_TRUE("/foo/bar"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/foo/bar/bla"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/foo"_canonPath.isAllowed(allowed));
+    ASSERT_FALSE("/bar"_canonPath.isAllowed(allowed));
+    ASSERT_FALSE("/bar/a"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/a"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/a/b"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/a/b/c"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/a/b/c/d"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/a/b/c/d/e"_canonPath.isAllowed(allowed));
+    ASSERT_FALSE("/a/b/a"_canonPath.isAllowed(allowed));
+    ASSERT_FALSE("/a/b/d"_canonPath.isAllowed(allowed));
+    ASSERT_FALSE("/aaa"_canonPath.isAllowed(allowed));
+    ASSERT_FALSE("/zzz"_canonPath.isAllowed(allowed));
+    ASSERT_TRUE("/"_canonPath.isAllowed(allowed));
 }
 
 TEST(CanonPath, makeRelative)
 {
-    CanonPath d("/foo/bar");
-    ASSERT_EQ(d.makeRelative(CanonPath("/foo/bar")), ".");
-    ASSERT_EQ(d.makeRelative(CanonPath("/foo")), "..");
-    ASSERT_EQ(d.makeRelative(CanonPath("/")), "../..");
-    ASSERT_EQ(d.makeRelative(CanonPath("/foo/bar/xyzzy")), "xyzzy");
-    ASSERT_EQ(d.makeRelative(CanonPath("/foo/bar/xyzzy/bla")), "xyzzy/bla");
-    ASSERT_EQ(d.makeRelative(CanonPath("/foo/xyzzy/bla")), "../xyzzy/bla");
-    ASSERT_EQ(d.makeRelative(CanonPath("/xyzzy/bla")), "../../xyzzy/bla");
+    auto d = "/foo/bar"_canonPath;
+    ASSERT_EQ(d.makeRelative("/foo/bar"_canonPath), ".");
+    ASSERT_EQ(d.makeRelative("/foo"_canonPath), "..");
+    ASSERT_EQ(d.makeRelative("/"_canonPath), "../..");
+    ASSERT_EQ(d.makeRelative("/foo/bar/xyzzy"_canonPath), "xyzzy");
+    ASSERT_EQ(d.makeRelative("/foo/bar/xyzzy/bla"_canonPath), "xyzzy/bla");
+    ASSERT_EQ(d.makeRelative("/foo/xyzzy/bla"_canonPath), "../xyzzy/bla");
+    ASSERT_EQ(d.makeRelative("/xyzzy/bla"_canonPath), "../../xyzzy/bla");
 }
 } // namespace nix

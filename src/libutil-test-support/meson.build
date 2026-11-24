@@ -43,8 +43,11 @@ deps_private_no_pkgconfig += cxx.find_library(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'canon-path.cc',
+  'filename.cc',
   'hash.cc',
   'string_callback.cc',
+  'unresolved-path.cc',
 )
 
 subdir('include/nix/util/tests')

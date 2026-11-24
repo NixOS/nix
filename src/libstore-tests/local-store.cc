@@ -1,3 +1,4 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "nix/store/local-store.hh"
@@ -5,6 +6,7 @@
 
 #include "nix/util/archive.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 #ifdef _WIN32
 #  include "nix/util/tests/wine.hh"
@@ -35,6 +37,21 @@ TEST(LocalStore, storeDir_relativePath_rejected)
 TEST(LocalStore, storeDir_empty_rejected)
 {
     EXPECT_THROW(LocalStoreConfig("", {{"store", ""}}), UsageError);
+}
+
+TEST(LocalStore, storeDir_dotDot_rejected)
+{
+    /* Not removed lexically, as `store` could be a symlink. */
+    std::filesystem::path storeDir =
+#ifdef _WIN32
+        "C:\\";
+#else
+        "/";
+#endif
+    storeDir = storeDir / "nix" / "store" / ".." / "store";
+    EXPECT_THAT(
+        [&] { LocalStoreConfig("", {{"store", storeDir.string()}}); },
+        ::testing::ThrowsMessage<UsageError>(testing::HasSubstrIgnoreANSIMatcher("must not contain '..' components")));
 }
 
 TEST(LocalStore, constructConfig_rootQueryParam)
@@ -169,13 +186,13 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
 {
     auto accessor = make_ref<MemorySourceAccessor>();
     accessor->addDirectory(CanonPath::root);
-    accessor->addFile(CanonPath("/regular"), "test");
-    accessor->addFile(CanonPath("/executable"), "test", /*executable=*/true);
-    accessor->addDirectory(CanonPath("/dir"));
-    accessor->addFile(CanonPath("/dir/regular"), "test 2");
-    accessor->addFile(CanonPath("/dir/executable"), "test 2", /*executable=*/true);
-    accessor->addSymlink(CanonPath("/dir/symlink"), "..");
-    accessor->addSymlink(CanonPath("/symlink"), "some target");
+    accessor->addFile("/regular"_canonPath, "test");
+    accessor->addFile("/executable"_canonPath, "test", /*executable=*/true);
+    accessor->addDirectory("/dir"_canonPath);
+    accessor->addFile("/dir/regular"_canonPath, "test 2");
+    accessor->addFile("/dir/executable"_canonPath, "test 2", /*executable=*/true);
+    accessor->addSymlink("/dir/symlink"_canonPath, "..");
+    accessor->addSymlink("/symlink"_canonPath, "some target");
     auto source = sinkToSource([&accessor](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });
     auto sp = store->addToStoreFromDump(
         *source,
@@ -188,7 +205,7 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
         NoRepair);
     assertCanonicalPermissions(store->toRealPath(sp));
 
-    accessor->addFile(CanonPath("/other"), "");
+    accessor->addFile("/other"_canonPath, "");
     auto sp2 = store->addToStoreSlow("nar-slow", {accessor}, ContentAddressMethod::Raw::NixArchive, getHashAlgo()).path;
     assertCanonicalPermissions(store->toRealPath(sp2));
 
@@ -198,7 +215,7 @@ TEST_P(LocalStoreCanonicalisationTest, simpleNar)
     // So that we always spill to the file system.
     settings.getLocalSettings().narBufferSize = 0;
 
-    accessor->addDirectory(CanonPath("/dir/entirely-something-else"));
+    accessor->addDirectory("/dir/entirely-something-else"_canonPath);
     StringSink narDump;
     accessor->dumpPath(CanonPath::root, narDump);
     StringSource narSource{narDump.s};

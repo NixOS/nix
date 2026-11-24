@@ -685,7 +685,7 @@ string_t AttrCursor::getStringWithContext()
                context, but we can guess by looking up the "mount". */
             auto [sp, _] = state.store->toStorePath(sourcePath.path.abs());
             NixStringContext context;
-            if (state.storeFS->getMount(CanonPath(state.store->printStorePath(sp))))
+            if (state.storeFS->getMount(state.storePath(sp).path))
                 context.insert(NixStringContextElem::Opaque{std::move(sp)});
             return {sourcePath.path.abs(), context};
         }

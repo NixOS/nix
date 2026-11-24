@@ -1,3 +1,4 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
@@ -8,6 +9,7 @@
 
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 namespace nix {
 
@@ -42,8 +44,16 @@ TEST(DummyStore, storeDir_absolutePath)
 
 TEST(DummyStore, storeDir_canonicalized)
 {
-    DummyStoreConfig config{{{"store", "/my//store/../store"}}};
+    DummyStoreConfig config{{{"store", "/my//store/./"}}};
     EXPECT_EQ(config.storeDir, "/my/store");
+}
+
+TEST(DummyStore, storeDir_dotDot_rejected)
+{
+    /* Not removed lexically, as `store` could be a symlink. */
+    EXPECT_THAT(
+        ([] { DummyStoreConfig{{{"store", "/my/store/../store"}}}; }),
+        ::testing::ThrowsMessage<UsageError>(testing::HasSubstrIgnoreANSIMatcher("must not contain '..' components")));
 }
 
 TEST(DummyStore, storeDir_relativePath_rejected)

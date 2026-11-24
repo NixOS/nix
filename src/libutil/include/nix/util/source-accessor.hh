@@ -221,13 +221,58 @@ public:
     virtual std::string showPath(const CanonPath & path);
 
     /**
+     * Like the other `showPath`, but for a path that may have `..` in it.
+     * Without any, it is that `showPath`, so that the rendering of the
+     * accessor in question applies; with some, which part of the accessor
+     * it is in is not known until it is resolved, so this just shows it
+     * with the display prefix and suffix.
+     */
+    std::string showPath(const UnresolvedPath & path);
+
+    /**
      * Resolve any symlinks in `path` according to the given
      * resolution mode.
+     *
+     * A `CanonPath` has no `..`; for a path that may, first make it one
+     * with `resolvePath`, rather than removing them lexically.
      *
      * @param mode might only be a temporary solution for this.
      * See the discussion in https://github.com/NixOS/nix/pull/9985.
      */
     CanonPath resolveSymlinks(const CanonPath & path, SymlinkResolution mode = SymlinkResolution::Full);
+
+    /**
+     * Resolve @p path into a `CanonPath`, safely and efficiently.
+     *
+     * This performs the minimal amount of symlink resolution needed to convert
+     * an `UnresolvedPath` into a `CanonPath` without resorting to any
+     * likely-improper lexical canonicalisations that just cancel-out `foo/..`.
+     * (When `foo` is not a symlink those are fine, but when `foo` is one, the
+     * expected path traversal semantics are to resolve `foo`'s *target's*
+     * parent directory, not `foo`'s *own*. And in general, we do not know
+     * whether `foo` is a symlink.)
+     *
+     * We say "minimal" because not all symlinks are resolved. Once we have
+     * resolved enough that no `..` is left, we have no problem: remaining
+     * symlinks in the path are fine, and do not get in the way of us having a
+     * valid `CanonPath`.
+     *
+     * In particular, this function resolves only the symlinks that the `..`
+     * components of @p path need: those up to the last `..`. The components
+     * after it are kept as given, symlinks or not. Without any `..`, @p path
+     * is kept as it is, without looking at anything.
+     *
+     * For example, `link/../foo` is `foo` in the parent of the link's target,
+     * but `dir/link` stays `dir/link`.
+     *
+     * Therefore resolving the symlinks of the resulting `CanonPath` is sound:
+     * `resolveSymlinks(resolvePath(p), mode)` resolves `p`, `..` and all, as
+     * if it had been resolved one component at a time.
+     *
+     * (As with any path resolution, this only holds as long as the file system
+     * objects involved do not change in the meantime.)
+     */
+    CanonPath resolvePath(const UnresolvedPath & path);
 
     /**
      * A string that uniquely represents the contents of this

@@ -150,7 +150,7 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
     if (!lineno)
         fail();
 
-    return {SourcePath{path.accessor, CanonPath(fn.substr(0, colon))}, *lineno};
+    return {SourcePath{path.accessor, CanonPath::improperlyResolveLexicallyFrom(fn.substr(0, colon))}, *lineno};
 }
 
 } // namespace nix

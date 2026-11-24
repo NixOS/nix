@@ -23,12 +23,13 @@ typedef std::set<std::filesystem::path> PathSet;
  * with an owning type and a non-owning view of one, both portable and
  * OS-native:
  *
- * | Portable, owned | Portable, view     | OS-native, owned        | OS-native, view |
- * |-----------------|--------------------|-------------------------|-----------------|
- * | `Filename`      | `FilenameView`     | `OsFilename`            | (none yet)      |
- * | `CanonPath`     | (none yet)         | `OsCanonPath`           | (none yet)      |
- * | (none for now)  |                    | `std::filesystem::path` | `PathView`      |
- * | `std::string`   | `std::string_view` | `OsString`              | `OsStringView`  |
+ * | Portable, owned  | Portable, view     | OS-native, owned        | OS-native, view |
+ * |------------------|--------------------|-------------------------|-----------------|
+ * | `Filename`       | `FilenameView`     | `OsFilename`            | (none yet)      |
+ * | `CanonPath`      | (none yet)         | `OsCanonPath`           | (none yet)      |
+ * | `UnresolvedPath` | (none yet)         | (none)                  |                 |
+ * | (none for now)   |                    | `std::filesystem::path` | `PathView`      |
+ * | `std::string`    | `std::string_view` | `OsString`              | `OsStringView`  |
  *
  * Each is a special case of the next:
  *
@@ -39,9 +40,14 @@ typedef std::set<std::filesystem::path> PathSet;
  *
  * 3. A `std::filesystem::path` is an `OsString` that names a path.
  *
- * The same goes for the portable types, except that a `CanonPath` is
- * absolute, always starting with `/`, and that there is, deliberately
- * for now, no portable counterpart of `std::filesystem::path`.
+ * Almost the same goes for the portable types:
+ *
+ * 1. A `Filename` is a `CanonPath` of one component.
+ *
+ * 2. A `CanonPath` is an `UnresolvedPath` with no `..` components.
+ *
+ * 3. An `UnresolvedPath` is a `std::string` that names an absolute path,
+ *    starting with `/`, with no `.` or empty components.
  *
  * Each of our own views, unlike the `std::` ones, names its owning
  * type as `Owned`.

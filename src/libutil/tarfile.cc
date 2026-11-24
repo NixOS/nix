@@ -233,8 +233,16 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
         auto path = archive_entry_pathname(entry);
         if (!path)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
-        /* TODO: Reject `..` components like the above ARCHIVE_EXTRACT_SECURE_NODOTDOT. */
-        auto cpath = CanonPath{path};
+        /* Reject `..` components, like `ARCHIVE_EXTRACT_SECURE_NODOTDOT`
+           does for `unpackTarfile` above.
+
+           TODO: Someday, they could be supported instead, by having the sink
+           resolve them against what it has created so far, as unpacking
+           onto a file system would. The sink already treats the entries as
+           a series of updates, in order, which do not commute: a later
+           entry replaces an earlier one, and a hard link refers to whatever
+           its target is at that point. */
+        auto cpath = CanonPath::fromThrowing(UnresolvedPath(path), "in archive member '%s'", path);
         if (r == ARCHIVE_WARN)
             warn("getting archive member '%1%': %2%", path, archive_error_string(archive.archive));
         else
@@ -243,7 +251,8 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
         lastModified = std::max(lastModified, archive_entry_mtime(entry));
 
         if (auto target = archive_entry_hardlink(entry)) {
-            parseSink.createHardlink(cpath, CanonPath(target));
+            parseSink.createHardlink(
+                cpath, CanonPath::fromThrowing(UnresolvedPath(target), "in the target of hard link '%s'", path));
             continue;
         }
 

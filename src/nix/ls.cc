@@ -158,7 +158,9 @@ struct CmdLsNar : Command, MixLs
         auto fd = valueOr(
             openFileReadonly(narPath), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening NAR file %s", PathFmt(narPath)));
         auto source = FdSource{fd.get()};
-        list(makeLazyNarAccessor(parseNarListing(source), seekableGetNarBytes(fd.get())), CanonPath{path});
+        auto accessor = makeLazyNarAccessor(parseNarListing(source), seekableGetNarBytes(fd.get()));
+        auto resolved = accessor->resolvePath(UnresolvedPath(path));
+        list(accessor, resolved);
     }
 };
 

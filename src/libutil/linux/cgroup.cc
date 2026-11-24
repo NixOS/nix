@@ -166,7 +166,11 @@ CanonPath getCurrentCgroup()
     auto ourCgroup = ourCgroups[""];
     if (ourCgroup == "")
         throw Error("cannot determine cgroup name from /proc/self/cgroup");
-    return CanonPath{ourCgroup};
+    /* Usually without `..`. But under a cgroup namespace, a cgroup
+       outside the namespace's root is shown with `..` (see "Namespace"
+       in the kernel's `Documentation/admin-guide/cgroup-v2.rst`), which
+       cannot be resolved here. */
+    return CanonPath::fromThrowing(UnresolvedPath(ourCgroup), "while reading our cgroup from '/proc/self/cgroup'");
 }
 
 static std::optional<CanonPath> rootCgroupOverride;
