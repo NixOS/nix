@@ -18,13 +18,13 @@ function skipTest() {
 
 function reportDiffAcceptFailure() {
     (( testNumber+=1 ))
-    local -r testName=$2
+    local -r testName=$1
     if [[ "${_NIX_TEST_ACCEPT-}" == 1 ]]; then
         echo "ok $testNumber $testName # SKIP"
     else
         echo "not ok $testNumber $testName"
     fi
-    echo "$1" >&2
+    echo "$2" >&2
 }
 
 function reportDiffAcceptSuccess() {

@@ -108,7 +108,7 @@ expectedDiff=$(printf '%s\n' \
   $'\e[31m-Bye!\e[0m' \
   $'\e[32m+Hi!\e[0m')
 
-# `reportDiffAcceptFailure` gets the diff, then the test name
+# `reportDiffAcceptFailure` gets the test name, then the diff
 (
   function reportDiffAcceptFailure() {
     printf '%s' "$1" > "$TEST_ROOT/reported-1"
@@ -116,15 +116,15 @@ expectedDiff=$(printf '%s\n' \
   }
   TZ=UTC0 diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected"
 )
-[[ "$(< "$TEST_ROOT/reported-1")" == "$expectedDiff" ]]
-[[ "$(< "$TEST_ROOT/reported-2")" == test ]]
+[[ "$(< "$TEST_ROOT/reported-1")" == test ]]
+[[ "$(< "$TEST_ROOT/reported-2")" == "$expectedDiff" ]]
 
-# the default `reportDiffAcceptFailure` prints its second argument, then a line that names its first
+# the default `reportDiffAcceptFailure` prints the diff, then a line that names the test
 (
   # xtrace would write into the captured stderr
   { set +x; } 2>/dev/null
   TZ=UTC0 diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected" 2> "$TEST_ROOT/stderr"
 )
 diff -u \
-  <(printf '%s\n' "testsubtest '$expectedDiff' failed: characterised output of $expectedDiff not as expected") \
+  <(printf '%s\n' "$expectedDiff" "subtest 'test' failed: characterised output of test not as expected") \
   "$TEST_ROOT/stderr"

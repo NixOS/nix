@@ -5,7 +5,7 @@ badTestNames=()
 function reportDiffAcceptFailure() {
     local -r testName=$1
     # We receive the diff unified stdout/stderr output as the argument
-    printf '%s' "$2" >&2
+    printf '%s\n' "$2" >&2
     diffExitCode=$?
     echo >&2 "subtest '$testName' failed: characterised output of $testName not as expected"
 }
@@ -39,7 +39,7 @@ function diffAndAcceptInner() {
     set -e
 
     if ((diffExitCode != 0)); then
-        reportDiffAcceptFailure "$diffOutput" "$testName"
+        reportDiffAcceptFailure "$testName" "$diffOutput"
         # shellcheck disable=SC2034
         badDiff=1
         badTestNames+=("$testName")
