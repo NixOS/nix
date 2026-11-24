@@ -62,8 +62,10 @@ struct PluginSettings : Config
           command, and RegisterSetting to add new nix config settings. See the
           constructors for those types for more details.
 
-          Warning! These APIs are inherently unstable and may change from
-          release to release.
+          Plugins should prefer to use the C bindings, which expose a stable ABI
+          and look up necessary functions via `dlsym`.
+
+          The C++ API is unstable and is not ABI compatible even across patch releases.
 
           Since these files are loaded into the same address space as Nix
           itself, they must be DSOs compatible with the instance of Nix
