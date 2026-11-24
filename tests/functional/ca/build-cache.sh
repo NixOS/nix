@@ -50,8 +50,6 @@ testRemoteCache () {
     testRemoteCacheFor rootCA
     testRemoteCacheFor dependentCA
     testRemoteCacheFor dependentNonCA
-    # A fixed-output derivation cannot depend on a version 2 one yet.
-    # testRemoteCacheFor dependentFixedOutput
     testRemoteCacheFor dependentForBuildCA
     testRemoteCacheFor dependentForBuildNonCA
 }

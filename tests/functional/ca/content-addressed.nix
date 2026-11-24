@@ -91,15 +91,8 @@ rec {
       touch $out
     '';
   };
-  dependentFixedOutput = mkDerivation {
-    name = "dependent-fixed-output";
-    outputHashMode = "recursive";
-    outputHash = "sha512-7aJcmSuEuYP5tGKcmGY8bRr/lrCjJlOxP2mIUjO/vMQeg6gx/65IbzRWES8EKiPDOs9z+wF30lEfcwxM/cT4pw==";
-    buildCommand = ''
-      cat ${dependentCA}/dep
-      echo foo > $out
-    '';
-  };
+  # No `dependentFixedOutput`: a fixed-output derivation, being version 1,
+  # cannot yet depend on a version 2 derivation like `dependentCA`.
   runnable = mkCADerivation rec {
     name = "runnable-thing";
     buildCommand = ''
