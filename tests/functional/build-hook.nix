@@ -17,9 +17,10 @@ let
     else
       { };
 
+  # Floating content-addressed derivations are version 2 derivations.
   mkDerivation =
     args:
-    derivation (
+    (if contentAddressed then derivationV2 else derivation) (
       {
         inherit system;
         builder = busybox;

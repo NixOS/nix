@@ -27,6 +27,7 @@ rec {
   # addressing, and the legacy option attributes become options.
   derivationV2 = drvAttrs@{ outputs ? [ "out" ], ... }:
     let
+      lib_optionalAttrs = c: a: if c then a else {};
       toEnv1 = v:
         if v == true then "1"
         else if v == false || v == null then ""
@@ -50,7 +51,10 @@ rec {
       env =
         builtins.mapAttrs (n: v: if builtins.elem n passAsFile then { value = toEnv v; passAsFile = true; } else toEnv v)
           (removeAttrs drvAttrs special)
-        // builtins.listToAttrs (map (o: { name = o; value = builtins.placeholder o; }) outputs)
+        # Like `derivation`, which does not set output variables for
+        # derivations that talk to Nix over RPC.
+        // lib_optionalAttrs (!builtins.elem "builder-rpc-v0" (drvAttrs.requiredSystemFeatures or []))
+          (builtins.listToAttrs (map (o: { name = o; value = builtins.placeholder o; }) outputs))
         // { outputs = builtins.concatStringsSep " " outputs; };
       strict = builtins.derivationStrictV2 {
         inherit (drvAttrs) name system builder;
