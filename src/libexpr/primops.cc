@@ -1895,35 +1895,6 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         drv.outputs.insert_or_assign("out", decltype(drv.outputs)::mapped_type{.output = std::move(dof)});
     }
 
-    else if (contentAddressed || isImpure) {
-        if (contentAddressed && isImpure)
-            state.error<EvalError>("derivation cannot be both content-addressed and impure").atPos(v).debugThrow();
-
-        auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
-        auto method = ingestionMethod.value_or(ContentAddressMethod::Raw::NixArchive);
-
-        for (auto & i : outputs) {
-            if (!isSubmittingOutputs)
-                drv.env[i] = {.value = hashPlaceholder(i)};
-            if (isImpure)
-                drv.outputs.insert_or_assign(
-                    i,
-                    decltype(drv.outputs)::mapped_type{
-                        .output = DerivationOutput::Impure{
-                            .method = method,
-                            .hashAlgo = ha,
-                        }});
-            else
-                drv.outputs.insert_or_assign(
-                    i,
-                    decltype(drv.outputs)::mapped_type{
-                        .output = DerivationOutput::CAFloating{
-                            .method = method,
-                            .hashAlgo = ha,
-                        }});
-        }
-    }
-
     else {
         /* Compute a hash over the "masked" store derivation, which is
            the final one except that in the list of outputs, the
@@ -1947,7 +1918,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     drv = derivation::v1::elaborated(derivation::v1::fromParsed(
         derivation::lower(drv), std::string{drvName}, *state.store, experimentalFeatureSettings, /*shouldWarn=*/false));
 
-    if (!outputHash && !contentAddressed && !isImpure)
+    if (!outputHash)
         fillInOutputPaths(drv, *state.store);
 
     /* Write the resulting term into the Nix store directory.
