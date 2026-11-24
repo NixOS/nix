@@ -104,14 +104,30 @@ void LocalOverlayStore::queryPathInfoUncached(
                 return callbackPtr->rethrow();
             }
             // If we don't have it, check lower store
-            lowerStore->queryPathInfo(path, {[path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
+            lowerStore->queryPathInfo(path, {[this, path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
                                           try {
-                                              (*callbackPtr)(fut.get().get_ptr());
+                                              /* Copy the lower store object up into the
+                                                 upper DB, so that subsequent queries (such
+                                                 as derivation output lookups) find it there,
+                                                 and so that we return an info whose DB id
+                                                 belongs to the upper DB rather than the
+                                                 lower one. */
+                                              registerLowerPath(*fut.get());
                                           } catch (...) {
                                               return callbackPtr->rethrow();
                                           }
+                                          LocalStore::queryPathInfoUncached(path, std::move(*callbackPtr));
                                       }});
         }});
+}
+
+void LocalOverlayStore::registerLowerPath(const ValidPathInfo & info)
+{
+    // recur on references, syncing entire closure.
+    for (auto & r : info.references)
+        if (r != info.path)
+            isValidPath(r);
+    LocalStore::registerValidPath(info);
 }
 
 void LocalOverlayStore::queryRealisationUncached(
@@ -146,15 +162,9 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
     if (res)
         return res;
     res = lowerStore->isValidPath(path);
-    if (res) {
+    if (res)
         // Get path info from lower store so upper DB genuinely has it.
-        auto p = lowerStore->queryPathInfo(path);
-        // recur on references, syncing entire closure.
-        for (auto & r : p->references)
-            if (r != path)
-                isValidPath(r);
-        LocalStore::registerValidPath(*p);
-    }
+        registerLowerPath(*lowerStore->queryPathInfo(path));
     return res;
 }
 
