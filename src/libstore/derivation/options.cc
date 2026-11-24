@@ -1,6 +1,6 @@
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/util/json-utils.hh"
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/store/store-api.hh"
@@ -14,7 +14,7 @@
 #include <regex>
 #include <ranges>
 
-namespace nix {
+namespace nix::derivation {
 
 static std::optional<std::string>
 getStringAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
@@ -70,10 +70,10 @@ getStringSetAttr(const StringMap & env, const StructuredAttrs * parsed, const st
 }
 
 template<typename Inputs>
-using OutputChecksVariant = std::
-    variant<derivation::OutputChecks<Inputs>, std::map<std::string, derivation::OutputChecks<Inputs>, std::less<>>>;
+using OutputChecksVariant =
+    std::variant<OutputChecks<Inputs>, std::map<std::string, OutputChecks<Inputs>, std::less<>>>;
 
-DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
+Options<StorePath> optionsFromStructuredAttrs(
     const StoreDirConfig & store,
     const StringMap & env,
     const StructuredAttrs * parsed,
@@ -84,7 +84,7 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
        resolve. */
     std::set<SingleDerivedPath> emptyInputs{};
     auto singleDerivedPathOptions =
-        derivationOptionsFromStructuredAttrs(store, emptyInputs, env, parsed, shouldWarn, mockXpSettings);
+        optionsFromStructuredAttrs(store, emptyInputs, env, parsed, shouldWarn, mockXpSettings);
 
     /* "Resolve" all SingleDerivedPath inputs to StorePath. */
     auto resolved = tryResolve(
@@ -112,7 +112,7 @@ static void flatten(const nlohmann::json & value, StringSet & res)
         throw Error("'exportReferencesGraph' value is not an array or a string");
 }
 
-DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
+Options<SingleDerivedPath> optionsFromStructuredAttrs(
     const StoreDirConfig & store,
     const std::set<SingleDerivedPath> & inputs,
     const StringMap & env,
@@ -120,9 +120,7 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     bool shouldWarn,
     const ExperimentalFeatureSettings & mockXpSettings)
 {
-    using namespace derivation;
-
-    DerivationOptions<SingleDerivedPath> defaults = {};
+    Options<SingleDerivedPath> defaults = {};
 
     std::map<std::string, SingleDerivedPath::Built, std::less<>> placeholders;
     if (mockXpSettings.isEnabled(Xp::CaDerivations)) {
@@ -336,8 +334,6 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     };
 }
 
-namespace derivation {
-
 template<typename Input>
 template<typename Inputs>
 StringSet Options<Input>::getRequiredSystemFeatures(const Derivation<Inputs, Output> & drv) const
@@ -522,9 +518,7 @@ std::optional<Options<StorePath>> tryResolve(
 template struct Options<StorePath>;
 template struct Options<SingleDerivedPath>;
 
-} // namespace derivation
-
-} // namespace nix
+} // namespace nix::derivation
 
 namespace nlohmann {
 

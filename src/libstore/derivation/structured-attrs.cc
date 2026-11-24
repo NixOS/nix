@@ -1,13 +1,13 @@
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 
 #include <nlohmann/json.hpp>
 #include <cassert>
 #include <regex>
 
-namespace nix {
+namespace nix::derivation {
 
 StructuredAttrs StructuredAttrs::parse(std::string_view encoded)
 {
@@ -123,7 +123,7 @@ nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
     Store & store,
     const DerivationOptions<StorePath> & drvOptions,
     const StorePathSet & inputPaths,
-    const std::map<std::string, derivation::Output> & outputs) const
+    const std::map<std::string, Output> & outputs) const
 {
     /* Copy to then modify */
     auto json = structuredAttrs;
@@ -214,4 +214,4 @@ std::string StructuredAttrs::writeShell(const nlohmann::json::object_t & json)
     return jsonSh;
 }
 
-} // namespace nix
+} // namespace nix::derivation

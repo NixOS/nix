@@ -8,7 +8,7 @@
 #include "nix/util/repair-flag.hh"
 #include "nix/store/derivation/output.hh"
 #include "nix/store/derived-path-map.hh"
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 #include "nix/util/fun.hh"

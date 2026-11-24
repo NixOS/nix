@@ -3,9 +3,9 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/resolution.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/downstream-placeholder.hh"
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/json-characterization.hh"
 
@@ -77,7 +77,8 @@ protected:
     /**
      * Helper for the `exportReferencesGraph` + placeholder subpath tests.
      */
-    void exportRefGraphSubpathTest(std::string_view stem, const Derivation & drv, const StructuredAttrs * parsed);
+    void exportRefGraphSubpathTest(
+        std::string_view stem, const Derivation & drv, const derivation::StructuredAttrs * parsed);
 
     /**
      * Checkpoint before/buildTrace/after and assert the resolved derivation
@@ -196,7 +197,7 @@ TEST_F(TryResolveTest, withInputs)
                     {"DEP1_DEV", placeholder1Dev},
                     {"DEP2", placeholder2Out},
                 },
-            .structuredAttrs = StructuredAttrs{{
+            .structuredAttrs = derivation::StructuredAttrs{{
                 {"dep1out", placeholder1Out},
                 {"nested", nlohmann::json::object({{"dep2", "before " + placeholder2Out + " after"}})},
             }},
@@ -237,7 +238,7 @@ TEST_F(TryResolveTest, withInputs)
                 {"DEP1_DEV", store->printStorePath(dep1DevPath)},
                 {"DEP2", store->printStorePath(dep2OutPath)},
             };
-            expected.structuredAttrs = StructuredAttrs{{
+            expected.structuredAttrs = derivation::StructuredAttrs{{
                 {"dep1out", store->printStorePath(dep1OutPath)},
                 {"nested",
                  nlohmann::json::object({{"dep2", "before " + store->printStorePath(dep2OutPath) + " after"}})},
@@ -273,7 +274,7 @@ TEST_F(TryResolveTest, resolutionFailure)
 }
 
 /**
- * Test that `derivationOptionsFromStructuredAttrs` can parse
+ * Test that `derivation::optionsFromStructuredAttrs` can parse
  * `exportReferencesGraph` entries that reference a CA derivation output
  * with a subpath appended (e.g. `${dep}/foo`), and that the parsed
  * options resolve correctly.
@@ -284,14 +285,14 @@ TEST_F(TryResolveTest, resolutionFailure)
  * `/nix/store/`.
  */
 void TryResolveTest::exportRefGraphSubpathTest(
-    std::string_view stem, const Derivation & drv, const StructuredAttrs * parsed)
+    std::string_view stem, const Derivation & drv, const derivation::StructuredAttrs * parsed)
 {
     StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
     StorePath depOutPath{"f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out"};
 
     nix::checkpointJson(*this, std::string{stem} + "-before", drv);
 
-    auto options = derivationOptionsFromStructuredAttrs(*store, drv.inputs, drv.env, parsed, true);
+    auto options = derivation::optionsFromStructuredAttrs(*store, drv.inputs, drv.env, parsed, true);
 
     nix::checkpointJson(*this, std::string{stem} + "-before-options", options);
 
@@ -326,7 +327,7 @@ void TryResolveTest::exportRefGraphSubpathTest(
 
     // Re-parse options from the resolved derivation, where placeholders
     // have been substituted with concrete store paths.
-    auto resolvedOptions = derivationOptionsFromStructuredAttrs(
+    auto resolvedOptions = derivation::optionsFromStructuredAttrs(
         *store,
         /* inputDrvs */ {},
         resolved->env,
@@ -378,7 +379,7 @@ TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath_structuredAttrs)
         },
         .platform = "x86_64-linux",
         .builder = "/bin/bash",
-        .structuredAttrs = StructuredAttrs{{
+        .structuredAttrs = derivation::StructuredAttrs{{
             {
                 "exportReferencesGraph",
                 nlohmann::json::object({{"refs", nlohmann::json::array({placeholder + "/foo"})}}),
@@ -388,7 +389,8 @@ TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath_structuredAttrs)
     };
     // env depends on structuredAttrs, so set it after construction
     drv.env = {
-        {std::string{StructuredAttrs::envVarName}, nlohmann::json(drv.structuredAttrs->structuredAttrs).dump()},
+        {std::string{derivation::StructuredAttrs::envVarName},
+         nlohmann::json(drv.structuredAttrs->structuredAttrs).dump()},
     };
 
     exportRefGraphSubpathTest("export-ref-subpath-sa", drv, &*drv.structuredAttrs);

@@ -1,9 +1,9 @@
 #pragma once
 ///@file
 
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/store-api.hh"

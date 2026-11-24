@@ -18,14 +18,13 @@ class Store;
 struct StoreDirConfig;
 
 namespace derivation {
+struct StructuredAttrs;
 template<typename Inputs, typename Out>
 struct Derivation;
 struct Output;
 } // namespace derivation
 
 using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
-
-struct StructuredAttrs;
 
 template<typename V>
 struct DerivedPathMap;
@@ -101,8 +100,8 @@ struct Options
      * Either one set of checks for all outputs, or separate checks
      * per-output.
      */
-    std::variant<derivation::OutputChecks<Input>, std::map<std::string, derivation::OutputChecks<Input>, std::less<>>>
-        outputChecks = derivation::OutputChecks<Input>{};
+    std::variant<OutputChecks<Input>, std::map<std::string, OutputChecks<Input>, std::less<>>> outputChecks =
+        OutputChecks<Input>{};
 
     /**
      * Whether to avoid scanning for references for a given output.
@@ -213,18 +212,13 @@ struct Options
 extern template struct Options<StorePath>;
 extern template struct Options<SingleDerivedPath>;
 
-} // namespace derivation
-
-template<typename Input>
-using DerivationOptions = derivation::Options<Input>;
-
 /**
  * Parse this information from its legacy encoding as part of the
  * environment. This should not be used with nice greenfield formats
  * (e.g. JSON) but is necessary for supporting old formats (e.g.
  * ATerm).
  */
-DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
+Options<SingleDerivedPath> optionsFromStructuredAttrs(
     const StoreDirConfig & store,
     const std::set<SingleDerivedPath> & inputs,
     const StringMap & env,
@@ -232,14 +226,12 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     bool shouldWarn = true,
     const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
 
-DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
+Options<StorePath> optionsFromStructuredAttrs(
     const StoreDirConfig & store,
     const StringMap & env,
     const StructuredAttrs * parsed,
     bool shouldWarn = true,
     const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
-
-namespace derivation {
 
 /**
  * This is the counterpart of `Derivation::tryResolve`. In particular,
@@ -256,6 +248,9 @@ std::optional<Options<StorePath>> tryResolve(
         queryResolutionChain);
 
 } // namespace derivation
+
+template<typename Input>
+using DerivationOptions = derivation::Options<Input>;
 
 }; // namespace nix
 

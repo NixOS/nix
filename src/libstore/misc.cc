@@ -1,8 +1,8 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/outputs-query.hh"
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/derivation/full-inputs.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/options.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/nar-info.hh"
@@ -227,7 +227,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                     try {
                         // FIXME: this is a lot of work just to get the value
                         // of `allowSubstitutes`.
-                        drvOptions = derivationOptionsFromStructuredAttrs(
+                        drvOptions = derivation::optionsFromStructuredAttrs(
                             *this, drv->inputs, drv->env, get(drv->structuredAttrs));
                     } catch (Error & e) {
                         e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));

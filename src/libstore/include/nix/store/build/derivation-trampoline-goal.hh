@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/store/build/goal.hh"
