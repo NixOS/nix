@@ -77,7 +77,7 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
  * mechanism to allow this to evolve again and get back in sync, but for
  * now we must not change - not even extend - the behavior.
  */
-static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePaths)
+nlohmann::json exportReferencesGraphToJSON(Store & store, const StorePathSet & storePaths)
 {
     using nlohmann::json;
 
@@ -133,7 +133,7 @@ nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
 
     /* Handle exportReferencesGraph. */
     for (auto & [key, storePaths] : drv.options.exportReferencesGraph) {
-        json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, inputPaths));
+        json[key] = exportReferencesGraphToJSON(store, store.exportReferences(storePaths, inputPaths));
     }
 
     return json;

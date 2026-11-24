@@ -84,6 +84,16 @@ struct StructuredAttrs
     static std::string writeShell(const nlohmann::json::object_t & prepared);
 };
 
+/**
+ * The JSON form of an exported references graph: a list of store object
+ * infos, in the format builders have long consumed (and which therefore
+ * must not change), for the closure `storePaths`.
+ *
+ * Used both under its key in the structured attributes of a version 1
+ * derivation, and on its own, in a file, by a version 2 derivation.
+ */
+nlohmann::json exportReferencesGraphToJSON(Store & store, const StorePathSet & storePaths);
+
 } // namespace derivation
 
 } // namespace nix

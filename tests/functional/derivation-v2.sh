@@ -73,3 +73,26 @@ grepQuiet -F '[("out","","","",' "$downstreamDrv"
 
 downstreamOut=$(nix-store --extra-experimental-features ca-derivations --realise "$downstreamDrv")
 [[ "$(cat "$downstreamOut")" = ca ]]
+
+# The export references graph of a version 2 derivation is JSON, in a
+# file of its own.
+
+graphExpr="
+with import ${config_nix};
+
+let
+  dep = builtins.toFile \"dep\" \"dependency\";
+in builtins.derivationStrictV2 {
+  name = \"derivation-v2-graph\";
+  inherit system;
+  builder = shell;
+  args = [ \"-c\" \"read -r first < graph; case \\\"\$first\\\" in '['*) ;; *) exit 1;; esac; grep -q \${dep} graph; cp graph \$out\" ];
+  env = { out = builtins.placeholder \"out\"; PATH = path; salt = testSalt; };
+  outputs.out = {};
+  options.exportReferencesGraph.graph = [ dep ];
+}
+"
+
+graphDrv=$(nix-instantiate --read-write-mode --eval --raw -E "($graphExpr).drvPath")
+graphOut=$(nix-store --realise "$graphDrv")
+grepQuiet '"narHash"' "$graphOut"

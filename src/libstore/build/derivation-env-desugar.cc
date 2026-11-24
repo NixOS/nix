@@ -47,8 +47,15 @@ DesugaredEnv DesugaredEnv::create(Store & store, const BasicDerivation & drv, co
         /* Handle exportReferencesGraph(), if set. */
         for (auto & [fileName, storePaths] : drv.options.exportReferencesGraph) {
             /* Write closure info to <fileName>. */
+            auto closure = store.exportReferences(storePaths, inputPaths);
+            /* A version 2 derivation gets it as JSON, a version 1
+               derivation without structured attributes in the legacy
+               textual format. */
             res.extraFiles.insert_or_assign(
-                fileName, store.makeValidityRegistration(store.exportReferences(storePaths, inputPaths), false, false));
+                fileName,
+                drv.version == derivation::Version::V2
+                    ? derivation::exportReferencesGraphToJSON(store, closure).dump()
+                    : store.makeValidityRegistration(closure, false, false));
         }
     }
 
