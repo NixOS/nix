@@ -36,34 +36,11 @@
 
 namespace nix {
 
-DirectoryIterator::DirectoryIterator(const std::filesystem::path & p)
+DirectoryIterator::DirectoryIterator(const std::filesystem::path & path)
+    : DirectoryIterator{valueOr(
+          openDirectory(path, FinalSymlink::Follow),
+          NIX_THROW_NATIVE_SYS_ERROR_HANDLER("cannot read directory %s", PathFmt(path)))}
 {
-    try {
-        // **Attempt to create the underlying directory_iterator**
-        it_ = std::filesystem::directory_iterator(p);
-    } catch (const std::filesystem::filesystem_error & e) {
-        // **Catch filesystem_error and throw SystemError**
-        // Adapt the error message as needed for SystemError
-        throw SystemError(e.code(), "cannot read directory %s", PathFmt(p));
-    }
-}
-
-DirectoryIterator & DirectoryIterator::operator++()
-{
-    // **Attempt to increment the underlying iterator**
-    std::error_code ec;
-    it_.increment(ec);
-    if (ec) {
-        // Try to get path info if possible, might fail if iterator is bad
-        try {
-            if (it_ != std::filesystem::directory_iterator{}) {
-                throw SysError("cannot read directory past %s: %s", PathFmt(it_->path()), ec.message());
-            }
-        } catch (...) {
-            throw SysError("cannot read directory");
-        }
-    }
-    return *this;
 }
 
 std::filesystem::path
@@ -369,16 +346,27 @@ void recursiveSync(const std::filesystem::path & path)
     while (!dirsToEnumerate.empty()) {
         auto currentDir = dirsToEnumerate.back();
         dirsToEnumerate.pop_back();
-        for (auto & entry : DirectoryIterator(currentDir)) {
-            auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
-                dirsToEnumerate.emplace_back(entry.path());
-            } else if (std::filesystem::is_regular_file(st)) {
+        for (const auto & entry : DirectoryIterator(currentDir)) {
+            auto entryPath = currentDir / entry.name.mkPath();
+            auto type = entry.type != std::filesystem::file_type::none
+                            ? entry.type
+                            : std::filesystem::symlink_status(entryPath).type();
+            NIX_INCOMPLETE_SWITCH_BEGIN
+            switch (type) {
+            case std::filesystem::file_type::directory:
+                dirsToEnumerate.emplace_back(std::move(entryPath));
+                break;
+            case std::filesystem::file_type::regular: {
                 auto fd = valueOr(
-                    openFileReadonly(entry.path(), FinalSymlink::DontFollow),
-                    NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %1%", PathFmt(entry.path())));
+                    openFileReadonly(entryPath, FinalSymlink::DontFollow),
+                    NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %1%", PathFmt(entryPath)));
                 fd.fsync();
+                break;
             }
+            default:
+                break;
+            }
+            NIX_INCOMPLETE_SWITCH_END
         }
         dirsToFsync.emplace_back(std::move(currentDir));
     }
@@ -607,8 +595,8 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
         }
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);
-        for (auto & entry : DirectoryIterator(from)) {
-            copyFile(entry, to / entry.path().filename(), /*contents=*/false);
+        for (const auto & entry : DirectoryIterator(from)) {
+            copyFile(from / entry.name.mkPath(), to / entry.name.mkPath(), /*contents=*/false);
         }
     } else {
         throw Error("file %s has an unsupported type", PathFmt(from));

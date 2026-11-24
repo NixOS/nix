@@ -15,7 +15,8 @@ class OsFilename;
  * A non-owning view of a single filename component, with the same
  * invariants as `OsFilename`.
  *
- * Unlike `OsFilename`, making one does not copy the name.
+ * Unlike `OsFilename`, making one does not copy the name, which is why
+ * `DirectoryIterator` hands these out.
  *
  * See `PathView` for how this relates to the other path types.
  */
