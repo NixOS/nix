@@ -285,6 +285,8 @@ sources = files(
   'derivation/resolution.cc',
   'derivation/structured-attrs.cc',
   'derivation/traditional/json.cc',
+  'derivation/v2/aterm.cc',
+  'derivation/v2/derivation.cc',
   'derivations.cc',
   'derived-path-map.cc',
   'derived-path.cc',
