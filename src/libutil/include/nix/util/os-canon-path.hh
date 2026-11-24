@@ -87,6 +87,15 @@ public:
     }
 
     /**
+     * Like the constructor from an `OsFilename`, copying the name
+     * @p name refers to.
+     */
+    OsCanonPath(OsFilenameView name)
+        : p(name.native())
+    {
+    }
+
+    /**
      * Construct an `OsCanonPath` from a `CanonPath`.
      *
      * Builds the path component-by-component using
@@ -111,6 +120,18 @@ public:
     CanonPath toPortable() const;
 
     const std::filesystem::path & path() const noexcept
+    {
+        return p;
+    }
+
+    /**
+     * The most specific view of this path, which must not outlive it.
+     *
+     * That is a `PathView`, since there is no `OsCanonPathView` yet.
+     *
+     * @todo Return an `OsCanonPathView` once there is one.
+     */
+    PathView view() const noexcept
     {
         return p;
     }

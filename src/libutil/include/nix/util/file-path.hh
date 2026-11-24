@@ -23,13 +23,13 @@ typedef std::set<std::filesystem::path> PathSet;
  * with an owning type and a non-owning view of one, both portable and
  * OS-native:
  *
- * | Portable, owned  | Portable, view     | OS-native, owned        | OS-native, view |
- * |------------------|--------------------|-------------------------|-----------------|
- * | `Filename`       | `FilenameView`     | `OsFilename`            | (none yet)      |
- * | `CanonPath`      | (none yet)         | `OsCanonPath`           | (none yet)      |
- * | `UnresolvedPath` | (none yet)         | (none)                  |                 |
- * | (none for now)   |                    | `std::filesystem::path` | `PathView`      |
- * | `std::string`    | `std::string_view` | `OsString`              | `OsStringView`  |
+ * | Portable, owned  | Portable, view     | OS-native, owned        | OS-native, view  |
+ * |------------------|--------------------|-------------------------|------------------|
+ * | `Filename`       | `FilenameView`     | `OsFilename`            | `OsFilenameView` |
+ * | `CanonPath`      | (none yet)         | `OsCanonPath`           | (none yet)       |
+ * | `UnresolvedPath` | (none yet)         | (none)                  |                  |
+ * | (none for now)   |                    | `std::filesystem::path` | `PathView`       |
+ * | `std::string`    | `std::string_view` | `OsString`              | `OsStringView`   |
  *
  * Each is a special case of the next:
  *
@@ -48,6 +48,14 @@ typedef std::set<std::filesystem::path> PathSet;
  *
  * 3. An `UnresolvedPath` is a `std::string` that names an absolute path,
  *    starting with `/`, with no `.` or empty components.
+ *
+ * An `OsCanonPathView` would complete the OS-native hierarchy, but
+ * nothing needs one yet.
+ *
+ * Each owning OS-native type's `view()` gives the most specific view of
+ * it there is, and from there one works up the hierarchy, e.g. with
+ * `OsFilenameView::pathView()`. (A `std::filesystem::path` just
+ * converts to a `PathView`.)
  *
  * Each of our own views, unlike the `std::` ones, names its owning
  * type as `Owned`.
