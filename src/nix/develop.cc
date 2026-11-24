@@ -13,6 +13,7 @@
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/traditional.hh"
 
 #ifndef _WIN32 // TODO re-enable on Windows
 #  include "run.hh"
@@ -255,9 +256,8 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
 
     drv.args = {store->printStorePath(getEnvShPath)};
 
-    /* Remove derivation checks, both the first-class options and their
-       legacy environment-variable (and structured-attributes) encoding,
-       which must stay in sync. */
+    /* Remove derivation checks from their encoding, in the environment
+       or the structured attributes. */
     if (drv.structuredAttrs) {
         drv.structuredAttrs->structuredAttrs.erase("outputChecks");
         /* `unparse` writes `verbatim` when it is set, so keeping it
@@ -269,9 +269,17 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
         drv.env.erase("disallowedReferences");
         drv.env.erase("disallowedRequisites");
     }
-    drv.options.allOutputChecks = std::nullopt;
-    for (auto & [_, output] : drv.outputs)
-        output.options.checks = std::nullopt;
+    if (drv.version == derivation::Version::V1) {
+        /* The options of a version 1 derivation are only a cache of
+           what they are decoded from, which was just edited; decode
+           them again. */
+        drv = derivation::elaborate(derivation::lower(drv), *store, drv.name);
+    } else {
+        /* Those of a version 2 derivation are fields in their own
+           right. */
+        for (auto & [_, output] : drv.outputs)
+            output.options.checks = std::nullopt;
+    }
 
     drv.env.erase("name");
 
