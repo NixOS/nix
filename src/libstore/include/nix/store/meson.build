@@ -43,9 +43,10 @@ headers = [ config_pub_h ] + files(
   'derivation/resolution.hh',
   'derivation/structured-attrs.hh',
   'derivation/traditional.hh',
+  'derivation/v2.hh',
   'derivation/v2/aterm.hh',
   'derivation/v2/convert.hh',
-  'derivation/v2/derivation.hh',
+
   'derivations.hh',
   'derived-path-map.hh',
   'derived-path.hh',

@@ -4,7 +4,7 @@
 /// Version 2 derivations' input addressing, and their conversion to and
 /// from the elaborated `derivation::Full` that the rest of Nix works on.
 
-#include "nix/store/derivation/v2/derivation.hh"
+#include "nix/store/derivation/v2.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/repair-flag.hh"
 

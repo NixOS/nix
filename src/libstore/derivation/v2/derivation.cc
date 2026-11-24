@@ -1,4 +1,4 @@
-#include "nix/store/derivation/v2/derivation.hh"
+#include "nix/store/derivation/v2.hh"
 #include "nix/util/util.hh"
 
 namespace nix::derivation::v2 {

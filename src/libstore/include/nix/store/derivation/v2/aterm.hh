@@ -3,7 +3,7 @@
 ///
 /// The [version 2 "ATerm" format](@docroot@/protocols/derivation-aterm/v2.md).
 
-#include "nix/store/derivation/v2/derivation.hh"
+#include "nix/store/derivation/v2.hh"
 #include "nix/util/configuration.hh"
 
 namespace nix {
