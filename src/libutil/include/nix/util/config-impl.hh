@@ -18,6 +18,7 @@
 #include "nix/util/logging.hh"
 
 #include <filesystem>
+#include <list>
 
 namespace nix {
 
@@ -34,6 +35,8 @@ NIX_DECLARE_APPENDABLE_SETTING(Strings);
 NIX_DECLARE_APPENDABLE_SETTING(StringSet);
 NIX_DECLARE_APPENDABLE_SETTING(StringMap);
 NIX_DECLARE_APPENDABLE_SETTING(std::set<ExperimentalFeature>);
+NIX_DECLARE_APPENDABLE_SETTING(std::list<std::filesystem::path>);
+NIX_DECLARE_APPENDABLE_SETTING(std::set<std::filesystem::path>);
 
 #undef NIX_DECLARE_APPENDABLE_SETTING
 

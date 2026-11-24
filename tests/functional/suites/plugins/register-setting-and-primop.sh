@@ -4,5 +4,9 @@
 # setting value.
 
 plugin=$(findPlugin libplugintest)
-res=$(nix --option setting-set true --option plugin-files "$plugin" eval --expr builtins.anotherNull)
-[ "$res"x = "nullx" ]
+
+for options in "--option plugin-files" "--option extra-plugin-files" "--plugin-files" "--extra-plugin-files"; do
+    # shellcheck disable=SC2086
+    res=$(nix --option setting-set true $options "$plugin" eval --expr builtins.anotherNull)
+    [ "$res"x = "nullx" ]
+done
