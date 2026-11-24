@@ -95,3 +95,36 @@ badDiff=0
   diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected"
   (( "$badDiff" == 0 ))
 )
+
+# doesn't match, the reporter receives the diff of the expected and the actual output.
+# Fixed modification times and time zone make the diff's header lines reproducible.
+echo Hi! > "$TEST_ROOT/got"
+echo Bye! > "$TEST_ROOT/expected"
+touch -d @0 "$TEST_ROOT/got" "$TEST_ROOT/expected"
+expectedDiff=$(printf '%s\n' \
+  $'\e[1m--- '"$TEST_ROOT/expected"$'\t1970-01-01 00:00:00.000000000 +0000\e[0m' \
+  $'\e[1m+++ '"$TEST_ROOT/got"$'\t1970-01-01 00:00:00.000000000 +0000\e[0m' \
+  $'\e[36m@@ -1 +1 @@\e[0m' \
+  $'\e[31m-Bye!\e[0m' \
+  $'\e[32m+Hi!\e[0m')
+
+# `reportDiffAcceptFailure` gets the test name, then the diff
+(
+  function reportDiffAcceptFailure() {
+    printf '%s' "$1" > "$TEST_ROOT/reported-1"
+    printf '%s' "$2" > "$TEST_ROOT/reported-2"
+  }
+  TZ=UTC0 diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected"
+)
+[[ "$(< "$TEST_ROOT/reported-1")" == test ]]
+[[ "$(< "$TEST_ROOT/reported-2")" == "$expectedDiff" ]]
+
+# the default `reportDiffAcceptFailure` prints the diff, then a line that names the test
+(
+  # xtrace would write into the captured stderr
+  { set +x; } 2>/dev/null
+  TZ=UTC0 diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected" 2> "$TEST_ROOT/stderr"
+)
+diff -u \
+  <(printf '%s\n' "$expectedDiff" "subtest 'test' failed: characterised output of test not as expected") \
+  "$TEST_ROOT/stderr"
