@@ -10,14 +10,14 @@
 
 namespace nix::fetchers {
 
-std::shared_ptr<Registry> Registry::read(const Settings & settings, const SourcePath & path, RegistryType type)
+ref<Registry> Registry::read(const Settings & settings, const SourcePath & path, RegistryType type)
 {
     debug("reading registry '%s'", path);
 
-    auto registry = std::make_shared<Registry>(type);
+    auto registry = make_ref<Registry>(type);
 
     if (!path.pathExists())
-        return std::make_shared<Registry>(type);
+        return make_ref<Registry>(type);
 
     try {
 
@@ -95,7 +95,7 @@ static std::filesystem::path getSystemRegistryPath()
     return nixConfDir() / "registry.json";
 }
 
-static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
+static ref<Registry> getSystemRegistry(const Settings & settings)
 {
     static auto systemRegistry = Registry::read(
         settings,
@@ -109,7 +109,7 @@ std::filesystem::path getUserRegistryPath()
     return getConfigDir() / "registry.json";
 }
 
-std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
+ref<Registry> getUserRegistry(const Settings & settings)
 {
     static auto userRegistry = Registry::read(
         settings,
@@ -118,16 +118,16 @@ std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
     return userRegistry;
 }
 
-std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
+ref<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
 {
     static auto customRegistry = Registry::read(
         settings, SourcePath{getFSSourceAccessor(), CanonPath{p.string()}}.resolveSymlinks(), Registry::Custom);
     return customRegistry;
 }
 
-std::shared_ptr<Registry> getFlagRegistry()
+ref<Registry> getFlagRegistry()
 {
-    static auto flagRegistry = std::make_shared<Registry>(Registry::Flag);
+    static auto flagRegistry = make_ref<Registry>(Registry::Flag);
     return flagRegistry;
 }
 
@@ -136,12 +136,12 @@ void overrideRegistry(const Input & from, const Input & to, const Attrs & extraA
     getFlagRegistry()->add(from, to, extraAttrs);
 }
 
-static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, Store & store)
+static ref<Registry> getGlobalRegistry(const Settings & settings, Store & store)
 {
     static auto reg = [&]() {
         auto path = settings.flakeRegistry.get();
         if (path == "") {
-            return std::make_shared<Registry>(Registry::Global); // empty registry
+            return make_ref<Registry>(Registry::Global); // empty registry
         }
 
         return Registry::read(
