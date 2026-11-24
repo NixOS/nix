@@ -258,6 +258,8 @@ An output's store path is *static* if it is known without building anything:
 - the output of a version 1 input-addressed derivation, which is always recorded in it;
 - the output of a version 2 input-addressed derivation, if it is recorded in it, as described next.
 
+A [higher-order input](../index.md#dynamic) --- an output of a derivation that is itself an output --- never has a static store path, since which derivation it is an output of is not known until that has been built.
+
 If every input of a version 2 input-addressed derivation has a static store path, resolution needs no building, so it is done ahead of time, when the derivation is created: the derivation is *pre-resolved*, its output paths are computed as above, and they are recorded in the derivation.
 Its outputs then have static store paths in turn, so this propagates down the derivation graph exactly as far as it can.
 
