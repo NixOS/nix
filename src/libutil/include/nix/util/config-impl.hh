@@ -18,32 +18,27 @@
 #include "nix/util/logging.hh"
 
 #include <filesystem>
+#include <list>
 
 namespace nix {
 
-template<>
-struct BaseSetting<Strings>::trait
-{
-    static constexpr bool appendable = true;
-};
+#define NIX_DECLARE_APPENDABLE_SETTING(T)        \
+    template<>                                   \
+    struct BaseSetting<T>::trait                 \
+    {                                            \
+        static constexpr bool appendable = true; \
+    };                                           \
+    template<>                                   \
+    void BaseSetting<T>::appendOrSet(T newValue, bool append)
 
-template<>
-struct BaseSetting<StringSet>::trait
-{
-    static constexpr bool appendable = true;
-};
+NIX_DECLARE_APPENDABLE_SETTING(Strings);
+NIX_DECLARE_APPENDABLE_SETTING(StringSet);
+NIX_DECLARE_APPENDABLE_SETTING(StringMap);
+NIX_DECLARE_APPENDABLE_SETTING(std::set<ExperimentalFeature>);
+NIX_DECLARE_APPENDABLE_SETTING(std::list<std::filesystem::path>);
+NIX_DECLARE_APPENDABLE_SETTING(std::set<std::filesystem::path>);
 
-template<>
-struct BaseSetting<StringMap>::trait
-{
-    static constexpr bool appendable = true;
-};
-
-template<>
-struct BaseSetting<std::set<ExperimentalFeature>>::trait
-{
-    static constexpr bool appendable = true;
-};
+#undef NIX_DECLARE_APPENDABLE_SETTING
 
 template<typename T>
 struct BaseSetting<T>::trait
@@ -56,15 +51,6 @@ bool BaseSetting<T>::isAppendable()
 {
     return trait::appendable;
 }
-
-template<>
-void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append);
-template<>
-void BaseSetting<StringSet>::appendOrSet(StringSet newValue, bool append);
-template<>
-void BaseSetting<StringMap>::appendOrSet(StringMap newValue, bool append);
-template<>
-void BaseSetting<std::set<ExperimentalFeature>>::appendOrSet(std::set<ExperimentalFeature> newValue, bool append);
 
 template<typename T>
 void BaseSetting<T>::appendOrSet(T newValue, bool append)
