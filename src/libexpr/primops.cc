@@ -1822,6 +1822,40 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     if (drv.platform == "")
         state.error<EvalError>("required attribute 'system' missing").atPos(v).debugThrow();
 
+    /* `derivation` only creates version 1 derivations; anything they cannot
+       express needs a version 2 derivation instead. */
+    if (!outputHash && (contentAddressed || isImpure))
+        state
+            .error<EvalError>(
+                "%s derivations are version 2 derivations, which are created with 'builtins.derivationStrictV2'",
+                isImpure ? "impure" : "floating content-addressed")
+            .atPos(v)
+            .debugThrow();
+    for (auto & input : drv.inputs)
+        if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw())) {
+            auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&built->drvPath->raw());
+            if (!opaque)
+                state
+                    .error<EvalError>(
+                        "an input that is an output of an output of a derivation needs a version 2 derivation, which is created with 'builtins.derivationStrictV2'")
+                    .atPos(v)
+                    .debugThrow();
+            /* An input derivation that cannot be read, e.g. because it was
+               only computed in read-only mode, is not checked here. */
+            std::optional<derivation::Version> version;
+            try {
+                version = state.store->readInvalidDerivation(opaque->path).version;
+            } catch (Error &) {
+            }
+            if (version && *version != derivation::Version::V1)
+                state
+                    .error<EvalError>(
+                        "a version 1 derivation cannot depend on the version 2 derivation '%s'",
+                        state.store->printStorePath(opaque->path))
+                    .atPos(v)
+                    .debugThrow();
+        }
+
     /* Check whether the derivation name is valid. */
     if (isDerivationFileName(drvName)
         && !(
