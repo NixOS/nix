@@ -170,7 +170,7 @@ A path in an interpolated expression is first copied into the Nix store, and the
 >
 >     "/nix/store/2hhl2nz5v0khbn06ys82nrk99aa1xxdw-foo"
 
-A derivation interpolates to the [store path] of its first [output](./derivations.md#attr-outputs).
+A derivation interpolates to the [store path] of its first [output](./derivations/v1.md#attr-outputs).
 
 > **Example**
 >

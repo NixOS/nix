@@ -144,7 +144,7 @@ on, you need a way for your current Nix installation to build code for that
 platform. Common solutions include [remote build machines] and [binary format emulation]
 (only supported on NixOS).
 
-[remote builders]: @docroot@/language/derivations.md#attr-builder
+[remote builders]: @docroot@/language/derivations/v1.md#attr-builder
 [binary format emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
 Given such a setup, executing the build only requires selecting the respective attribute.

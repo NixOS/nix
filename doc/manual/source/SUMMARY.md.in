@@ -49,6 +49,8 @@
   - [Operators](language/operators.md)
   - [Built-ins](language/builtins.md)
     - [Derivations](language/derivations.md)
+      - [Version 1](language/derivations/v1.md)
+      - [Version 2](language/derivations/v2.md)
       - [Advanced Attributes](language/advanced-attributes.md)
       - [Import From Derivation](language/import-from-derivation.md)
 - [Package Management](package-management/index.md)
