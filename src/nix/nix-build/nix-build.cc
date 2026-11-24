@@ -613,14 +613,11 @@ static void main_nix_build(int argc, char ** argv)
         auto tz = getEnv("TZ");
         auto tzExport = tz ? "export TZ=" + escapeShellArgAlways(*tz) + "; " : "";
 
-        using namespace std::string_literals;
-
-        std::string rc = fmt(
-                (R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
-                  "trap _nix_shell_clean_tmpdir EXIT; "
-                  "exitHooks+=(_nix_shell_clean_tmpdir); "
-                  "failureHooks+=(_nix_shell_clean_tmpdir); ") +
-                (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;") +
+        std::string rc =
+            fmt(R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"
+                "trap _nix_shell_clean_tmpdir EXIT; "
+                "exitHooks+=(_nix_shell_clean_tmpdir); "
+                "failureHooks+=(_nix_shell_clean_tmpdir); "
                 "%2%"
                 // always clear PATH.
                 // when nix-shell is run impure, we rehydrate it with the `p=$PATH` above
@@ -633,10 +630,8 @@ static void main_nix_build(int argc, char ** argv)
                 "SHELL=%6%; "
                 "BASH=%6%; "
                 "set +e; "
-                R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && )s" +
-                (isRootUser()
-                    ? R"s(PS1='\n\[\033[1;31m\][nix-shell:\w]\$\[\033[0m\] '; )s"
-                    : R"s(PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s") +
+                R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && )s"
+                "%9%"
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
@@ -644,13 +639,15 @@ static void main_nix_build(int argc, char ** argv)
                 "shopt -s execfail;"
                 "%8%",
                 escapeShellArgAlways(tmpDir.path().string()),
-                (pure ? "" : "p=$PATH; "),
+                (pure ? "" : "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;p=$PATH; "),
                 structuredAttrsRC,
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
                 escapeShellArgAlways(std::filesystem::path(*shell).parent_path().string()),
                 escapeShellArgAlways(*shell),
                 tzExport,
-                envCommand);
+                envCommand,
+                (isRootUser() ? R"s(PS1='\n\[\033[1;31m\][nix-shell:\w]\$\[\033[0m\] '; )s"
+                              : R"s(PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; )s"));
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);
 

@@ -53,7 +53,8 @@ void SQLiteBusy::anchor() {}
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         auto exp = SQLiteBusy(path, errMsg, err, exterr, offset, std::move(hf));
         exp.err.msg = HintFmt(
-            err == SQLITE_PROTOCOL ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)" : "SQLite database '%s' is busy",
+            err == SQLITE_PROTOCOL ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"_fmt
+                                   : "SQLite database '%s' is busy"_fmt,
             path ? path : "(in-memory)");
         throw std::move(exp);
     } else
@@ -229,14 +230,14 @@ void SQLiteStmt::Use::exec()
     int r = step();
     assert(r != SQLITE_ROW);
     if (r != SQLITE_DONE)
-        SQLiteError::throw_(stmt.db, fmt("executing SQLite statement '%s'", sqlite3_expanded_sql(stmt.stmt)));
+        SQLiteError::throw_(stmt.db, "executing SQLite statement '%s'", Uncolored(sqlite3_expanded_sql(stmt.stmt)));
 }
 
 bool SQLiteStmt::Use::next()
 {
     int r = step();
     if (r != SQLITE_DONE && r != SQLITE_ROW)
-        SQLiteError::throw_(stmt.db, fmt("executing SQLite query '%s'", sqlite3_expanded_sql(stmt.stmt)));
+        SQLiteError::throw_(stmt.db, "executing SQLite query '%s'", Uncolored(sqlite3_expanded_sql(stmt.stmt)));
     return r == SQLITE_ROW;
 }
 
