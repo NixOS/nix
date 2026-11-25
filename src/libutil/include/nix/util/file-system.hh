@@ -12,6 +12,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/os-filename.hh"
 #include "nix/util/deleter.hh"
 
 #include <filesystem>
@@ -25,6 +26,8 @@
 #endif
 
 #include <functional>
+#include <iterator>
+#include <memory>
 #include <optional>
 
 /**
@@ -323,30 +326,6 @@ void createDirs(const std::filesystem::path & path);
 void createDir(const std::filesystem::path & path, mode_t mode = 0755);
 
 /**
- * Set the access and modification times of the given path, not
- * following symlinks.
- *
- * @param accessedTime Specified in seconds.
- *
- * @param modificationTime Specified in seconds.
- *
- * @param isSymlink Whether the file in question is a symlink. Used for
- * fallback code where we don't have `lutimes` or similar. if
- * `std::optional` is passed, the information will be recomputed if it
- * is needed. Race conditions are possible so be careful!
- */
-void setWriteTime(
-    const std::filesystem::path & path,
-    time_t accessedTime,
-    time_t modificationTime,
-    std::optional<bool> isSymlink = std::nullopt);
-
-/**
- * Convenience wrapper that takes all arguments from the `PosixStat`.
- */
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st);
-
-/**
  * Create a symlink.
  *
  */
@@ -573,76 +552,15 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
  */
 void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst);
 
+class DirectoryIterator;
+
 /**
- * @brief A directory iterator that can be used to iterate over the
- * contents of a directory. It is similar to std::filesystem::directory_iterator
- * but throws NixError on failure instead of std::filesystem::filesystem_error.
+ * Read the directory at @p path, following a symlink there.
+ *
+ * @todo Prefer opening the directory and giving it to
+ * `DirectoryIterator`'s descriptor constructor (see
+ * `file-system-at.hh`).
  */
-class DirectoryIterator
-{
-public:
-    // --- Iterator Traits ---
-    using iterator_category = std::input_iterator_tag;
-    using value_type = std::filesystem::directory_entry;
-    using difference_type = std::ptrdiff_t;
-    using pointer = const std::filesystem::directory_entry *;
-    using reference = const std::filesystem::directory_entry &;
-
-    // Default constructor (represents end iterator)
-    DirectoryIterator() noexcept = default;
-
-    // Constructor taking a path
-    explicit DirectoryIterator(const std::filesystem::path & p);
-
-    reference operator*() const
-    {
-        // Accessing the value itself doesn't typically throw filesystem_error
-        // after successful construction/increment, but underlying operations might.
-        // If directory_entry methods called via -> could throw, add try-catch there.
-        return *it_;
-    }
-
-    pointer operator->() const
-    {
-        return &(*it_);
-    }
-
-    DirectoryIterator & operator++();
-
-    // Postfix increment operator
-    DirectoryIterator operator++(int)
-    {
-        DirectoryIterator temp = *this;
-        ++(*this); // Uses the prefix increment's try-catch logic
-        return temp;
-    }
-
-    // Equality comparison
-    friend bool operator==(const DirectoryIterator & a, const DirectoryIterator & b) noexcept
-    {
-        return a.it_ == b.it_;
-    }
-
-    // Inequality comparison
-    friend bool operator!=(const DirectoryIterator & a, const DirectoryIterator & b) noexcept
-    {
-        return !(a == b);
-    }
-
-    // Allow direct use in range-based for loops if iterating over an instance
-    DirectoryIterator begin() const
-    {
-        return *this;
-    }
-
-    DirectoryIterator end() const
-    {
-        return DirectoryIterator{};
-    }
-
-
-private:
-    std::filesystem::directory_iterator it_;
-};
+DirectoryIterator openDirectoryIterator(const std::filesystem::path & path);
 
 } // namespace nix

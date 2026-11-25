@@ -1,5 +1,6 @@
 #include "nix/util/canon-path.hh"
 #include "nix/util/os-canon-path.hh"
+#include "nix/util/path-iterator.hh"
 
 #include <gtest/gtest.h>
 
@@ -38,7 +39,7 @@ struct CanonicalPathTraits<CanonPath>
 
     static CanonPath parse(std::string_view s)
     {
-        return CanonPath(s);
+        return CanonPath::viaLexical(s);
     }
 
     static std::vector<std::string> components(const CanonPath & p)

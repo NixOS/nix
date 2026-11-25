@@ -621,7 +621,14 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             if (!hasSuffix(key, ".path"))
                 continue;
             std::string key2(key, 0, key.size() - 5);
-            auto path = CanonPath(value);
+            auto path = [&] {
+                try {
+                    return CanonPath::fromThrowing(UnresolvedPath(value));
+                } catch (Error & e) {
+                    e.addTrace({}, "in the path of submodule '%s'", key2);
+                    throw;
+                }
+            }();
             result.push_back(
                 Submodule{
                     .path = path,
@@ -652,25 +659,43 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             info.headRev = toHash(headRev);
 
         /* Get all tracked files and determine whether the working
-           directory is dirty. */
+           directory is dirty. An exception from the callback is kept
+           until `git_status_foreach_ext` returns, rather than thrown
+           through libgit2. */
+        std::exception_ptr statusError;
         std::function<int(const char * path, unsigned int statusFlags)> statusCallback = [&](const char * path,
                                                                                              unsigned int statusFlags) {
-            if (!(statusFlags & GIT_STATUS_INDEX_DELETED) && !(statusFlags & GIT_STATUS_WT_DELETED)) {
-                info.files.insert(CanonPath(path));
+            try {
+                auto cpath = CanonPath::fromThrowing(UnresolvedPath(path));
+                if (!(statusFlags & GIT_STATUS_INDEX_DELETED) && !(statusFlags & GIT_STATUS_WT_DELETED)) {
+                    info.files.insert(cpath);
+                    if (statusFlags != GIT_STATUS_CURRENT)
+                        info.dirtyFiles.insert(cpath);
+                } else
+                    info.deletedFiles.insert(cpath);
                 if (statusFlags != GIT_STATUS_CURRENT)
-                    info.dirtyFiles.insert(CanonPath(path));
-            } else
-                info.deletedFiles.insert(CanonPath(path));
-            if (statusFlags != GIT_STATUS_CURRENT)
-                info.isDirty = true;
-            return 0;
+                    info.isDirty = true;
+                return 0;
+            } catch (...) {
+                statusError = std::current_exception();
+                return -1;
+            }
         };
 
         git_status_options options = GIT_STATUS_OPTIONS_INIT;
         options.flags |= GIT_STATUS_OPT_INCLUDE_UNMODIFIED;
         options.flags |= GIT_STATUS_OPT_EXCLUDE_SUBMODULES;
-        if (git_status_foreach_ext(*this, &options, &statusCallbackTrampoline, &statusCallback))
+        if (git_status_foreach_ext(*this, &options, &statusCallbackTrampoline, &statusCallback)) {
+            if (statusError) {
+                try {
+                    std::rethrow_exception(statusError);
+                } catch (Error & e) {
+                    e.addTrace({}, "while getting the status of Git repository %s", PathFmt(path));
+                    throw;
+                }
+            }
             throw GitError("getting working directory status");
+        }
 
         /* Gitlinks in the index are the submodules; .gitmodules only
            supplies their URLs. */
@@ -687,7 +712,14 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             auto entry = git_index_get_byindex(index.get(), n);
             if (entry->mode != GIT_FILEMODE_COMMIT || git_index_entry_stage(entry) != 0)
                 continue;
-            CanonPath entryPath(entry->path);
+            auto entryPath = [&] {
+                try {
+                    return CanonPath::fromThrowing(UnresolvedPath(entry->path));
+                } catch (Error & e) {
+                    e.addTrace({}, "in the index of Git repository %s", PathFmt(path));
+                    throw;
+                }
+            }();
             if (auto it = configured.find(entryPath); it != configured.end())
                 info.submodules.push_back(std::move(it->second));
             else
@@ -1749,7 +1781,7 @@ ref<GitRepoPool> GitRepoPool::create(const std::filesystem::path & path, GitRepo
 std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules(const Hash & rev, bool exportIgnore)
 {
     /* Read the .gitmodules files from this revision. */
-    CanonPath modulesFile(".gitmodules");
+    CanonPath modulesFile = ".gitmodules"_filename;
 
     auto accessor = getAccessor(rev, {.exportIgnore = exportIgnore}, "");
     if (!accessor->pathExists(modulesFile))

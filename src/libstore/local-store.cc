@@ -1,4 +1,5 @@
 #include "nix/store/local-store.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/build.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/path-references.hh"
@@ -13,8 +14,10 @@
 #include "nix/util/topo-sort.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
@@ -145,6 +148,11 @@ LocalStore::LocalStore(ref<const Config> config)
     } else {
         makeStoreWritable();
     }
+    /* Only now, since `makeStoreWritable()` may have moved us into a new
+       mount namespace with the store remounted read-write; a handle
+       opened before that would still refer to the old mount. Not
+       virtual, since we are still constructing. */
+    LocalFSStore::init();
     createDirs(linksDir);
     auto profilesDir = config->stateDir.get() / "profiles";
     createDirs(profilesDir);
@@ -177,11 +185,13 @@ LocalStore::LocalStore(ref<const Config> config)
                 "warning: the group '%1%' specified in 'build-users-group' does not exist",
                 localSettings.buildUsersGroup);
         else if (!config->readOnly) {
-            auto st = stat(config->realStoreDir.get());
+            auto st = fstat(getRealStoreDirFd());
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                chown(config->realStoreDir.get(), 0, gr->gr_gid);
-                chmod(config->realStoreDir.get(), perm);
+                if (::fchown(getRealStoreDirFd(), 0, gr->gr_gid) == -1)
+                    throw SysError("changing owner of %s", PathFmt(config->realStoreDir.get()));
+                if (::fchmod(getRealStoreDirFd(), perm) == -1)
+                    throw SysError("changing permissions of %s", PathFmt(config->realStoreDir.get()));
             }
         }
     }
@@ -1501,19 +1511,19 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking link hashes...");
 
-        for (auto & link : DirectoryIterator{linksDir}) {
+        for (const auto & link : openDirectoryIterator(linksDir)) {
             checkInterrupt();
-            auto name = link.path().filename();
+            auto name = link.name.mkPath();
+            auto linkPath = linksDir / name;
             printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
             std::string hash =
-                hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
+                hashPath(makeFSSourceAccessor(linkPath), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError(
-                    "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
+                printError("link %s was modified! expected hash %s, got '%s'", PathFmt(linkPath), name.string(), hash);
                 if (repair) {
-                    unlinkIfExists(link.path());
-                    printInfo("removed link %s", PathFmt(link.path()));
+                    unlinkIfExists(linkPath);
+                    printInfo("removed link %s", PathFmt(linkPath));
                 } else {
                     errors = true;
                 }
@@ -1596,10 +1606,12 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : DirectoryIterator{config->realStoreDir.get()}) {
+    for (const auto & i : DirectoryIterator{valueOr(
+             reopenDirectory(getRealStoreDirFd()),
+             NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening the store directory"))}) {
         checkInterrupt();
         try {
-            storePathsInStoreDir.insert({i.path().filename().string()});
+            storePathsInStoreDir.insert({os_string_to_string(i.name.native())});
         } catch (BadStorePath &) {
         }
     }

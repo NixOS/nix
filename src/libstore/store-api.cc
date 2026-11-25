@@ -54,7 +54,9 @@ static std::string canonStoreDir(std::string path)
 {
     if (path.empty() || path[0] != '/')
         throw UsageError("store directory path \"%s\" is not an absolute path", path);
-    return CanonPath(std::move(path)).abs();
+    if (auto res = CanonPath::maybeFromUnresolved(UnresolvedPath(path)))
+        return res->abs();
+    throw UsageError("store directory path \"%s\" must not contain '..' components", path);
 }
 
 static std::string canonStoreDir(std::filesystem::path path)
@@ -143,7 +145,7 @@ std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(std::string_view pat
     if (slash == std::string::npos)
         return {parseStorePath(path), CanonPath::root};
     else
-        return {parseStorePath(path.substr(0, slash)), CanonPath{path.substr(slash)}};
+        return {parseStorePath(path.substr(0, slash)), CanonPath::fromThrowing(UnresolvedPath(path.substr(slash)))};
 }
 
 ref<Builder> Store::getBuilder(std::shared_ptr<Store> evalStore)

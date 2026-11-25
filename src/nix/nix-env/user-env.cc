@@ -15,15 +15,17 @@
 
 namespace nix {
 
-PackageInfos queryInstalled(EvalState & state, const std::filesystem::path & userEnv)
+PackageInfos queryInstalled(EvalState & state, const SourcePath & userEnv)
 {
     PackageInfos elems;
-    if (pathExists(userEnv / "manifest.json"))
-        throw Error("profile %s is incompatible with 'nix-env'; please use 'nix profile' instead", PathFmt(userEnv));
-    auto manifestFile = userEnv / "manifest.nix";
-    if (pathExists(manifestFile)) {
+    /* Only ever looking inside `userEnv`, following any symlinks on the
+       way, so it needn't have its own resolved. */
+    if ((userEnv / "manifest.json"_filename).resolveSymlinks().pathExists())
+        throw Error("profile '%s' is incompatible with 'nix-env'; please use 'nix profile' instead", userEnv);
+    auto manifest = userEnv / "manifest.nix"_filename;
+    if (manifest.resolveSymlinks().pathExists()) {
         Value v;
-        state.evalFile(state.rootPath(CanonPath(manifestFile.string())).resolveSymlinks(), v);
+        state.evalFile(manifest, v);
         const Bindings & bindings = Bindings::emptyBindings;
         getDerivations(state, v, "", bindings, elems, false);
     }

@@ -95,11 +95,11 @@ struct LibFlakeState : EvalState::Extension
         auto internalFS = make_ref<MemorySourceAccessor>();
         internalFS->setPathDisplay("«flakes-internal»", "");
         internalFS->addFile(
-            CanonPath("call-flake.nix"),
+            "call-flake.nix"_filename,
             {
 #embed "call-flake.nix"
             });
-        state.evalFile(SourcePath{internalFS, CanonPath("call-flake.nix")}, **vCallFlake);
+        state.evalFile(SourcePath{internalFS, "call-flake.nix"_filename}, **vCallFlake);
     }
 };
 
@@ -281,7 +281,7 @@ static Flake readFlake(
     const SourcePath & rootDir,
     const InputAttrPath & lockRootAttrPath)
 {
-    auto flakeDir = rootDir / CanonPath(resolvedRef.subdir);
+    auto flakeDir = rootDir / CanonPath::viaLexical(resolvedRef.subdir);
     auto flakePath = flakeDir / "flake.nix"_filename;
 
     // NOTE evalFile forces vInfo to be an attrset because mustBeTrivial is true.
@@ -627,7 +627,8 @@ LockedFlake lockFlake(
                         if (auto relativePath = input.ref->input.isRelative()) {
                             return SourcePath{
                                 overriddenSourcePath.accessor,
-                                CanonPath(relativePath->string(), overriddenSourcePath.path.parent().value())};
+                                CanonPath::viaLexical(UnresolvedPath(
+                                    relativePath->string(), overriddenSourcePath.path.parent().value()))};
                         } else
                             return std::nullopt;
                     };
@@ -904,7 +905,7 @@ LockedFlake lockFlake(
                             }
 
                             topRef.input.putFile(
-                                CanonPath((topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock"),
+                                CanonPath::viaLexical((topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock"),
                                 newLockFileS,
                                 commitMessage);
                         }
@@ -984,7 +985,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
         auto key = keyMap.find(node);
         assert(key != keyMap.end());
 
-        override.alloc(libFlakeState.sDir).mkString(CanonPath(subdir).rel(), state.mem);
+        override.alloc(libFlakeState.sDir).mkString(subdir.rel(), state.mem);
 
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }

@@ -47,6 +47,8 @@ private:
     friend class FilenameView;
     template<size_t N>
     friend struct FilenameLiteral;
+    template<size_t N>
+    friend struct CanonPathLiteral;
 
     /**
      * Why @p s is not a valid `Filename`, or `std::nullopt` if it is.
