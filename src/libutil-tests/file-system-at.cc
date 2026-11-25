@@ -46,12 +46,12 @@ TEST(readLinkAt, works)
     bool hasLongSymlinks = true;
     {
         RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-        root.createChild("link", [](auto & s) { s.createSymlink("target"); });
-        root.createChild("relative", [](auto & s) { s.createSymlink("../relative/path"); });
-        root.createChild("absolute", [](auto & s) { s.createSymlink("/absolute/path"); });
+        root.createChild("link"_filename, [](auto & s) { s.createSymlink("target"); });
+        root.createChild("relative"_filename, [](auto & s) { s.createSymlink("../relative/path"); });
+        root.createChild("absolute"_filename, [](auto & s) { s.createSymlink("/absolute/path"); });
         try {
-            root.createChild("medium", [&](auto & s) { s.createSymlink(mediumTarget); });
-            root.createChild("long", [&](auto & s) { s.createSymlink(longTarget); });
+            root.createChild("medium"_filename, [&](auto & s) { s.createSymlink(mediumTarget); });
+            root.createChild("long"_filename, [&](auto & s) { s.createSymlink(longTarget); });
         } catch (SystemError & e) {
             if (e.is(std::errc::filename_too_long)) {
                 hasLongSymlinks = false;
@@ -59,16 +59,17 @@ TEST(readLinkAt, works)
                 throw;
             }
         }
-        root.createChild("a", [](auto & s) {
+        root.createChild("a"_filename, [](auto & s) {
             s.createDirectory([](auto & a) {
-                a.createChild("b", [](auto & s) {
-                    s.createDirectory(
-                        [](auto & b) { b.createChild("link", [](auto & s) { s.createSymlink("nested_target"); }); });
+                a.createChild("b"_filename, [](auto & s) {
+                    s.createDirectory([](auto & b) {
+                        b.createChild("link"_filename, [](auto & s) { s.createSymlink("nested_target"); });
+                    });
                 });
             });
         });
-        root.createChild("regular", [](auto & s) { s.createRegularFile(false, [](auto &) {}); });
-        root.createChild("dir", [](auto & s) { s.createDirectory([](auto &) {}); });
+        root.createChild("regular"_filename, [](auto & s) { s.createRegularFile(false, [](auto &) {}); });
+        root.createChild("dir"_filename, [](auto & s) { s.createDirectory([](auto &) {}); });
     }
 
     auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
@@ -106,24 +107,24 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 
     {
         RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-        root.createChild("a", [&](auto & s) {
+        root.createChild("a"_filename, [&](auto & s) {
             s.createDirectory([&](auto & a) {
-                a.createChild("absolute_symlink", [&](auto & s) { s.createSymlink(tmpDir.string()); });
-                a.createChild("relative_symlink", [](auto & s) { s.createSymlink("../."); });
-                a.createChild("broken_symlink", [](auto & s) { s.createSymlink("./nonexistent"); });
-                a.createChild("b", [](auto & s) {
+                a.createChild("absolute_symlink"_filename, [&](auto & s) { s.createSymlink(tmpDir.string()); });
+                a.createChild("relative_symlink"_filename, [](auto & s) { s.createSymlink("../."); });
+                a.createChild("broken_symlink"_filename, [](auto & s) { s.createSymlink("./nonexistent"); });
+                a.createChild("b"_filename, [](auto & s) {
                     s.createDirectory([](auto & b) {
-                        b.createChild("d", [](auto & s) { s.createDirectory([](auto &) {}); });
-                        b.createChild("c", [](auto & s) { s.createSymlink("./d"); });
+                        b.createChild("d"_filename, [](auto & s) { s.createDirectory([](auto &) {}); });
+                        b.createChild("c"_filename, [](auto & s) { s.createSymlink("./d"); });
                     });
                 });
             });
         });
-        root.createChild("c", [](auto & s) {
+        root.createChild("c"_filename, [](auto & s) {
             s.createDirectory([](auto & c) {
-                c.createChild("d", [](auto & s) {
+                c.createChild("d"_filename, [](auto & s) {
                     s.createDirectory([](auto & d) {
-                        d.createChild("regular", [](auto & s) {
+                        d.createChild("regular"_filename, [](auto & s) {
                             s.createRegularFile(false, [](auto & crf) { crf("some contents"); });
                         });
                     });
@@ -137,18 +138,19 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
        exists fails. */
     {
         RestoreSink::Directory ab{testing::valueOrFail(openDirectory(tmpDir / "a" / "b", FinalSymlink::Follow))};
-        for (auto name : {"c", "d"})
+        for (auto name : {"c"_filename, "d"_filename})
             for (auto & create : std::vector<FileSystemObjectSink::OnDirectory::ChildCreatedCallback>{
                      [](auto & s) {
                          s.createDirectory([](auto & dir) {
-                             dir.createChild("pwned", [](auto & s) { s.createRegularFile(false, [](auto &) {}); });
+                             dir.createChild(
+                                 "pwned"_filename, [](auto & s) { s.createRegularFile(false, [](auto &) {}); });
                          });
                      },
                      [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("pwned"); }); },
                      [](auto & s) { s.createSymlink("pwned"); },
                  })
                 EXPECT_THAT([&] { ab.createChild(name, create); }, testing::ThrowsSystemError(std::errc::file_exists))
-                    << name;
+                    << name.str();
 
         /* Nothing appeared at the symlink's target. */
         EXPECT_TRUE(std::filesystem::is_empty(tmpDir / "a" / "b" / "d"));
@@ -328,7 +330,7 @@ TEST(openFileEnsureBeneathNoSymlinksDeathTest, rejectsONofollow)
 
     {
         RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-        root.createChild("file", [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
+        root.createChild("file"_filename, [](auto & s) { s.createRegularFile(false, [](auto & crf) {}); });
     }
 
     auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
@@ -356,17 +358,5 @@ TEST(openFileEnsureBeneathNoSymlinksDeathTest, rejectsONofollow)
 #  endif
 }
 #endif
-
-TEST(RestoreSink, createChildInvalidName)
-{
-    std::filesystem::path tmpDir = nix::createTempDir();
-    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
-
-    RestoreSink::Directory root{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
-    for (std::string_view name : {"", ".", "..", "a/b"})
-        EXPECT_THROW(root.createChild(name, [](auto & s) { s.createDirectory([](auto &) {}); }), Error) << name;
-
-    EXPECT_TRUE(std::filesystem::is_empty(tmpDir));
-}
 
 } // namespace nix

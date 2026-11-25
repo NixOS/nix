@@ -116,7 +116,10 @@ CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolut
             if (!res.isRoot())
                 res.pop();
         } else {
-            res.push(c);
+            /* Not empty, `.` or `..`, which are handled above, and with no
+               `/`, which the components are split on; and no file names
+               (and so no symlink targets they came from) contain NUL. */
+            res.push(FilenameView::fromStringUnchecked(c));
             if (mode == SymlinkResolution::Full || !todo.empty()) {
                 if (auto st = maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
                     if (!linksAllowed--)

@@ -199,33 +199,33 @@ TEST(references, scanForReferencesDeep)
         .entries{
             {
                 // file1.txt: contains hash1
-                "file1.txt",
+                "file1.txt"_filename,
                 File::Regular{
                     .contents = "This file references " + hash1 + " in its content",
                 },
             },
             {
                 // file2.txt: contains hash2 and hash3
-                "file2.txt",
+                "file2.txt"_filename,
                 File::Regular{
                     .contents = "Multiple refs: " + hash2 + " and also " + hash3,
                 },
             },
             {
                 // file3.txt: contains no references
-                "file3.txt",
+                "file3.txt"_filename,
                 File::Regular{
                     .contents = "This file has no store path references at all",
                 },
             },
             {
                 // subdir: a subdirectory
-                "subdir",
+                "subdir"_filename,
                 File::Directory{
                     .entries{
                         {
                             // subdir/file4.txt: contains hash1 again
-                            "file4.txt",
+                            "file4.txt"_filename,
                             File::Regular{
                                 .contents = "Subdirectory file with " + hash1,
                             },
@@ -235,7 +235,7 @@ TEST(references, scanForReferencesDeep)
             },
             {
                 // link1: a symlink that contains a reference in its target
-                "link1",
+                "link1"_filename,
                 File::Symlink{
                     .target = hash2 + "-target",
                 },

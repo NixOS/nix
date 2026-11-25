@@ -90,14 +90,15 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             if (!done.insert(path).second)
                 continue;
 
-            auto binDir = state->storeFS->resolveSymlinks(CanonPath(store->printStorePath(path)) / "bin");
+            auto binDir = state->storeFS->resolveSymlinks(CanonPath(store->printStorePath(path)) / "bin"_filename);
             if (!store->isInStore(binDir.abs()))
                 throw Error("path '%s' is not in the Nix store", binDir);
 
             pathAdditions.push_back(binDir.abs());
 
             auto propPath = state->storeFS->resolveSymlinks(
-                CanonPath(store->printStorePath(path)) / "nix-support" / "propagated-user-env-packages");
+                CanonPath(store->printStorePath(path)) / "nix-support"_filename
+                / "propagated-user-env-packages"_filename);
             if (auto st = state->storeFS->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
                 for (auto & p : tokenizeString<Strings>(state->storeFS->readFile(propPath)))
                     todo.push(store->parseStorePath(p));

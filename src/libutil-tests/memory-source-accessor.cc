@@ -32,25 +32,25 @@ ref<MemorySourceAccessor> exampleComplex()
     files->root = File::Directory{
         .entries{
             {
-                "foo",
+                "foo"_filename,
                 File::Regular{
                     .contents = "hello\n\0\n\tworld!"s,
                 },
             },
             {
-                "bar",
+                "bar"_filename,
                 File::Directory{
                     .entries =
                         {
                             {
-                                "baz",
+                                "baz"_filename,
                                 File::Regular{
                                     .executable = true,
                                     .contents = "good day,\n\0\n\tworld!"s,
                                 },
                             },
                             {
-                                "quux",
+                                "quux"_filename,
                                 File::Symlink{
                                     .target = "/over/there",
                                 },
@@ -196,17 +196,6 @@ TEST_F(MemorySourceAccessorTestErrors, addSymlinkNotASymlink)
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/file"), HasSubstrIgnoreANSIMatcher("is not a symbolic link"))));
 }
 
-TEST_F(MemorySourceAccessorTestErrors, createChildInvalidName)
-{
-    sink.createDirectory([&](auto & dir) {
-        for (std::string_view name : {"", ".", "..", "a/b"})
-            EXPECT_THROW(dir.createChild(name, [](auto & child) { child.createSymlink("target"); }), BadCanonPath)
-                << name;
-    });
-
-    EXPECT_TRUE(accessor->readDirectory(CanonPath::root).empty());
-}
-
 TEST_F(MemorySourceAccessorTestErrors, createRootAlreadyExists)
 {
     sink.createRegularFile(false, [](auto & crf) { crf("first"); });
@@ -219,12 +208,13 @@ TEST_F(MemorySourceAccessorTestErrors, createRootAlreadyExists)
 TEST_F(MemorySourceAccessorTestErrors, createChildAlreadyExists)
 {
     sink.createDirectory([](auto & dir) {
-        dir.createChild("subdir", [](auto & child) {
+        dir.createChild("subdir"_filename, [](auto & child) {
             child.createDirectory([](auto & subdir) {
-                subdir.createChild(
-                    "file", [](auto & child) { child.createRegularFile(false, [](auto & crf) { crf("first"); }); });
+                subdir.createChild("file"_filename, [](auto & child) {
+                    child.createRegularFile(false, [](auto & crf) { crf("first"); });
+                });
                 EXPECT_THAT(
-                    [&] { subdir.createChild("file", [](auto & child) { child.createSymlink("second"); }); },
+                    [&] { subdir.createChild("file"_filename, [](auto & child) { child.createSymlink("second"); }); },
                     ThrowsMessage<Error>(HasSubstrIgnoreANSIMatcher("file 'somepath/subdir/file' already exists")));
             });
         });

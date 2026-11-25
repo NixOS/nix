@@ -79,7 +79,17 @@ time_t dumpPathAndGetMtime(const std::filesystem::path & path, Sink & sink, Path
  */
 void dumpString(std::string_view s, Sink & sink);
 
+/**
+ * Parse a NAR, using the `use-case-hack` setting.
+ */
 void parseDump(FileSystemObjectSink & sink, Source & source);
+
+/**
+ * Like the other `parseDump`, but saying whether to apply the case hack
+ * to names that collide when case is ignored, rather than using the
+ * `use-case-hack` setting.
+ */
+void parseDump(FileSystemObjectSink & sink, Source & source, bool useCaseHack);
 
 /**
  * Read a NAR from 'source' and write it to 'sink'.

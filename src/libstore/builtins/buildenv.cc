@@ -54,7 +54,8 @@ createLinks(State & state, const std::filesystem::path & srcDir, const CanonPath
             /* not matched by glob */
             continue;
         auto srcFile = srcDir / name;
-        auto dstFile = dstDir / name.string();
+        /* Read from a directory, so a valid file name. */
+        auto dstFile = dstDir / Filename::fromStringUnchecked(name.string());
 
         auto srcStOpt = maybeStat(srcFile);
         if (!srcStOpt) {

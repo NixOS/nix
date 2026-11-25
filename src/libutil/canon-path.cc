@@ -56,7 +56,7 @@ CanonPath::CanonPath(const std::vector<std::string> & elems)
     : path("/")
 {
     for (auto & s : elems)
-        push(s);
+        push(FilenameView::fromStringThrowing(s));
 }
 
 std::optional<CanonPath> CanonPath::parent() const
@@ -106,21 +106,11 @@ CanonPath CanonPath::operator/(const CanonPath & x) const
     return res;
 }
 
-void CanonPath::push(std::string_view c)
+void CanonPath::push(FilenameView c)
 {
-    assert(c.find('/') == c.npos);
-    assert(c != "." && c != "..");
-    ensureNoNullBytes(c);
     if (!isRoot())
         path += '/';
-    path += c;
-}
-
-CanonPath CanonPath::operator/(std::string_view c) const
-{
-    auto res = *this;
-    res.push(c);
-    return res;
+    path += c.str();
 }
 
 bool CanonPath::isAllowed(const std::set<CanonPath> & allowed) const
