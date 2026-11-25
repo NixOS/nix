@@ -103,7 +103,7 @@ void increment(void* user_data, nix_c_context* ctx, EvalState* state, Value** ar
     }
 }
 
-void nix_plugin_entry() {
+void nix_plugin_entry(void) {
   const char* args[] = {"n", NULL};
   PrimOp *p = nix_alloc_primop(NULL, increment, 1, "increment", args, "Example custom built-in function: increments an integer", NULL);
   nix_register_primop(NULL, p);
