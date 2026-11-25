@@ -256,7 +256,7 @@ TEST(references, scanForReferencesDeep)
 
         // Check file1.txt found path1
         {
-            CanonPath f1Path("/file1.txt");
+            auto f1Path = "/file1.txt"_canonPath;
             auto it = foundRefs.find(f1Path);
             ASSERT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 1);
@@ -265,7 +265,7 @@ TEST(references, scanForReferencesDeep)
 
         // Check file2.txt found path2 and path3
         {
-            CanonPath f2Path("/file2.txt");
+            auto f2Path = "/file2.txt"_canonPath;
             auto it = foundRefs.find(f2Path);
             ASSERT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 2);
@@ -275,13 +275,13 @@ TEST(references, scanForReferencesDeep)
 
         // Check file3.txt is not in results (no refs)
         {
-            CanonPath f3Path("/file3.txt");
+            auto f3Path = "/file3.txt"_canonPath;
             EXPECT_FALSE(foundRefs.count(f3Path));
         }
 
         // Check subdir/file4.txt found path1
         {
-            CanonPath f4Path("/subdir/file4.txt");
+            auto f4Path = "/subdir/file4.txt"_canonPath;
             auto it = foundRefs.find(f4Path);
             ASSERT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 1);
@@ -290,7 +290,7 @@ TEST(references, scanForReferencesDeep)
 
         // Check symlink found path2
         {
-            CanonPath linkPath("/link1");
+            auto linkPath = "/link1"_canonPath;
             auto it = foundRefs.find(linkPath);
             ASSERT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 1);
@@ -305,17 +305,17 @@ TEST(references, scanForReferencesDeep)
         EXPECT_EQ(results.size(), 4); // file1, file2, file4, link1
 
         // Verify all expected files are in the results
-        EXPECT_TRUE(results.count(CanonPath("/file1.txt")));
-        EXPECT_TRUE(results.count(CanonPath("/file2.txt")));
-        EXPECT_TRUE(results.count(CanonPath("/subdir/file4.txt")));
-        EXPECT_TRUE(results.count(CanonPath("/link1")));
-        EXPECT_FALSE(results.count(CanonPath("/file3.txt")));
+        EXPECT_TRUE(results.count("/file1.txt"_canonPath));
+        EXPECT_TRUE(results.count("/file2.txt"_canonPath));
+        EXPECT_TRUE(results.count("/subdir/file4.txt"_canonPath));
+        EXPECT_TRUE(results.count("/link1"_canonPath));
+        EXPECT_FALSE(results.count("/file3.txt"_canonPath));
 
         // Verify the references found in each file are correct
-        EXPECT_EQ(results.at(CanonPath("/file1.txt")), StorePathSet{path1});
-        EXPECT_EQ(results.at(CanonPath("/file2.txt")), StorePathSet({path2, path3}));
-        EXPECT_EQ(results.at(CanonPath("/subdir/file4.txt")), StorePathSet{path1});
-        EXPECT_EQ(results.at(CanonPath("/link1")), StorePathSet{path2});
+        EXPECT_EQ(results.at("/file1.txt"_canonPath), StorePathSet{path1});
+        EXPECT_EQ(results.at("/file2.txt"_canonPath), StorePathSet({path2, path3}));
+        EXPECT_EQ(results.at("/subdir/file4.txt"_canonPath), StorePathSet{path1});
+        EXPECT_EQ(results.at("/link1"_canonPath), StorePathSet{path2});
     }
 }
 

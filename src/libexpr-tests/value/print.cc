@@ -367,7 +367,7 @@ TEST_F(ValuePrintingTests, ansiColorsStringElided)
 TEST_F(ValuePrintingTests, ansiColorsPath)
 {
     Value v;
-    v.mkPath(state.rootPath(CanonPath("puppy")), state.mem);
+    v.mkPath(state.rootPath(CanonPath{"puppy"_filename}), state.mem);
 
     test(v, ANSI_GREEN "/puppy" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }

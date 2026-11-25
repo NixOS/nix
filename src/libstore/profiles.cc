@@ -1,4 +1,5 @@
 #include "nix/store/profiles.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-fs-store.hh"
@@ -35,10 +36,10 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
     std::filesystem::path profileDir = profile.parent_path();
     auto profileName = profile.filename().string();
 
-    for (auto & i : DirectoryIterator{profileDir}) {
+    for (const auto & i : openDirectoryIterator(profileDir)) {
         checkInterrupt();
-        if (auto n = parseName(profileName, i.path().filename().string())) {
-            auto path = i.path().string();
+        if (auto n = parseName(profileName, os_string_to_string(i.name.native()))) {
+            auto path = (profileDir / i.name.mkPath()).string();
             gens.push_back({.number = *n, .path = path, .creationTime = lstat(path).st_mtime});
         }
     }

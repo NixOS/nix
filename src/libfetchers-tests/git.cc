@@ -196,7 +196,7 @@ TEST_F(GitTest, submodulePeriodSupport)
 
     auto [accessor, i] = input.getAccessor(settings, *store);
 
-    ASSERT_EQ(accessor->readFile(CanonPath("deps/sub/lib.txt")), "hello from submodule\n");
+    ASSERT_EQ(accessor->readFile("/deps/sub/lib.txt"_canonPath), "hello from submodule\n");
 }
 
 } // namespace nix::fetchers

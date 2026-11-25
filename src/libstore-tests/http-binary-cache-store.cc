@@ -2,6 +2,7 @@
 #include <regex>
 
 #include "nix/store/http-binary-cache-store.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/tests/https-store.hh"
 
 namespace nix {
@@ -104,11 +105,12 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthor
     StringSource dump{std::string_view("test")};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
 
-    for (auto & entry : DirectoryIterator{cacheDir})
-        if (entry.path().extension() == ".narinfo") {
-            auto content = readFile(entry.path());
+    for (const auto & entry : openDirectoryIterator(cacheDir))
+        if (entry.name.mkPath().extension() == ".narinfo") {
+            auto entryPath = cacheDir / entry.name.mkPath();
+            auto content = readFile(entryPath);
             content = std::regex_replace(content, std::regex("URL: nar/"), fmt("URL: https://127.0.0.1:%d/nar/", port));
-            writeFile(entry.path(), content);
+            writeFile(entryPath, content);
         }
 
     auto config = makeConfig();

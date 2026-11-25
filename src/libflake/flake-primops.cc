@@ -61,8 +61,8 @@ PrimOp getFlake(const Settings & settings)
             if (auto sourcePath = flakeRef.input.getSourcePath();
                 flakeRef.input.getType() == "path" && sourcePath && state.store->isInStore(sourcePath->string())) {
                 auto [storePath, subPath] = state.store->toStorePath(sourcePath->string());
-                if (auto mount = state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath)))) {
-                    auto path = state.storePath(storePath) / CanonPath(subPath) / CanonPath(flakeRef.subdir);
+                if (auto mount = state.storeFS->getMount(state.storePath(storePath).path)) {
+                    auto path = state.storePath(storePath) / subPath / CanonPath::viaLexical(flakeRef.subdir);
                     return callFlake(state, lockFlake(settings, state, path, lockFlags), v);
                 }
             }

@@ -263,7 +263,8 @@ struct MercurialInputScheme : InputScheme
                 auto accessor = makeFSSourceAccessor(absPath(localPath));
 
                 PathFilter filter = [&](const std::string & p) -> bool {
-                    auto cp = CanonPath(p);
+                    /* `dumpPath` gives the filter `CanonPath`s, as strings. */
+                    auto cp = CanonPath::fromAsserting(UnresolvedPath(p));
                     auto st = accessor->lstat(cp);
 
                     if (st.type == SourceAccessor::tDirectory) {

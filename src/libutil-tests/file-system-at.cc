@@ -81,10 +81,10 @@ TEST(readLinkAt, works)
         EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("medium")), string_to_os_string(mediumTarget));
         EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("long")), string_to_os_string(longTarget));
     }
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), "/a/b/link"_canonPath), OS_STR("nested_target"));
 
     auto subDirFd = testing::valueOrFail(openDirectory(tmpDir / "a", FinalSymlink::Follow));
-    EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
+    EXPECT_EQ(readLinkAt(subDirFd.get(), "/b/link"_canonPath), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
     EXPECT_THROW(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("regular")), SystemError);
@@ -170,12 +170,12 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
         return std::move(fd).value();
     };
 
-    auto openRead = [&](std::string_view path) -> AutoCloseFD {
+    auto openRead = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path,
+            path.rel(),
             openFileEnsureBeneathNoSymlinks(
                 dirFd.get(),
-                CanonPath(path),
+                path,
 #ifdef _WIN32
                 FILE_READ_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
                 0
@@ -186,12 +186,12 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
                 ));
     };
 
-    auto openReadDir = [&](std::string_view path) -> AutoCloseFD {
+    auto openReadDir = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path,
+            path.rel(),
             openFileEnsureBeneathNoSymlinks(
                 dirFd.get(),
-                CanonPath(path),
+                path,
 #ifdef _WIN32
                 FILE_READ_ATTRIBUTES | SYNCHRONIZE,
                 FILE_DIRECTORY_FILE
@@ -203,21 +203,21 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     };
 
 #if defined(__linux__)
-    auto openReadDirPath = [&](std::string_view path) -> AutoCloseFD {
+    auto openReadDirPath = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path, openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath(path), O_PATH | O_DIRECTORY | O_CLOEXEC, 0));
+            path.rel(), openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_PATH | O_DIRECTORY | O_CLOEXEC, 0));
     };
-    auto openPath = [&](std::string_view path) -> AutoCloseFD {
-        return check(path, openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath(path), O_PATH | O_CLOEXEC, 0));
+    auto openPath = [&](const CanonPath & path) -> AutoCloseFD {
+        return check(path.rel(), openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_PATH | O_CLOEXEC, 0));
     };
 #endif
 
-    auto openCreateExclusive = [&](std::string_view path) -> AutoCloseFD {
+    auto openCreateExclusive = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path,
+            path.rel(),
             openFileEnsureBeneathNoSymlinks(
                 dirFd.get(),
-                CanonPath(path),
+                path,
 #ifdef _WIN32
                 FILE_WRITE_DATA | SYNCHRONIZE,
                 0,
@@ -235,53 +235,53 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
 
     // Symlinks in the path (any position) are rejected.
-    EXPECT_THROW(openRead("a/absolute_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/relative_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/absolute_symlink/a"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/absolute_symlink/c/d"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/relative_symlink/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/b/c/d"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/absolute_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/relative_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/absolute_symlink/a"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/absolute_symlink/c/d"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/relative_symlink/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/b/c/d"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/broken_symlink"_canonPath), SymlinkNotAllowed);
 
     /* Trailing symlink with `O_DIRECTORY` (no `O_NOFOLLOW`): the
        syscall reports `ELOOP`, handled by the direct
        `SymlinkNotAllowed` throw in `openFileEnsureBeneathNoSymlinks`. */
-    EXPECT_THROW(openReadDir("a/absolute_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDir("a/relative_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDir("a/b/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDir("a/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/absolute_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/relative_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/b/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/broken_symlink"_canonPath), SymlinkNotAllowed);
 
 #if defined(__linux__)
     // Same thing for `O_PATH | O_DIRECTORY` (Linux-only flag).
-    EXPECT_THROW(openReadDirPath("a/absolute_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDirPath("a/relative_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDirPath("a/b/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDirPath("a/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/absolute_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/relative_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/b/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/broken_symlink"_canonPath), SymlinkNotAllowed);
 
     /* `O_PATH` on a trailing symlink is allowed: the caller gets a
        path fd referring to the symlink itself. Interior symlinks are
        still rejected. */
-    EXPECT_TRUE(openPath("a/absolute_symlink"));
-    EXPECT_TRUE(openPath("a/relative_symlink"));
-    EXPECT_TRUE(openPath("a/b/c"));
-    EXPECT_TRUE(openPath("a/broken_symlink"));
-    EXPECT_THROW(openPath("a/absolute_symlink/a"), SymlinkNotAllowed);
-    EXPECT_THROW(openPath("a/absolute_symlink/c/d"), SymlinkNotAllowed);
-    EXPECT_THROW(openPath("a/relative_symlink/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openPath("a/b/c/d"), SymlinkNotAllowed);
+    EXPECT_TRUE(openPath("/a/absolute_symlink"_canonPath));
+    EXPECT_TRUE(openPath("/a/relative_symlink"_canonPath));
+    EXPECT_TRUE(openPath("/a/b/c"_canonPath));
+    EXPECT_TRUE(openPath("/a/broken_symlink"_canonPath));
+    EXPECT_THROW(openPath("/a/absolute_symlink/a"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openPath("/a/absolute_symlink/c/d"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openPath("/a/relative_symlink/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openPath("/a/b/c/d"_canonPath), SymlinkNotAllowed);
 #endif
 
 #if !defined(_WIN32) && !defined(__CYGWIN__)
     /* Sanity check: behaves the same as plain openat with
        `O_EXCL | O_CREAT` on an existing broken-symlink path —
        the symlink counts as "already there". */
-    EXPECT_THAT([&] { openCreateExclusive("a/broken_symlink"); }, ThrowsSysError(EEXIST));
+    EXPECT_THAT([&] { openCreateExclusive("/a/broken_symlink"_canonPath); }, ThrowsSysError(EEXIST));
 #endif
-    EXPECT_THROW(openCreateExclusive("a/absolute_symlink/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openCreateExclusive("/a/absolute_symlink/broken_symlink"_canonPath), SymlinkNotAllowed);
 
     // Non-symlink failure modes: error codes must survive.
     EXPECT_THAT(
-        [&] { openRead("c/d/regular/a"); },
+        [&] { openRead("/c/d/regular/a"_canonPath); },
 #ifdef _WIN32
         ThrowsWinError(ERROR_DIRECTORY)
 #else
@@ -289,7 +289,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
     );
     EXPECT_THAT(
-        [&] { openReadDir("c/d/regular"); },
+        [&] { openReadDir("/c/d/regular"_canonPath); },
 #ifdef _WIN32
         ThrowsWinError(ERROR_DIRECTORY)
 #else
@@ -297,7 +297,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
     );
     EXPECT_THAT(
-        [&] { openRead("c/d/nonexistent"); },
+        [&] { openRead("/c/d/nonexistent"_canonPath); },
 #ifdef _WIN32
         ThrowsWinError(ERROR_FILE_NOT_FOUND)
 #else
@@ -306,15 +306,15 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     );
 
     // Happy paths.
-    EXPECT_TRUE(openRead("c/d/regular"));
-    EXPECT_TRUE(openReadDir("c"));
-    EXPECT_TRUE(openReadDir("c/d"));
-    EXPECT_TRUE(openCreateExclusive("a/regular"));
+    EXPECT_TRUE(openRead("/c/d/regular"_canonPath));
+    EXPECT_TRUE(openReadDir("/c"_canonPath));
+    EXPECT_TRUE(openReadDir("/c/d"_canonPath));
+    EXPECT_TRUE(openCreateExclusive("/a/regular"_canonPath));
 #if defined(__linux__)
-    EXPECT_TRUE(openReadDirPath("c"));
-    EXPECT_TRUE(openReadDirPath("c/d"));
-    EXPECT_TRUE(openPath("c/d/regular"));
-    EXPECT_TRUE(openPath("c"));
+    EXPECT_TRUE(openReadDirPath("/c"_canonPath));
+    EXPECT_TRUE(openReadDirPath("/c/d"_canonPath));
+    EXPECT_TRUE(openPath("/c/d/regular"_canonPath));
+    EXPECT_TRUE(openPath("/c"_canonPath));
 #endif
 }
 

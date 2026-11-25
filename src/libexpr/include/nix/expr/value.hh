@@ -1499,7 +1499,8 @@ public:
     SourcePath path() const
     {
         return SourcePath(
-            ref(pathAccessor()->shared_from_this()), CanonPath(CanonPath::unchecked_t(), std::string(pathStrView())));
+            ref(pathAccessor()->shared_from_this()),
+            CanonPath::fromUnchecked(UnresolvedPath::fromUnchecked(std::string(pathStrView()))));
     }
 
     const StringData & string_data() const noexcept

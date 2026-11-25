@@ -108,7 +108,7 @@ struct CmdCatNar : StoreCommand, MixCat
 
                     void createChild(FilenameView name, ChildCreatedCallback callback) override
                     {
-                        CatRegularFileSink childSink{parent.currentPath / name.str(), parent.neededPath, parent.found};
+                        CatRegularFileSink childSink{parent.currentPath / name, parent.neededPath, parent.found};
                         callback(childSink);
                     }
                 } dir{*this};
@@ -139,7 +139,9 @@ struct CmdCatNar : StoreCommand, MixCat
         };
 
         bool found = false;
-        CanonPath neededPath{path};
+        /* The NAR is streamed, with nothing to resolve symlinks in it
+           against, so `..` is an error. */
+        auto neededPath = CanonPath::fromThrowing(UnresolvedPath(path));
         CatRegularFileSink sink{CanonPath::root, neededPath, found};
         /* NOTE: We still parse the whole file to validate that it's a correct NAR. */
         parseDump(sink, source);
