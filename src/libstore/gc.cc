@@ -11,6 +11,8 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
+#include "nix/util/os-string.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/system-error.hh"
 
@@ -61,12 +63,14 @@ void LocalStore::createTempRootsFile()
         return;
 
     while (1) {
-        if (pathExists(fnTempRoots))
-            /* It *must* be stale, since there can be no two
-               processes with the same pid. */
-            tryUnlink(fnTempRoots);
+        /* If it exists, it *must* be stale, since there can be no two
+           processes with the same pid. Deleting it is best effort. */
+        try {
+            unlinkAt(tempRootsDirFd.get(), tempRootsName);
+        } catch (SystemError &) {
+        }
 
-        *fdTempRoots = openLockFile(fnTempRoots, true);
+        *fdTempRoots = openLockFileAt(tempRootsDirFd.get(), tempRootsName, true);
 
         debug("acquiring write lock on %s", PathFmt(fnTempRoots));
         lockFile(fdTempRoots->get(), ltWrite, true);
@@ -179,37 +183,42 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    for (auto & i : DirectoryIterator{tempRootsDir}) {
+    for (const auto & i : DirectoryIterator{valueOr(
+             reopenDirectory(tempRootsDirFd.get()),
+             NIX_THROW_NATIVE_SYS_ERROR_HANDLER(
+                 "reopening directory %s", PathFmt(descriptorToPath(tempRootsDirFd.get()))))}) {
         checkInterrupt();
-        auto name = i.path().filename().string();
+        auto name = os_string_to_string(i.name.native());
         if (name[0] == '.') {
             // Ignore hidden files. Some package managers (notably portage) create
             // those to keep the directory alive.
             continue;
         }
-        auto path = i.path();
+        auto path = tempRootsDir / i.name.mkPath();
 
         debug("reading temporary root file %1%", PathFmt(path));
-        AutoCloseFD fd(toDescriptor(open(
-            path.string().c_str(),
-#ifndef _WIN32
-            O_CLOEXEC |
-#endif
-                O_RDWR,
-            0666)));
-        if (!fd) {
-            /* It's okay if the file has disappeared. */
-            if (errno == ENOENT)
-                continue;
-            throw SysError("opening temporary roots file %1%", PathFmt(path));
+        AutoCloseFD fd;
+        try {
+            fd = openLockFileAt(tempRootsDirFd.get(), i.name, false);
+        } catch (SymlinkNotAllowed &) {
+            /* Not one of ours, which are never symlinks. */
+            warn("ignoring symlink %1% in the temporary roots directory", PathFmt(path));
+            continue;
         }
+        /* It's okay if the file has disappeared. */
+        if (!fd)
+            continue;
 
         /* Try to acquire a write lock without blocking.  This can
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
         if (lockFile(fd.get(), ltWrite, false)) {
             printInfo("removing stale temporary roots file %1%", PathFmt(path));
-            tryUnlink(path);
+            try {
+                unlinkAt(tempRootsDirFd.get(), i.name);
+            } catch (SystemError &) {
+                /* Best effort. */
+            }
             writeFull(fd.get(), "d");
             continue;
         }
@@ -229,7 +238,12 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     }
 }
 
-void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::file_type type, Roots & roots)
+void LocalStore::findRoots(
+    Descriptor dirFd,
+    const OsFilename & name,
+    const std::filesystem::path & path,
+    std::filesystem::file_type type,
+    Roots & roots)
 {
     auto foundRoot = [&](const std::filesystem::path & path, const std::filesystem::path & target) {
         try {
@@ -244,18 +258,31 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
 
     try {
 
-        if (type == std::filesystem::file_type::unknown)
-            type = std::filesystem::symlink_status(path).type();
-
-        if (type == std::filesystem::file_type::directory) {
-            for (auto & i : DirectoryIterator{path}) {
-                checkInterrupt();
-                findRoots(i.path(), i.symlink_status().type(), roots);
-            }
+        if (type == std::filesystem::file_type::none || type == std::filesystem::file_type::unknown) {
+            auto st = fstatat(dirFd, name);
+            type = S_ISDIR(st.st_mode)   ? std::filesystem::file_type::directory
+                   : S_ISLNK(st.st_mode) ? std::filesystem::file_type::symlink
+                   : S_ISREG(st.st_mode) ? std::filesystem::file_type::regular
+                                         : std::filesystem::file_type::unknown;
         }
 
-        else if (type == std::filesystem::file_type::symlink) {
-            auto target = readLink(path);
+        NIX_INCOMPLETE_SWITCH_BEGIN
+        switch (type) {
+        case std::filesystem::file_type::directory: {
+            auto childDirFd = valueOr(
+                openDirectoryAt(dirFd, name),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(path)));
+            for (const auto & i : DirectoryIterator{valueOr(
+                     reopenDirectory(childDirFd.get()),
+                     NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening directory %s", PathFmt(path)))}) {
+                checkInterrupt();
+                findRoots(childDirFd.get(), i.name, path / i.name.mkPath(), i.type, roots);
+            }
+            break;
+        }
+
+        case std::filesystem::file_type::symlink: {
+            std::filesystem::path target = readLinkAt(dirFd, name);
             if (isInStore(target.string()))
                 foundRoot(path, target);
 
@@ -266,7 +293,11 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                 if (!pathExists(target)) {
                     if (isInDir(path, config->stateDir.get() / gcRootsDir / "auto")) {
                         printInfo("removing stale link from %1% to %2%", PathFmt(path), PathFmt(target));
-                        tryUnlink(path);
+                        try {
+                            unlinkAt(dirFd, name);
+                        } catch (SystemError &) {
+                            /* Best effort: the root is stale either way. */
+                        }
                     }
                 } else {
                     if (!std::filesystem::is_symlink(target))
@@ -276,13 +307,20 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                         foundRoot(target, target2);
                 }
             }
+            break;
         }
 
-        else if (type == std::filesystem::file_type::regular) {
-            auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path.string())));
+        case std::filesystem::file_type::regular: {
+            auto storePath = maybeParseStorePath(storeDir + "/" + name.path().string());
             if (storePath && isValidPath(*storePath))
                 roots[std::move(*storePath)].emplace(path.string());
+            break;
         }
+
+        default:
+            break;
+        }
+        NIX_INCOMPLETE_SWITCH_END
 
     }
 
@@ -307,9 +345,30 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
 
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
-    /* Process direct roots in {gcroots,profiles}. */
-    findRoots(config->stateDir.get() / gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(config->stateDir.get() / "profiles", std::filesystem::file_type::unknown, roots);
+    /* Process direct roots in {gcroots,profiles}. These directories
+       may be symlinks themselves, so they are opened by path, following
+       symlinks; only within them are symlinks not followed. */
+    for (auto & dir : {config->stateDir.get() / gcRootsDir, config->stateDir.get() / "profiles"}) {
+        auto dirFdOrError = openDirectory(dir);
+        if (!dirFdOrError) {
+            /* We only ignore permanent failures, like `findRoots`. */
+            auto ec = NativeSysError::toErrorCode(dirFdOrError.error());
+            if (ec == std::errc::permission_denied || ec == std::errc::no_such_file_or_directory
+                || ec == std::errc::not_a_directory) {
+                printInfo("cannot read potential root %1%", PathFmt(dir));
+                continue;
+            }
+            throw NativeSysError(dirFdOrError.error(), "opening directory %s", PathFmt(dir));
+        }
+        auto & dirFd = dirFdOrError.value();
+        for (const auto & i : DirectoryIterator{valueOr(
+                 reopenDirectory(dirFd.get()),
+                 NIX_THROW_NATIVE_SYS_ERROR_HANDLER(
+                     "reopening directory %s", PathFmt(descriptorToPath(dirFd.get()))))}) {
+            checkInterrupt();
+            findRoots(dirFd.get(), i.name, dir / i.name.mkPath(), i.type, roots);
+        }
+    }
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
@@ -401,7 +460,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     std::condition_variable wakeup;
 
     if (shouldDelete)
-        deletePath(reservedPath);
+        unlinkAt(dbDirFd.get(), OsFilename::fromPathAsserting(reservedPath.filename()));
 
     /* Acquire the global GC root. Note: we don't use fdGCLock
        here because then in auto-gc mode, another thread could
@@ -565,22 +624,37 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
-    auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
-        assert(!std::filesystem::path(baseName).is_absolute());
-
+    auto deleteFromStore = [&](const OsFilename & name, bool isKnownPath) {
         /* Using `std::string` since this is the logical store dir. Hopefully that is the right choice. */
-        std::string path = storeDir + "/" + std::string(baseName);
-        auto realPath = config->realStoreDir.get() / std::string(baseName);
+        std::string path = storeDir + "/" + name.path().string();
+        auto realPath = config->realStoreDir.get() / name.path();
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
-           exclusive lock before deleting them. */
-        if (baseName.find("tmp-", 0) == 0) {
-            /* TODO Reconsider whether Follow is the right choice, here */
-            auto tmpDirFd = openDirectory(realPath, FinalSymlink::Follow);
-            if (!tmpDirFd || !lockFile(tmpDirFd.value().get(), ltWrite, false)) {
-                debug("skipping locked tempdir %s", PathFmt(realPath));
+           exclusive lock before deleting them.
+
+           We hold that lock until the deletion is done. Otherwise the
+           process that created the directory could lock it in between, and
+           think it got a directory it could use (see
+           `createTempDirInStore()`).
+
+           That process opens the directory without following symlinks, so
+           we do the same. Anything that isn't a directory then can't be in
+           use, and is just deleted. */
+        AutoCloseFD tmpDirLock;
+        if (name.path().native().starts_with(OS_STR("tmp-"))) {
+            auto tmpDirFd = openDirectoryAt(getRealStoreDirFd(), name);
+            if (tmpDirFd) {
+                if (!lockFile(tmpDirFd.value().get(), ltWrite, false)) {
+                    debug("skipping locked tempdir %s", PathFmt(realPath));
+                    return;
+                }
+                tmpDirLock = std::move(tmpDirFd.value());
+            } else if (auto ec = NativeSysError::toErrorCode(tmpDirFd.error());
+                       ec == std::errc::no_such_file_or_directory) {
                 return;
+            } else if (ec != std::errc::not_a_directory && ec != std::errc::too_many_symbolic_link_levels) {
+                throw NativeSysError(tmpDirFd.error(), "opening %s", PathFmt(realPath));
             }
         }
 
@@ -589,7 +663,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         results.paths.insert(path);
 
         uint64_t bytesFreed = 0;
-        deleteStorePath(realPath, bytesFreed, isKnownPath);
+        deleteStorePath(name, bytesFreed, isKnownPath);
 
         results.bytesFreed += bytesFreed;
 
@@ -771,7 +845,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 });
                 try {
                     invalidatePathChecked(path);
-                    deleteFromStore(path.to_string(), true);
+                    deleteFromStore(OsFilename{path.filename()}, true);
                     referrersCache.erase(path);
                 } catch (PathInUse & e) {
                     // If we end up here, it's likely a new occurrence
@@ -827,25 +901,22 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                         printInfo("determining live/dead paths...");
                     }
 
-                    AutoCloseDir dir(opendir(config->realStoreDir.get().string().c_str()));
-                    if (!dir)
-                        throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
-
                     /* Read the store and delete all paths that are invalid or
                     unreachable. We don't use readDirectory() here so that
                     GCing can start faster. */
                     auto linksName = linksDir.filename();
-                    struct dirent * dirent;
-                    while (errno = 0, dirent = readdir(dir.get())) {
+                    for (const auto & entry : DirectoryIterator{valueOr(
+                             reopenDirectory(getRealStoreDirFd()),
+                             NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening the store directory"))}) {
                         checkInterrupt();
-                        std::string name = dirent->d_name;
-                        if (name == "." || name == ".." || name == linksName)
+                        std::string name = os_string_to_string(entry.name.native());
+                        if (name == linksName)
                             continue;
 
                         if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
                             maybeDeleteReferrersClosure(*storePath);
                         else if (shouldDelete)
-                            deleteFromStore(name, false);
+                            deleteFromStore(entry.name, false);
                     }
                 },
             },
@@ -873,21 +944,16 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
         printInfo("deleting unused links...");
 
-        AutoCloseDir dir(opendir(linksDir.string().c_str()));
-        if (!dir)
-            throw SysError("opening directory %1%", PathFmt(linksDir));
-
         int64_t actualSize = 0, unsharedSize = 0;
 
-        struct dirent * dirent;
-        while (errno = 0, dirent = readdir(dir.get())) {
+        for (const auto & entry : DirectoryIterator{valueOr(
+                 reopenDirectory(linksDirFd.get()),
+                 NIX_THROW_NATIVE_SYS_ERROR_HANDLER(
+                     "reopening directory %s", PathFmt(descriptorToPath(linksDirFd.get()))))}) {
             checkInterrupt();
-            std::string name = dirent->d_name;
-            if (name == "." || name == "..")
-                continue;
-            auto path = linksDir / name;
+            auto path = linksDir / entry.name.mkPath();
 
-            auto st = lstat(path);
+            auto st = fstatat(linksDirFd.get(), entry.name);
 
             if (st.st_nlink != 1) {
                 actualSize += st.st_size;
@@ -897,7 +963,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             printMsg(lvlTalkative, "deleting unused link %1%", PathFmt(path));
 
-            unlink(path);
+            unlinkAt(linksDirFd.get(), entry.name);
 
             /* Do not account for deleted file here. Rely on deletePath()
                accounting.  */
@@ -908,7 +974,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             0
 #else
             [&] {
-                auto st = stat(linksDir);
+                auto st = nix::fstat(linksDirFd.get());
                 return st.st_blocks * 512ULL;
             }()
 #endif
@@ -933,8 +999,8 @@ void LocalStore::autoGC(bool sync)
             return std::stoll(readFile(*fakeFreeSpaceFile));
 
         struct statvfs st;
-        if (statvfs(config->realStoreDir.get().c_str(), &st))
-            throw SysError("getting filesystem info about '%s'", PathFmt(config->realStoreDir.get()));
+        if (fstatvfs(getRealStoreDirFd(), &st))
+            throw SysError("getting filesystem info about %s", PathFmt(config->realStoreDir.get()));
 
         return (uint64_t) st.f_bavail * st.f_frsize;
     };

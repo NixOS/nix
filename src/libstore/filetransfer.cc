@@ -86,6 +86,22 @@ std::chrono::milliseconds computeRetryDelayMs(const RetryDelayParams & p, std::m
     return std::chrono::milliseconds(std::uniform_int_distribution<uint32_t>(floor, ceiling)(rng));
 }
 
+/**
+ * Like `pathExists`, but false on a permission error, for inferring
+ * default paths across directories that might not be readable.
+ */
+static bool pathAccessible(const std::filesystem::path & path)
+{
+    try {
+        return pathExists(path);
+    } catch (SystemError & e) {
+        // swallow EPERM
+        if (e.is(std::errc::operation_not_permitted))
+            return false;
+        throw;
+    }
+}
+
 std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
 {
     /* Windows has no notion of a default location for the certificate bundles.

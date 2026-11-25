@@ -250,6 +250,26 @@ public:
 
 private:
 
+    /**
+     * Handle to `linksDir`, opened by the constructor.
+     */
+    AutoCloseFD linksDirFd;
+
+    /**
+     * Handle to `tempRootsDir`, opened by the constructor.
+     */
+    AutoCloseFD tempRootsDirFd;
+
+    /**
+     * Handle to `dbDir`, opened by the constructor.
+     */
+    AutoCloseFD dbDirFd;
+
+    /**
+     * The name of `fnTempRoots` in `tempRootsDir`.
+     */
+    const OsFilename tempRootsName;
+
     const PublicKeys & getPublicKeys();
 
 public:
@@ -377,9 +397,10 @@ public:
     }
 
     /**
-     * Called by `collectGarbage` to recursively delete a path.
-     * The default implementation simply calls `deletePath`, but it can be
-     * overridden by stores that wish to provide their own deletion behaviour.
+     * Called by `collectGarbage` to recursively delete @p name in the
+     * store directory. The default implementation simply calls
+     * `deletePathAt`, but it can be overridden by stores that wish to
+     * provide their own deletion behaviour.
      *
      * @param isKnownPath true if this is a known store path, false if it's
      *        garbage/unknown content found in the store directory
@@ -389,7 +410,7 @@ public:
      *             Initialised to zero by this function so that the caller may not need to initialise
      *             it.
      */
-    virtual void deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath);
+    virtual void deleteStorePath(const OsFilename & name, uint64_t & bytesFreed, bool isKnownPath);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking
@@ -403,7 +424,17 @@ public:
      * Optimise a single store path. Optionally, test the encountered
      * symlinks for corruption.
      */
-    void optimisePath(const std::filesystem::path & path, RepairFlag repair);
+    void optimisePath(const StorePath & path, RepairFlag repair);
+
+    /**
+     * A directory, as a handle to its parent directory and its name in
+     * that.
+     */
+    struct DirectoryInParent
+    {
+        Descriptor parentFd;
+        OsFilename name;
+    };
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -519,22 +550,53 @@ private:
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
 
-    void findRoots(const std::filesystem::path & path, std::filesystem::file_type type, Roots & roots);
+    /**
+     * Find the GC roots at @p name in the directory @p dirFd, which is
+     * at @p path, without following symlinks to it.
+     *
+     * @param type The type of @p name, if already known, or
+     * `std::filesystem::file_type::none` or
+     * `std::filesystem::file_type::unknown` if not.
+     */
+    void findRoots(
+        Descriptor dirFd,
+        const OsFilename & name,
+        const std::filesystem::path & path,
+        std::filesystem::file_type type,
+        Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
+    /**
+     * @return The name of the temporary directory in the store
+     * directory, and a handle to it, which holds the lock that keeps
+     * the garbage collector from deleting it.
+     */
+    std::pair<OsFilename, AutoCloseFD> createTempDirInStore();
 
     typedef boost::unordered_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
-    std::list<OsFilename> readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
+    std::list<OsFilename> readDirectoryIgnoringInodes(Descriptor dirFd, const InodeHash & inodeHash);
+
+    /**
+     * Optimise @p name in the directory @p dirFd.
+     *
+     * @param path The path of @p name, for messages.
+     *
+     * @param dir Where @p dirFd is, so that it can be made writable
+     * while @p name is replaced. `std::nullopt` if @p dirFd is the
+     * store directory, whose permissions are left alone.
+     */
     void optimisePath_(
         Activity * act,
         OptimiseStats & stats,
+        Descriptor dirFd,
+        const OsFilename & name,
         const std::filesystem::path & path,
+        const std::optional<DirectoryInParent> & dir,
         InodeHash & inodeHash,
         RepairFlag repair);
 

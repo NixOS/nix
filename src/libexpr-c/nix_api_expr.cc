@@ -47,7 +47,8 @@ nix_err nix_expr_eval_from_string(
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        nix::Expr * parsedExpr = state->state.parseExprFromString(expr, state->state.rootPath(nix::CanonPath(path)));
+        nix::Expr * parsedExpr =
+            state->state.parseExprFromString(expr, state->state.rootPath(nix::CanonPath::viaLexical(path)));
         state->state.eval(parsedExpr, *value->value);
         state->state.forceValue(*value->value, nix::noPos);
     }

@@ -12,6 +12,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/os-filename.hh"
 #include "nix/util/deleter.hh"
 
 #include <filesystem>
@@ -25,6 +26,8 @@
 #endif
 
 #include <functional>
+#include <iterator>
+#include <memory>
 #include <optional>
 
 /**
@@ -160,14 +163,6 @@ std::optional<PosixStat> maybeStat(const std::filesystem::path & path);
 bool pathExists(const std::filesystem::path & path);
 
 /**
- * A version of pathExists that returns false on a permission error.
- * Useful for inferring default paths across directories that might not
- * be readable.
- * @return true iff the given path can be accessed and exists
- */
-bool pathAccessible(const std::filesystem::path & path);
-
-/**
  * Read the contents (target) of a symbolic link.  The result is not
  * in any way canonicalised.
  */
@@ -287,16 +282,6 @@ void writeFile(
     Descriptor fd, std::string_view s, FsSync sync = FsSync::No, const std::filesystem::path * origPath = nullptr);
 
 /**
- * Flush a path's parent directory to disk.
- */
-void syncParent(const std::filesystem::path & path);
-
-/**
- * Flush a file or entire directory tree to disk.
- */
-void recursiveSync(const std::filesystem::path & path);
-
-/**
  * Delete a path; i.e., in the case of a directory, it is deleted
  * recursively. It's not an error if the path does not exist. The
  * second variant returns the number of bytes and blocks freed.
@@ -318,35 +303,6 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 void createDirs(const std::filesystem::path & path);
 
 /**
- * Create a single directory.
- */
-void createDir(const std::filesystem::path & path, mode_t mode = 0755);
-
-/**
- * Set the access and modification times of the given path, not
- * following symlinks.
- *
- * @param accessedTime Specified in seconds.
- *
- * @param modificationTime Specified in seconds.
- *
- * @param isSymlink Whether the file in question is a symlink. Used for
- * fallback code where we don't have `lutimes` or similar. if
- * `std::optional` is passed, the information will be recomputed if it
- * is needed. Race conditions are possible so be careful!
- */
-void setWriteTime(
-    const std::filesystem::path & path,
-    time_t accessedTime,
-    time_t modificationTime,
-    std::optional<bool> isSymlink = std::nullopt);
-
-/**
- * Convenience wrapper that takes all arguments from the `PosixStat`.
- */
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st);
-
-/**
  * Create a symlink.
  *
  */
@@ -356,17 +312,6 @@ void createSymlink(const std::filesystem::path & target, const std::filesystem::
  * Atomically create or replace a symlink.
  */
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link);
-
-/**
- * Recursively copy the content of `oldPath` to `newPath`.
- *
- * @todo Delete this. This function is prone to TOCTOU races and follows
- * symlinks in the destination.
- *
- * If contents is set, always create a regular file, even if the source is a
- * link.
- */
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool contents);
 
 /**
  * Automatic cleanup of resources.
@@ -479,12 +424,14 @@ std::filesystem::path defaultTempDir();
 bool isExecutableFileAmbient(const std::filesystem::path & exe);
 
 /**
- * Return temporary path constructed by appending a suffix to a root path.
+ * Return a temporary file name, for use with `*At` functions.
  *
- * The constructed path looks like `<root><suffix>-<pid>-<unique>`. To create a
- * path nested in a directory, provide a suffix starting with `/`.
+ * The constructed name looks like `<prefix>-<pid>-<unique>`.
+ *
+ * @throws Error if that is not a valid file name, e.g. because @p prefix
+ * contains a separator.
  */
-std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix = ".tmp");
+OsFilename makeTempName(std::string_view prefix);
 
 /**
  * Used in various places.
@@ -494,22 +441,6 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
 typedef fun<bool(const std::string & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
-
-/**
- * Change permissions of a file only if necessary.
- *
- * @details
- * Skip chmod call if the directory already has the requested permissions.
- * This is to avoid failing when the executing user lacks permissions to change the
- * directory's permissions even if it would be no-op.
- *
- * @param path Path to the file to change the permissions for.
- * @param mode New file mode.
- * @param mask Used for checking if the file already has requested permissions.
- *
- * @return true if permissions changed, false otherwise.
- */
-bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask = S_IRWXU | S_IRWXG | S_IRWXO);
 
 /**
  * Set permissions on a path, throwing an exception on error.
@@ -534,115 +465,21 @@ void chown(const std::filesystem::path & path, uid_t owner, gid_t group);
 #endif
 
 /**
- * Remove a file, throwing an exception on error.
- *
- * @param path Path to the file to remove.
- */
-void unlink(const std::filesystem::path & path);
-
-/**
- * Remove a file, throwing an exception on error. ENOENT is ignored.
- *
- * @param path Path to the file to remove.
- */
-void unlinkIfExists(const std::filesystem::path & path);
-
-/**
  * Try to remove a file, ignoring errors.
  *
  * @param path Path to the file to try to remove.
  */
 void tryUnlink(const std::filesystem::path & path);
 
-/**
- * @brief Move/rename path 'src' to 'dst'.
- *
- * Temporarily makes 'src' writable if it's a directory and we're not root (to
- * be able to update the directory's parent link "..").
- *
- * Atomically replaces the destination if it exists. Does not follow symlinks if
- * dst is a symlink.
- */
-void movePath(const std::filesystem::path & src, const std::filesystem::path & dst);
+class DirectoryIterator;
 
 /**
- * @brief Thin wrapper around ::rename that throws SystemError on errors.
+ * Read the directory at @p path, following a symlink there.
  *
- * Unlike @ref nix::movePath(), doesn't attempt to make the source writable if
- * it's a directory.
+ * @todo Prefer opening the directory and giving it to
+ * `DirectoryIterator`'s descriptor constructor (see
+ * `file-system-at.hh`).
  */
-void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst);
-
-/**
- * @brief A directory iterator that can be used to iterate over the
- * contents of a directory. It is similar to std::filesystem::directory_iterator
- * but throws NixError on failure instead of std::filesystem::filesystem_error.
- */
-class DirectoryIterator
-{
-public:
-    // --- Iterator Traits ---
-    using iterator_category = std::input_iterator_tag;
-    using value_type = std::filesystem::directory_entry;
-    using difference_type = std::ptrdiff_t;
-    using pointer = const std::filesystem::directory_entry *;
-    using reference = const std::filesystem::directory_entry &;
-
-    // Default constructor (represents end iterator)
-    DirectoryIterator() noexcept = default;
-
-    // Constructor taking a path
-    explicit DirectoryIterator(const std::filesystem::path & p);
-
-    reference operator*() const
-    {
-        // Accessing the value itself doesn't typically throw filesystem_error
-        // after successful construction/increment, but underlying operations might.
-        // If directory_entry methods called via -> could throw, add try-catch there.
-        return *it_;
-    }
-
-    pointer operator->() const
-    {
-        return &(*it_);
-    }
-
-    DirectoryIterator & operator++();
-
-    // Postfix increment operator
-    DirectoryIterator operator++(int)
-    {
-        DirectoryIterator temp = *this;
-        ++(*this); // Uses the prefix increment's try-catch logic
-        return temp;
-    }
-
-    // Equality comparison
-    friend bool operator==(const DirectoryIterator & a, const DirectoryIterator & b) noexcept
-    {
-        return a.it_ == b.it_;
-    }
-
-    // Inequality comparison
-    friend bool operator!=(const DirectoryIterator & a, const DirectoryIterator & b) noexcept
-    {
-        return !(a == b);
-    }
-
-    // Allow direct use in range-based for loops if iterating over an instance
-    DirectoryIterator begin() const
-    {
-        return *this;
-    }
-
-    DirectoryIterator end() const
-    {
-        return DirectoryIterator{};
-    }
-
-
-private:
-    std::filesystem::directory_iterator it_;
-};
+DirectoryIterator openDirectoryIterator(const std::filesystem::path & path);
 
 } // namespace nix

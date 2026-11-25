@@ -6,9 +6,11 @@
 #include <memory>
 #include <functional>
 
+#include "nix/util/file-descriptor.hh"
+
 namespace nix {
 
-class AutoDelete;
+class AutoDeleteAt;
 struct UserLock;
 
 /**
@@ -18,6 +20,12 @@ struct BuildChrootParams
 {
     /** The directory where the chroot will be created */
     std::filesystem::path chrootParentDir;
+
+    /**
+     * A handle to the real store directory, which `chrootParentDir` is
+     * directly in.
+     */
+    Descriptor realStoreDirFd;
 
     /** Whether the derivation uses UID range feature */
     bool useUidRange;
@@ -31,20 +39,23 @@ struct BuildChrootParams
     /** The store directory (e.g., "/nix/store") */
     std::string storeDir;
 
-    /** Callback to change ownership of a path to the build user */
-    std::function<void(const std::filesystem::path &)> chownToBuilder;
+    /**
+     * Callback to change ownership of an open file to the build user.
+     * The path is only for error messages.
+     */
+    std::function<void(Descriptor fd, const std::filesystem::path & path)> chownToBuilder;
 };
 
 /**
  * Set up a chroot build environment.
  *
  * Creates the chroot directory structure and sets up necessary directories
- * (/tmp, /etc, store directory). Returns the chroot root path and an AutoDelete
+ * (/tmp, /etc, store directory). Returns the chroot root path and an `AutoDeleteAt`
  * that will clean up the chroot directory when destroyed.
  *
  * @param params Parameters for chroot setup
  * @return Pair of (chroot root path, cleanup object)
  */
-std::pair<std::filesystem::path, AutoDelete> setupBuildChroot(const BuildChrootParams & params);
+std::pair<std::filesystem::path, AutoDeleteAt> setupBuildChroot(const BuildChrootParams & params);
 
 } // namespace nix

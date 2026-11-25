@@ -2,6 +2,8 @@
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
+#include <tuple>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -30,6 +32,78 @@
 #include "../file-descriptor-private.hh"
 
 namespace nix {
+
+struct DirectoryIterator::PlatformState
+{
+    AutoCloseDir dir;
+};
+
+DirectoryIterator::DirectoryIterator() noexcept = default;
+DirectoryIterator::DirectoryIterator(DirectoryIterator &&) noexcept = default;
+DirectoryIterator & DirectoryIterator::operator=(DirectoryIterator &&) noexcept = default;
+DirectoryIterator::~DirectoryIterator() = default;
+
+static std::filesystem::file_type fileTypeFromDirent(unsigned char dType)
+{
+    using T = std::filesystem::file_type;
+    switch (dType) {
+    case DT_REG:
+        return T::regular;
+    case DT_DIR:
+        return T::directory;
+    case DT_LNK:
+        return T::symlink;
+    case DT_CHR:
+        return T::character;
+    case DT_BLK:
+        return T::block;
+    case DT_FIFO:
+        return T::fifo;
+    case DT_SOCK:
+        return T::socket;
+    case DT_UNKNOWN:
+        return T::none;
+    default:
+        return T::unknown;
+    }
+}
+
+DirectoryIterator::DirectoryIterator(AutoCloseFD dirFd)
+{
+    auto s = std::make_unique<PlatformState>();
+    s->dir = AutoCloseDir{::fdopendir(dirFd.get())};
+    if (!s->dir)
+        throw SysError("cannot read directory %s", PathFmt(descriptorToPath(dirFd.get())));
+    /* Now owned by `s->dir`. */
+    dirFd.release();
+    state = std::move(s);
+    ++*this;
+}
+
+DirectoryIterator & DirectoryIterator::operator++()
+{
+    auto & s = *state;
+    while (true) {
+        errno = 0;
+        auto * dirent = ::readdir(s.dir.get());
+        if (!dirent) {
+            if (errno)
+                throw SysError("reading directory %s", PathFmt(descriptorToPath(::dirfd(s.dir.get()))));
+            state.reset();
+            entry.reset();
+            return *this;
+        }
+        std::string_view name = dirent->d_name;
+        if (name == "." || name == "..")
+            continue;
+        entry = DirectoryEntry{
+            .name = OsFilenameView::fromNativeUnchecked(name),
+            .type = fileTypeFromDirent(dirent->d_type),
+            .ino = dirent->d_ino,
+        };
+        return *this;
+    }
+}
 
 Result<AutoCloseFD, NativeError> openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
@@ -115,53 +189,6 @@ std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
         throw SysError("getting status of %s", PathFmt(path));
     }
     return st;
-}
-
-void setWriteTime(
-    const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
-{
-    // Would be nice to use std::filesystem unconditionally, but
-    // doesn't support access time just modification time.
-    //
-    // System clock vs File clock issues also make that annoying.
-#if HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
-    struct timespec times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_nsec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_nsec = 0,
-        },
-    };
-    if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
-        throw SysError("changing modification time of %s (using `utimensat`)", PathFmt(path));
-#else
-    struct timeval times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_usec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_usec = 0,
-        },
-    };
-#  if HAVE_LUTIMES
-    if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of %s", PathFmt{path});
-#  else
-    bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
-
-    if (!isSymlink) {
-        if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of %s (not a symlink)", PathFmt{path});
-    } else {
-        throw Error("Cannot change modification time of symlink %s", PathFmt{path});
-    }
-#  endif
-#endif
 }
 
 #ifdef __FreeBSD__
@@ -267,21 +294,25 @@ static void _deletePath(
     }
 }
 
-static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
+/**
+ * Delete @p path, which is in the directory @p parentfd. @p path is
+ * only used for messages and, on FreeBSD, to recognise mount points.
+ */
+static void deletePathIn(Descriptor parentfd, const std::filesystem::path & path, uint64_t & bytesFreed)
 {
-    assert(path.is_absolute());
-    auto parentDirPath = path.parent_path();
-    assert(parentDirPath != path);
-
-    /* It's ok to follow symlinks in the parent since we only need to
-       ensure that there's no TOCTOU when traversing inside the path. */
-    auto dirfdOrError = openDirectory(parentDirPath, FinalSymlink::Follow);
-    if (!dirfdOrError) {
-        if (dirfdOrError.error() == ENOENT)
-            return;
-        throw SysError(dirfdOrError.error(), "opening directory %s", PathFmt(parentDirPath));
+    bytesFreed = 0;
+#ifdef __FreeBSD__
+    std::set<std::filesystem::path> mountedPaths;
+    struct statfs * mntbuf;
+    int count;
+    if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
+        throw SysError("getmntinfo");
     }
-    auto dirfd = std::move(dirfdOrError).value();
+
+    for (int i = 0; i < count; i++) {
+        mountedPaths.emplace(mntbuf[i].f_mntonname);
+    }
+#endif
 
     std::exception_ptr ex;
 
@@ -304,7 +335,7 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
         forceDontChmod = caps[CAP_TO_INDEX(CAP_DAC_OVERRIDE)].effective & CAP_TO_MASK(CAP_DAC_OVERRIDE);
 #endif
 
-    _deletePath(dirfd.get(), path, bytesFreed, ex, forceDontChmod MOUNTEDPATHS_ARG);
+    _deletePath(parentfd, path, bytesFreed, ex, forceDontChmod MOUNTEDPATHS_ARG);
 
     if (ex)
         std::rethrow_exception(ex);
@@ -318,20 +349,50 @@ void deletePath(const std::filesystem::path & path)
 
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
-    bytesFreed = 0;
-#ifdef __FreeBSD__
-    std::set<std::filesystem::path> mountedPaths;
-    struct statfs * mntbuf;
-    int count;
-    if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
-        throw SysError("getmntinfo");
+    assert(path.is_absolute());
+    auto parentDirPath = path.parent_path();
+    assert(parentDirPath != path);
+
+    /* It's ok to follow symlinks in the parent since we only need to
+       ensure that there's no TOCTOU when traversing inside the path. */
+    auto dirfdOrError = openDirectory(parentDirPath, FinalSymlink::Follow);
+    if (!dirfdOrError) {
+        bytesFreed = 0;
+        if (dirfdOrError.error() == ENOENT)
+            return;
+        throw SysError(dirfdOrError.error(), "opening directory %s", PathFmt(parentDirPath));
+    }
+    auto dirfd = std::move(dirfdOrError).value();
+
+    deletePathIn(dirfd.get(), path, bytesFreed);
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFreed)
+{
+    assert(!path.empty());
+
+    Descriptor parentFd = dirFd;
+    AutoCloseFD parentFdOwned;
+    if (auto parent = path.parent(); !parent->empty()) {
+        auto parentFdOrError = openFileEnsureBeneathNoSymlinks(dirFd, *parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (!parentFdOrError) {
+            bytesFreed = 0;
+            if (parentFdOrError.error() == ENOENT)
+                return;
+            throw SysError(
+                parentFdOrError.error(), "opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path()));
+        }
+        parentFdOwned = std::move(parentFdOrError).value();
+        parentFd = parentFdOwned.get();
     }
 
-    for (int i = 0; i < count; i++) {
-        mountedPaths.emplace(mntbuf[i].f_mntonname);
-    }
-#endif
-    _deletePath(path, bytesFreed MOUNTEDPATHS_ARG);
+    deletePathIn(parentFd, descriptorToPath(dirFd) / path.path(), bytesFreed);
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path)
+{
+    uint64_t dummy;
+    deletePathAt(dirFd, path, dummy);
 }
 
 void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
@@ -340,15 +401,25 @@ void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
         throw SysError("changing ownership of %s", PathFmt(path));
 }
 
-void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
+/**
+ * Move @p srcName in @p srcParent to @p dstName in @p dstParent, like
+ * `movePathAt`. @p srcPath and @p dstPath are only used for messages.
+ */
+static void movePathIn(
+    Descriptor srcParent,
+    const OsFilename & srcName,
+    const std::filesystem::path & srcPath,
+    Descriptor dstParent,
+    const OsFilename & dstName,
+    const std::filesystem::path & dstPath)
 {
     /* If we have O_PATH (Linux, FreeBSD), then we can open the to-be-renamed
        file without requiring any permissions and "pin" the inode that we'll
        fchmod. This avoids operating on paths, which is prone to TOCTOU. */
 #ifdef O_PATH
-    AutoCloseFD fd = ::open(src.c_str(), O_NOFOLLOW | O_CLOEXEC | O_PATH);
+    AutoCloseFD fd = ::openat(srcParent, srcName.c_str(), O_NOFOLLOW | O_CLOEXEC | O_PATH);
     if (!fd)
-        throw SysError("failed to open file %1%", PathFmt(src));
+        throw SysError("failed to open file %1%", PathFmt(srcPath));
 
     auto changePermsOnFile = [&](mode_t newMode) -> int {
         /* AT_EMPTY_PATH here is supported since 6.6, but reports EINVAL without fchmodat2. */
@@ -368,7 +439,7 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
 
     const PosixStat st = nix::fstat(fd.get());
 #else
-    const PosixStat st = nix::lstat(src);
+    const PosixStat st = nix::fstatat(srcParent, srcName);
 #endif
 
     bool changePerm = (::geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
@@ -376,46 +447,73 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
         const mode_t newMode = st.st_mode | S_IWUSR;
 #ifdef O_PATH
         if (changePermsOnFile(newMode) == -1)
-            throw SysError("making %s writable for renaming", PathFmt(src));
+            throw SysError("making %s writable for renaming", PathFmt(srcPath));
 #else
-        nix::chmod(src, newMode);
+        unix::fchmodatTryNoFollow(srcParent, srcName, newMode);
 #endif
     }
 
-    if (::rename(src.c_str(), dst.c_str()) == -1) {
+    if (::renameat(srcParent, srcName.c_str(), dstParent, dstName.c_str()) == -1) {
         const int savedErrno = errno;
         if (changePerm) {
             /* Ignore all errors on restoring permissions. We want to throw the
-               original error originating from ::rename. */
+               original error originating from ::renameat. */
 #ifdef O_PATH
             changePermsOnFile(st.st_mode);
 #else
-            ::chmod(src.c_str(), st.st_mode);
+            try {
+                unix::fchmodatTryNoFollow(srcParent, srcName, st.st_mode);
+            } catch (SysError &) {
+            }
 #endif
         }
-        throw SysError(savedErrno, "renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+        throw SysError(savedErrno, "renaming %1% to %2%", PathFmt(srcPath), PathFmt(dstPath));
     }
 
     if (changePerm) {
 #ifdef O_PATH
         if (changePermsOnFile(st.st_mode) == -1)
-            throw SysError("restoring permissions on %s", PathFmt(dst));
+            throw SysError("restoring permissions on %s", PathFmt(dstPath));
 #else
-        nix::chmod(dst, st.st_mode);
+        unix::fchmodatTryNoFollow(dstParent, dstName, st.st_mode);
 #endif
     }
 }
 
-void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
+/**
+ * Open the parent directory of @p path beneath @p dirFd, without
+ * following symlinks, for `*At` functions that operate on the final
+ * component of @p path.
+ *
+ * @return The parent directory, owned if it had to be opened, and the
+ * final component of @p path.
+ */
+static std::tuple<AutoCloseFD, Descriptor, OsFilename> openParentBeneath(Descriptor dirFd, const OsCanonPath & path)
 {
-    if (::rename(src.c_str(), dst.c_str()) == -1)
-        throw SysError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+    assert(!path.empty());
+    auto lastIt = std::ranges::prev(path.end());
+    OsFilename name = *lastIt;
+    auto parent = path.parent();
+    if (parent->empty())
+        return {AutoCloseFD{}, dirFd, std::move(name)};
+    auto parentFd = valueOr(
+        openFileEnsureBeneathNoSymlinks(dirFd, *parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path())));
+    auto fd = parentFd.get();
+    return {std::move(parentFd), fd, std::move(name)};
 }
 
-void createDir(const std::filesystem::path & path, mode_t mode)
+void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst)
 {
-    if (::mkdir(path.c_str(), mode) == -1)
-        throw SysError("creating directory %s", PathFmt(path));
+    auto [srcParentOwned, srcParent, srcName] = openParentBeneath(srcDirFd, src);
+    auto [dstParentOwned, dstParent, dstName] = openParentBeneath(dstDirFd, dst);
+    movePathIn(
+        srcParent,
+        srcName,
+        descriptorToPath(srcDirFd) / src.path(),
+        dstParent,
+        dstName,
+        descriptorToPath(dstDirFd) / dst.path());
 }
 
 } // namespace nix

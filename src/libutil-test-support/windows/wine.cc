@@ -19,7 +19,7 @@ bool wineSymlinksSupported(const std::filesystem::path & dir)
         supported = false;
     }
     /* Also cleans up the empty file that a failed attempt leaves behind. */
-    deletePath(dir / name.path());
+    deletePathAt(dirFd.get(), name);
     return supported;
 }
 

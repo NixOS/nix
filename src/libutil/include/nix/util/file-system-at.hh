@@ -24,6 +24,7 @@
 
 #include <optional>
 #include <system_error>
+#include <utility>
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -146,6 +147,17 @@ Result<AutoCloseFD, NativeError> createDirectoryAt(
 );
 
 /**
+ * Create the directory @p path relative to @p dirFd, along with any of
+ * its missing parents, like `mkdir -p`, and open it.
+ *
+ * Existing components must be directories: symlinks are never
+ * followed.
+ *
+ * @throws SystemError on failure.
+ */
+AutoCloseFD createDirsAt(Descriptor dirFd, const OsCanonPath & path);
+
+/**
  * Get status of an open file/directory handle.
  *
  * @param fd File descriptor/handle
@@ -222,6 +234,174 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
 #endif
     std::function<void(AutoCloseFD dirFd, OsCanonPath relPath)> dirFdCallback = nullptr);
 
+/**
+ * Like `openFileReadonly`, but for @p path relative to the directory
+ * @p dirFd, without following symlinks anywhere in @p path.
+ *
+ * @return The descriptor, or on failure the native error code.
+ * @throws SymlinkNotAllowed if @p path, or a directory in it, is a
+ * symlink.
+ */
+Result<AutoCloseFD, NativeError> openFileReadonlyAt(Descriptor dirFd, const OsCanonPath & path);
+
+/**
+ * Like `openNewFileForWrite`, but for @p path relative to the directory
+ * @p dirFd, without following symlinks anywhere in @p path.
+ *
+ * @pre `params.followSymlinksOnTruncate` is false.
+ *
+ * @return The descriptor, or on failure the native error code.
+ * @throws SymlinkNotAllowed if @p path, or a directory in it, is a
+ * symlink.
+ */
+Result<AutoCloseFD, NativeError>
+openNewFileForWriteAt(Descriptor dirFd, const OsCanonPath & path, mode_t mode, OpenNewFileForWriteParams params);
+
+/**
+ * Set the access and modification time of a file relative to a directory file descriptor.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTime, time_t modificationTime);
+
+/**
+ * Flush the file or entire directory tree @p name, relative to the
+ * directory @p dirFd, to disk. Symlinks are not followed, at the top or
+ * within the tree.
+ *
+ * This does not flush @p dirFd itself, so the entry for @p name in it
+ * is only durable once the caller syncs that too.
+ *
+ * @throws SystemError on I/O errors.
+ */
+void recursiveSyncAt(Descriptor dirFd, const OsFilename & name);
+
+/**
+ * Delete @p path relative to the directory @p dirFd, recursively if it
+ * is a directory. No symlinks are followed: neither in the parent
+ * directories of @p path, nor within it, nor @p path itself, which is
+ * deleted if it is a symlink. It is not an error if @p path does not
+ * exist.
+ *
+ * @param[out] bytesFreed Estimation of how many bytes of disk space have
+ *                        been reclaimed. Initialised to zero internally, so
+ *                        the caller doesn't need to initialise it.
+ *
+ * @pre `path` must be non-empty.
+ * @throws SystemError on I/O errors.
+ */
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFreed);
+
+/**
+ * Like the other overload, without reporting the bytes freed.
+ */
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path);
+
+/**
+ * Delete @p name in the directory @p dirFd, which must not be a
+ * directory, like `unlink`. If it is a symlink, the symlink itself is
+ * deleted. It is not an error if @p name does not exist.
+ *
+ * @throws SystemError on I/O errors, including if @p name is a
+ * directory.
+ */
+void unlinkAt(Descriptor dirFd, const OsFilename & name);
+
+/**
+ * Deletes @p path in the directory @p dirFd with `deletePathAt` when
+ * destroyed, unless that has already been done.
+ *
+ * The caller must ensure that @p dirFd remains valid for the lifetime
+ * of this object.
+ */
+class AutoDeleteAt
+{
+    Descriptor dirFd = INVALID_DESCRIPTOR;
+
+    /**
+     * `std::nullopt` once there is nothing left to delete.
+     */
+    std::optional<OsCanonPath> path;
+
+public:
+    AutoDeleteAt() = default;
+
+    AutoDeleteAt(Descriptor dirFd, OsCanonPath path)
+        : dirFd{dirFd}
+        , path{std::move(path)}
+    {
+    }
+
+    AutoDeleteAt(AutoDeleteAt && x) noexcept
+        : dirFd{x.dirFd}
+        , path{std::exchange(x.path, std::nullopt)}
+    {
+    }
+
+    AutoDeleteAt & operator=(AutoDeleteAt && x) noexcept
+    {
+        std::swap(dirFd, x.dirFd);
+        std::swap(path, x.path);
+        return *this;
+    }
+
+    AutoDeleteAt(const AutoDeleteAt &) = delete;
+    AutoDeleteAt & operator=(const AutoDeleteAt &) = delete;
+
+    ~AutoDeleteAt();
+
+    /**
+     * Delete the path now, so that the destructor does not try to
+     * again.
+     *
+     * The destructor calls this, but ignoring any exception.
+     */
+    void deletePath();
+};
+
+/**
+ * Move @p src, relative to the directory @p srcDirFd, to @p dst,
+ * relative to the directory @p dstDirFd.
+ *
+ * On Unix, temporarily makes @p src writable if it is a directory and
+ * we are not root (to be able to update the directory's parent link
+ * `..`).
+ *
+ * Atomically replaces @p dst if it exists.
+ *
+ * No symlinks are followed in the parent directories of @p src or
+ * @p dst. If @p src is a symlink, the symlink itself is moved, and if
+ * @p dst is one, it is replaced.
+ *
+ * @pre `src` and `dst` must be non-empty.
+ * @throws SystemError on I/O errors.
+ */
+void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst);
+
+/**
+ * Create a hard link @p dst in the directory @p dstDirFd to @p src in
+ * the directory @p srcDirFd.
+ *
+ * If @p src is a symlink, the link is to the symlink itself.
+ *
+ * @throws SystemError on failure, e.g. `std::errc::file_exists` if
+ * @p dst already exists.
+ */
+void createHardLinkAt(Descriptor srcDirFd, const OsFilename & src, Descriptor dstDirFd, const OsFilename & dst);
+
+/**
+ * Like `makeFSSourceAccessor(std::filesystem::path, MakeFSSourceAccessorParams)`
+ * with the default `FinalSymlink::DontFollow`, but for @p name in the
+ * directory @p dirFd.
+ *
+ * @param root The path of @p name in @p dirFd. It is not used to
+ * access the file system, only for display and
+ * `SourceAccessor::getPhysicalPath`.
+ */
+ref<SourceAccessor> makeFSSourceAccessor(
+    Descriptor dirFd, const OsFilename & name, std::filesystem::path root, bool trackLastModified = false);
+
 #ifdef __linux__
 namespace linux {
 
@@ -260,5 +440,130 @@ void fchmodatTryNoFollow(Descriptor dirFd, const OsCanonPath & path, mode_t mode
 
 } // namespace unix
 #endif
+
+/**
+ * An entry read by @ref DirectoryIterator.
+ */
+struct DirectoryEntry
+{
+    /**
+     * The entry's name. It refers to the iterator's own buffer, so it is
+     * only valid until the iterator is advanced; copy it into an
+     * `OsFilename` to keep it.
+     */
+    OsFilenameView name;
+
+    /**
+     * The entry's own type (symlinks are not followed), as reported by
+     * the directory read itself. `std::filesystem::file_type::none` if
+     * it was not reported, in which case callers that need it have to
+     * `lstat` the entry themselves.
+     */
+    std::filesystem::file_type type;
+
+#ifndef _WIN32
+    /**
+     * The entry's inode number, as reported by the directory read
+     * itself.
+     */
+    ino_t ino;
+#endif
+};
+
+/**
+ * @brief A directory iterator that can be used to iterate over the
+ * contents of a directory, other than `.` and `..`. It is similar to
+ * std::filesystem::directory_iterator but throws SystemError on failure
+ * instead of std::filesystem::filesystem_error.
+ *
+ * Unlike `std::filesystem::directory_iterator`, it can only be moved,
+ * not copied, since copies could only ever share one position, and the
+ * entries it hands out are overwritten as it advances. It is its own
+ * range: `begin()` moves it, so it can be used directly in a
+ * range-based for loop. Also unlike `std::filesystem::directory_iterator`,
+ * entries are just names relative to the directory rather than full
+ * paths.
+ */
+class DirectoryIterator
+{
+public:
+    // --- Iterator Traits ---
+    using iterator_concept = std::input_iterator_tag;
+    using value_type = DirectoryEntry;
+    using difference_type = std::ptrdiff_t;
+    using pointer = const DirectoryEntry *;
+    using reference = const DirectoryEntry &;
+
+    // Default constructor (represents end iterator)
+    DirectoryIterator() noexcept;
+
+    /**
+     * Read the directory @p dirFd refers to, taking ownership of it.
+     *
+     * The handle's read position is consumed, so it must not be shared.
+     * On Unix it must not be an `O_PATH` descriptor; on Windows it needs
+     * `FILE_LIST_DIRECTORY` access.
+     */
+    explicit DirectoryIterator(AutoCloseFD dirFd);
+
+    DirectoryIterator(DirectoryIterator &&) noexcept;
+    DirectoryIterator & operator=(DirectoryIterator &&) noexcept;
+    ~DirectoryIterator();
+
+    reference operator*() const
+    {
+        return *entry;
+    }
+
+    pointer operator->() const
+    {
+        return &*entry;
+    }
+
+    DirectoryIterator & operator++();
+
+    // Postfix increment operator
+    void operator++(int)
+    {
+        ++*this;
+    }
+
+    /**
+     * Whether this is the end iterator.
+     */
+    bool operator==(std::default_sentinel_t) const noexcept
+    {
+        return !state;
+    }
+
+    // Allow direct use in range-based for loops if iterating over an instance
+    DirectoryIterator begin()
+    {
+        return std::move(*this);
+    }
+
+    std::default_sentinel_t end() const noexcept
+    {
+        return std::default_sentinel;
+    }
+
+private:
+    /**
+     * The entry `operator*` hands out, overwritten as the iterator
+     * advances.
+     */
+    std::optional<DirectoryEntry> entry;
+
+    /**
+     * Each platform's implementation defines this. Its destructor and
+     * the iterator's moves are defined there too, where it is complete.
+     */
+    struct PlatformState;
+
+    /**
+     * Null exactly for the end iterator.
+     */
+    std::unique_ptr<PlatformState> state;
+};
 
 } // namespace nix

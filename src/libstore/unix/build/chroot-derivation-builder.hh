@@ -2,6 +2,7 @@
 
 #include "unix-derivation-builder-impl.hh"
 #include "chroot.hh"
+#include "nix/util/file-system-at.hh"
 
 namespace nix {
 
@@ -26,7 +27,12 @@ public:
     /**
      * RAII cleanup for the chroot directory.
      */
-    std::optional<AutoDelete> autoDelChroot;
+    std::optional<AutoDeleteAt> autoDelChroot;
+
+    /**
+     * A handle to the store directory inside the chroot.
+     */
+    AutoCloseFD chrootStoreDirFd;
 
     PathsInChroot pathsInChroot;
 
@@ -46,6 +52,8 @@ public:
     Strings getPreBuildHookArgs() override;
 
     std::filesystem::path realPathInHost(const StorePath & p) override;
+
+    Descriptor realStoreDirFdInHost() override;
 
     void cleanupBuild(bool force) override;
 

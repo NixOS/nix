@@ -27,6 +27,10 @@ struct SourcePath;
  */
 struct StoreDirConfig
 {
+    /**
+     * The store directory. Always canonical: absolute, with no `.`, `..`
+     * or empty components.
+     */
     const std::string & storeDir;
 
     // pure methods

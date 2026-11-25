@@ -3,6 +3,7 @@
 #include "nix/store/local-overlay-store.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/os-string.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/store-open.hh"
@@ -211,30 +212,31 @@ void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & re
     remountIfNecessary();
 }
 
-void LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
+void LocalOverlayStore::deleteStorePath(const OsFilename & name, uint64_t & bytesFreed, bool isKnownPath)
 {
     bytesFreed = 0;
 
-    if (path.parent_path() != config->realStoreDir.get()) {
-        warn("local-overlay: unexpected gc path %s", PathFmt(path));
-        return;
-    }
-
-    StorePath storePath = {path.filename().string()};
+    StorePath storePath = {name.path().string()};
     auto upperPath = config->toUpperPath(storePath);
 
-    if (pathExists(upperPath)) {
-        debug("upper exists: %s", PathFmt(path));
+    /* By path, following symlinks, as the upper layer is configured; the
+       store object in it is not followed. */
+    auto upperLayerFd = valueOr(
+        openDirectory(config->upperLayer.get()),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the upper layer %s", PathFmt(config->upperLayer.get())));
+
+    if (maybeFstatat(upperLayerFd.get(), name)) {
+        debug("upper exists: %s", PathFmt(upperPath));
         if (lowerStore->isValidPath(storePath)) {
             debug("lower exists: %s", storePath.to_string());
             // Path also exists in lower store.
             // We must delete via upper layer to avoid creating a whiteout.
-            deletePath(upperPath, bytesFreed);
+            deletePathAt(upperLayerFd.get(), name, bytesFreed);
             _remountRequired = true;
         } else {
             // Path does not exist in lower store.
             // So we can delete via overlayfs and not need to remount.
-            LocalStore::deleteStorePath(path, bytesFreed, isKnownPath);
+            LocalStore::deleteStorePath(name, bytesFreed, isKnownPath);
         }
     }
 }
@@ -254,7 +256,7 @@ void LocalOverlayStore::optimiseStore()
         if (lowerStore->isValidPath(path)) {
             uint64_t bytesFreed = 0;
             // Deduplicate store path
-            deleteStorePath(toRealPath(path), bytesFreed, true);
+            deleteStorePath(OsFilename{path.filename()}, bytesFreed, true);
         }
         done++;
         act.progress(done, paths.size());
@@ -268,7 +270,7 @@ LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag
     StorePathSet done;
 
     auto existsInStoreDir = [&](const StorePath & storePath) {
-        return pathExists(config->realStoreDir.get() / storePath.to_string());
+        return maybeFstatat(getRealStoreDirFd(), OsFilename{storePath.filename()}).has_value();
     };
 
     bool errors = false;

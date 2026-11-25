@@ -13,8 +13,7 @@ void ChrootDerivationBuilder::setBuildTmpDir()
        On macOS, we don't use an actual chroot, so this isn't
        possible. Any mitigation along these lines would have to be
        done directly in the sandbox profile. */
-    tmpDir = topTmpDir / "build";
-    createDir(tmpDir, 0700);
+    setBuildTmpDirToSubdir(OsFilename::fromPathAsserting("build"));
 }
 
 std::filesystem::path ChrootDerivationBuilder::tmpDirInSandbox()
@@ -34,17 +33,23 @@ void ChrootDerivationBuilder::prepareSandbox()
     // Set up chroot parameters
     BuildChrootParams params{
         .chrootParentDir = store->toRealPath(drvPath) + ".chroot",
+        .realStoreDirFd = store->getRealStoreDirFd(),
         .useUidRange = drvOptions.useUidRange(drv),
         .isSandboxed = derivationType.isSandboxed(),
         .buildUser = buildUser.get(),
         .storeDir = store->storeDir,
-        .chownToBuilder = [this](const std::filesystem::path & path) { this->chownToBuilder(path); },
+        .chownToBuilder = [this](Descriptor fd, const std::filesystem::path & path) { this->chownToBuilder(fd, path); },
     };
 
     // Create the chroot
     auto [rootDir, cleanup] = setupBuildChroot(params);
     chrootRootDir = std::move(rootDir);
     autoDelChroot.emplace(std::move(cleanup));
+
+    auto chrootStoreDir = chrootRootDir / std::filesystem::path{store->storeDir}.relative_path();
+    chrootStoreDirFd = valueOr(
+        openDirectory(chrootStoreDir, FinalSymlink::DontFollow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening %s", PathFmt(chrootStoreDir)));
 
     // Start with the default sandbox paths
     pathsInChroot = getPathsInSandbox();
@@ -81,6 +86,12 @@ std::filesystem::path ChrootDerivationBuilder::realPathInHost(const StorePath & 
     // FIXME: why the needsHashRewrite() conditional?
     return !needsHashRewrite() ? chrootRootDir / std::filesystem::path{store->printStorePath(p)}.relative_path()
                                : store->toRealPath(p);
+}
+
+Descriptor ChrootDerivationBuilder::realStoreDirFdInHost()
+{
+    /* Same condition as `realPathInHost()`. */
+    return !needsHashRewrite() ? chrootStoreDirFd.get() : UnixDerivationBuilderImpl::realStoreDirFdInHost();
 }
 
 void ChrootDerivationBuilder::cleanupBuild(bool force)

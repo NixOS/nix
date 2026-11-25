@@ -750,6 +750,14 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
         throw SysError("unable to bind mount %1%", PathFmt(chrootRootDir));
 
+    /* Everything below is created relative to this, after the bind mount
+       above so that it refers to the bind mount. We really do have to
+       reopen the dirfd in the child, otherwise move_mount dies with
+       EINVAL. */
+    auto chrootRootDirFd = valueOr(
+        openDirectory(chrootRootDir, FinalSymlink::DontFollow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(chrootRootDir)));
+
     /* Bind-mount the sandbox's Nix store onto itself so that
        we can mark it as a "shared" subtree, allowing bind
        mounts made in *this* mount namespace to be propagated
@@ -770,8 +778,8 @@ void ChrootLinuxDerivationBuilder::enterChroot()
        bind-mount the host /dev. */
     Strings ss;
     if (pathsInChroot.find("/dev") == pathsInChroot.end()) {
-        createDirs(chrootRootDir / "dev" / "shm");
-        createDirs(chrootRootDir / "dev" / "pts");
+        createDirsAt(chrootRootDirFd.get(), CanonPath("dev/shm"));
+        createDirsAt(chrootRootDirFd.get(), CanonPath("dev/pts"));
         ss.push_back("/dev/full");
         if (systemFeatures.count("kvm")) {
             if (pathExists("/dev/kvm")) {
@@ -788,10 +796,10 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         ss.push_back("/dev/tty");
         ss.push_back("/dev/urandom");
         ss.push_back("/dev/zero");
-        createSymlink("/proc/self/fd", chrootRootDir / "dev" / "fd");
-        createSymlink("/proc/self/fd/0", chrootRootDir / "dev" / "stdin");
-        createSymlink("/proc/self/fd/1", chrootRootDir / "dev" / "stdout");
-        createSymlink("/proc/self/fd/2", chrootRootDir / "dev" / "stderr");
+        createUnknownSymlinkAt(chrootRootDirFd.get(), CanonPath("dev/fd"), "/proc/self/fd");
+        createUnknownSymlinkAt(chrootRootDirFd.get(), CanonPath("dev/stdin"), "/proc/self/fd/0");
+        createUnknownSymlinkAt(chrootRootDirFd.get(), CanonPath("dev/stdout"), "/proc/self/fd/1");
+        createUnknownSymlinkAt(chrootRootDirFd.get(), CanonPath("dev/stderr"), "/proc/self/fd/2");
     }
 
     /* Fixed-output derivations typically need to access the
@@ -802,7 +810,12 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         // services. Don’t use it for anything else that may
         // be configured for this system. This limits the
         // potential impurities introduced in fixed-outputs.
-        writeFile(chrootRootDir / "etc" / "nsswitch.conf", "hosts: files dns\nservices: files\n");
+        {
+            auto fd = valueOr(
+                openNewFileForWriteAt(chrootRootDirFd.get(), CanonPath("etc/nsswitch.conf"), 0666, {}),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("creating %s", PathFmt(chrootRootDir / "etc" / "nsswitch.conf")));
+            writeFile(fd.get(), "hosts: files dns\nservices: files\n");
+        }
 
         /* N.B. it is realistic that these paths might not exist. It
            happens when testing Nix building fixed-output derivations
@@ -825,11 +838,6 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         pathsInChroot.emplace(i, canonicalPath);
     }
 
-    /* We really do have to reopen the dirfd in the child, otherwise move_mount dies with EINVAL. */
-    auto chrootRootDirFd = valueOr(
-        openDirectory(chrootRootDir, FinalSymlink::DontFollow),
-        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(chrootRootDir)));
-
     /* Bind-mount all the directories from the "host"
        filesystem that we want in the chroot
        environment. */
@@ -841,10 +849,16 @@ void ChrootLinuxDerivationBuilder::enterChroot()
             static constexpr unsigned char sh[] = {
 #  embed EMBEDDED_SANDBOX_SHELL_PATH
             };
-            auto dst = chrootRootDir / i.first.relative_path();
-            createDirs(dst.parent_path());
-            writeFile(dst, std::string_view((const char *) sh, sizeof(sh)));
-            chmod(dst, 0555);
+            auto dst = i.first.relative_path();
+            /* Via `CanonPath`, which cannot climb out of the chroot. */
+            auto parentFd = createDirsAt(chrootRootDirFd.get(), CanonPath(dst.parent_path().string()));
+            auto fd = valueOr(
+                openNewFileForWriteAt(parentFd.get(), OsFilename::fromPathThrowing(dst.filename()), 0555, {}),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("creating %s", PathFmt(chrootRootDir / dst)));
+            writeFile(fd.get(), std::string_view((const char *) sh, sizeof(sh)));
+            /* Regardless of the umask. */
+            if (::fchmod(fd.get(), 0555) == -1)
+                throw SysError("making %s executable", PathFmt(chrootRootDir / dst));
         } else
 #endif
         {
@@ -853,13 +867,13 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     }
 
     /* Bind a new instance of procfs on /proc. */
-    createDirs(chrootRootDir / "proc");
+    createDirsAt(chrootRootDirFd.get(), CanonPath("proc"));
     if (mount("none", (chrootRootDir / "proc").c_str(), "proc", 0, 0) == -1)
         throw SysError("mounting /proc");
 
     /* Mount sysfs on /sys. */
     if (buildUser && buildUser->getUIDCount() != 1) {
-        createDirs(chrootRootDir / "sys");
+        createDirsAt(chrootRootDirFd.get(), CanonPath("sys"));
         if (mount("none", (chrootRootDir / "sys").c_str(), "sysfs", 0, 0) == -1)
             throw SysError("mounting /sys");
     }
@@ -880,14 +894,14 @@ void ChrootLinuxDerivationBuilder::enterChroot()
        requires the kernel to be compiled with
        CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
        if /dev/ptx/ptmx exists). */
-    if (pathExists("/dev/pts/ptmx") && !pathExists(chrootRootDir / "dev" / "ptmx")
+    if (pathExists("/dev/pts/ptmx") && !maybeFstatat(chrootRootDirFd.get(), CanonPath("dev/ptmx"))
         && !pathsInChroot.count("/dev/pts")) {
         if (mount("none", (chrootRootDir / "dev" / "pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0) {
-            createSymlink("/dev/pts/ptmx", chrootRootDir / "dev" / "ptmx");
+            createUnknownSymlinkAt(chrootRootDirFd.get(), CanonPath("dev/ptmx"), "/dev/pts/ptmx");
 
             /* Make sure /dev/pts/ptmx is world-writable.  With some
                 Linux versions, it is created with permissions 0.  */
-            chmod(chrootRootDir / "dev" / "pts" / "ptmx", 0666);
+            unix::fchmodatTryNoFollow(chrootRootDirFd.get(), CanonPath("dev/pts/ptmx"), 0666);
         } else {
             if (errno != EINVAL)
                 throw SysError("mounting /dev/pts");
@@ -898,7 +912,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
 
     /* Make /etc unwritable */
     if (!drvOptions.useUidRange(drv))
-        chmod(chrootRootDir / "etc", 0555);
+        unix::fchmodatTryNoFollow(chrootRootDirFd.get(), CanonPath("etc"), 0555);
 
     /* Unshare this mount namespace. This is necessary because
        pivot_root() below changes the root of the mount

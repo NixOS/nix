@@ -81,10 +81,10 @@ TEST(readLinkAt, works)
         EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("medium")), string_to_os_string(mediumTarget));
         EXPECT_EQ(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("long")), string_to_os_string(longTarget));
     }
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), "/a/b/link"_canonPath), OS_STR("nested_target"));
 
     auto subDirFd = testing::valueOrFail(openDirectory(tmpDir / "a", FinalSymlink::Follow));
-    EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
+    EXPECT_EQ(readLinkAt(subDirFd.get(), "/b/link"_canonPath), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
     EXPECT_THROW(readLinkAt(dirFd.get(), OsFilename::fromPathAsserting("regular")), SystemError);
@@ -170,12 +170,12 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
         return std::move(fd).value();
     };
 
-    auto openRead = [&](std::string_view path) -> AutoCloseFD {
+    auto openRead = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path,
+            path.rel(),
             openFileEnsureBeneathNoSymlinks(
                 dirFd.get(),
-                CanonPath(path),
+                path,
 #ifdef _WIN32
                 FILE_READ_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
                 0
@@ -186,12 +186,12 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
                 ));
     };
 
-    auto openReadDir = [&](std::string_view path) -> AutoCloseFD {
+    auto openReadDir = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path,
+            path.rel(),
             openFileEnsureBeneathNoSymlinks(
                 dirFd.get(),
-                CanonPath(path),
+                path,
 #ifdef _WIN32
                 FILE_READ_ATTRIBUTES | SYNCHRONIZE,
                 FILE_DIRECTORY_FILE
@@ -203,21 +203,21 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     };
 
 #if defined(__linux__)
-    auto openReadDirPath = [&](std::string_view path) -> AutoCloseFD {
+    auto openReadDirPath = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path, openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath(path), O_PATH | O_DIRECTORY | O_CLOEXEC, 0));
+            path.rel(), openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_PATH | O_DIRECTORY | O_CLOEXEC, 0));
     };
-    auto openPath = [&](std::string_view path) -> AutoCloseFD {
-        return check(path, openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath(path), O_PATH | O_CLOEXEC, 0));
+    auto openPath = [&](const CanonPath & path) -> AutoCloseFD {
+        return check(path.rel(), openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_PATH | O_CLOEXEC, 0));
     };
 #endif
 
-    auto openCreateExclusive = [&](std::string_view path) -> AutoCloseFD {
+    auto openCreateExclusive = [&](const CanonPath & path) -> AutoCloseFD {
         return check(
-            path,
+            path.rel(),
             openFileEnsureBeneathNoSymlinks(
                 dirFd.get(),
-                CanonPath(path),
+                path,
 #ifdef _WIN32
                 FILE_WRITE_DATA | SYNCHRONIZE,
                 0,
@@ -235,53 +235,53 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
 
     // Symlinks in the path (any position) are rejected.
-    EXPECT_THROW(openRead("a/absolute_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/relative_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/absolute_symlink/a"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/absolute_symlink/c/d"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/relative_symlink/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/b/c/d"), SymlinkNotAllowed);
-    EXPECT_THROW(openRead("a/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/absolute_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/relative_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/absolute_symlink/a"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/absolute_symlink/c/d"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/relative_symlink/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/b/c/d"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openRead("/a/broken_symlink"_canonPath), SymlinkNotAllowed);
 
     /* Trailing symlink with `O_DIRECTORY` (no `O_NOFOLLOW`): the
        syscall reports `ELOOP`, handled by the direct
        `SymlinkNotAllowed` throw in `openFileEnsureBeneathNoSymlinks`. */
-    EXPECT_THROW(openReadDir("a/absolute_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDir("a/relative_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDir("a/b/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDir("a/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/absolute_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/relative_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/b/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDir("/a/broken_symlink"_canonPath), SymlinkNotAllowed);
 
 #if defined(__linux__)
     // Same thing for `O_PATH | O_DIRECTORY` (Linux-only flag).
-    EXPECT_THROW(openReadDirPath("a/absolute_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDirPath("a/relative_symlink"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDirPath("a/b/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openReadDirPath("a/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/absolute_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/relative_symlink"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/b/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openReadDirPath("/a/broken_symlink"_canonPath), SymlinkNotAllowed);
 
     /* `O_PATH` on a trailing symlink is allowed: the caller gets a
        path fd referring to the symlink itself. Interior symlinks are
        still rejected. */
-    EXPECT_TRUE(openPath("a/absolute_symlink"));
-    EXPECT_TRUE(openPath("a/relative_symlink"));
-    EXPECT_TRUE(openPath("a/b/c"));
-    EXPECT_TRUE(openPath("a/broken_symlink"));
-    EXPECT_THROW(openPath("a/absolute_symlink/a"), SymlinkNotAllowed);
-    EXPECT_THROW(openPath("a/absolute_symlink/c/d"), SymlinkNotAllowed);
-    EXPECT_THROW(openPath("a/relative_symlink/c"), SymlinkNotAllowed);
-    EXPECT_THROW(openPath("a/b/c/d"), SymlinkNotAllowed);
+    EXPECT_TRUE(openPath("/a/absolute_symlink"_canonPath));
+    EXPECT_TRUE(openPath("/a/relative_symlink"_canonPath));
+    EXPECT_TRUE(openPath("/a/b/c"_canonPath));
+    EXPECT_TRUE(openPath("/a/broken_symlink"_canonPath));
+    EXPECT_THROW(openPath("/a/absolute_symlink/a"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openPath("/a/absolute_symlink/c/d"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openPath("/a/relative_symlink/c"_canonPath), SymlinkNotAllowed);
+    EXPECT_THROW(openPath("/a/b/c/d"_canonPath), SymlinkNotAllowed);
 #endif
 
 #if !defined(_WIN32) && !defined(__CYGWIN__)
     /* Sanity check: behaves the same as plain openat with
        `O_EXCL | O_CREAT` on an existing broken-symlink path —
        the symlink counts as "already there". */
-    EXPECT_THAT([&] { openCreateExclusive("a/broken_symlink"); }, ThrowsSysError(EEXIST));
+    EXPECT_THAT([&] { openCreateExclusive("/a/broken_symlink"_canonPath); }, ThrowsSysError(EEXIST));
 #endif
-    EXPECT_THROW(openCreateExclusive("a/absolute_symlink/broken_symlink"), SymlinkNotAllowed);
+    EXPECT_THROW(openCreateExclusive("/a/absolute_symlink/broken_symlink"_canonPath), SymlinkNotAllowed);
 
     // Non-symlink failure modes: error codes must survive.
     EXPECT_THAT(
-        [&] { openRead("c/d/regular/a"); },
+        [&] { openRead("/c/d/regular/a"_canonPath); },
 #ifdef _WIN32
         ThrowsWinError(ERROR_DIRECTORY)
 #else
@@ -289,7 +289,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
     );
     EXPECT_THAT(
-        [&] { openReadDir("c/d/regular"); },
+        [&] { openReadDir("/c/d/regular"_canonPath); },
 #ifdef _WIN32
         ThrowsWinError(ERROR_DIRECTORY)
 #else
@@ -297,7 +297,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 #endif
     );
     EXPECT_THAT(
-        [&] { openRead("c/d/nonexistent"); },
+        [&] { openRead("/c/d/nonexistent"_canonPath); },
 #ifdef _WIN32
         ThrowsWinError(ERROR_FILE_NOT_FOUND)
 #else
@@ -306,17 +306,305 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     );
 
     // Happy paths.
-    EXPECT_TRUE(openRead("c/d/regular"));
-    EXPECT_TRUE(openReadDir("c"));
-    EXPECT_TRUE(openReadDir("c/d"));
-    EXPECT_TRUE(openCreateExclusive("a/regular"));
+    EXPECT_TRUE(openRead("/c/d/regular"_canonPath));
+    EXPECT_TRUE(openReadDir("/c"_canonPath));
+    EXPECT_TRUE(openReadDir("/c/d"_canonPath));
+    EXPECT_TRUE(openCreateExclusive("/a/regular"_canonPath));
 #if defined(__linux__)
-    EXPECT_TRUE(openReadDirPath("c"));
-    EXPECT_TRUE(openReadDirPath("c/d"));
-    EXPECT_TRUE(openPath("c/d/regular"));
-    EXPECT_TRUE(openPath("c"));
+    EXPECT_TRUE(openReadDirPath("/c"_canonPath));
+    EXPECT_TRUE(openReadDirPath("/c/d"_canonPath));
+    EXPECT_TRUE(openPath("/c/d/regular"_canonPath));
+    EXPECT_TRUE(openPath("/c"_canonPath));
 #endif
 }
+
+/* ----------------------------------------------------------------------------
+ * recursiveSyncAt
+ * --------------------------------------------------------------------------*/
+
+/* Not on Windows, where flushing needs write access that
+   `recursiveSyncAt` doesn't open with yet. */
+#ifndef _WIN32
+TEST(recursiveSyncAt, works)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    auto root = tmpDir / "root";
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("root"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & rootDir) {
+                rootDir.createChild("sub"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
+                        sub.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("world"); });
+                        });
+                    });
+                });
+                rootDir.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("hello"); });
+                });
+                /* Dangling, so following it would fail. */
+                rootDir.createChild(
+                    "dangling"_filename, [](FileSystemObjectSink & s) { s.createSymlink("nonexistent"); });
+            });
+        });
+        top.createChild("dangling"_filename, [](FileSystemObjectSink & s) { s.createSymlink("nonexistent"); });
+    }
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A whole tree, including a symlink within it. */
+    EXPECT_NO_THROW(recursiveSyncAt(dirFd.get(), OsFilename::fromPathAsserting("root")));
+
+    /* A regular file or symlink at the top. */
+    auto rootFd = testing::valueOrFail(openDirectory(root, FinalSymlink::Follow));
+    EXPECT_NO_THROW(recursiveSyncAt(rootFd.get(), OsFilename::fromPathAsserting("file")));
+    EXPECT_NO_THROW(recursiveSyncAt(dirFd.get(), OsFilename::fromPathAsserting("dangling")));
+
+    EXPECT_THROW(recursiveSyncAt(dirFd.get(), OsFilename::fromPathAsserting("nonexistent")), SystemError);
+}
+#endif
+
+/* ----------------------------------------------------------------------------
+ * deletePathAt
+ * --------------------------------------------------------------------------*/
+
+TEST(deletePathAt, works)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    bool symlinks = true;
+#ifdef _WIN32
+    symlinks = !windows::isWine() || windows::wineSymlinksSupported(tmpDir);
+#endif
+
+    auto outside = tmpDir / "outside";
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("outside"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("keep me"); });
+        });
+        top.createChild("a"_filename, [&](FileSystemObjectSink & s) {
+            s.createDirectory([&](FileSystemObjectSink::OnDirectory & a) {
+                a.createChild("tree"_filename, [&](FileSystemObjectSink & s) {
+                    s.createDirectory([&](FileSystemObjectSink::OnDirectory & tree) {
+                        tree.createChild("sub"_filename, [](FileSystemObjectSink & s) {
+                            s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
+                                sub.createChild("read-only"_filename, [](FileSystemObjectSink & s) {
+                                    s.createRegularFile(
+                                        false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("world"); });
+                                });
+                            });
+                        });
+                        tree.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("hello"); });
+                        });
+                        if (symlinks)
+                            tree.createChild(
+                                "link"_filename, [&](FileSystemObjectSink & s) { s.createSymlink(outside.string()); });
+                    });
+                });
+            });
+        });
+        if (symlinks)
+            top.createChild("link-to-a"_filename, [](FileSystemObjectSink & s) { s.createSymlink("a"); });
+    }
+    std::filesystem::permissions(
+        tmpDir / "a" / "tree" / "sub" / "read-only",
+        std::filesystem::perms::owner_write | std::filesystem::perms::group_write
+            | std::filesystem::perms::others_write,
+        std::filesystem::perm_options::remove);
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A whole tree, through a parent directory. The symlink in it is
+       deleted, not followed. */
+    uint64_t bytesFreed;
+    deletePathAt(dirFd.get(), OsCanonPath::fromPathAsserting(std::filesystem::path{"a"} / "tree"), bytesFreed);
+    EXPECT_FALSE(pathExists(tmpDir / "a" / "tree"));
+    EXPECT_TRUE(pathExists(tmpDir / "a"));
+    EXPECT_EQ(readFile(outside), "keep me");
+    EXPECT_GE(bytesFreed, 10u);
+
+    /* Missing, and with a missing parent: not an error. */
+    EXPECT_NO_THROW(deletePathAt(dirFd.get(), OsFilename::fromPathAsserting("nonexistent")));
+    EXPECT_NO_THROW(
+        deletePathAt(dirFd.get(), OsCanonPath::fromPathAsserting(std::filesystem::path{"nonexistent"} / "child")));
+
+    if (symlinks) {
+        /* Not through a symlink in the parent directories. */
+        EXPECT_THROW(
+            deletePathAt(dirFd.get(), OsCanonPath::fromPathAsserting(std::filesystem::path{"link-to-a"} / "x")),
+            SymlinkNotAllowed);
+
+        /* A symlink itself. */
+        deletePathAt(dirFd.get(), OsFilename::fromPathAsserting("link-to-a"));
+        EXPECT_FALSE(pathExists(tmpDir / "link-to-a"));
+        EXPECT_TRUE(pathExists(tmpDir / "a"));
+    }
+}
+
+/* ----------------------------------------------------------------------------
+ * movePathAt
+ * --------------------------------------------------------------------------*/
+
+TEST(movePathAt, works)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    bool symlinks = true;
+#ifdef _WIN32
+    symlinks = !windows::isWine() || windows::wineSymlinksSupported(tmpDir);
+#endif
+
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("src"_filename, [&](FileSystemObjectSink & s) {
+            s.createDirectory([&](FileSystemObjectSink::OnDirectory & src) {
+                src.createChild("tree"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory & tree) {
+                        tree.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("hello"); });
+                        });
+                    });
+                });
+                src.createChild("new"_filename, [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("new"); });
+                });
+                src.createChild("read-only"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+                });
+                if (symlinks) {
+                    src.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+                    src.createChild("another"_filename, [](FileSystemObjectSink & s) {
+                        s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("x"); });
+                    });
+                }
+            });
+        });
+        top.createChild("dst"_filename, [&](FileSystemObjectSink & s) {
+            s.createDirectory([&](FileSystemObjectSink::OnDirectory & dst) {
+                dst.createChild("sub"_filename, [](FileSystemObjectSink & s) {
+                    s.createDirectory([](FileSystemObjectSink::OnDirectory & sub) {
+                        sub.createChild("replaced"_filename, [](FileSystemObjectSink & s) {
+                            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("old"); });
+                        });
+                    });
+                });
+                if (symlinks)
+                    dst.createChild("sub-link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("sub"); });
+            });
+        });
+    }
+
+    auto srcFd = testing::valueOrFail(openDirectory(tmpDir / "src", FinalSymlink::Follow));
+    auto dstFd = testing::valueOrFail(openDirectory(tmpDir / "dst", FinalSymlink::Follow));
+
+    auto sub = [](std::string_view a, std::string_view b) {
+        return OsCanonPath::fromPathAsserting(std::filesystem::path{a} / b);
+    };
+
+    /* A directory, between two directory handles, into a subdirectory. */
+    movePathAt(srcFd.get(), OsFilename::fromPathAsserting("tree"), dstFd.get(), sub("sub", "tree"));
+    EXPECT_FALSE(pathExists(tmpDir / "src" / "tree"));
+    EXPECT_EQ(readFile(tmpDir / "dst" / "sub" / "tree" / "file"), "hello");
+
+    /* Replacing an existing file. */
+    movePathAt(srcFd.get(), OsFilename::fromPathAsserting("new"), dstFd.get(), sub("sub", "replaced"));
+    EXPECT_EQ(readFile(tmpDir / "dst" / "sub" / "replaced"), "new");
+
+#ifndef _WIN32
+    /* A read-only directory, which has to be made writable temporarily
+       to be moved, but ends up read-only again. */
+    nix::chmod(tmpDir / "src" / "read-only", 0555);
+    movePathAt(srcFd.get(), OsFilename::fromPathAsserting("read-only"), dstFd.get(), sub("sub", "read-only"));
+    EXPECT_EQ(nix::lstat(tmpDir / "dst" / "sub" / "read-only").st_mode & 0777, 0555);
+    nix::chmod(tmpDir / "dst" / "sub" / "read-only", 0755);
+#endif
+
+    if (symlinks) {
+        /* A symlink is moved itself. */
+        movePathAt(
+            srcFd.get(), OsFilename::fromPathAsserting("link"), dstFd.get(), OsFilename::fromPathAsserting("link"));
+        EXPECT_EQ(readLink(tmpDir / "dst" / "link"), "target");
+
+        /* Not through a symlink in the parent directories. */
+        EXPECT_THROW(
+            movePathAt(srcFd.get(), OsFilename::fromPathAsserting("another"), dstFd.get(), sub("sub-link", "another")),
+            SymlinkNotAllowed);
+    }
+}
+
+#ifndef _WIN32
+
+TEST(movePathAt, restoresPermissionsOnError)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("src"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+        });
+        top.createChild("dst"_filename, [](FileSystemObjectSink & s) {
+            s.createDirectory([](FileSystemObjectSink::OnDirectory & dst) {
+                dst.createChild("file"_filename, [](FileSystemObjectSink & s) {
+                    s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
+                });
+            });
+        });
+    }
+    nix::chmod(tmpDir / "src", 0500);
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A non-empty directory cannot be replaced, which is only found out
+       after making the source directory writable to move it. */
+    EXPECT_THROW(
+        movePathAt(
+            dirFd.get(), OsFilename::fromPathAsserting("src"), dirFd.get(), OsFilename::fromPathAsserting("dst")),
+        SysError);
+    EXPECT_EQ(nix::lstat(tmpDir / "src").st_mode & 0777, 0500);
+    nix::chmod(tmpDir / "src", 0755);
+}
+
+TEST(movePathAt, symlinkReplaces)
+{
+    std::filesystem::path tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+
+    {
+        RestoreSink::Directory top{testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow))};
+        top.createChild("link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("dangling"); });
+        top.createChild("other-link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("other"); });
+        top.createChild("regular"_filename, [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("test"); });
+        });
+        top.createChild("another-link"_filename, [](FileSystemObjectSink & s) { s.createSymlink("hello"); });
+    }
+
+    auto dirFd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+
+    /* A symlink replaces a symlink. */
+    movePathAt(
+        dirFd.get(), OsFilename::fromPathAsserting("link"), dirFd.get(), OsFilename::fromPathAsserting("other-link"));
+    EXPECT_EQ(readLink(tmpDir / "other-link"), "dangling");
+
+    /* A symlink replaces a regular file. */
+    movePathAt(
+        dirFd.get(),
+        OsFilename::fromPathAsserting("another-link"),
+        dirFd.get(),
+        OsFilename::fromPathAsserting("regular"));
+    EXPECT_EQ(readLink(tmpDir / "regular"), "hello");
+}
+
+#endif
 
 /* ----------------------------------------------------------------------------
  * openFileEnsureBeneathNoSymlinks — O_NOFOLLOW is forbidden

@@ -2,6 +2,9 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/compression.hh"
 #include "nix/store/derivations.hh"
+#include "nix/util/path-iterator.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 
 namespace nix {
 
@@ -28,6 +31,22 @@ LocalFSStore::LocalFSStore(const Config & config)
     : Store{static_cast<const Store::Config &>(*this)}
     , config{config}
 {
+}
+
+void LocalFSStore::init()
+{
+    if (realStoreDirFd)
+        return;
+    auto dir = getRealStoreDir();
+    realStoreDirFd = valueOr(
+        openDirectory(dir, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening store directory %s", PathFmt(dir)));
+}
+
+Descriptor LocalFSStore::getRealStoreDirFd()
+{
+    assert(realStoreDirFd && "`LocalFSStore::init()` must be called first");
+    return realStoreDirFd.get();
 }
 
 namespace {
@@ -191,7 +210,7 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
             return nullptr;
         /* A valid store object exists on disk, so opening it is
            expected to succeed. */
-        return makeFSSourceAccessor(std::move(absPath));
+        return makeFSSourceAccessor(getRealStoreDirFd(), OsFilename{path.filename()}, std::move(absPath));
     } else {
         /* Return non-null as long as some file system data exists,
            even if the store object is not fully registered. */
@@ -208,21 +227,45 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 {
     auto baseName = path.to_string();
 
+    /* Whether a failure to open something means that it just isn't
+       there. */
+    auto isMissing = [](NativeError err) {
+        auto ec = NativeSysError::toErrorCode(err);
+        return ec == std::errc::no_such_file_or_directory || ec == std::errc::not_a_directory;
+    };
+
     for (int j = 0; j < 2; j++) {
 
-        auto logPath = config.logDir.get()
-                       / (j == 0 ? drvsLogDir / baseName.substr(0, 2) / baseName.substr(2) : drvsLogDir / baseName);
-        auto logBz2Path = logPath;
-        logBz2Path += ".bz2";
+        auto dir = config.logDir.get() / (j == 0 ? drvsLogDir / baseName.substr(0, 2) : drvsLogDir);
+        auto name = std::string(j == 0 ? baseName.substr(2) : baseName);
 
-        if (pathExists(logPath))
-            return readFile(logPath);
+        /* By path, following symlinks; only the log file in it is not
+           followed. */
+        auto dirFdOrError = openDirectory(dir);
+        if (!dirFdOrError) {
+            if (isMissing(dirFdOrError.error()))
+                continue;
+            throw NativeSysError(dirFdOrError.error(), "opening directory %s", PathFmt(dir));
+        }
+        auto & dirFd = dirFdOrError.value();
 
-        else if (pathExists(logBz2Path)) {
-            try {
-                return decompress(CompressionAlgo::bzip2, readFile(logBz2Path));
-            } catch (Error &) {
+        auto readLog = [&](const std::string & name) -> std::optional<std::string> {
+            auto fdOrError = openFileReadonlyAt(dirFd.get(), OsFilename::fromPathThrowing(name));
+            if (!fdOrError) {
+                if (isMissing(fdOrError.error()))
+                    return std::nullopt;
+                throw NativeSysError(fdOrError.error(), "opening file %s", PathFmt(dir / name));
             }
+            return readFile(fdOrError.value().get());
+        };
+
+        if (auto log = readLog(name))
+            return log;
+
+        try {
+            if (auto log = readLog(name + ".bz2"))
+                return decompress(CompressionAlgo::bzip2, *log);
+        } catch (Error &) {
         }
     }
 

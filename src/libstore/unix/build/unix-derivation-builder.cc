@@ -195,9 +195,9 @@ bool UnixDerivationBuilderImpl::decideWhetherDiskFull()
     {
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(store->getRealStoreDir().c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (fstatvfs(store->getRealStoreDirFd(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
-        if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (fstatvfs(tmpDirFd.get(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
     }
 #endif
@@ -246,6 +246,28 @@ static void checkNotWorldWritable(std::filesystem::path path)
     return;
 }
 
+void UnixDerivationBuilderImpl::setBuildTmpDir()
+{
+    tmpDir = topTmpDir;
+    tmpDirFd = valueOr(
+        reopenDirectory(topTmpDirFd.get()),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening the build temporary directory %s", PathFmt(tmpDir)));
+}
+
+void UnixDerivationBuilderImpl::setBuildTmpDirToSubdir(const OsFilename & name)
+{
+    tmpDir = topTmpDir / name.path();
+    auto created = createDirectoryAt(topTmpDirFd.get(), name, 0700);
+    if (!created)
+        throw NativeSysError(created.error(), "creating the build temporary directory %s", PathFmt(tmpDir));
+    tmpDirFd =
+        created.value()
+            ? std::move(created).value()
+            : valueOr(
+                  openDirectoryAt(topTmpDirFd.get(), name),
+                  NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build temporary directory %s", PathFmt(tmpDir)));
+}
+
 std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
 {
     if (useBuildUsers(localSettings)) {
@@ -268,17 +290,19 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
     if (buildUser)
         checkNotWorldWritable(buildDir);
 
+    buildDirFd = valueOr(
+        openDirectory(buildDir, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build directory %s", PathFmt(buildDir)));
+
     /* Create a temporary directory where the build will take
        place. */
     topTmpDir = createTempDir(buildDir, "nix", 0700);
+    topTmpDirFd = valueOr(
+        openDirectoryAt(buildDirFd.get(), OsFilename::fromPathAsserting(topTmpDir.filename())),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening the build temporary directory %s", PathFmt(topTmpDir)));
     setBuildTmpDir();
     assert(!tmpDir.empty());
-
-    /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
-       POSIX semantics.*/
-    tmpDirFd = valueOr(openDirectory(tmpDir, FinalSymlink::DontFollow), [&](auto err) {
-        throw SysError(err, "failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
-    });
+    assert(tmpDirFd);
 
     chownToBuilder(tmpDirFd.get(), tmpDir);
 
@@ -325,7 +349,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
             continue;
 
         /* Ensure scratch path is ours to use. */
-        deletePath(store->printStorePath(scratchPath));
+        deletePathAt(store->getRealStoreDirFd(), OsFilename{scratchPath.filename()});
 
         /* Rewrite and unrewrite paths */
         {
@@ -981,7 +1005,7 @@ void UnixDerivationBuilderImpl::cleanupBuild(bool force)
     if (force) {
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(store->toRealPath(i.second));
+            deletePathAt(store->getRealStoreDirFd(), OsFilename{i.second.filename()});
     }
 
     if (topTmpDir != "") {
@@ -992,16 +1016,28 @@ void UnixDerivationBuilderImpl::cleanupBuild(bool force)
          * This hardens against an attack which smuggles a file descriptor
          * to make use of the temporary directory.
          */
-        chmod(topTmpDir, 0000);
+        auto fchmodOrThrow = [](Descriptor fd, mode_t mode, const std::filesystem::path & path) {
+            if (::fchmod(fd, mode) == -1)
+                throw SysError("changing permissions of %s", PathFmt(path));
+        };
+
+        /* Set up together with `topTmpDir`, so only missing if that
+           failed partway. */
+        if (topTmpDirFd)
+            fchmodOrThrow(topTmpDirFd.get(), 0000, topTmpDir);
 
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv.isBuiltin()) {
             printError("note: keeping build directory %s", PathFmt(tmpDir));
-            chmod(topTmpDir, 0755);
-            chmod(tmpDir, 0755);
+            if (topTmpDirFd)
+                fchmodOrThrow(topTmpDirFd.get(), 0755, topTmpDir);
+            if (tmpDirFd)
+                fchmodOrThrow(tmpDirFd.get(), 0755, tmpDir);
         } else
-            deletePath(topTmpDir);
+            deletePathAt(buildDirFd.get(), OsFilename::fromPathAsserting(topTmpDir.filename()));
+        topTmpDirFd.close();
+        buildDirFd.close();
         topTmpDir = "";
         tmpDir = "";
     }

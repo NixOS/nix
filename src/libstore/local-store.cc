@@ -1,4 +1,5 @@
 #include "nix/store/local-store.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/build.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/path-references.hh"
@@ -13,8 +14,10 @@
 #include "nix/util/topo-sort.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
@@ -123,6 +126,23 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryValidPaths;
 };
 
+/**
+ * Durably write @p schema to the schema file, which is at @p schemaPath,
+ * in the database directory @p dbDirFd.
+ */
+static void writeSchema(Descriptor dbDirFd, const std::filesystem::path & schemaPath, int schema)
+{
+    auto fd = valueOr(
+        openNewFileForWriteAt(
+            dbDirFd, OsFilename::fromPathAsserting(schemaPath.filename()), 0666, {.truncateExisting = true}),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(schemaPath)));
+    writeFile(fd.get(), fmt("%1%", schema), FsSync::Yes, &schemaPath);
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    /* So that the new directory entry is durable too. */
+    syncDescriptor(dbDirFd);
+}
+
 LocalStore::LocalStore(ref<const Config> config)
     : Store{*config}
     , LocalFSStore{*config}
@@ -134,6 +154,7 @@ LocalStore::LocalStore(ref<const Config> config)
     , schemaPath(dbDir / "schema")
     , tempRootsDir(config->stateDir.get() / "temproots")
     , fnTempRoots(tempRootsDir / std::to_string(getpid()))
+    , tempRootsName(OsFilename::fromPathAsserting(fnTempRoots.filename()))
 {
     auto state(_state->lock());
     state->stmts = std::make_unique<State::Stmts>();
@@ -145,11 +166,35 @@ LocalStore::LocalStore(ref<const Config> config)
     } else {
         makeStoreWritable();
     }
-    createDirs(linksDir);
+    /* Only now, since `makeStoreWritable()` may have moved us into a new
+       mount namespace with the store remounted read-write; a handle
+       opened before that would still refer to the old mount. Not
+       virtual, since we are still constructing. */
+    LocalFSStore::init();
+    {
+        /* Without following symlinks, like the store objects beside
+           it. */
+        auto linksName = OsFilename::fromPathAsserting(linksDir.filename());
+        auto createdOrError = createDirectoryAt(getRealStoreDirFd(), linksName);
+        if (!createdOrError && NativeSysError::toErrorCode(createdOrError.error()) != std::errc::file_exists)
+            throw NativeSysError(createdOrError.error(), "creating directory %s", PathFmt(linksDir));
+        if (createdOrError && createdOrError.value())
+            linksDirFd = std::move(createdOrError).value();
+        else
+            linksDirFd = valueOr(
+                openDirectoryAt(getRealStoreDirFd(), linksName),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(linksDir)));
+    }
     auto profilesDir = config->stateDir.get() / "profiles";
     createDirs(profilesDir);
     createDirs(tempRootsDir);
+    /* By path, following symlinks, since state directories may be
+       symlinks; only within it are symlinks not followed. */
+    tempRootsDirFd = valueOr(
+        openDirectory(tempRootsDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(tempRootsDir)));
     createDirs(dbDir);
+    /* Likewise. */
+    dbDirFd = valueOr(openDirectory(dbDir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dbDir)));
     auto gcRootsDir = config->stateDir.get() / "gcroots";
     const auto & localSettings = config->getLocalSettings();
     const auto & gcSettings = localSettings.getGCSettings();
@@ -157,12 +202,20 @@ LocalStore::LocalStore(ref<const Config> config)
 
     for (auto & perUserDir : {profilesDir / "per-user", gcRootsDir / "per-user"}) {
         createDirs(perUserDir);
+        /* On Windows, there are no such permissions to set. */
+#ifndef _WIN32
         if (!config->readOnly) {
+            auto perUserDirFd = valueOr(
+                openDirectory(perUserDir),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(perUserDir)));
             // Skip chmod call if the directory already has the correct permissions (0755).
             // This is to avoid failing when the executing user lacks permissions to change the directory's permissions
             // even if it would be no-op.
-            chmodIfNeeded(perUserDir, 0755, S_IRWXU | S_IRWXG | S_IRWXO);
+            if ((nix::fstat(perUserDirFd.get()).st_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) != 0755
+                && ::fchmod(perUserDirFd.get(), 0755) == -1)
+                throw SysError("setting permissions on %s", PathFmt(perUserDir));
         }
+#endif
     }
 
 #ifndef _WIN32
@@ -177,11 +230,13 @@ LocalStore::LocalStore(ref<const Config> config)
                 "warning: the group '%1%' specified in 'build-users-group' does not exist",
                 localSettings.buildUsersGroup);
         else if (!config->readOnly) {
-            auto st = stat(config->realStoreDir.get());
+            auto st = fstat(getRealStoreDirFd());
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                chown(config->realStoreDir.get(), 0, gr->gr_gid);
-                chmod(config->realStoreDir.get(), perm);
+                if (::fchown(getRealStoreDirFd(), 0, gr->gr_gid) == -1)
+                    throw SysError("changing owner of %s", PathFmt(config->realStoreDir.get()));
+                if (::fchmod(getRealStoreDirFd(), perm) == -1)
+                    throw SysError("changing permissions of %s", PathFmt(config->realStoreDir.get()));
             }
         }
     }
@@ -206,16 +261,12 @@ LocalStore::LocalStore(ref<const Config> config)
        needed, we reserve some dummy space that we can free just
        before doing a garbage collection. */
     try {
-        auto st = maybeStat(reservedPath);
+        auto reservedName = OsFilename::fromPathAsserting(reservedPath.filename());
+        auto st = maybeFstatat(dbDirFd.get(), reservedName);
         if (!st || st->st_size != gcSettings.reservedSize) {
-            AutoCloseFD fd = toDescriptor(open(
-                reservedPath.string().c_str(),
-                O_WRONLY | O_CREAT
-#ifndef _WIN32
-                    | O_CLOEXEC
-#endif
-                ,
-                0600));
+            auto fd = valueOr(
+                openNewFileForWriteAt(dbDirFd.get(), reservedName, 0600, {.truncateExisting = true}),
+                NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening %s", PathFmt(reservedPath)));
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
             res = posix_fallocate(fd.get(), 0, gcSettings.reservedSize);
@@ -232,15 +283,15 @@ LocalStore::LocalStore(ref<const Config> config)
                     ;
             }
         }
-    } catch (SystemError & e) { /* don't care about errors */
+    } catch (SystemError & e) {       /* don't care about errors */
+    } catch (SymlinkNotAllowed & e) { /* likewise */
     }
 
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
     if (!config->readOnly) {
-        auto globalLockPath = dbDir / "big-lock";
         try {
-            globalLock = openLockFile(globalLockPath, true);
+            globalLock = openLockFileAt(dbDirFd.get(), OsFilename::fromPathAsserting("big-lock"), true);
         } catch (SystemError & e) {
             if (e.is(std::errc::permission_denied) || e.is(std::errc::operation_not_permitted)) {
                 e.addTrace(
@@ -285,7 +336,7 @@ LocalStore::LocalStore(ref<const Config> config)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, fmt("%1%", curSchema), 0666, FsSync::Yes);
+        writeSchema(dbDirFd.get(), schemaPath, curSchema);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -332,7 +383,7 @@ LocalStore::LocalStore(ref<const Config> config)
             txn.commit();
         }
 
-        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, FsSync::Yes);
+        writeSchema(dbDirFd.get(), schemaPath, nixSchemaVersion);
 
         // Downgrade to a read lock and hold to prevent other processes from
         // upgrading the schema while we're using the store
@@ -418,10 +469,11 @@ AutoCloseFD LocalStore::openGCLock()
     return openLockFile(fnGCLock, /*create=*/true);
 }
 
-void LocalStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
+void LocalStore::deleteStorePath(const OsFilename & name, uint64_t & bytesFreed, bool isKnownPath)
 {
+    auto path = config->realStoreDir.get() / name.path();
     try {
-        deletePath(path, bytesFreed);
+        deletePathAt(getRealStoreDirFd(), name, bytesFreed);
     } catch (SystemError & e) {
         if (config->ignoreGcDeleteFailure) {
             logWarning(
@@ -465,7 +517,11 @@ LocalStore::~LocalStore()
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
             fdTempRoots->close();
-            tryUnlink(fnTempRoots);
+            try {
+                unlinkAt(tempRootsDirFd.get(), tempRootsName);
+            } catch (SystemError &) {
+                /* Best effort. */
+            }
         }
     } catch (...) {
         ignoreExceptionInDestructor();
@@ -503,13 +559,16 @@ bool LocalStoreConfig::getReadOnly() const
 int LocalStore::getSchema()
 {
     int curSchema = 0;
-    if (pathExists(schemaPath)) {
-        auto s = readFile(schemaPath);
+    auto fdOrError = openFileReadonlyAt(dbDirFd.get(), OsFilename::fromPathAsserting(schemaPath.filename()));
+    if (fdOrError) {
+        auto & fd = fdOrError.value();
+        auto s = readFile(fd.get());
         auto n = string2Int<int>(s);
         if (!n)
             throw Error("%1% is corrupt", PathFmt(schemaPath));
         curSchema = *n;
-    }
+    } else if (NativeSysError::toErrorCode(fdOrError.error()) != std::errc::no_such_file_or_directory)
+        throw NativeSysError(fdOrError.error(), "opening file %s", PathFmt(schemaPath));
     return curSchema;
 }
 
@@ -1105,8 +1164,9 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 /* We'll restore to a temporary location accessible only to us first, confirm that
                    the narHash/narSize/ca match after restoration and only then move the path into
                    the expected location. */
-                auto [tempDir, tempDirFd] = createTempDirInStore();
-                AutoDelete delTempDir(tempDir);
+                auto [tempDirName, tempDirFd] = createTempDirInStore();
+                auto tempDir = config->realStoreDir.get() / tempDirName.path();
+                AutoDeleteAt delTempDir{getRealStoreDirFd(), tempDirName};
                 auto tempName = OsFilename::fromPathAsserting("x");
                 std::filesystem::path tempPath = tempDir / tempName.path();
 
@@ -1145,7 +1205,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 if (info.ca) {
                     auto & specified = *info.ca;
                     auto actualHash = ({
-                        SourcePath sourcePath = {makeFSSourceAccessor(tempPath)};
+                        SourcePath sourcePath = {makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath)};
                         Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
                         switch (fim) {
@@ -1180,13 +1240,15 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 /* Now that the content address / signed NAR contents is checked, we can move the path into place.
                    TODO: We should use atomic exchange (RENAME_EXCHANGE and renamex_np with RENAME_SWAP) if possible. */
 
+                auto name = OsFilename{info.path.filename()};
+
                 /* Delete the path for good measure even if not repairing. */
-                deletePath(realPath);
+                deletePathAt(getRealStoreDirFd(), name);
 
                 try {
-                    /* movePath and not renameFile because at this point the top-level directory is
+                    /* movePathAt and not a plain rename because at this point the top-level directory is
                        read-only. */
-                    movePath(tempPath, realPath);
+                    movePathAt(tempDirFd.get(), tempName, getRealStoreDirFd(), name);
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;
@@ -1195,9 +1257,10 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                        are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
                        Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
-                    auto copySink = RestoreSink::forPath(
-                        realPath, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get());
-                    copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink);
+                    RestoreSink copySink{
+                        getRealStoreDirFd(), name, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get()};
+                    copyRecursive(
+                        *makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath), CanonPath::root, copySink);
                 }
 
                 /* Clean up the staging directory. */
@@ -1206,11 +1269,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 autoGC();
 
-                optimisePath(realPath, repair); // FIXME: combine with hashPath()
+                optimisePath(info.path, repair); // FIXME: combine with hashPath()
 
                 if (config->getLocalSettings().fsyncStorePaths) {
-                    recursiveSync(realPath);
-                    syncParent(realPath);
+                    recursiveSyncAt(getRealStoreDirFd(), OsFilename{info.path.filename()});
+                    syncDescriptor(getRealStoreDirFd());
                 }
 
                 registerValidPath(info);
@@ -1296,7 +1359,8 @@ StorePath LocalStore::addToStoreFromDump(
             break;
     }
 
-    std::unique_ptr<AutoDelete> delTempDir;
+    std::unique_ptr<AutoDeleteAt> delTempDir;
+    const auto tempName = OsFilename::fromPathAsserting("x");
     std::filesystem::path tempPath;
     std::filesystem::path tempDir;
     AutoCloseFD tempDirFd;
@@ -1315,9 +1379,10 @@ StorePath LocalStore::addToStoreFromDump(
         StringSource dumpSource{dump};
         ChainSource bothSource{dumpSource, source};
 
-        std::tie(tempDir, tempDirFd) = createTempDirInStore();
-        delTempDir = std::make_unique<AutoDelete>(tempDir);
-        auto tempName = OsFilename::fromPathAsserting("x");
+        auto [tempDirName, newTempDirFd] = createTempDirInStore();
+        tempDir = config->realStoreDir.get() / tempDirName.path();
+        tempDirFd = std::move(newTempDirFd);
+        delTempDir = std::make_unique<AutoDeleteAt>(getRealStoreDirFd(), tempDirName);
         tempPath = tempDir / tempName.path();
 
         RestoreSink restoreSink{
@@ -1343,7 +1408,11 @@ StorePath LocalStore::addToStoreFromDump(
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
         methodsMatch ? dumpHash
-                     : hashPath(makeFSSourceAccessor(tempPath), hashMethod.getFileIngestionMethod(), hashAlgo).first,
+                     : hashPath(
+                           makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath),
+                           hashMethod.getFileIngestionMethod(),
+                           hashAlgo)
+                           .first,
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1366,7 +1435,7 @@ StorePath LocalStore::addToStoreFromDump(
         /* The path may have been created by another process in the meantime, so check again. */
         if (repair || !isValidPathUncached(dstPath)) {
 
-            deletePath(realPath);
+            deletePathAt(getRealStoreDirFd(), OsFilename{dstPath.filename()});
 
             autoGC();
 
@@ -1377,8 +1446,11 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive: {
-                    auto restoreSink =
-                        RestoreSink::forPath(realPath, localSettings.fsyncStorePaths, canonicalisingRestoreHooks.get());
+                    RestoreSink restoreSink{
+                        getRealStoreDirFd(),
+                        OsFilename{dstPath.filename()},
+                        localSettings.fsyncStorePaths,
+                        canonicalisingRestoreHooks.get()};
                     restorePath(restoreSink, dumpSource, (FileSerialisationMethod) fim);
                     break;
                 }
@@ -1390,9 +1462,9 @@ StorePath LocalStore::addToStoreFromDump(
             } else {
                 /* Move the temporary path we restored above. */
                 try {
-                    /* movePath and not renameFile because at this point the top-level directory is
+                    /* movePathAt and not a plain rename because at this point the top-level directory is
                        read-only. */
-                    movePath(tempPath, realPath);
+                    movePathAt(tempDirFd.get(), tempName, getRealStoreDirFd(), OsFilename{dstPath.filename()});
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;
@@ -1401,9 +1473,13 @@ StorePath LocalStore::addToStoreFromDump(
                        are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
                        Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
-                    auto copySink = RestoreSink::forPath(
-                        realPath, /*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get());
-                    copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink);
+                    RestoreSink copySink{
+                        getRealStoreDirFd(),
+                        OsFilename{dstPath.filename()},
+                        /*startFsync=*/false,
+                        /*hooks=*/canonicalisingRestoreHooks.get()};
+                    copyRecursive(
+                        *makeFSSourceAccessor(tempDirFd.get(), tempName, tempPath), CanonPath::root, copySink);
                     delTempDir->deletePath();
                 }
             }
@@ -1413,15 +1489,16 @@ StorePath LocalStore::addToStoreFromDump(
             HashResult narHash = {dumpHash, size};
             if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink{HashAlgorithm::SHA256};
-                dumpPath(realPath, narSink);
+                SourcePath{makeFSSourceAccessor(getRealStoreDirFd(), OsFilename{dstPath.filename()}, realPath)}
+                    .dumpPath(narSink);
                 narHash = narSink.finish();
             }
 
-            optimisePath(realPath, repair);
+            optimisePath(dstPath, repair);
 
             if (localSettings.fsyncStorePaths) {
-                recursiveSync(realPath);
-                syncParent(realPath);
+                recursiveSyncAt(getRealStoreDirFd(), OsFilename{dstPath.filename()});
+                syncDescriptor(getRealStoreDirFd());
             }
 
             auto info = ValidPathInfo::makeFromCA(*this, name, std::move(desc), narHash.hash);
@@ -1439,25 +1516,51 @@ StorePath LocalStore::addToStoreFromDump(
 
 /* Create a temporary directory in the store that won't be
    garbage-collected until the returned FD is closed. */
-std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
+std::pair<OsFilename, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    std::filesystem::path tmpDirFn;
-    AutoCloseFD tmpDirFd;
-    bool lockedByUs = false;
-    do {
-        /* There is a slight possibility that `tmpDir' gets deleted by
-           the GC between createTempDir() and when we acquire a lock on it.
-           We'll repeat until 'tmpDir' exists and we've locked it.
-           Make the directory accessible only to the current user. */
-        tmpDirFn = createTempDir(config->realStoreDir.get(), "tmp", /*mode=*/0700);
-        auto tmpDirFdOrError = openDirectory(tmpDirFn, FinalSymlink::DontFollow);
-        if (!tmpDirFdOrError) {
-            continue;
+    while (true) {
+        checkInterrupt();
+
+        /* There is a slight possibility that the directory gets deleted
+           by the GC between creating it and when we acquire a lock on
+           it. We'll repeat until it exists and we've locked it. Make the
+           directory accessible only to the current user. */
+        auto name = makeTempName("tmp");
+        auto fdOrError = createDirectoryAt(
+            getRealStoreDirFd(),
+            name
+#ifndef _WIN32
+            ,
+            0700
+#endif
+        );
+        if (!fdOrError) {
+            if (NativeSysError::toErrorCode(fdOrError.error()) == std::errc::file_exists)
+                continue;
+            throw NativeSysError(
+                fdOrError.error(), "creating directory %s", PathFmt(config->realStoreDir.get() / name.path()));
         }
-        tmpDirFd = std::move(tmpDirFdOrError).value();
-        lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
-    } while (!pathExists(tmpDirFn) || !lockedByUs);
-    return {tmpDirFn, std::move(tmpDirFd)};
+        auto fd = std::move(fdOrError).value();
+        if (!fd) {
+            /* Without following symlinks, like the garbage collector
+               when it locks these. */
+            auto openedOrError = openDirectoryAt(getRealStoreDirFd(), name);
+            if (!openedOrError)
+                continue;
+            fd = std::move(openedOrError).value();
+        }
+
+#ifdef __FreeBSD__
+        /* Explicitly set the group of the directory, like
+           `createTempDir` does, since on BSD directories inherit the
+           group of their parent. */
+        if (::fchown(fd.get(), (uid_t) -1, getegid()) != 0)
+            throw SysError("setting group of directory %1%", PathFmt(config->realStoreDir.get() / name.path()));
+#endif
+
+        if (lockFile(fd.get(), ltWrite, true) && maybeFstatat(getRealStoreDirFd(), name))
+            return {std::move(name), std::move(fd)};
+    }
 }
 
 void PathInUse::anchor() {}
@@ -1501,19 +1604,22 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         printInfo("checking link hashes...");
 
-        for (auto & link : DirectoryIterator{linksDir}) {
+        for (const auto & link : DirectoryIterator{valueOr(
+                 reopenDirectory(linksDirFd.get()),
+                 NIX_THROW_NATIVE_SYS_ERROR_HANDLER(
+                     "reopening directory %s", PathFmt(descriptorToPath(linksDirFd.get()))))}) {
             checkInterrupt();
-            auto name = link.path().filename();
+            auto name = link.name.mkPath();
+            auto linkPath = linksDir / name;
             printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
-            std::string hash =
-                hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
-                    .first.to_string(HashFormat::Nix32, false);
+            auto accessor = makeFSSourceAccessor(linksDirFd.get(), link.name, linkPath);
+            std::string hash = hashPath(accessor, FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
+                                   .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError(
-                    "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
+                printError("link %s was modified! expected hash %s, got '%s'", PathFmt(linkPath), name.string(), hash);
                 if (repair) {
-                    unlinkIfExists(link.path());
-                    printInfo("removed link %s", PathFmt(link.path()));
+                    unlinkAt(linksDirFd.get(), link.name);
+                    printInfo("removed link %s", PathFmt(linkPath));
                 } else {
                     errors = true;
                 }
@@ -1534,7 +1640,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 auto hashSink = HashSink(info->narHash.algo);
 
-                dumpPath(toRealPath(i), hashSink);
+                SourcePath{makeFSSourceAccessor(getRealStoreDirFd(), OsFilename{i.filename()}, toRealPath(i))}.dumpPath(
+                    hashSink);
                 auto current = hashSink.finish();
 
                 if (info->narHash != nullHash && info->narHash != current.hash) {
@@ -1596,10 +1703,12 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : DirectoryIterator{config->realStoreDir.get()}) {
+    for (const auto & i : DirectoryIterator{valueOr(
+             reopenDirectory(getRealStoreDirFd()),
+             NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening the store directory"))}) {
         checkInterrupt();
         try {
-            storePathsInStoreDir.insert({i.path().filename().string()});
+            storePathsInStoreDir.insert({os_string_to_string(i.name.native())});
         } catch (BadStorePath &) {
         }
     }
@@ -1761,20 +1870,30 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto baseName = drvPath.to_string();
 
-    auto logPath =
-        config->logDir.get() / drvsLogDir / baseName.substr(0, 2) / (std::string(baseName.substr(2)) + ".bz2");
+    auto dir = config->logDir.get() / drvsLogDir / baseName.substr(0, 2);
+    auto name = OsFilename::fromPathThrowing(std::string(baseName.substr(2)) + ".bz2");
 
-    if (pathExists(logPath))
+    createDirs(dir);
+    /* By path, following symlinks; only the log file in it is not
+       followed. */
+    auto dirFd = valueOr(openDirectory(dir), NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(dir)));
+
+    if (maybeFstatat(dirFd.get(), name))
         return;
 
-    createDirs(logPath.parent_path());
+    auto tmpName = OsFilename::fromPathThrowing(name.path().string() + ".tmp." + std::to_string(getpid()));
+    auto tmpFile = dir / tmpName.path();
 
-    auto tmpFile = logPath;
-    tmpFile += ".tmp." + std::to_string(getpid());
+    {
+        auto fd = valueOr(
+            openNewFileForWriteAt(dirFd.get(), tmpName, 0666, {.truncateExisting = true}),
+            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(tmpFile)));
+        writeFile(fd.get(), compress(CompressionAlgo::bzip2, log), FsSync::No, &tmpFile);
+        // Explicitly close to make sure exceptions are propagated.
+        fd.close();
+    }
 
-    writeFile(tmpFile, compress(CompressionAlgo::bzip2, log));
-
-    std::filesystem::rename(tmpFile, logPath);
+    movePathAt(dirFd.get(), tmpName, dirFd.get(), name);
 }
 
 std::optional<std::string> LocalStore::getVersion()

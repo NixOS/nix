@@ -7,6 +7,7 @@
 #include "nix/store/restricted-store.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/file-content-address.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/git.hh"
 #include "nix/util/processes.hh"
@@ -68,39 +69,40 @@ static void handleDiffHook(
     }
 }
 
-static void replaceValidPath(const std::filesystem::path & storePath, const std::filesystem::path & tmpPath)
+static void
+replaceValidPath(Descriptor storeDirFd, const OsFilename & name, Descriptor tmpDirFd, const OsFilename & tmpName)
 {
-    /* We can't atomically replace storePath (the original) with
-       tmpPath (the replacement), so we have to move it out of the
+    /* We can't atomically replace `name` (the original) with
+       `tmpName` (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
-    std::filesystem::path oldPath;
+    std::optional<OsFilename> oldName;
 
-    if (pathExists(storePath)) {
+    if (maybeFstatat(storeDirFd, name)) {
         // why do we loop here?
-        // although makeTempPath should be unique, we can't
+        // although makeTempName should be unique, we can't
         // guarantee that.
         do {
-            oldPath = makeTempPath(storePath, ".old");
+            oldName = makeTempName(name.path().string() + ".old");
             // store paths are often directories so we can't just unlink() it
             // let's make sure the path doesn't exist before we try to use it
-        } while (pathExists(oldPath));
-        movePath(storePath, oldPath);
+        } while (maybeFstatat(storeDirFd, *oldName));
+        movePathAt(storeDirFd, name, storeDirFd, *oldName);
     }
     try {
-        movePath(tmpPath, storePath);
+        movePathAt(tmpDirFd, tmpName, storeDirFd, name);
     } catch (...) {
         try {
             // attempt to recover
-            if (!oldPath.empty())
-                movePath(oldPath, storePath);
+            if (oldName)
+                movePathAt(storeDirFd, *oldName, storeDirFd, name);
         } catch (...) {
             ignoreExceptionExceptInterrupt();
         }
         throw;
     }
-    if (!oldPath.empty())
-        deletePath(oldPath);
+    if (oldName)
+        deletePathAt(storeDirFd, *oldName);
 }
 
 SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
@@ -172,7 +174,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             continue;
         }
 
-        auto optSt = maybeLstat(actualPath);
+        auto optSt = maybeFstatat(realStoreDirFdInHost(), OsFilename{scratchOutput->filename()});
         if (!optSt)
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
@@ -200,7 +202,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
            rewriting doesn't contain a hard link to /etc/shadow or
            something like that. */
         canonicalisePathMetaData(
-            actualPath,
+            realStoreDirFdInHost(),
+            OsFilename{scratchOutput->filename()},
             {
 #ifndef _WIN32
                 .uidRange = buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
@@ -221,7 +224,10 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 
             /* Pass blank Sink as we are not ready to hash data at this stage. */
             NullSink blank;
-            references = scanForReferences(blank, actualPath, referenceablePaths);
+            references = scanForReferences(
+                blank,
+                {makeFSSourceAccessor(realStoreDirFdInHost(), OsFilename{scratchOutput->filename()}, actualPath)},
+                referenceablePaths);
         }
 
         StringSet referencedOutputs;
@@ -280,13 +286,17 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
         auto actualPath = realPathInHost(*scratchPath);
+        /* `actualPath` again, as a directory handle and a name in it, for
+           `*At` operations. Kept in sync with `actualPath`. */
+        Descriptor actualDirFd = realStoreDirFdInHost();
+        auto actualName = OsFilename{scratchPath->filename()};
 
         /* An optional file descriptor of a directory used for intermediate
            operations. */
         AutoCloseFD tempDirFd;
         /* RAII cleanup of a temporary directory inside the store that is used
            for intermediate operations. */
-        AutoDelete delTempDir;
+        AutoDeleteAt delTempDir;
 
         auto finish = [&](StorePath finalStorePath) {
             /* Store the final path */
@@ -323,24 +333,25 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 /* FIXME: Is this actually streaming? */
                 auto source = sinkToSource([&](Sink & nextSink) {
                     RewritingSink rsink(rewrites, nextSink);
-                    dumpPath(actualPath, rsink);
+                    SourcePath{makeFSSourceAccessor(actualDirFd, actualName, actualPath)}.dumpPath(rsink);
                     rsink.flush();
                 });
                 /* Put the temporary copy in a directory inaccessible to the builder.
                    actualPath might point inside the build chroot, which is controlled
                    by the derivation builder. */
-                auto [rewriteTempDir, rewriteTempDirFd] = localStore.createTempDirInStore();
-                AutoDelete delRewriteTempDir(rewriteTempDir);
+                auto [rewriteTempDirName, rewriteTempDirFd] = localStore.createTempDirInStore();
+                AutoDeleteAt delRewriteTempDir{localStore.getRealStoreDirFd(), rewriteTempDirName};
                 auto tmpName = OsFilename::fromPathAsserting("x");
                 RestoreSink restoreSink{rewriteTempDirFd.get(), tmpName};
                 parseDump(restoreSink, *source);
-                deletePath(actualPath);
-                movePath(rewriteTempDir / tmpName.path(), actualPath);
+                deletePathAt(actualDirFd, actualName);
+                movePathAt(rewriteTempDirFd.get(), tmpName, actualDirFd, actualName);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
                 canonicalisePathMetaData(
-                    actualPath,
+                    actualDirFd,
+                    actualName,
                     {
 #ifndef _WIN32
                         // builder UIDs are already dealt with
@@ -403,11 +414,16 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                     MaskedHashSink caSink{outputHash.hashAlgo, oldHashPart};
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
-                        {makeFSSourceAccessor(actualPath), CanonPath::root}, caSink, (FileSerialisationMethod) fim);
+                        {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root},
+                        caSink,
+                        (FileSerialisationMethod) fim);
                     return caSink.finish().hash;
                 }
                 case FileIngestionMethod::Git: {
-                    return git::dumpHash(outputHash.hashAlgo, {makeFSSourceAccessor(actualPath), CanonPath::root}).hash;
+                    return git::dumpHash(
+                               outputHash.hashAlgo,
+                               {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root})
+                        .hash;
                 }
                 }
                 assert(false);
@@ -429,7 +445,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 
             {
                 HashResult narHashAndSize = hashPath(
-                    {makeFSSourceAccessor(actualPath), CanonPath::root},
+                    {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.hash;
@@ -441,21 +457,25 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         };
 
         auto moveOutputToTempDir = [&]() -> void {
-            std::filesystem::path tempDir;
-            std::tie(tempDir, tempDirFd) = localStore.createTempDirInStore();
-            delTempDir = AutoDelete(tempDir);
+            auto [tempDirName, newTempDirFd] = localStore.createTempDirInStore();
+            auto tempDir = localStore.config->realStoreDir.get() / tempDirName.path();
+            tempDirFd = std::move(newTempDirFd);
+            delTempDir = AutoDeleteAt{localStore.getRealStoreDirFd(), tempDirName};
 
-            auto tmpOutput = tempDir / "x";
+            auto tmpName = OsFilename::fromPathAsserting("x");
+            auto tmpOutput = tempDir / tmpName.path();
 
             /* Copy files to break stale file descriptors. copyRecursive below will use
                reflinking to optimise the copying overhead. */
-            auto pathAccessor = makeFSSourceAccessor(actualPath);
-            auto restoreSink = RestoreSink::forPath(tmpOutput, store->getLocalSettings().fsyncStorePaths);
+            auto pathAccessor = makeFSSourceAccessor(actualDirFd, actualName, actualPath);
+            RestoreSink restoreSink{tempDirFd.get(), tmpName, store->getLocalSettings().fsyncStorePaths};
             copyRecursive(*pathAccessor, CanonPath::root, restoreSink);
             /* This makes it slightly harder to make sense of the control flow. The rule
                of thumb is that actualPath points to the current location of the stuff
                that we'll end up registering. */
             actualPath = std::move(tmpOutput);
+            actualDirFd = tempDirFd.get();
+            actualName = std::move(tmpName);
         };
 
         ValidPathInfo newInfo = std::visit(
@@ -471,7 +491,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                             std::string{scratchPath->hashPart()}, std::string{requiredFinalPath.hashPart()});
                     rewriteOutput(outputRewrites);
                     HashResult narHashAndSize = hashPath(
-                        {makeFSSourceAccessor(actualPath), CanonPath::root},
+                        {makeFSSourceAccessor(actualDirFd, actualName, actualPath), CanonPath::root},
                         FileSerialisationMethod::NixArchive,
                         HashAlgorithm::SHA256);
                     ValidPathInfo newInfo0{requiredFinalPath, {*store, narHashAndSize.hash}};
@@ -516,7 +536,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
         canonicalisePathMetaData(
-            actualPath,
+            actualDirFd,
+            actualName,
             {
 #ifndef _WIN32
                 // builder UIDs are already dealt with
@@ -550,7 +571,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                     "failed to lock correct output path of %s, namely %s, not moving output",
                     store->printStorePath(drvPath),
                     PathFmt(store->toRealPath(newInfo.path)));
-                deletePath(actualPath);
+                deletePathAt(actualDirFd, actualName);
                 /* Trigger the hash-mismatch error. */
                 checkCAOutput(*store, drvPath, *output, newInfo, outputName);
                 unreachable();
@@ -561,7 +582,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
         if (store->toRealPath(newInfo.path) != actualPath) {
             if (buildMode == bmRepair) {
                 /* Path already exists, need to replace it */
-                replaceValidPath(store->toRealPath(newInfo.path), actualPath);
+                replaceValidPath(
+                    store->getRealStoreDirFd(), OsFilename{newInfo.path.filename()}, actualDirFd, actualName);
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
@@ -570,11 +592,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                    else. No moving needed. */
                 assert(newInfo.ca);
                 /* Can delete our scratch copy now. */
-                deletePath(actualPath);
+                deletePathAt(actualDirFd, actualName);
             } else {
-                auto destPath = store->toRealPath(newInfo.path);
-                deletePath(destPath);
-                movePath(actualPath, destPath);
+                auto destName = OsFilename{newInfo.path.filename()};
+                deletePathAt(store->getRealStoreDirFd(), destName);
+                movePathAt(actualDirFd, actualName, store->getRealStoreDirFd(), destName);
             }
         }
 
@@ -588,8 +610,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                     if (diffHook || settings.keepFailed) {
                         auto dst = store->toRealPath(newInfo.path);
                         dst += ".check";
-                        deletePath(dst);
-                        movePath(actualPath, dst);
+                        auto dstName = OsFilename::fromPathAsserting(std::string(newInfo.path.to_string()) + ".check");
+                        deletePathAt(store->getRealStoreDirFd(), dstName);
+                        movePathAt(actualDirFd, actualName, store->getRealStoreDirFd(), dstName);
 
                         if (diffHook) {
                             handleDiffHook(
@@ -635,8 +658,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
             }
 
             if (!localStore.isValidPath(newInfo.path))
-                localStore.optimisePath(
-                    store->toRealPath(newInfo.path), NoRepair); // FIXME: combine with scanForReferences()
+                localStore.optimisePath(newInfo.path, NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
@@ -785,6 +807,11 @@ struct LocalBuildingStore : BuildingStore
     std::filesystem::path getRealStoreDir() const override
     {
         return localStore.config->realStoreDir.get();
+    }
+
+    Descriptor getRealStoreDirFd() const override
+    {
+        return localStore.getRealStoreDirFd();
     }
 
     std::filesystem::path getBuildDir() const override

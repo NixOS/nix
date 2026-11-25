@@ -1,11 +1,16 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/tests/result.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 #include <rapidcheck/gtest.h>
 
+#include <map>
 #include <ranges>
 
 #ifdef _WIN32
@@ -260,54 +265,83 @@ TEST(pathExists, bogusPathDoesNotExist)
 }
 
 /* ----------------------------------------------------------------------------
- * chmodIfNeeded
- * --------------------------------------------------------------------------*/
-
-TEST(chmodIfNeeded, works)
-{
-#ifdef _WIN32
-    // Windows doesn't support Unix-style permission bits - lstat always
-    // returns the same mode regardless of what chmod sets.
-    GTEST_SKIP() << "chmod on Windows not expected to work";
-#endif
-    auto [autoClose_, tmpFile] = nix::createTempFile();
-    auto deleteTmpFile = AutoDelete(tmpFile);
-
-    auto modes = std::vector<mode_t>{0755, 0644, 0422, 0600, 0777};
-    for (mode_t oldMode : modes) {
-        for (mode_t newMode : modes) {
-            chmod(tmpFile.c_str(), oldMode);
-            bool permissionsChanged = false;
-            ASSERT_NO_THROW(permissionsChanged = chmodIfNeeded(tmpFile, newMode));
-            ASSERT_EQ(permissionsChanged, oldMode != newMode);
-        }
-    }
-}
-
-TEST(chmodIfNeeded, nonexistent)
-{
-    ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SystemError);
-}
-
-/* ----------------------------------------------------------------------------
  * DirectoryIterator
  * --------------------------------------------------------------------------*/
 
-TEST(DirectoryIterator, works)
+class DirectoryIteratorTest : public ::testing::Test
 {
-    auto tmpDir = nix::createTempDir();
-    nix::AutoDelete delTmpDir(tmpDir, true);
+protected:
+    std::filesystem::path tmpDir;
+    std::unique_ptr<nix::AutoDelete> delTmpDir;
 
+    void SetUp() override
+    {
+        tmpDir = nix::createTempDir();
+        delTmpDir = std::make_unique<nix::AutoDelete>(tmpDir, true);
+    }
+
+    void TearDown() override
+    {
+        delTmpDir.reset();
+    }
+};
+
+TEST_F(DirectoryIteratorTest, works)
+{
     nix::writeFile(tmpDir / "somefile", "");
 
-    for (auto path : DirectoryIterator(tmpDir)) {
-        ASSERT_EQ(path.path(), tmpDir / "somefile");
+    for (const auto & entry : openDirectoryIterator(tmpDir)) {
+        ASSERT_EQ(entry.name.mkPath(), "somefile");
     }
 }
 
-TEST(DirectoryIterator, nonexistent)
+TEST_F(DirectoryIteratorTest, namesAndTypes)
 {
-    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
+    nix::writeFile(tmpDir / "file", "");
+    nix::createDirs(tmpDir / "dir");
+
+    std::map<std::filesystem::path, std::filesystem::file_type> entries;
+    for (const auto & entry : openDirectoryIterator(tmpDir))
+        entries.emplace(entry.name.mkPath(), entry.type);
+
+    /* No `.` or `..`. */
+    ASSERT_EQ(entries.size(), 2);
+    /* `none` means the directory read didn't say, which is allowed. */
+    auto typeIs = [&](const std::filesystem::path & name, std::filesystem::file_type type) {
+        auto t = entries.at(name);
+        return t == type || t == std::filesystem::file_type::none;
+    };
+    ASSERT_TRUE(typeIs("file", std::filesystem::file_type::regular));
+    ASSERT_TRUE(typeIs("dir", std::filesystem::file_type::directory));
+}
+
+TEST_F(DirectoryIteratorTest, fromDescriptor)
+{
+    nix::writeFile(tmpDir / "somefile", "");
+
+    auto fd = testing::valueOrFail(openDirectory(tmpDir, FinalSymlink::Follow));
+    std::vector<std::filesystem::path> names;
+    for (const auto & entry : DirectoryIterator(std::move(fd)))
+        names.push_back(entry.name.mkPath());
+    ASSERT_EQ(names, std::vector<std::filesystem::path>{"somefile"});
+}
+
+TEST_F(DirectoryIteratorTest, empty)
+{
+    ASSERT_TRUE(openDirectoryIterator(tmpDir) == std::default_sentinel);
+}
+
+TEST_F(DirectoryIteratorTest, nonexistent)
+{
+    ASSERT_THROW(openDirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
+}
+
+TEST_F(DirectoryIteratorTest, notADirectory)
+{
+    nix::writeFile(tmpDir / "file", "");
+
+    ASSERT_THAT(
+        [&] { openDirectoryIterator(tmpDir / "file"); }, testing::ThrowsSystemError(std::errc::not_a_directory));
 }
 
 /* ----------------------------------------------------------------------------
@@ -349,93 +383,5 @@ TEST(createTempDir, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
     ASSERT_TRUE(std::filesystem::is_directory(tmpDir));
 }
-
-/* ----------------------------------------------------------------------------
- * movePath
- * --------------------------------------------------------------------------*/
-
-class MovePathTest : public ::testing::Test
-{
-protected:
-    std::filesystem::path tmpDir;
-    nix::AutoDelete delTmpDir;
-
-private:
-    void SetUp() override
-    {
-        tmpDir = createTempDir();
-        delTmpDir = {tmpDir, /*recursive=*/true};
-    }
-
-    void TearDown() override
-    {
-        delTmpDir.deletePath();
-    }
-};
-
-TEST_F(MovePathTest, works)
-{
-    auto regSrc = tmpDir / OS_STR("reg1");
-    auto regAnother = tmpDir / OS_STR("reg2");
-    writeFile(regSrc, "hello1");
-    writeFile(regAnother, "hello2");
-    // Overwrite existing.
-    movePath(regAnother, regSrc);
-
-    auto dirSrc = tmpDir / OS_STR("dir");
-    createDir(dirSrc);
-    writeFile(dirSrc / OS_STR("reg"), "hello3");
-    auto dst = tmpDir / OS_STR("renamed");
-    movePath(regSrc, dst);
-    ASSERT_FALSE(pathExists(regSrc));
-    ASSERT_EQ(readFile(dst), "hello2");
-
-    // Non-empty directory can't replace a regular file.
-    unlink(dst);
-    movePath(dirSrc, dst);
-    auto files = std::ranges::to<std::vector<std::filesystem::path>>(DirectoryIterator{dst});
-    ASSERT_EQ(files, std::vector{dst / OS_STR("reg")});
-}
-
-#ifndef _WIN32
-
-TEST_F(MovePathTest, nonWritableDirectories)
-{
-    // Non-writable source directory.
-    auto srcDir = tmpDir / "src";
-    auto dstDir = tmpDir / "dst";
-    createDir(srcDir, 0500);
-    movePath(srcDir, dstDir);
-    ASSERT_FALSE(pathExists(srcDir));
-    ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0500);
-
-    ASSERT_THROW(movePath(dstDir, tmpDir / "nonexistent" / "dir"), SysError);
-    // Permissions are restored on rename errors.
-    ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0500);
-}
-
-TEST_F(MovePathTest, symlinkReplacesSymlink)
-{
-    auto srcLink = tmpDir / "link";
-    auto dstLink = tmpDir / "dst";
-    createSymlink("dangling", srcLink);
-    createSymlink("other", dstLink);
-
-    movePath(srcLink, dstLink);
-    ASSERT_EQ(readLink(dstLink), "dangling");
-}
-
-TEST_F(MovePathTest, symlinkReplacesRegular)
-{
-    auto srcLink = tmpDir / "link";
-    auto dst = tmpDir / "dst";
-    createSymlink("hello", srcLink);
-    writeFile(dst, "test");
-
-    movePath(srcLink, dst);
-    ASSERT_EQ(readLink(dst), "hello");
-}
-
-#endif
 
 } // namespace nix

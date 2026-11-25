@@ -6,7 +6,12 @@
 #include "nix/util/util.hh"
 #include "nix/util/system-error.hh"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstring>
 #include <span>
+#include <tuple>
+#include <vector>
 
 #include <fileapi.h>
 #define WIN32_LEAN_AND_MEAN
@@ -266,6 +271,24 @@ bool isReparsePoint(HANDLE handle)
     return (basicInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
 }
 
+/**
+ * Convert Unix time_t to Windows FILETIME.
+ *
+ * FILETIME epoch is January 1, 1601 00:00:00 UTC.
+ * Unix epoch is January 1, 1970 00:00:00 UTC.
+ * Difference is 11644473600 seconds.
+ * FILETIME is in 100-nanosecond intervals.
+ */
+FILETIME timeToFileTime(time_t t)
+{
+    constexpr uint64_t EPOCH_DIFF = 11644473600ULL;
+    uint64_t intervals = (static_cast<uint64_t>(t) + EPOCH_DIFF) * 10000000ULL;
+    FILETIME ft;
+    ft.dwLowDateTime = static_cast<DWORD>(intervals);
+    ft.dwHighDateTime = static_cast<DWORD>(intervals >> 32);
+    return ft;
+}
+
 } // anonymous namespace
 
 } // namespace windows
@@ -433,6 +456,24 @@ PosixStat fstatat(Descriptor dirFd, const OsCanonPath & path)
     return fstat(handle.get());
 }
 
+void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTime, time_t modificationTime)
+{
+    using namespace nix::windows;
+
+    assert(!path.empty());
+
+    /* Open the file with write attributes permission, not following symlinks */
+    AutoCloseFD handle(ntOpenAt(
+        dirFd, path.c_str(), FILE_WRITE_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT /* Don't follow symlinks */
+        ));
+
+    FILETIME atime = timeToFileTime(accessedTime);
+    FILETIME mtime = timeToFileTime(modificationTime);
+
+    if (!SetFileTime(handle.get(), nullptr /* creation time */, &atime, &mtime))
+        throw WinError("changing modification time of %s", PathFmt(path.path()));
+}
+
 std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const OsCanonPath & path)
 {
     using namespace nix::windows;
@@ -560,6 +601,208 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
         throw SymlinkNotAllowed(path);
 
     return outcome::success(std::move(finalResult.value()));
+}
+
+/**
+ * Delete @p name in the directory @p parentFd, like `deletePathAt`,
+ * or, if not @p recursive, like `unlinkAt`. @p path is only used for
+ * messages.
+ */
+static void deletePathIn(
+    Descriptor parentFd,
+    const OsFilename & name,
+    const std::filesystem::path & path,
+    uint64_t & bytesFreed,
+    bool recursive = true)
+{
+    using namespace nix::windows;
+
+    checkInterrupt();
+
+    /* `DELETE` to delete it, and `FILE_WRITE_ATTRIBUTES` to make it
+       deletable if it is read-only. Not following symlinks, so that
+       they are deleted themselves. */
+    auto result = maybeNtOpenAt(
+        parentFd,
+        name.path().native(),
+        DELETE | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | SYNCHRONIZE,
+        FILE_OPEN_REPARSE_POINT);
+    if (!result) {
+        auto lastError = RtlNtStatusToDosError(result.error());
+        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+            return;
+        throw WinError(lastError, "opening %s for deletion", PathFmt(path));
+    }
+    auto handle = std::move(result.value());
+
+    FILE_BASIC_INFO basicInfo;
+    if (!GetFileInformationByHandleEx(handle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
+        throw WinError("getting attributes of %s", PathFmt(path));
+
+    if ((basicInfo.FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        && !(basicInfo.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+        /* Like `DeleteFileW` does for a directory. */
+        if (!recursive)
+            throw WinError(DWORD{ERROR_ACCESS_DENIED}, "deleting directory %s", PathFmt(path));
+        for (const auto & entry : DirectoryIterator{valueOr(
+                 reopenDirectory(handle.get()),
+                 NIX_THROW_NATIVE_SYS_ERROR_HANDLER("reopening directory %s", PathFmt(path)))})
+            deletePathIn(handle.get(), entry.name, path / entry.name.mkPath(), bytesFreed);
+    } else {
+        /* Like on Unix, assume that a file with two links was
+           optimised, so that deleting it frees space too. */
+        auto st = fstat(handle.get());
+        if (st.st_nlink <= 2)
+            bytesFreed += st.st_size;
+    }
+
+    /* Deleting fails on read-only files, so clear that first. Zero
+       means "unchanged" to `SetFileInformationByHandle`, hence
+       `FILE_ATTRIBUTE_NORMAL` when no other attribute is left. */
+    if (basicInfo.FileAttributes & FILE_ATTRIBUTE_READONLY) {
+        basicInfo.FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
+        if (!basicInfo.FileAttributes)
+            basicInfo.FileAttributes = FILE_ATTRIBUTE_NORMAL;
+        if (!SetFileInformationByHandle(handle.get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
+            throw WinError("making %s writable for deletion", PathFmt(path));
+    }
+
+    /* Deleted once `handle` is closed. */
+    FILE_DISPOSITION_INFO dispositionInfo{.DeleteFile = TRUE};
+    if (!SetFileInformationByHandle(handle.get(), FileDispositionInfo, &dispositionInfo, sizeof(dispositionInfo)))
+        throw WinError("deleting %s", PathFmt(path));
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path, uint64_t & bytesFreed)
+{
+    using namespace nix::windows;
+
+    assert(!path.empty());
+
+    bytesFreed = 0;
+
+    Descriptor parentFd = dirFd;
+    AutoCloseFD parentFdOwned;
+    if (auto parent = path.parent(); !parent->empty()) {
+        auto parentFdOrError = openFileEnsureBeneathNoSymlinks(
+            dirFd,
+            *parent,
+            FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            FILE_DIRECTORY_FILE);
+        if (!parentFdOrError) {
+            auto lastError = parentFdOrError.error();
+            if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+                return;
+            throw WinError(lastError, "opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path()));
+        }
+        parentFdOwned = std::move(parentFdOrError).value();
+        parentFd = parentFdOwned.get();
+    }
+
+    auto lastIt = std::ranges::prev(path.end());
+    deletePathIn(parentFd, *lastIt, descriptorToPath(dirFd) / path.path(), bytesFreed);
+}
+
+void deletePathAt(Descriptor dirFd, const OsCanonPath & path)
+{
+    uint64_t dummy;
+    deletePathAt(dirFd, path, dummy);
+}
+
+void unlinkAt(Descriptor dirFd, const OsFilename & name)
+{
+    uint64_t dummy;
+    deletePathIn(dirFd, name, descriptorToPath(dirFd) / name.path(), dummy, /*recursive=*/false);
+}
+
+/**
+ * Open the parent directory of @p path beneath @p dirFd, without
+ * following symlinks, for `*At` functions that operate on the final
+ * component of @p path.
+ *
+ * @return The parent directory, owned if it had to be opened, and the
+ * final component of @p path.
+ */
+static std::tuple<AutoCloseFD, Descriptor, OsFilename> openParentBeneath(Descriptor dirFd, const OsCanonPath & path)
+{
+    using namespace nix::windows;
+
+    assert(!path.empty());
+    auto lastIt = std::ranges::prev(path.end());
+    OsFilename name = *lastIt;
+    auto parent = path.parent();
+    if (parent->empty())
+        return {AutoCloseFD{}, dirFd, std::move(name)};
+    auto parentFd = valueOr(
+        openFileEnsureBeneathNoSymlinks(
+            dirFd,
+            *parent,
+            FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            FILE_DIRECTORY_FILE),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %s", PathFmt(descriptorToPath(dirFd) / parent->path())));
+    auto fd = parentFd.get();
+    return {std::move(parentFd), fd, std::move(name)};
+}
+
+void movePathAt(Descriptor srcDirFd, const OsCanonPath & src, Descriptor dstDirFd, const OsCanonPath & dst)
+{
+    using namespace nix::windows;
+
+    auto [srcParentOwned, srcParent, srcName] = openParentBeneath(srcDirFd, src);
+    auto [dstParentOwned, dstParent, dstName] = openParentBeneath(dstDirFd, dst);
+
+    /* Not following symlinks, so that they are moved themselves. */
+    auto handle = ntOpenAt(srcParent, srcName.path().native(), DELETE | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+
+    /* TODO: FileRenameInformationEx with FILE_RENAME_POSIX_SEMANTICS? */
+
+    /* `FILE_RENAME_INFO` ends in the variable-length new name, which is
+       relative to `RootDirectory`. */
+    const auto & newName = dstName.path().native();
+    auto nameBytes = newName.size() * sizeof(wchar_t);
+    std::vector<std::byte> buf(std::max(sizeof(FILE_RENAME_INFO), offsetof(FILE_RENAME_INFO, FileName) + nameBytes));
+    auto * info = reinterpret_cast<FILE_RENAME_INFO *>(buf.data());
+    info->ReplaceIfExists = TRUE;
+    info->RootDirectory = dstParent;
+    info->FileNameLength = static_cast<DWORD>(nameBytes);
+    std::memcpy(info->FileName, newName.data(), nameBytes);
+
+    if (!SetFileInformationByHandle(handle.get(), FileRenameInfo, info, static_cast<DWORD>(buf.size())))
+        throw WinError(
+            "renaming %1% to %2%",
+            PathFmt(descriptorToPath(srcDirFd) / src.path()),
+            PathFmt(descriptorToPath(dstDirFd) / dst.path()));
+}
+
+void createHardLinkAt(Descriptor srcDirFd, const OsFilename & src, Descriptor dstDirFd, const OsFilename & dst)
+{
+    using namespace nix::windows;
+
+    /* Not following symlinks, so that a symlink is linked itself.
+       `FILE_WRITE_ATTRIBUTES`, as `CreateHardLinkW` uses too. */
+    auto handle = ntOpenAt(srcDirFd, src.path().native(), FILE_WRITE_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+
+    /* `FILE_LINK_INFORMATION` ends in the variable-length new name,
+       which is relative to `RootDirectory`. */
+    const auto & newName = dst.path().native();
+    auto nameBytes = newName.size() * sizeof(wchar_t);
+    std::vector<std::byte> buf(
+        std::max(sizeof(FILE_LINK_INFORMATION), offsetof(FILE_LINK_INFORMATION, FileName) + nameBytes));
+    auto * info = reinterpret_cast<FILE_LINK_INFORMATION *>(buf.data());
+    info->ReplaceIfExists = FALSE;
+    info->RootDirectory = dstDirFd;
+    info->FileNameLength = static_cast<ULONG>(nameBytes);
+    std::memcpy(info->FileName, newName.data(), nameBytes);
+
+    IO_STATUS_BLOCK ioStatus;
+    NTSTATUS status =
+        NtSetInformationFile(handle.get(), &ioStatus, info, static_cast<ULONG>(buf.size()), FileLinkInformation);
+    if (status != 0)
+        throw WinError(
+            RtlNtStatusToDosError(status),
+            "creating hard link %1% to %2%",
+            PathFmt(descriptorToPath(dstDirFd) / dst.path()),
+            PathFmt(descriptorToPath(srcDirFd) / src.path()));
 }
 
 } // namespace nix

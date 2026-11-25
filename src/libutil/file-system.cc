@@ -14,7 +14,6 @@
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
-#include <deque>
 #include <filesystem>
 
 #include <fcntl.h>
@@ -36,34 +35,11 @@
 
 namespace nix {
 
-DirectoryIterator::DirectoryIterator(const std::filesystem::path & p)
+DirectoryIterator openDirectoryIterator(const std::filesystem::path & path)
 {
-    try {
-        // **Attempt to create the underlying directory_iterator**
-        it_ = std::filesystem::directory_iterator(p);
-    } catch (const std::filesystem::filesystem_error & e) {
-        // **Catch filesystem_error and throw SystemError**
-        // Adapt the error message as needed for SystemError
-        throw SystemError(e.code(), "cannot read directory %s", PathFmt(p));
-    }
-}
-
-DirectoryIterator & DirectoryIterator::operator++()
-{
-    // **Attempt to increment the underlying iterator**
-    std::error_code ec;
-    it_.increment(ec);
-    if (ec) {
-        // Try to get path info if possible, might fail if iterator is bad
-        try {
-            if (it_ != std::filesystem::directory_iterator{}) {
-                throw SysError("cannot read directory past %s: %s", PathFmt(it_->path()), ec.message());
-            }
-        } catch (...) {
-            throw SysError("cannot read directory");
-        }
-    }
-    return *this;
+    return DirectoryIterator{valueOr(
+        openDirectory(path, FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("cannot read directory %s", PathFmt(path)))};
 }
 
 std::filesystem::path
@@ -203,18 +179,6 @@ bool pathExists(const std::filesystem::path & path)
     return maybeLstat(path).has_value();
 }
 
-bool pathAccessible(const std::filesystem::path & path)
-{
-    try {
-        return pathExists(path);
-    } catch (SystemError & e) {
-        // swallow EPERM
-        if (e.is(std::errc::operation_not_permitted))
-            return false;
-        throw;
-    }
-}
-
 std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
@@ -296,6 +260,19 @@ void writeFile(Descriptor fd, std::string_view s, FsSync sync, const std::filesy
     }
 }
 
+/**
+ * Flush a path's parent directory to disk.
+ */
+static void syncParent(const std::filesystem::path & path)
+{
+    assert(path.has_parent_path());
+    auto fd = valueOr(
+        openDirectory(path.parent_path(), FinalSymlink::Follow),
+        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
+    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
+    fd.fsync();
+}
+
 void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
     auto fd = valueOr(
@@ -335,61 +312,6 @@ void writeFile(Descriptor fd, Source & source, FsSync sync, const std::filesyste
     }
     if (sync == FsSync::Yes)
         syncDescriptor(fd);
-}
-
-void syncParent(const std::filesystem::path & path)
-{
-    assert(path.has_parent_path());
-    auto fd = valueOr(
-        openDirectory(path.parent_path(), FinalSymlink::Follow),
-        NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
-    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
-    fd.fsync();
-}
-
-void recursiveSync(const std::filesystem::path & path)
-{
-    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
-    /* If it's a file or symlink, just fsync and return. */
-    auto st = lstat(path);
-    if (S_ISREG(st.st_mode)) {
-        auto fd = valueOr(
-            openFileReadonly(path, FinalSymlink::DontFollow),
-            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %s", PathFmt(path)));
-        fd.fsync();
-        return;
-    } else if (S_ISLNK(st.st_mode))
-        return;
-
-    /* Otherwise, perform a depth-first traversal of the directory and
-       fsync all the files. */
-    std::deque<std::filesystem::path> dirsToEnumerate;
-    dirsToEnumerate.push_back(path);
-    std::vector<std::filesystem::path> dirsToFsync;
-    while (!dirsToEnumerate.empty()) {
-        auto currentDir = dirsToEnumerate.back();
-        dirsToEnumerate.pop_back();
-        for (auto & entry : DirectoryIterator(currentDir)) {
-            auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
-                dirsToEnumerate.emplace_back(entry.path());
-            } else if (std::filesystem::is_regular_file(st)) {
-                auto fd = valueOr(
-                    openFileReadonly(entry.path(), FinalSymlink::DontFollow),
-                    NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening file %1%", PathFmt(entry.path())));
-                fd.fsync();
-            }
-        }
-        dirsToFsync.emplace_back(std::move(currentDir));
-    }
-
-    /* Fsync all the directories. */
-    for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        auto fd = valueOr(
-            openDirectory(*dir, FinalSymlink::DontFollow),
-            NIX_THROW_NATIVE_SYS_ERROR_HANDLER("opening directory %1%", PathFmt(*dir)));
-        fd.fsync();
-    }
 }
 
 void createDirs(const std::filesystem::path & path)
@@ -443,9 +365,10 @@ void AutoDelete::cancel() noexcept
 
 std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const std::string & prefix, mode_t mode)
 {
+    auto root = canonPath(tmpRoot.empty() ? defaultTempDir() : tmpRoot, true);
     while (1) {
         checkInterrupt();
-        std::filesystem::path tmpDir = makeTempPath(tmpRoot, prefix);
+        auto tmpDir = root / makeTempName(prefix).path();
         if (mkdir(
                 tmpDir.string().c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -478,7 +401,7 @@ AutoCloseFD createAnonymousTempFile()
     AutoCloseFD fd;
 
 #ifdef _WIN32
-    auto path = makeTempPath(defaultTempDir(), "nix-anonymous");
+    auto path = canonPath(defaultTempDir(), true) / makeTempName("nix-anonymous").path();
     fd = CreateFileW(
         path.c_str(),
         GENERIC_READ | GENERIC_WRITE,
@@ -536,13 +459,16 @@ std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesyst
     return createTempFile(defaultTempDir(), prefix);
 }
 
-std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)
+static uint32_t nextTempCounter()
 {
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic<uint32_t> counter(std::random_device{}());
-    assert(!std::filesystem::path(suffix).is_absolute());
-    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
-    return tmpRoot / fmt("%s-%s-%s", suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
+    return counter.fetch_add(1, std::memory_order_relaxed);
+}
+
+OsFilename makeTempName(std::string_view prefix)
+{
+    return OsFilename::fromPathThrowing(fmt("%s-%s-%s", prefix, getpid(), nextTempCounter()));
 }
 
 void createSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
@@ -587,36 +513,6 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
     }
 }
 
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
-{
-    setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
-}
-
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool contents)
-{
-    auto fromStatus = std::filesystem::symlink_status(from);
-
-    if (std::filesystem::is_symlink(fromStatus) || std::filesystem::is_regular_file(fromStatus)) {
-        if (contents) {
-            std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
-        } else {
-            std::filesystem::copy(
-                from,
-                to,
-                std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
-        }
-    } else if (std::filesystem::is_directory(fromStatus)) {
-        std::filesystem::create_directory(to);
-        for (auto & entry : DirectoryIterator(from)) {
-            copyFile(entry, to / entry.path().filename(), /*contents=*/false);
-        }
-    } else {
-        throw Error("file %s has an unsupported type", PathFmt(from));
-    }
-
-    setWriteTime(to, lstat(from));
-}
-
 //////////////////////////////////////////////////////////////////////
 
 bool isExecutableFileAmbient(const std::filesystem::path & exe)
@@ -655,36 +551,11 @@ void chmod(const std::filesystem::path & path, mode_t mode)
 #  define UNLINK_PROC ::unlink
 #endif
 
-void unlinkIfExists(const std::filesystem::path & path)
-{
-    if (UNLINK_PROC(path.c_str()) == -1) {
-        if (errno != ENOENT)
-            throw SysError("removing %s", PathFmt(path));
-    }
-}
-
-void unlink(const std::filesystem::path & path)
-{
-    if (UNLINK_PROC(path.c_str()) == -1)
-        throw SysError("removing %s", PathFmt(path));
-}
-
 void tryUnlink(const std::filesystem::path & path)
 {
     UNLINK_PROC(path.c_str());
 }
 
 #undef UNLINK_PROC
-
-bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask)
-{
-    auto prevMode = lstat(path).st_mode;
-
-    if (((prevMode ^ mode) & mask) == 0)
-        return false;
-
-    chmod(path, mode);
-    return true;
-}
 
 } // namespace nix

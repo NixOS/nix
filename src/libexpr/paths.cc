@@ -14,12 +14,14 @@ SourcePath EvalState::rootPath(std::string_view path)
 {
     /* FIXME: Move this out of EvalState, since it's using native
        std::filesystem::path and current working directory. */
-    return {rootFS, CanonPath(absPath(path).string())};
+    return {rootFS, CanonPath::viaLexical(absPath(path).string())};
 }
 
-SourcePath EvalState::storePath(const StorePath & path)
+SourcePath EvalState::storePath(const StorePath & path) const
 {
-    return {rootFS, CanonPath{store->printStorePath(path)}};
+    /* `storeDir` has no `..`, and a store path base name is never
+       `..`. */
+    return {rootFS, CanonPath::fromAsserting(UnresolvedPath(store->printStorePath(path)))};
 }
 
 void EvalState::ensureLazyPathCopied(const StorePath & path)
@@ -27,7 +29,7 @@ void EvalState::ensureLazyPathCopied(const StorePath & path)
     if (settings.isReadOnly())
         return;
 
-    auto mount = storeFS->getMount(CanonPath(store->printStorePath(path)));
+    auto mount = storeFS->getMount(storePath(path).path);
     if (!mount)
         return;
 
@@ -74,7 +76,7 @@ EvalState::mountInput(fetchers::Input & input, const fetchers::Input & originalI
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
-    storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
+    storeFS->mount(this->storePath(storePath).path, accessor);
 
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 

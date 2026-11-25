@@ -286,6 +286,24 @@ Result<AutoCloseFD, NativeError> openFileEnsureBeneathNoSymlinks(
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode, std::move(dirFdCallback));
 }
 
+void createHardLinkAt(Descriptor srcDirFd, const OsFilename & src, Descriptor dstDirFd, const OsFilename & dst)
+{
+    /* Without `AT_SYMLINK_FOLLOW`, so that a symlink is linked itself. */
+    if (::linkat(srcDirFd, src.path().c_str(), dstDirFd, dst.path().c_str(), 0) == -1)
+        throw SysError([&] {
+            return HintFmt(
+                "creating hard link %1% to %2%",
+                PathFmt(descriptorToPath(dstDirFd) / dst.path()),
+                PathFmt(descriptorToPath(srcDirFd) / src.path()));
+        });
+}
+
+void unlinkAt(Descriptor dirFd, const OsFilename & name)
+{
+    if (::unlinkat(dirFd, name.path().c_str(), 0) == -1 && errno != ENOENT)
+        throw SysError([&] { return HintFmt("deleting %1%", PathFmt(descriptorToPath(dirFd) / name.path())); });
+}
+
 OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
     /* No emptiness assertion, unlike the other operations here: since Linux
@@ -389,6 +407,33 @@ std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const OsCanonPath & path
         throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(dirFd) / path.path())); });
     }
     return st;
+}
+
+void setWriteTime(Descriptor dirFd, const OsCanonPath & path, time_t accessedTime, time_t modificationTime)
+{
+    struct timespec times[2] = {
+        {
+            .tv_sec = accessedTime,
+            .tv_nsec = 0,
+        },
+        {
+            .tv_sec = modificationTime,
+            .tv_nsec = 0,
+        },
+    };
+
+#if HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
+    if (utimensat(dirFd, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
+        throw SysError("changing modification time of %s (using `utimensat`)", PathFmt(path.path()));
+#else
+    // Fallback: open the file and use futimens
+    AutoCloseFD fd = openat(dirFd, path.c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (!fd)
+        throw SysError("opening %s to change modification time", PathFmt(path.path()));
+
+    if (futimens(fd.get(), times) == -1)
+        throw SysError("changing modification time of %s (using `futimens`)", PathFmt(path.path()));
+#endif
 }
 
 } // namespace nix
