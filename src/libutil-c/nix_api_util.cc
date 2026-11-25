@@ -7,6 +7,7 @@
 
 #include <cxxabi.h>
 #include <typeinfo>
+#include <utility>
 
 #include "nix_api_util_config.h"
 
@@ -64,8 +65,13 @@ nix_err nix_context_error(nix_c_context * context) NIXC_NOEXCEPT
 
 nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg) NIXC_NOEXCEPT
 {
+    assert(msg); /* Otherwise the copy into last_err below is UB. */
     if (context == nullptr) {
-        nix::panic("nix_set_err_msg called without context");
+        nix::panic(
+            nix::fmt(
+                "nix_set_err_msg called without context with error code %d% and error message %s",
+                std::to_underlying(err),
+                msg));
     }
     context->last_err_code = err;
     context->last_err = msg;

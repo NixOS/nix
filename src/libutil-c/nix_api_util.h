@@ -156,8 +156,8 @@ typedef enum nix_verbosity nix_verbosity;
  * Passed as a first parameter to functions that can fail, to store error
  * information.
  *
- * Optional wherever it can be used, passing NULL instead will throw a C++
- * exception.
+ * Optional wherever it can be used, passing NULL will terminate the process
+ * on errors.
  *
  * The struct is laid out so that it can also be cast to nix_err* to inspect
  * directly:
@@ -186,14 +186,15 @@ typedef void (*nix_get_string_callback)(const char * start, unsigned int n, void
 
 /**
  * @brief Allocate a new nix_c_context.
- * @throws std::bad_alloc
- * @return allocated nix_c_context, owned by the caller. Free using
- * `nix_c_context_free`.
+ * @return allocated nix_c_context, owned by the caller. Free using @ref nix_c_context_free.
+ *         nullptr on allocation failures. If you see this returning a nullptr the process
+ *         is likely beyond recovery and the only avenue is to terminate.
  */
 nix_c_context * nix_c_context_create() NIXC_NOEXCEPT;
+
 /**
  * @brief Free a nix_c_context. Does not fail.
- * @param[out] context The context to free, mandatory.
+ * @param[in] context The context to free. Can be NULL.
  */
 void nix_c_context_free(nix_c_context * context) NIXC_NOEXCEPT;
 /**
@@ -275,7 +276,7 @@ const char * nix_version_get() NIXC_NOEXCEPT;
  * @param[in] ctx the context to retrieve the error message from
  * @param[out] n optional: a pointer to an unsigned int that is set to the
  * length of the error.
- * @return nullptr if no error message was ever set,
+ * @return NULL if no error message was ever set,
  *         a borrowed pointer to the error message otherwise, which is valid
  *         until the next call to a Nix function, or until the context is
  *         destroyed.
@@ -329,7 +330,8 @@ nix_err nix_err_name(
  *
  * Does not fail
  *
- * @param[in] read_context the context to retrieve the error message from
+ * @param[in] read_context the context to retrieve the error message from.
+ *            Must not be NULL.
  * @return most recent error code stored in the context.
  */
 nix_err nix_err_code(const nix_c_context * read_context) NIXC_NOEXCEPT;
@@ -341,9 +343,10 @@ nix_err nix_err_code(const nix_c_context * read_context) NIXC_NOEXCEPT;
  *
  * All other use is internal to the API.
  *
- * @param context context to write the error message to
+ * @param context context to write the error message to. Must not be NULL
  * @param err The error code to set and return
  * @param msg The error message to set. This string is copied.
+ *            Must not be NULL
  * @returns the error code set
  */
 nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg) NIXC_NOEXCEPT;
@@ -366,6 +369,9 @@ nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg) 
  * 4. The handled error is raised again, from an unrelated call.
  *
  * This failure can be avoided by clearing the error message after handling it.
+ *
+ * @param[out] context The context to clear the error from. This function is a no-op
+ *                     when @p context is NULL.
  */
 void nix_clear_err(nix_c_context * context) NIXC_NOEXCEPT;
 
