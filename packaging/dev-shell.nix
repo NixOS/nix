@@ -213,7 +213,10 @@ nixComponents.callPackage (
       version = lib.fileContents ../.version;
       name = finalAttrs.pname;
 
-      installFlags = "sysconfdir=$(out)/etc";
+      strictDeps = true;
+      __structuredAttrs = true;
+
+      installFlags = [ "sysconfdir=$(out)/etc" ];
       shellHook = ''
         PATH=$prefix/bin:$PATH
         unset PYTHONPATH

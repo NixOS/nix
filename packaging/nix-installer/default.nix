@@ -57,6 +57,8 @@ in
 
 runCommand "nix-installer-${tarball.passthru.nixVersion}"
   {
+    strictDeps = true;
+
     nativeBuildInputs = [
       buildPackages.python3
     ]

@@ -9,6 +9,8 @@
 
 runCommand "repl-completion"
   {
+    __structuredAttrs = true;
+    strictDeps = true;
     nativeBuildInputs = [
       expect
       nix
@@ -50,9 +52,6 @@ runCommand "repl-completion"
       }
       exit 0
     '';
-    passAsFile = [
-      "expectScript"
-    ];
   }
   ''
     export NIX_STORE=$TMPDIR/store
@@ -61,7 +60,8 @@ runCommand "repl-completion"
     mkdir $HOME
 
     nix-store --init
-    expect $expectScriptPath
+    printf '%s' "$expectScript" > $TMPDIR/repl-completion.exp
+    expect $TMPDIR/repl-completion.exp
 
     # FIXME: Please let's have test infrastructure that allows us to write such
     # tests in not so utterly humiliating ways.

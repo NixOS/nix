@@ -71,6 +71,8 @@ mkMesonExecutable (finalAttrs: {
       run =
         runCommand "${finalAttrs.pname}-run"
           {
+            __structuredAttrs = true;
+            strictDeps = true;
             meta.broken = withUnitTests && !stdenv.hostPlatform.emulatorAvailable buildPackages;
           }
           (
@@ -119,6 +121,8 @@ mkMesonExecutable (finalAttrs: {
           run-without-new-syscalls =
             runCommand "${finalAttrs.pname}-run-without-new-syscalls"
               {
+                __structuredAttrs = true;
+                strictDeps = true;
                 meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
                 nativeBuildInputs = [ util-linux ];
               }

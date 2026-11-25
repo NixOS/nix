@@ -18,6 +18,8 @@ in
 
 runCommand "filetransfer-retry-backoff"
   {
+    __structuredAttrs = true;
+    strictDeps = true;
     nativeBuildInputs = [
       nix-cli
       python3

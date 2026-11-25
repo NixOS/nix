@@ -21,6 +21,8 @@ in
 
 runCommand "nix-installer-tarball-${nix.version}"
   {
+    __structuredAttrs = true;
+    strictDeps = true;
     nativeBuildInputs = [ zstd ];
 
     passthru = {

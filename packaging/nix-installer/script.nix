@@ -7,6 +7,8 @@
 
 runCommand "nix-installer-script-${version}"
   {
+    __structuredAttrs = true;
+    strictDeps = true;
     allowedRequisites = [ ];
   }
   ''

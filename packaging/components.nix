@@ -163,14 +163,13 @@ let
     ];
   };
 
-  mesonBuildLayer = finalAttrs: prevAttrs: rec {
+  mesonBuildLayer = finalAttrs: prevAttrs: {
     nativeBuildInputs = prevAttrs.nativeBuildInputs or [ ] ++ [
       pkg-config
     ];
-    separateDebugInfo = !stdenv.hostPlatform.isStatic;
-    # needed by separateDebugInfo
+    # Needs `__structuredAttrs`, which `nixDefaultsLayer` enables.
     # SEE: https://github.com/NixOS/nixpkgs/pull/394674/commits/a4d355342976e9e9823fb94f133bc43ebec9da5b
-    __structuredAttrs = separateDebugInfo;
+    separateDebugInfo = !stdenv.hostPlatform.isStatic;
   };
 
   mesonLibraryLayer = finalAttrs: prevAttrs: {
@@ -265,6 +264,7 @@ let
 
   nixDefaultsLayer = finalAttrs: prevAttrs: {
     strictDeps = prevAttrs.strictDeps or true;
+    __structuredAttrs = prevAttrs.__structuredAttrs or true;
     enableParallelBuilding = true;
     pos = builtins.unsafeGetAttrPos "pname" prevAttrs;
     meta = prevAttrs.meta or { } // {
@@ -411,6 +411,8 @@ in
               pkgs.buildPackages.stdenvNoCC.mkDerivation {
                 name = "${finalScope.src.name or "nix-source"}-patched";
                 inherit (finalScope) src patches;
+                strictDeps = true;
+                __structuredAttrs = true;
               }
             );
         resolvePath = p: finalScope.patchedSrc + "/${resolveRelPath p}";

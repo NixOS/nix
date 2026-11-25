@@ -337,11 +337,9 @@ buildPhase
 To use an external fuzzing engine, set `fuzzing-engine`:
 
 ```shell
-mesonFlagsArray+=(
-  "-Dunit-tests=false"
-  "-Dfuzzers=true"
-  "-Dfuzzing-engine=$LIB_FUZZING_ENGINE"
-)
+appendToVar mesonFlags "-Dunit-tests=false"
+appendToVar mesonFlags "-Dfuzzers=true"
+appendToVar mesonFlags "-Dfuzzing-engine=$LIB_FUZZING_ENGINE"
 ```
 
 Nix passes this value as one compiler-driver argument.

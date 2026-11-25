@@ -78,6 +78,9 @@ stdenv.mkDerivation (finalAttrs: {
   pname = "nix";
   version = nix-cli.version;
 
+  strictDeps = true;
+  __structuredAttrs = true;
+
   /**
     This package uses a multi-output derivation, even though some outputs could
     have been provided directly by the constituent component that provides it.
