@@ -149,6 +149,7 @@ suites = [
       'nix_path.sh',
       'no-url-literals.sh',
       'optimise-store.sh',
+      'optimise-store-parallel.sh',
       'output-normalization.sh',
       'pass-as-file.sh',
       'path-from-hash-part.sh',
@@ -195,6 +196,22 @@ suites = [
 ]
 
 nix_store = dependency('nix-store', required : false)
+optimise_preload = ''
+optimise_deps = []
+if host_machine.system() == 'linux' and get_option('default_library') != 'static'
+  add_languages('cpp')
+  optimise_race = shared_library(
+    'optimise-race',
+    'optimise-race.cc',
+    dependencies : [
+      dependency('threads'),
+      meson.get_compiler('cpp').find_library('dl'),
+    ],
+    install : false,
+  )
+  optimise_preload = optimise_race.full_path()
+  optimise_deps = [ optimise_race ]
+endif
 if nix_store.found()
   add_languages('cpp')
   subdir('test-libstoreconsumer')
@@ -236,6 +253,12 @@ foreach suite : suites
     deps += [ nix ] + nix_subproject.get_variable('nix_symlinks_targets')
   endif
   foreach script : suite['tests']
+    test_deps = deps
+    test_env = {}
+    if script == 'optimise-store-parallel.sh'
+      test_deps += optimise_deps
+      test_env = { 'OPTIMISE_TEST_PRELOAD' : optimise_preload }
+    endif
     # Turns, e.g., `tests/functional/flakes/show.sh` into a Meson test target called
     # `functional-flakes-show`.
     name = fs.replace_suffix(script, '')
@@ -269,13 +292,13 @@ foreach suite : suites
         'TEST_NAME' : name,
         'NIX_REMOTE' : '',
         'PS4' : '+(${BASH_SOURCE[0]-$0}:$LINENO) ',
-      } + suite.get('env', {}),
+      } + suite.get('env', {}) + test_env,
       # Some tests take 15+ seconds even on an otherwise idle machine;
       # on a loaded machine this can easily drive them to failure. Give
       # them more time than the default of 30 seconds.
       timeout : 300,
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
-      depends : deps,
+      depends : test_deps,
       workdir : workdir,
       protocol : protocol,
     )

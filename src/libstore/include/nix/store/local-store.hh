@@ -530,13 +530,15 @@ private:
     typedef boost::unordered_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
-    std::list<OsFilename> readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
+    std::list<OsFilename>
+    readDirectoryIgnoringInodes(const std::filesystem::path & path, const Sync<InodeHash> & inodeHash);
     void optimisePath_(
         Activity * act,
         OptimiseStats & stats,
         const std::filesystem::path & path,
-        InodeHash & inodeHash,
-        RepairFlag repair);
+        Sync<InodeHash> & inodeHash,
+        RepairFlag repair,
+        const std::filesystem::path & tempDir = {});
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);

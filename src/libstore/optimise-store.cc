@@ -5,6 +5,7 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/thread-pool.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -72,7 +73,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 }
 
 std::list<OsFilename>
-LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash)
+LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, const Sync<InodeHash> & inodeHash)
 {
     std::list<OsFilename> names;
 
@@ -84,7 +85,7 @@ LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, cons
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
         checkInterrupt();
 
-        if (inodeHash.count(dirent->d_ino)) {
+        if (inodeHash.readLock()->count(dirent->d_ino)) {
             debug("'%1%' is already linked", dirent->d_name);
             continue;
         }
@@ -103,7 +104,12 @@ LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, cons
 }
 
 void LocalStore::optimisePath_(
-    Activity * act, OptimiseStats & stats, const std::filesystem::path & path, InodeHash & inodeHash, RepairFlag repair)
+    Activity * act,
+    OptimiseStats & stats,
+    const std::filesystem::path & path,
+    Sync<InodeHash> & inodeHash,
+    RepairFlag repair,
+    const std::filesystem::path & tempDir)
 {
     checkInterrupt();
 
@@ -125,7 +131,7 @@ void LocalStore::optimisePath_(
     if (S_ISDIR(st.st_mode)) {
         auto names = readDirectoryIgnoringInodes(path, inodeHash);
         for (const auto & i : names)
-            optimisePath_(act, stats, path / i.path(), inodeHash, repair);
+            optimisePath_(act, stats, path / i.path(), inodeHash, repair, tempDir);
         return;
     }
 
@@ -147,7 +153,7 @@ void LocalStore::optimisePath_(
     }
 
     /* This can still happen on top-level files. */
-    if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
+    if (st.st_nlink > 1 && inodeHash.readLock()->count(st.st_ino)) {
         debug("%s is already linked, with %d other file(s)", PathFmt(path), st.st_nlink - 2);
         return;
     }
@@ -168,21 +174,24 @@ void LocalStore::optimisePath_(
     std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
 
     /* Maybe delete the link, if it has been corrupted. */
-    if (pathExists(linkPath)) {
-        auto stLink = lstat(linkPath);
-        if (st.st_size != stLink.st_size || (repair && hash != ({
-                                                           hashPath(
-                                                               makeFSSourceAccessor(linkPath),
-                                                               FileSerialisationMethod::NixArchive,
-                                                               HashAlgorithm::SHA256)
-                                                               .hash;
-                                                       }))) {
-            // XXX: Consider overwriting linkPath with our valid version.
+    if (auto stLink = maybeLstat(linkPath)) {
+        if (st.st_size != stLink->st_size || (repair && hash != ({
+                                                            hashPath(
+                                                                makeFSSourceAccessor(linkPath),
+                                                                FileSerialisationMethod::NixArchive,
+                                                                HashAlgorithm::SHA256)
+                                                                .hash;
+                                                        }))) {
             warn("removing corrupted link %s", PathFmt(linkPath));
             warn(
                 "There may be more corrupted paths."
                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
-            unlinkIfExists(linkPath);
+            auto [replacementDir, replacementDirFd] = createTempDirInStore();
+            AutoDelete delReplacementDir(replacementDir);
+            auto replacement = makeTempPath(replacementDir, ".tmp-link");
+            AutoDelete delReplacement(replacement, false);
+            std::filesystem::create_hard_link(path, replacement);
+            std::filesystem::rename(replacement, linkPath);
         }
     }
 
@@ -190,7 +199,6 @@ void LocalStore::optimisePath_(
         /* Nope, create a hard link in the links directory. */
         try {
             std::filesystem::create_hard_link(path, linkPath);
-            inodeHash.insert(st.st_ino);
         } catch (std::filesystem::filesystem_error & e) {
             if (e.code() == std::errc::file_exists) {
                 /* Fall through if another process created ‘linkPath’ before
@@ -241,11 +249,14 @@ void LocalStore::optimisePath_(
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : std::filesystem::path{});
 
-    std::filesystem::path tempLink = makeTempPath(config->realStoreDir.get(), ".tmp-link");
+    std::filesystem::path tempLink =
+        makeTempPath(tempDir.empty() ? std::filesystem::path{config->realStoreDir.get()} : tempDir, ".tmp-link");
+    AutoDelete delTempLink(tempLink, false);
+    ino_t linkedInode;
 
     try {
         std::filesystem::create_hard_link(linkPath, tempLink);
-        inodeHash.insert(st.st_ino);
+        linkedInode = lstat(tempLink).st_ino;
     } catch (std::filesystem::filesystem_error & e) {
         if (e.code() == std::errc::too_many_links) {
             /* Too many links to the same file (>= 32000 on most file
@@ -285,6 +296,7 @@ void LocalStore::optimisePath_(
         throw SystemError(e.code(), "renaming %1% to %2%", PathFmt(tempLink), PathFmt(path));
     }
 
+    inodeHash.lock()->insert(linkedInode);
     stats.filesLinked++;
     stats.bytesFreed += st.st_size;
 
@@ -304,23 +316,68 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     Activity act(*logger, actOptimiseStore);
 
     auto paths = queryAllValidPaths();
-    InodeHash inodeHash = loadInodeHash();
+    if (paths.empty())
+        return;
+    addTempRoots(paths);
+    Sync<InodeHash> inodeHash(loadInodeHash());
+    auto [tempDir, tempDirFd] = createTempDirInStore();
+    AutoDelete delTempDir(tempDir);
 
     act.progress(0, paths.size());
 
-    uint64_t done = 0;
+    Sync<uint64_t> done{0};
+    Sync<StorePathSet::const_iterator> next(paths.cbegin());
+    std::atomic_bool stopped{false};
+    auto jobs = std::min(paths.size(), std::max<size_t>(1, config->getLocalSettings().optimiseStoreJobs.get()));
+    ThreadPool pool(jobs);
 
-    for (auto & i : paths) {
-        addTempRoot(i);
-        if (!isValidPath(i))
-            continue; /* path was GC'ed, probably */
-        {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);
+    for (size_t worker = 0; worker < 2 * jobs; ++worker) {
+        try {
+            pool.enqueue([&] {
+                try {
+                    while (!stopped) {
+                        checkInterrupt();
+                        auto path = [&]() -> std::optional<StorePath> {
+                            auto current = next.lock();
+                            if (*current == paths.cend())
+                                return std::nullopt;
+                            return *(*current)++;
+                        }();
+                        if (!path)
+                            return;
+                        if (!isValidPath(*path))
+                            continue; /* path was GC'ed, probably */
+                        Activity actPath(
+                            *logger,
+                            lvlTalkative,
+                            actUnknown,
+                            fmt("optimising path '%s'", printStorePath(*path)),
+                            {},
+                            act.id);
+                        OptimiseStats pathStats;
+                        optimisePath_(
+                            &actPath,
+                            pathStats,
+                            config->realStoreDir.get() / path->to_string(),
+                            inodeHash,
+                            NoRepair,
+                            tempDir);
+                        auto completed = done.lock();
+                        stats.filesLinked += pathStats.filesLinked;
+                        stats.bytesFreed += pathStats.bytesFreed;
+                        act.progress(++*completed, paths.size());
+                    }
+                } catch (...) {
+                    stopped = true;
+                    throw;
+                }
+            });
+        } catch (ThreadPoolShutDown &) {
+            break;
         }
-        done++;
-        act.progress(done, paths.size());
     }
+
+    pool.process();
 }
 
 void LocalStore::optimiseStore()
@@ -335,7 +392,7 @@ void LocalStore::optimiseStore()
 void LocalStore::optimisePath(const std::filesystem::path & path, RepairFlag repair)
 {
     OptimiseStats stats;
-    InodeHash inodeHash;
+    Sync<InodeHash> inodeHash;
 
     if (config->getLocalSettings().autoOptimiseStore)
         optimisePath_(nullptr, stats, path, inodeHash, repair);

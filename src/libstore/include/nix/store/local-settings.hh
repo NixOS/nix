@@ -265,6 +265,8 @@ public:
           duplicate files.
         )"};
 
+    Setting<size_t> optimiseStoreJobs{this, 1, "optimise-store-jobs", "Sets the maximum number of workers used during a manual store optimisation. Automatic store optimisation remains unaffected."};
+
     Setting<size_t> narBufferSize{
         this, 32 * 1024 * 1024, "nar-buffer-size", "Maximum size of NARs before spilling them to disk."};
 
