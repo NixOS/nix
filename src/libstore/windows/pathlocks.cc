@@ -14,20 +14,18 @@ namespace nix {
 
 void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
 {
-
-    int exit = DeleteFileW(path.c_str());
-    if (exit == 0)
-        warn("%s: %s", PathFmt(path), std::to_string(GetLastError()));
+    if (!DeleteFileW(path.c_str()))
+        logWarning(windows::WinError("deleting lock file %s", PathFmt(path)).info());
 }
 
 void PathLocks::unlock()
 {
     for (auto & i : fds) {
-        if (deletePaths)
-            deleteLockFile(i.second, i.first);
-
         if (CloseHandle(i.first) == -1)
             printError("error (ignored): cannot close lock file on %1%", PathFmt(i.second));
+
+        if (deletePaths)
+            deleteLockFile(i.second, i.first);
 
         debug("lock released on %1%", PathFmt(i.second));
     }

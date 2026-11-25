@@ -107,6 +107,12 @@ public:
      */
     MuxablePipe builderPipe;
 
+    /**
+     * The job object the builder runs in, set to kill it when this handle is
+     * closed, so that it dies with us rather than outliving the daemon.
+     */
+    AutoCloseFD job;
+
     /* --- RestrictionContext --- */
 
     const StorePathSet & originalPaths() override
@@ -206,17 +212,34 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
     env[OS_STR("TEMPDIR")] = tmpDir.native();
     env[OS_STR("PWD")] = tmpDir.native();
     env[OS_STR("NIX_STORE")] = os(store->storeDir);
+    /* Many programs look for the user's profile, which a build has none of. */
+    env[OS_STR("USERPROFILE")] = tmpDir.native();
+
+    /* The maximum number of cores to utilize for parallel building. */
+    env[OS_STR("NIX_BUILD_CORES")] = os(fmt(
+        "%d",
+        settings.getLocalSettings().buildCores ? settings.getLocalSettings().buildCores : settings.getDefaultCores()));
 
     /* Most Windows programs, `cmd.exe` included, will not start without these, and
        system tools live outside the store so `PATH` is needed to find them at all.
        Impure: a derivation sees whatever else is on the builder's `PATH`. */
-    for (std::string_view name : {"SystemRoot", "SystemDrive", "windir", "COMSPEC", "PATHEXT", "PATH"})
+    for (std::string_view name :
+         {"SystemRoot",
+          "SystemDrive",
+          "windir",
+          "COMSPEC",
+          "PATHEXT",
+          "PATH",
+          "NUMBER_OF_PROCESSORS",
+          "OS",
+          "PROCESSOR_ARCHITECTURE",
+          "PROCESSOR_ARCHITEW6432"})
         if (auto value = getEnvOs(os(name)))
             env[os(name)] = *value;
 
     /* The derivation's own environment wins over all of the above. */
     for (auto & [name, entry] : desugaredEnv.variables)
-        env[os(name)] = os(entry.value);
+        env[os(name)] = entry.prependBuildDirectory ? (tmpDir / os(entry.value)).native() : os(entry.value);
 
     OsString block;
     for (auto & [name, value] : env) {
@@ -265,7 +288,8 @@ void WindowsDerivationBuilderImpl::spawnBuilder()
             NULL,
             /* Inherit handles, so the child gets the pipe. */
             TRUE,
-            CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED,
+            /* No console window pops up for console builders. */
+            CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED | CREATE_NO_WINDOW,
             envBlock.data(),
             tmpDir.native().c_str(),
             &startInfo,
@@ -280,12 +304,20 @@ void WindowsDerivationBuilderImpl::spawnBuilder()
 
     /* Put the child in a job object so it dies with us rather than leaking.
        Without this a runaway builder outlives the daemon. */
-    Descriptor job = CreateJobObjectW(NULL, NULL);
-    if (job == NULL) {
+    job = AutoCloseFD{CreateJobObjectW(NULL, NULL)};
+    if (!job) {
         TerminateProcess(processHandle.get(), 1);
         throw WinError("cannot create job object for builder");
     }
-    if (AssignProcessToJobObject(job, processHandle.get()) == FALSE) {
+    {
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits = {};
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if (SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &limits, sizeof(limits)) == FALSE) {
+            TerminateProcess(processHandle.get(), 1);
+            throw WinError("cannot set up job object for builder");
+        }
+    }
+    if (AssignProcessToJobObject(job.get(), processHandle.get()) == FALSE) {
         TerminateProcess(processHandle.get(), 1);
         throw WinError("cannot assign builder to job object");
     }
@@ -321,6 +353,11 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
 
     /* A fresh build directory per attempt. */
     tmpDir = createTempDir(defaultTempDir(), "nix-build");
+
+    /* The files that "passAsFile", structured attrs and the like refer to,
+       by names relative to the build directory. */
+    for (const auto & [fileName, value] : desugaredEnv.extraFiles)
+        writeFile(tmpDir / OsFilename::fromPathThrowing(std::filesystem::path(fileName)).path(), value);
 
     /* Clear anything a previous failed build left at the output paths. */
     for (auto & [name, status] : initialOutputs)

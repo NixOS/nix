@@ -194,14 +194,25 @@ void chrootHelper(int argc, char ** argv)
             std::filesystem::path dst = tmpDir / entry.path().filename();
             if (pathExists(dst))
                 continue;
-            auto st = entry.symlink_status();
-            if (std::filesystem::is_directory(st)) {
+            /* `symlink_status`, not `nix::lstat`: this only runs on Linux,
+               where it is right, and `entry` already has it. Once
+               `DirectoryIterator` becomes our own implementation, this will
+               go away. */
+            NIX_INCOMPLETE_SWITCH_BEGIN
+            switch (entry.symlink_status().type()) {
+            case std::filesystem::file_type::directory:
                 if (mkdir(dst.c_str(), 0700) == -1)
                     throw SysError("creating directory %s", PathFmt(dst));
                 if (mount(src.c_str(), dst.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("mounting %s on %s", PathFmt(src), PathFmt(dst));
-            } else if (std::filesystem::is_symlink(st))
+                break;
+            case std::filesystem::file_type::symlink:
                 createSymlink(readLink(src), dst);
+                break;
+            default:
+                break;
+            }
+            NIX_INCOMPLETE_SWITCH_END
         }
 
         char * cwd = getcwd(0, 0);

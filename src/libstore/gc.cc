@@ -269,7 +269,7 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                         tryUnlink(path);
                     }
                 } else {
-                    if (!std::filesystem::is_symlink(target))
+                    if (!isSymlink(target))
                         return;
                     auto target2 = readLink(target);
                     if (isInStore(target2.string()))
@@ -279,7 +279,7 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
         }
 
         else if (type == std::filesystem::file_type::regular) {
-            auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path.string())));
+            auto storePath = maybeParseStorePath(storeDir + "/" + path.filename().string());
             if (storePath && isValidPath(*storePath))
                 roots[std::move(*storePath)].emplace(path.string());
         }

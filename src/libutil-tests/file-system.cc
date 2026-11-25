@@ -2,6 +2,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/system-error.hh"
 
+#ifdef _WIN32
+#  include "nix/util/tests/wine.hh"
+#  include "nix/util/windows-environment.hh"
+#endif
+
 #include <limits.h>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
@@ -108,6 +113,33 @@ TEST(canonPath, removesDots2)
     auto p = canonPath(path.string());
 
     ASSERT_EQ(p, std::filesystem::path{FS_ROOT "this" FS_SEP "is" FS_SEP "a" FS_SEP "path"}.string());
+}
+
+TEST(canonPath, resolvesSymlinks)
+{
+    auto tmpDir = createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+
+    auto target = tmpDir / OS_STR("target");
+    createDir(target);
+    writeFile(target / OS_STR("file"), "contents");
+    createSymlink(OS_STR("target"), tmpDir / OS_STR("relative"));
+    /* On Windows, a target with a drive letter. */
+    createSymlink(target, tmpDir / OS_STR("absolute"));
+
+    auto expected = canonPath(target / OS_STR("file"), /*resolveSymlinks=*/true);
+    ASSERT_EQ(canonPath(tmpDir / OS_STR("relative") / OS_STR("file"), /*resolveSymlinks=*/true), expected);
+    ASSERT_EQ(canonPath(tmpDir / OS_STR("absolute") / OS_STR("file"), /*resolveSymlinks=*/true), expected);
+    ASSERT_EQ(readFile(expected), "contents");
+
+    /* Without resolving, the symlink is kept. */
+    ASSERT_EQ(
+        canonPath(tmpDir / OS_STR("relative") / OS_STR("file")),
+        canonPath(tmpDir) / OS_STR("relative") / OS_STR("file"));
 }
 
 TEST(canonPath, requiresAbsolutePath)
@@ -348,6 +380,32 @@ TEST(createTempDir, works)
     auto tmpDir = createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
     ASSERT_TRUE(std::filesystem::is_directory(tmpDir));
+}
+
+/* ----------------------------------------------------------------------------
+ * replaceSymlink
+ * --------------------------------------------------------------------------*/
+
+TEST(replaceSymlink, replacesSymlink)
+{
+    auto tmpDir = createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+#ifdef _WIN32
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
+#endif
+
+    auto link = tmpDir / OS_STR("link");
+    replaceSymlink(OS_STR("first"), link);
+    ASSERT_EQ(readLink(link), OS_STR("first"));
+
+    /* Replacing it again, and again, leaves just the link: no temporary
+       links behind. */
+    replaceSymlink(OS_STR("second"), link);
+    replaceSymlink(OS_STR("third"), link);
+    ASSERT_EQ(readLink(link), OS_STR("third"));
+    auto files = std::ranges::to<std::vector<std::filesystem::path>>(DirectoryIterator{tmpDir});
+    ASSERT_EQ(files, std::vector{link});
 }
 
 /* ----------------------------------------------------------------------------

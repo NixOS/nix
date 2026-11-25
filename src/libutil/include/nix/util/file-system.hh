@@ -160,6 +160,15 @@ std::optional<PosixStat> maybeStat(const std::filesystem::path & path);
 bool pathExists(const std::filesystem::path & path);
 
 /**
+ * Whether @p path is a symlink, without following it. False if nothing
+ * is there.
+ *
+ * Unlike `std::filesystem::is_symlink`, this works on Windows, where
+ * libstdc++ never reports a symlink.
+ */
+bool isSymlink(const std::filesystem::path & path);
+
+/**
  * A version of pathExists that returns false on a permission error.
  * Useful for inferring default paths across directories that might not
  * be readable.

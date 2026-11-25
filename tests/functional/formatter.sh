@@ -23,7 +23,7 @@ cat << EOF > flake.nix
         name = "formatter";
         buildCommand = ''
           mkdir -p \$out/bin
-          echo "#! ${shell}" > \$out/bin/formatter
+          echo "#! \${shell}" > \$out/bin/formatter
           cat \${./formatter.simple.sh} >> \$out/bin/formatter
           chmod +x \$out/bin/formatter
         '';
@@ -44,7 +44,7 @@ cat << EOF > subflake/flake.nix
         name = "formatter";
         buildCommand = ''
           mkdir -p \$out/bin
-          echo "#! ${shell}" > \$out/bin/formatter
+          echo "#! \${shell}" > \$out/bin/formatter
           cat \${./formatter.simple.sh} >> \$out/bin/formatter
           chmod +x \$out/bin/formatter
         '';
