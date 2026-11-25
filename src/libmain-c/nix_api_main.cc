@@ -1,3 +1,4 @@
+#include "nix_api_main.h"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
@@ -6,7 +7,7 @@
 
 extern "C" {
 
-nix_err nix_init_plugins(nix_c_context * context)
+nix_err nix_init_plugins(nix_c_context * context) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -16,7 +17,7 @@ nix_err nix_init_plugins(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_log_format(nix_c_context * context, const char * format)
+nix_err nix_set_log_format(nix_c_context * context, const char * format) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
