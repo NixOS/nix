@@ -1,5 +1,7 @@
 # Multi-User Mode
 
+The Nix Installer performs the following steps automatically, but they are documented here to show how to set up multi-user mode manually.
+
 To allow a Nix store to be shared safely among multiple users, it is
 important that users are not able to run builders that modify the Nix
 store or database in arbitrary ways, or that interfere with builds
@@ -62,7 +64,7 @@ into the users’ login scripts.
 
 ## Restricting access
 
-To limit which users can perform Nix operations, you can use the
+Optionally, to limit which users can perform Nix operations, you can use the
 permissions on the directory `/nix/var/nix/daemon-socket`. For instance,
 if you want to restrict the use of Nix to the members of a group called
 `nix-users`, do

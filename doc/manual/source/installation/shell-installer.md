@@ -1,4 +1,7 @@
-# Installing a Binary Distribution
+# Installing with the Shell Installer
+
+For the recommended Nix Installer on supported platforms, see [Installation](index.md).
+This page documents the shell installer, including single-user installations and platforms not supported by the Nix Installer.
 
 > **Updating to macOS 15 Sequoia**
 >
@@ -11,7 +14,7 @@
 To install the latest version Nix, run the following command:
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh
+$ curl -L https://channels.nixos.org/nix-latest/install | sh
 ```
 
 This performs the default type of installation for your platform:
@@ -29,7 +32,7 @@ The installer can be configured with various command line arguments and environm
 To show available command line flags:
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --help
+$ curl -L https://channels.nixos.org/nix-latest/install | sh -s -- --help
 ```
 
 To check what it does and how it can be customised further, [download and edit the second-stage installation script](#installing-from-a-binary-tarball).
@@ -58,7 +61,7 @@ Supported systems:
 To explicitly instruct the installer to perform a multi-user installation on your system:
 
 ```console
-$ bash <(curl -L https://nixos.org/nix/install) --daemon
+$ bash <(curl -L https://channels.nixos.org/nix-latest/install) --daemon
 ```
 
 You can run this under your usual user account or `root`.
@@ -69,7 +72,7 @@ The script will invoke `sudo` as needed.
 To explicitly select a single-user installation on your system:
 
 ```console
-$ bash <(curl -L https://nixos.org/nix/install) --no-daemon
+$ bash <(curl -L https://channels.nixos.org/nix-latest/install) --no-daemon
 ```
 
 In a single-user installation, `/nix` is owned by the invoking user.

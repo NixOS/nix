@@ -305,7 +305,7 @@ rec {
   );
 
   # The first half of the installation script. This is uploaded
-  # to https://nixos.org/nix/install. It downloads the binary
+  # to https://channels.nixos.org/nix-latest/install. It downloads the binary
   # tarball for the user's system and calls the second half of the
   # installation script.
   installerScript = installScriptFor [
@@ -488,7 +488,7 @@ rec {
 
       /**
         Test the installer in QEMU VMs. Doesn't operate on the user-facing
-        installation script https://nixos.org/nix/install, which downloads
+        installation script https://channels.nixos.org/nix-latest/install, which downloads
         the binaries for the system architecture but the second-stage tarballs
         directly.
       */

@@ -148,7 +148,8 @@ public:
 
             The current state of all channels for the `root` user.
 
-          These files are set up by the [Nix installer](@docroot@/installation/installing-binary.md).
+          For multi-user installations, the [shell installer](@docroot@/installation/shell-installer.md) sets up root's `nixpkgs` channel by default.
+          With the [Nix Installer](@docroot@/installation/index.md#multi-user), pass `--add-channel` to set it up.
           See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details on the environment variable.
 
           > **Note**

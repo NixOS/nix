@@ -6,17 +6,17 @@ For more in-depth information you are kindly referred to subsequent chapters.
 1. Install Nix:
 
    ```console
-   $ curl -L https://nixos.org/nix/install | sh
+   $ curl -sSfL https://channels.nixos.org/nix-latest/nix-installer | sh -s -- install
    ```
 
-   The install script will use `sudo`, so make sure you have sufficient rights.
+   The installer will use `sudo`, so make sure you have sufficient rights.
 
    For other installation methods, see the detailed [installation instructions](installation/index.md).
 
 1. Run software without installing it permanently:
 
    ```console
-   $ nix-shell --packages cowsay lolcat
+   $ nix-shell -I nixpkgs=channel:nixpkgs-unstable --packages cowsay lolcat
    ```
 
    This downloads the specified packages with all their dependencies, and drops you into a Bash shell where the commands provided by those packages are present.

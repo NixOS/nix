@@ -1,8 +1,20 @@
 # Uninstalling Nix
 
+## Nix Installer
+
+If you installed Nix with the [Nix Installer](https://github.com/NixOS/nix-installer), run:
+
+```console
+$ /nix/nix-installer uninstall
+```
+
+The installer reads the installation receipt at `/nix/receipt.json` and shows the actions it will undo.
+Confirming removes the Nix installation, including the Nix store.
+The instructions below apply to installations made with the shell installer.
+
 ## Multi User
 
-Removing a [multi-user installation](./installing-binary.md#multi-user-installation) depends on the operating system.
+Removing a [multi-user installation](./shell-installer.md#multi-user-installation) depends on the operating system.
 
 ### Linux
 
@@ -188,7 +200,7 @@ If you are on Linux with systemd:
 
 ## Single User
 
-To remove a [single-user installation](./installing-binary.md#single-user-installation) of Nix, run:
+To remove a [single-user installation](./shell-installer.md#single-user-installation) of Nix, run:
 
 ```console
 rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile ~/.local/share/nix ~/.local/state/nix ~/.cache/nix
