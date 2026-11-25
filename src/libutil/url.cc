@@ -385,7 +385,9 @@ std::ostream & operator<<(std::ostream & os, const ParsedURL & url)
 ParsedURL ParsedURL::canonicalise()
 {
     ParsedURL res(*this);
-    res.path = splitString<std::vector<std::string>>(CanonPath(renderPath()).abs(), "/");
+    /* Removing dot segments is lexical by definition (RFC 3986,
+       section 5.2.4), so here `viaLexical` is right. */
+    res.path = splitString<std::vector<std::string>>(CanonPath::viaLexical(renderPath()).abs(), "/");
     return res;
 }
 

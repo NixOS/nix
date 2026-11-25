@@ -180,8 +180,8 @@ void unix::closeExtraFDs(std::span<const Descriptor> keepExtra)
            closing that would make the next read fail. By the time we do the closing below, that
            FD is already closed by the iterator, so closing it again is a harmless no-op. */
         std::vector<int> openFds;
-        for (const auto & s : DirectoryIterator{"/proc/self/fd/"}) {
-            auto fd = string2Int<int>(s.path().filename().native());
+        for (const auto & s : openDirectoryIterator("/proc/self/fd/")) {
+            auto fd = string2Int<int>(s.name.native());
             if (!fd)
                 continue;
             if (*fd > maxKept)

@@ -1,59 +1,82 @@
 #include "nix/util/canon-path.hh"
-#include "nix/util/util.hh"
-#include "nix/util/file-path-impl.hh"
-#include "nix/util/strings-inline.hh"
+#include "nix/util/path-iterator.hh"
 
+#include <algorithm>
 #include <cstring>
 
 namespace nix {
 
 void BadCanonPath::anchor() {}
 
-const CanonPath CanonPath::root = CanonPath("/");
-
-static std::string absPathPure(std::string_view path)
-{
-    return canonPathInner<UnixPathTrait>(path, [](auto &, auto &) {});
-}
-
-static void ensureNoNullBytes(std::string_view s)
-{
-    if (std::memchr(s.data(), '\0', s.size())) [[unlikely]] {
-        using namespace std::string_view_literals;
-        auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
-        throw BadCanonPath("path segment '%s' must not contain null (\\0) bytes", str);
-    }
-}
+const CanonPath CanonPath::root = CanonPath::fromUnchecked(UnresolvedPath::fromUnchecked("/"));
 
 CanonPath CanonPath::fromFilename(std::string_view segment)
 {
-    auto res = CanonPath(segment);
-    /* Use existing canonicalisation logic for CanonPath to check that the segment
-       is already a valid filename. */
-    if (segment != res.rel() || std::ranges::distance(res) != 1)
-        throw BadCanonPath("invalid filename '%s'", segment);
-    return res;
+    return FilenameView::fromStringThrowing(segment);
 }
 
-CanonPath::CanonPath(std::string_view raw)
-    : path(absPathPure(concatStrings("/", raw)))
+namespace canon_path {
+
+/**
+ * Whether @p path has any `..` components. Without any, the rest of
+ * `CanonPath`'s invariants are `UnresolvedPath`'s.
+ */
+static bool hasDotDot(const UnresolvedPath & path)
 {
-    ensureNoNullBytes(raw);
+    return std::ranges::any_of(path, [](std::string_view c) { return c == ".."; });
 }
 
-CanonPath::CanonPath(const char * raw)
-    : path(absPathPure(concatStrings("/", raw)))
+} // namespace canon_path
+
+std::optional<CanonPath> CanonPath::maybeFromUnresolved(const UnresolvedPath & path)
 {
+    if (canon_path::hasDotDot(path))
+        return std::nullopt;
+    return CanonPath(path);
 }
 
-CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
-    : path(absPathPure(raw.size() > 0 && raw[0] == '/' ? raw : concatStrings(root.abs(), "/", raw)))
+CanonPath CanonPath::fromAsserting(UnresolvedPath path)
 {
-    ensureNoNullBytes(raw);
+    assert(!canon_path::hasDotDot(path));
+    return CanonPath(std::move(path));
+}
+
+CanonPath CanonPath::fromThrowing(UnresolvedPath path)
+{
+    if (canon_path::hasDotDot(path))
+        throw BadCanonPath("path '%s' must not contain '..' components", path.abs());
+    return CanonPath(std::move(path));
+}
+
+CanonPath CanonPath::viaLexical(UnresolvedPath path)
+{
+    /* Remove each `..` along with the component before it, ignoring
+       symlinks. The result is never longer, so it is written over
+       `path` as that is read: `out` is the length of the result so far,
+       which never gets ahead of `start`. */
+    auto & s = path.path;
+    size_t out = 0;
+    for (size_t start = 1; start < s.size();) {
+        auto end = std::min(s.find('/', start), s.size());
+        auto len = end - start;
+        if (std::string_view{s}.substr(start, len) == "..")
+            /* Back to before the last component of the result, if any. */
+            out = out == 0 ? 0 : s.rfind('/', out - 1);
+        else {
+            s[out] = '/';
+            std::memmove(&s[out + 1], &s[start], len);
+            out += 1 + len;
+        }
+        start = end + 1;
+    }
+    s.resize(std::max(out, (size_t) 1));
+    /* With no `..`, the rest of `CanonPath`'s invariants are
+       `UnresolvedPath`'s. */
+    return CanonPath(std::move(path));
 }
 
 CanonPath::CanonPath(const std::vector<std::string> & elems)
-    : path("/")
+    : CanonPath(UnresolvedPath::fromUnchecked("/"))
 {
     for (auto & s : elems)
         push(FilenameView::fromStringThrowing(s));
@@ -63,20 +86,17 @@ std::optional<CanonPath> CanonPath::parent() const
 {
     if (isRoot())
         return std::nullopt;
-    return CanonPath(unchecked_t(), path.substr(0, std::max((size_t) 1, path.rfind('/'))));
-}
-
-void CanonPath::pop()
-{
-    assert(!isRoot());
-    path.resize(std::max((size_t) 1, path.rfind('/')));
+    auto & path = abs();
+    return fromUnchecked(UnresolvedPath::fromUnchecked(path.substr(0, std::max((size_t) 1, path.rfind('/')))));
 }
 
 bool CanonPath::isWithin(const CanonPath & parent) const
 {
+    auto & path = abs();
+    auto & parentPath = parent.abs();
     return !(
-        path.size() < parent.path.size() || path.substr(0, parent.path.size()) != parent.path
-        || (parent.path.size() > 1 && path.size() > parent.path.size() && path[parent.path.size()] != '/'));
+        path.size() < parentPath.size() || path.substr(0, parentPath.size()) != parentPath
+        || (parentPath.size() > 1 && path.size() > parentPath.size() && path[parentPath.size()] != '/'));
 }
 
 CanonPath CanonPath::removePrefix(const CanonPath & prefix) const
@@ -84,9 +104,9 @@ CanonPath CanonPath::removePrefix(const CanonPath & prefix) const
     assert(isWithin(prefix));
     if (prefix.isRoot())
         return *this;
-    if (path.size() == prefix.path.size())
+    if (abs().size() == prefix.abs().size())
         return root;
-    return CanonPath(unchecked_t(), path.substr(prefix.path.size()));
+    return fromUnchecked(UnresolvedPath::fromUnchecked(abs().substr(prefix.abs().size())));
 }
 
 void CanonPath::extend(const CanonPath & x)
@@ -94,9 +114,9 @@ void CanonPath::extend(const CanonPath & x)
     if (x.isRoot())
         return;
     if (isRoot())
-        path += x.rel();
+        unresolved.path += x.rel();
     else
-        path += x.abs();
+        unresolved.path += x.abs();
 }
 
 CanonPath CanonPath::operator/(const CanonPath & x) const
@@ -108,9 +128,8 @@ CanonPath CanonPath::operator/(const CanonPath & x) const
 
 void CanonPath::push(FilenameView c)
 {
-    if (!isRoot())
-        path += '/';
-    path += c.str();
+    /* A file name is always a valid component. */
+    unresolved.pushUnchecked(c.str());
 }
 
 bool CanonPath::isAllowed(const std::set<CanonPath> & allowed) const

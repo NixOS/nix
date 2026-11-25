@@ -265,19 +265,19 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
         *vGenerateManpage);
 
     state.corepkgsFS->addFile(
-        CanonPath("utils.nix"),
+        "utils.nix"_filename,
         {
 #embed "doc/manual/utils.nix"
         });
 
     state.corepkgsFS->addFile(
-        CanonPath("/generate-settings.nix"),
+        "/generate-settings.nix"_canonPath,
         {
 #embed "doc/manual/generate-settings.nix"
         });
 
     state.corepkgsFS->addFile(
-        CanonPath("/generate-store-info.nix"),
+        "/generate-store-info.nix"_canonPath,
         {
 #embed "doc/manual/generate-store-info.nix"
         });

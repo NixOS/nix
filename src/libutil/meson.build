@@ -223,6 +223,7 @@ sources = [ config_priv_h ] + files(
   'thread-pool.cc',
   'union-source-accessor.cc',
   'unix-domain-socket.cc',
+  'unresolved-path.cc',
   'url.cc',
   'users.cc',
   'util.cc',

@@ -362,7 +362,7 @@ path_start
         /* Absolute paths are always interpreted relative to the
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
-        auto path = CanonPath(literal).abs();
+        auto path = CanonPath::viaLexical(literal).abs();
         /* add back in the trailing '/' to the first segment */
         if (literal.size() > 1 && literal.back() == '/')
           path += '/';
@@ -378,7 +378,7 @@ path_start
             return std::nullopt;
         });
 
-        auto path = CanonPath(literal, state->basePath.path).abs();
+        auto path = CanonPath::viaLexical(UnresolvedPath(literal, state->basePath.path)).abs();
         /* add back in the trailing '/' to the first segment */
         if (literal.size() > 1 && literal.back() == '/')
           path += '/';
@@ -400,7 +400,7 @@ path_start
         });
     });
 
-    auto path = CanonPath(concatStrings(getHome().string(), std::string_view($1.p + 1, $1.l - 1))).abs();
+    auto path = CanonPath::viaLexical(concatStrings(getHome().string(), std::string_view($1.p + 1, $1.l - 1))).abs();
     if (literal.size() > 1 && literal.back() == '/')
         path += '/';
 

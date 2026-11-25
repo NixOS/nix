@@ -1,4 +1,5 @@
 #include "nix/store/builtins/buildenv.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/store/builtins.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/archive.hh"
@@ -38,7 +39,7 @@ createLinks(State & state, const std::filesystem::path & srcDir, const CanonPath
     DirectoryIterator srcFiles;
 
     try {
-        srcFiles = DirectoryIterator{srcDir};
+        srcFiles = openDirectoryIterator(srcDir);
     } catch (SystemError & e) {
         if (e.is(std::errc::not_a_directory)) {
             warn("not including %s in the user environment because it's not a directory", PathFmt(srcDir));
@@ -49,7 +50,7 @@ createLinks(State & state, const std::filesystem::path & srcDir, const CanonPath
 
     for (const auto & ent : srcFiles) {
         checkInterrupt();
-        auto name = ent.path().filename();
+        auto name = ent.name.mkPath();
         if (name.string()[0] == '.')
             /* not matched by glob */
             continue;
