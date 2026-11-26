@@ -320,6 +320,10 @@ rec {
       inherit coverageProfileDrvs mergedProfdata coverageReports;
     };
 
+  darwinTests = lib.optionalAttrs stdenv.hostPlatform.isDarwin {
+    networkSandbox = nixComponents.callPackage ../../../tests/darwin-network-sandbox { };
+  };
+
   vmTests = {
     inherit (nixosTests) s3-binary-cache-store;
   }

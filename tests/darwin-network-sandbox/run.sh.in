@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+umask 077
+
+nixBin=@nixBin@
+probe=@probe@
+derivations=@derivations@
+
+testRoot=$(mktemp -d "/tmp/nix-net.XXXXXX")
+# Resolve /tmp to /private/tmp so Seatbelt rules match the socket paths.
+testRoot=$(cd "$testRoot" && pwd -P)
+listenerPid=
+
+cleanup() {
+  if [[ -n "$listenerPid" ]]; then
+    kill "$listenerPid" 2>/dev/null || true
+    wait "$listenerPid" 2>/dev/null || true
+  fi
+
+  chmod -R u+w "$testRoot"
+  rm -rf "$testRoot"
+}
+
+trap cleanup EXIT
+
+export HOME="$testRoot/home"
+export NIX_CONF_DIR="$testRoot/etc"
+export NIX_LOG_DIR="$testRoot/log"
+export NIX_REMOTE=local
+export NIX_STATE_DIR="$testRoot/state"
+export NIX_STORE_DIR="$testRoot/store"
+export NIX_USER_CONF_FILES=/dev/null
+
+# Keep these disjoint: a socket in the build directory must not also be
+# covered by the global temporary directory's network permission.
+export TMPDIR="$testRoot/tmp"
+outsideDir="$testRoot/outside"
+
+unset _NIX_TEST_NO_SANDBOX
+
+mkdir -p "$TMPDIR" "$outsideDir"
+
+# Serialize builds because they share socket fixtures.
+export NIX_CONFIG="
+build-users-group =
+builders =
+sandbox = true
+sandbox-fallback = false
+substituters =
+max-jobs = 1
+extra-sandbox-paths = $outsideDir
+"
+
+# A real listener and a file-access grant ensure that the denied Unix
+# connection tests network policy, not a missing socket or file permission.
+mkfifo "$testRoot/ready"
+"$probe" unix-listener "$outsideDir" > "$testRoot/ready" &
+listenerPid=$!
+read -r ready < "$testRoot/ready"
+[[ "$ready" == ready ]]
+"$probe" unix-client "$outsideDir"
+
+probeStorePath=$("$nixBin/nix-store" --add "$probe")
+
+"$nixBin/nix-build" "$derivations" \
+  --argstr probe "$probeStorePath" \
+  --argstr globalTmpDir "$TMPDIR" \
+  --argstr outsideDir "$outsideDir" \
+  --no-out-link
+
+# Verify the listener stayed alive through the sandbox tests.
+"$probe" unix-client "$outsideDir"
