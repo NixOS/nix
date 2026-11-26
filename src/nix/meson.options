@@ -19,6 +19,7 @@ option(
   'plugin-c-api',
   type : 'boolean',
   value : false,
+  yield : true,
   description : 'Embed the public C API into nix so plugins can resolve those symbols from the executable',
 )
 
