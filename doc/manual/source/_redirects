@@ -42,6 +42,8 @@
 /language/builtin-constants /language/builtins 301!
 
 /installation/installation /installation 301!
+/installation/installing-binary /installation/shell-installer 301!
+/installation/installing-binary.html /installation/shell-installer 301!
 
 /package-management/basic-package-mgmt /command-ref/nix-env 301!
 /package-management/channels /command-ref/nix-channel 301!

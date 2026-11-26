@@ -9,10 +9,11 @@ The current recommended option on Linux and MacOS is [multi-user](#multi-user).
 This installation offers better sharing, improved isolation, and more security
 over a single user installation.
 
-This option requires either:
+Use the official [Nix Installer](https://github.com/NixOS/nix-installer) on:
 
-* Linux running systemd, with SELinux disabled
-* MacOS
+* Linux running systemd (`x86_64` or `aarch64`)
+* macOS on Apple Silicon (`aarch64`)
+* WSL2 with systemd enabled (`x86_64` or `aarch64`)
 
 > **Updating to macOS 15 Sequoia**
 >
@@ -23,8 +24,16 @@ This option requires either:
 > when running Nix commands, refer to GitHub issue [NixOS/nix#10892](https://github.com/NixOS/nix/issues/10892) for instructions to fix your installation without reinstalling.
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
+$ curl -sSfL https://channels.nixos.org/nix-latest/nix-installer | sh -s -- install
 ```
+
+The installer enables the experimental `nix-command` interface and asks whether to enable `flakes`, unless you select it with `--enable-flakes`.
+To add a system-wide `nixpkgs` channel, pass `--add-channel`.
+
+The installer writes its settings to `/etc/nix/nix.conf`, which includes `/etc/nix/nix.custom.conf` for local settings.
+For other supported Linux architectures, see the [shell installer instructions](shell-installer.md).
+
+See [Uninstalling Nix](uninstall.md#nix-installer) to remove this installation.
 
 ## Single-user
 
@@ -35,10 +44,10 @@ $ curl -L https://nixos.org/nix/install | sh -s -- --daemon
 This installation has less requirements than the multi-user install, however it
 cannot offer equivalent sharing, isolation, or security.
 
-This option is suitable for systems without systemd.
+This option uses the shell installer and is suitable for systems without systemd.
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
+$ curl -L https://channels.nixos.org/nix-latest/install | sh -s -- --no-daemon
 ```
 
 ## Distributions
