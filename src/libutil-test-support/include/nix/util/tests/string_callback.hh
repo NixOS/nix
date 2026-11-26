@@ -3,9 +3,9 @@
 
 namespace nix::testing {
 
-void observe_string_cb(const char * start, unsigned int n, void * user_data);
+void observe_string_cb(const char * start, unsigned int n, void * user_data) noexcept;
 
-inline void * observe_string_cb_data(std::string & out)
+inline void * observe_string_cb_data(std::string & out) noexcept
 {
     return (void *) &out;
 };

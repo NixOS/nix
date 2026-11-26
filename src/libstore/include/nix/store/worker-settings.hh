@@ -15,7 +15,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {})
-        : BaseSetting<unsigned int>(def, true, name, description, aliases)
+        : BaseSetting(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }

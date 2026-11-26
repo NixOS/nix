@@ -29,7 +29,7 @@ public:
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {})
-        : BaseSetting<bool>(false, true, name, description, aliases, std::nullopt)
+        : BaseSetting(false, true, name, description, aliases, std::nullopt)
         , target(target)
         , targetName(targetName)
     {

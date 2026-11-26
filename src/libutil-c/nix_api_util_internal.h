@@ -7,8 +7,6 @@
 #include "nix/util/error.hh"
 #include "nix_api_util.h"
 
-extern "C" {
-
 struct nix_c_context
 {
     nix_err last_err_code = NIX_OK;
@@ -18,7 +16,9 @@ struct nix_c_context
     std::string name = "";
 };
 
-nix_err nix_context_error(nix_c_context * context);
+extern "C" {
+
+nix_err nix_context_error(nix_c_context * context) NIXC_NOEXCEPT;
 
 /**
  * Internal use only.
@@ -32,7 +32,8 @@ nix_err nix_context_error(nix_c_context * context);
  * @return NIX_OK if there were no errors.
  * @see nix_get_string_callback
  */
-nix_err call_nix_get_string_callback(const std::string_view str, nix_get_string_callback callback, void * user_data);
+nix_err call_nix_get_string_callback(const std::string_view str, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT;
 
 #define NIXC_CATCH_ERRS                    \
     catch (...)                            \

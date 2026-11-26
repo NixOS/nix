@@ -216,7 +216,9 @@ class CanonicalisingRestoreHooks : public RestoreSinkHooks
 #if NIX_SUPPORT_ACL
     const StringSet & ignoredAcls;
 #endif
+#ifndef __linux__
     bool symlinkPermissionsUnsupported = false;
+#endif
 
     void canonicaliseTimestampAndPermissions(Descriptor fd, mode_t mode)
     {

@@ -507,8 +507,8 @@ template<>
 class Setting<AbsolutePath> : public BaseSetting<AbsolutePath>
 {
 public:
-    using BaseSetting<AbsolutePath>::BaseSetting;
-    using BaseSetting<AbsolutePath>::operator=;
+    using BaseSetting::BaseSetting;
+    using BaseSetting::operator=;
 
     Setting(
         Config * options,
@@ -518,7 +518,7 @@ public:
         const StringSet & aliases = {},
         const bool documentDefault = true,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<AbsolutePath>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
+        : BaseSetting(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
     {
         options->addSetting(this);
     }

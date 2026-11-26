@@ -19,7 +19,7 @@
 
 extern "C" {
 
-nix_err nix_libstore_init(nix_c_context * context)
+nix_err nix_libstore_init(nix_c_context * context) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -29,7 +29,7 @@ nix_err nix_libstore_init(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_libstore_init_no_load_config(nix_c_context * context)
+nix_err nix_libstore_init_no_load_config(nix_c_context * context) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -39,7 +39,7 @@ nix_err nix_libstore_init_no_load_config(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
-Store * nix_store_open(nix_c_context * context, const char * uri, const char *** params)
+Store * nix_store_open(nix_c_context * context, const char * uri, const char *** params) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -61,12 +61,13 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_store_free(Store * store)
+void nix_store_free(Store * store) NIXC_NOEXCEPT
 {
     delete store;
 }
 
 nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -77,8 +78,8 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string
     NIXC_CATCH_ERRS
 }
 
-nix_err
-nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
+nix_err nix_store_get_storedir(
+    nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -88,8 +89,8 @@ nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_ca
     NIXC_CATCH_ERRS
 }
 
-nix_err
-nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data)
+nix_err nix_store_get_version(
+    nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -100,7 +101,7 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
     NIXC_CATCH_ERRS
 }
 
-bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path)
+bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -112,6 +113,7 @@ bool nix_store_is_valid_path(nix_c_context * context, Store * store, const Store
 
 nix_err nix_store_real_path(
     nix_c_context * context, Store * store, StorePath * path, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -123,7 +125,7 @@ nix_err nix_store_real_path(
     NIXC_CATCH_ERRS
 }
 
-StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path)
+StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -142,7 +144,7 @@ nix_err nix_store_get_fs_closure(
     bool include_outputs,
     bool include_derivers,
     void * userdata,
-    void (*callback)(nix_c_context * context, void * userdata, const StorePath * store_path))
+    void (*callback)(nix_c_context * context, void * userdata, const StorePath * store_path)) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -169,7 +171,7 @@ nix_err nix_store_realise(
     Store * store,
     StorePath * path,
     void * userdata,
-    void (*callback)(void * userdata, const char *, const StorePath *))
+    void (*callback)(void * userdata, const char *, const StorePath *)) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -201,23 +203,23 @@ nix_err nix_store_realise(
     NIXC_CATCH_ERRS
 }
 
-void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data)
+void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data) NIXC_NOEXCEPT
 {
     std::string_view name = store_path->path.name();
     callback(name.data(), name.size(), user_data);
 }
 
-void nix_store_path_free(StorePath * sp)
+void nix_store_path_free(StorePath * sp) NIXC_NOEXCEPT
 {
     delete sp;
 }
 
-void nix_derivation_free(nix_derivation * drv)
+void nix_derivation_free(nix_derivation * drv) NIXC_NOEXCEPT
 {
     delete drv;
 }
 
-StorePath * nix_store_path_clone(const StorePath * p)
+StorePath * nix_store_path_clone(const StorePath * p) NIXC_NOEXCEPT
 {
     try {
         return new StorePath{p->path};
@@ -226,12 +228,8 @@ StorePath * nix_store_path_clone(const StorePath * p)
     }
 }
 
-} // extern "C"
-
-extern "C" {
-
-nix_err
-nix_store_path_hash(nix_c_context * context, const StorePath * store_path, nix_store_path_hash_part * hash_part_out)
+nix_err nix_store_path_hash(
+    nix_c_context * context, const StorePath * store_path, nix_store_path_hash_part * hash_part_out) NIXC_NOEXCEPT
 {
     try {
         auto hashPart = store_path->path.hashPart();
@@ -246,7 +244,7 @@ nix_store_path_hash(nix_c_context * context, const StorePath * store_path, nix_s
 }
 
 StorePath * nix_store_create_from_parts(
-    nix_c_context * context, const nix_store_path_hash_part * hash, const char * name, size_t name_len)
+    nix_c_context * context, const nix_store_path_hash_part * hash, const char * name, size_t name_len) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -265,7 +263,7 @@ StorePath * nix_store_create_from_parts(
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_derivation * nix_derivation_clone(const nix_derivation * d)
+nix_derivation * nix_derivation_clone(const nix_derivation * d) NIXC_NOEXCEPT
 {
     try {
         return new nix_derivation{d->drv};
@@ -274,7 +272,7 @@ nix_derivation * nix_derivation_clone(const nix_derivation * d)
     }
 }
 
-nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json)
+nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -286,6 +284,7 @@ nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store
 
 nix_err nix_derivation_to_json(
     nix_c_context * context, const nix_derivation * drv, nix_get_string_callback callback, void * userdata)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -298,7 +297,7 @@ nix_err nix_derivation_to_json(
     NIXC_CATCH_ERRS
 }
 
-StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation)
+StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -315,7 +314,8 @@ StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_deriv
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path)
+nix_err
+nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -327,7 +327,8 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
     NIXC_CATCH_ERRS
 }
 
-nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * store, const StorePath * path)
+nix_derivation *
+nix_store_drv_from_store_path(nix_c_context * context, Store * store, const StorePath * path) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -337,7 +338,7 @@ nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * 
     NIXC_CATCH_ERRS_NULL
 }
 
-StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store * store, const char * hash)
+StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store * store, const char * hash) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -355,6 +356,7 @@ StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store *
 
 nix_err nix_store_copy_path(
     nix_c_context * context, Store * srcStore, Store * dstStore, const StorePath * path, bool repair, bool checkSigs)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;

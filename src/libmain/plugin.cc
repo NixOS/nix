@@ -1,19 +1,27 @@
-#ifndef _WIN32
-#  include <dlfcn.h>
-#endif
+#include "nix/main/plugin.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/system-error.hh"
 
 #include <filesystem>
 
-#include "nix/util/config-global.hh"
-#include "nix/util/signals.hh"
-#include "nix/util/file-system.hh"
-#include "nix/util/system-error.hh"
+#ifndef _WIN32
+#  include <dlfcn.h>
+#endif
 
 namespace nix {
 
 struct PluginFilesSetting : public BaseSetting<std::list<std::filesystem::path>>
 {
-    bool pluginsLoaded = false;
+    enum class LoadState {
+        NotLoaded,
+        InProgress,
+        Loaded,
+    };
+
+    LoadState pluginsLoaded = LoadState::NotLoaded;
 
     PluginFilesSetting(
         Config * options,
@@ -21,7 +29,7 @@ struct PluginFilesSetting : public BaseSetting<std::list<std::filesystem::path>>
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {})
-        : BaseSetting<std::list<std::filesystem::path>>(def, true, name, description, aliases)
+        : BaseSetting(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
@@ -31,10 +39,10 @@ struct PluginFilesSetting : public BaseSetting<std::list<std::filesystem::path>>
 
 std::list<std::filesystem::path> PluginFilesSetting::parse(const std::string & str) const
 {
-    if (pluginsLoaded)
+    if (pluginsLoaded != LoadState::NotLoaded)
         throw UsageError(
             "plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<std::list<std::filesystem::path>>::parse(str);
+    return BaseSetting::parse(str);
 }
 
 struct PluginSettings : Config
@@ -54,8 +62,10 @@ struct PluginSettings : Config
           command, and RegisterSetting to add new nix config settings. See the
           constructors for those types for more details.
 
-          Warning! These APIs are inherently unstable and may change from
-          release to release.
+          Plugins should prefer to use the C bindings, which expose a stable ABI
+          and look up necessary functions via `dlsym`.
+
+          The C++ API is unstable and is not ABI compatible even across patch releases.
 
           Since these files are loaded into the same address space as Nix
           itself, they must be DSOs compatible with the instance of Nix
@@ -75,7 +85,29 @@ static GlobalConfig::Register rPluginSettings(&pluginSettings);
 
 void initPlugins()
 {
-    assert(!pluginSettings.pluginFiles.pluginsLoaded);
+    auto & pluginsLoaded = pluginSettings.pluginFiles.pluginsLoaded;
+
+    using LoadState = PluginFilesSetting::LoadState;
+
+    if (pluginsLoaded != LoadState::NotLoaded) {
+        /* Prevent re-entrant calls to e.g. nix_init_plugins. */
+        if (pluginsLoaded == LoadState::InProgress)
+            throw Error(
+                "seems like a plugin attempted to call nix_init_plugins in nix_plugin_entry; this is not allowed");
+        throw Error("plugins should only be loaded once, preferably at startup");
+    }
+
+    /* To prevent plugins from re-entering this code, which would be unsafe and
+       recurse potentially which we really don't want. */
+    pluginsLoaded = LoadState::InProgress;
+
+    /* Pray that nothing attempts to call into initPlugins after it fails since
+       then we'd attempt to load the same plugins again. */
+    Finally restoreState{[&]() {
+        if (pluginsLoaded != LoadState::Loaded)
+            pluginsLoaded = LoadState::NotLoaded;
+    }};
+
     for (const auto & pluginFile : pluginSettings.pluginFiles.get()) {
         std::vector<std::filesystem::path> pluginFiles;
         try {
@@ -100,7 +132,7 @@ void initPlugins()
 
             /* Older plugins use a statically initialized object to run their code.
                Newer plugins can also export nix_plugin_entry() */
-            void (*nix_plugin_entry)() = (void (*)()) dlsym(handle, "nix_plugin_entry");
+            void (*nix_plugin_entry)(void) = (void (*)(void)) dlsym(handle, "nix_plugin_entry");
             if (nix_plugin_entry)
                 nix_plugin_entry();
 #else
@@ -113,9 +145,8 @@ void initPlugins()
        unknown settings. */
     globalConfig.reapplyUnknownSettings();
     globalConfig.warnUnknownSettings();
-
-    /* Tell the user if they try to set plugin-files after we've already loaded */
-    pluginSettings.pluginFiles.pluginsLoaded = true;
+    /* Prevent further calls into this function. */
+    pluginsLoaded = LoadState::Loaded;
 }
 
 } // namespace nix

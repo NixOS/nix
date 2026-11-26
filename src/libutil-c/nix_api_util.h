@@ -17,6 +17,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* The noexcept specifier doesn't affect ABI, but does help us ensure that exceptions
+   never propagate out of the C bindings, which is pretty much equivalent to a std::terminate
+   when called from C code. Unwinding into another language is risky and likely to result
+   in undefined behavior, even though it can appear to work if e.g. C code is compiled with .eh_frames. */
+#ifdef __cplusplus
+#  define NIXC_NOEXCEPT noexcept
+#else
+#  define NIXC_NOEXCEPT __attribute__((nothrow))
+#endif
+
 // cffi start
 
 /** @defgroup errors Handling errors
@@ -29,7 +40,7 @@ extern "C" {
  * Error information will be stored in this context, and can be retrieved
  * using nix_err_code and nix_err_msg.
  *
- * Passing NULL instead will cause the API to throw C++ errors.
+ * Passing NULL will terminate the process on an error condition.
  *
  * Example:
  * @code{.c}
@@ -145,8 +156,8 @@ typedef enum nix_verbosity nix_verbosity;
  * Passed as a first parameter to functions that can fail, to store error
  * information.
  *
- * Optional wherever it can be used, passing NULL instead will throw a C++
- * exception.
+ * Optional wherever it can be used, passing NULL will terminate the process
+ * on errors.
  *
  * The struct is laid out so that it can also be cast to nix_err* to inspect
  * directly:
@@ -169,22 +180,23 @@ typedef struct nix_c_context nix_c_context;
  * @param[in] n the string length.
  * @param[in] user_data optional, arbitrary data, passed to the nix_get_string_callback when it's called.
  */
-typedef void (*nix_get_string_callback)(const char * start, unsigned int n, void * user_data);
+typedef void (*nix_get_string_callback)(const char * start, unsigned int n, void * user_data) NIXC_NOEXCEPT;
 
 // Function prototypes
 
 /**
  * @brief Allocate a new nix_c_context.
- * @throws std::bad_alloc
- * @return allocated nix_c_context, owned by the caller. Free using
- * `nix_c_context_free`.
+ * @return allocated nix_c_context, owned by the caller. Free using @ref nix_c_context_free.
+ *         nullptr on allocation failures. If you see this returning a nullptr the process
+ *         is likely beyond recovery and the only avenue is to terminate.
  */
-nix_c_context * nix_c_context_create();
+nix_c_context * nix_c_context_create() NIXC_NOEXCEPT;
+
 /**
  * @brief Free a nix_c_context. Does not fail.
- * @param[out] context The context to free, mandatory.
+ * @param[in] context The context to free. Can be NULL.
  */
-void nix_c_context_free(nix_c_context * context);
+void nix_c_context_free(nix_c_context * context) NIXC_NOEXCEPT;
 /**
  *  @}
  */
@@ -199,7 +211,7 @@ void nix_c_context_free(nix_c_context * context);
  * @return NIX_OK if the initialization is successful, or an error code
  * otherwise.
  */
-nix_err nix_libutil_init(nix_c_context * context);
+nix_err nix_libutil_init(nix_c_context * context) NIXC_NOEXCEPT;
 
 /** @defgroup settings Nix configuration settings
  *  @{
@@ -218,7 +230,8 @@ nix_err nix_libutil_init(nix_c_context * context);
  * @return NIX_ERR_KEY if the setting is unknown, or NIX_OK if the setting was retrieved
  * successfully.
  */
-nix_err nix_setting_get(nix_c_context * context, const char * key, nix_get_string_callback callback, void * user_data);
+nix_err nix_setting_get(nix_c_context * context, const char * key, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief Sets a setting in the nix global configuration.
@@ -234,7 +247,7 @@ nix_err nix_setting_get(nix_c_context * context, const char * key, nix_get_strin
  * @return NIX_ERR_KEY if the setting is unknown, or NIX_OK if the setting was
  * set successfully.
  */
-nix_err nix_setting_set(nix_c_context * context, const char * key, const char * value);
+nix_err nix_setting_set(nix_c_context * context, const char * key, const char * value) NIXC_NOEXCEPT;
 
 /**
  *  @}
@@ -247,7 +260,7 @@ nix_err nix_setting_set(nix_c_context * context, const char * key, const char * 
  * Does not fail.
  * @return A static string representing the version of the nix library.
  */
-const char * nix_version_get();
+const char * nix_version_get() NIXC_NOEXCEPT;
 
 /** @addtogroup errors
  *  @{
@@ -263,12 +276,12 @@ const char * nix_version_get();
  * @param[in] ctx the context to retrieve the error message from
  * @param[out] n optional: a pointer to an unsigned int that is set to the
  * length of the error.
- * @return nullptr if no error message was ever set,
+ * @return NULL if no error message was ever set,
  *         a borrowed pointer to the error message otherwise, which is valid
  *         until the next call to a Nix function, or until the context is
  *         destroyed.
  */
-const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, unsigned int * n);
+const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, unsigned int * n) NIXC_NOEXCEPT;
 
 /**
  * @brief Retrieves the error message from errorInfo in a context.
@@ -287,7 +300,8 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, uns
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
 nix_err nix_err_info_msg(
-    nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data);
+    nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief Retrieves the error name from a context.
@@ -306,7 +320,8 @@ nix_err nix_err_info_msg(
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
 nix_err nix_err_name(
-    nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data);
+    nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief Retrieves the most recent error code from a nix_c_context
@@ -315,24 +330,26 @@ nix_err nix_err_name(
  *
  * Does not fail
  *
- * @param[in] read_context the context to retrieve the error message from
+ * @param[in] read_context the context to retrieve the error message from.
+ *            Must not be NULL.
  * @return most recent error code stored in the context.
  */
-nix_err nix_err_code(const nix_c_context * read_context);
+nix_err nix_err_code(const nix_c_context * read_context) NIXC_NOEXCEPT;
 
 /**
  * @brief Set an error message on a nix context.
  *
- * This should be used when you want to throw an error from a PrimOp callback.
+ * This should be used when you want to report an error from a PrimOp callback.
  *
  * All other use is internal to the API.
  *
- * @param context context to write the error message to, required unless C++ exceptions are supported
+ * @param context context to write the error message to. Must not be NULL
  * @param err The error code to set and return
  * @param msg The error message to set. This string is copied.
+ *            Must not be NULL
  * @returns the error code set
  */
-nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
+nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg) NIXC_NOEXCEPT;
 
 /**
  * @brief Clear the error message from a nix context.
@@ -352,8 +369,11 @@ nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
  * 4. The handled error is raised again, from an unrelated call.
  *
  * This failure can be avoided by clearing the error message after handling it.
+ *
+ * @param[out] context The context to clear the error from. This function is a no-op
+ *                     when @p context is NULL.
  */
-void nix_clear_err(nix_c_context * context);
+void nix_clear_err(nix_c_context * context) NIXC_NOEXCEPT;
 
 /**
  * @brief Sets the verbosity level
@@ -361,7 +381,7 @@ void nix_clear_err(nix_c_context * context);
  * @param[out] context Optional, additional error context.
  * @param[in] level Verbosity level
  */
-nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level);
+nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level) NIXC_NOEXCEPT;
 
 /**
  *  @}

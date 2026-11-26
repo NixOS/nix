@@ -7,12 +7,13 @@
 
 #include <cxxabi.h>
 #include <typeinfo>
+#include <utility>
 
 #include "nix_api_util_config.h"
 
 extern "C" {
 
-nix_c_context * nix_c_context_create()
+nix_c_context * nix_c_context_create() NIXC_NOEXCEPT
 {
     try {
         return new nix_c_context();
@@ -21,16 +22,22 @@ nix_c_context * nix_c_context_create()
     }
 }
 
-void nix_c_context_free(nix_c_context * context)
+void nix_c_context_free(nix_c_context * context) NIXC_NOEXCEPT
 {
     delete context;
 }
 
-nix_err nix_context_error(nix_c_context * context)
+nix_err nix_context_error(nix_c_context * context) NIXC_NOEXCEPT
 {
+    /* We have no other possible avenue for reporting the error other than panicking. */
     if (context == nullptr) {
-        throw;
+        try {
+            throw;
+        } catch (...) {
+            std::terminate();
+        }
     }
+
     try {
         throw;
     } catch (nix::Error & e) {
@@ -51,28 +58,33 @@ nix_err nix_context_error(nix_c_context * context)
         context->last_err = e.what();
         context->last_err_code = NIX_ERR_UNKNOWN;
         return context->last_err_code;
+    } catch (...) {
+        std::terminate();
     }
-    // unreachable
 }
 
-nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg)
+nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg) NIXC_NOEXCEPT
 {
+    assert(msg); /* Otherwise the copy into last_err below is UB. */
     if (context == nullptr) {
-        // todo last_err_code
-        throw nix::Error("Nix C api error: %s", msg);
+        nix::panic(
+            nix::fmt(
+                "nix_set_err_msg called without context with error code %d% and error message %s",
+                std::to_underlying(err),
+                msg));
     }
     context->last_err_code = err;
     context->last_err = msg;
     return err;
 }
 
-void nix_clear_err(nix_c_context * context)
+void nix_clear_err(nix_c_context * context) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
 }
 
-const char * nix_version_get()
+const char * nix_version_get() NIXC_NOEXCEPT
 {
     return PACKAGE_VERSION;
 }
@@ -80,6 +92,7 @@ const char * nix_version_get()
 // Implementations
 
 nix_err nix_setting_get(nix_c_context * context, const char * key, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -95,7 +108,7 @@ nix_err nix_setting_get(nix_c_context * context, const char * key, nix_get_strin
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_setting_set(nix_c_context * context, const char * key, const char * value)
+nix_err nix_setting_set(nix_c_context * context, const char * key, const char * value) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -106,7 +119,7 @@ nix_err nix_setting_set(nix_c_context * context, const char * key, const char * 
     }
 }
 
-nix_err nix_libutil_init(nix_c_context * context)
+nix_err nix_libutil_init(nix_c_context * context) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -117,7 +130,7 @@ nix_err nix_libutil_init(nix_c_context * context)
     NIXC_CATCH_ERRS
 }
 
-const char * nix_err_msg(nix_c_context * context, const nix_c_context * read_context, unsigned int * n)
+const char * nix_err_msg(nix_c_context * context, const nix_c_context * read_context, unsigned int * n) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -132,6 +145,7 @@ const char * nix_err_msg(nix_c_context * context, const nix_c_context * read_con
 
 nix_err nix_err_name(
     nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -143,6 +157,7 @@ nix_err nix_err_name(
 
 nix_err nix_err_info_msg(
     nix_c_context * context, const nix_c_context * read_context, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -152,19 +167,20 @@ nix_err nix_err_info_msg(
     return call_nix_get_string_callback(read_context->info->msg.str(), callback, user_data);
 }
 
-nix_err nix_err_code(const nix_c_context * read_context)
+nix_err nix_err_code(const nix_c_context * read_context) NIXC_NOEXCEPT
 {
     return read_context->last_err_code;
 }
 
 // internal
 nix_err call_nix_get_string_callback(const std::string_view str, nix_get_string_callback callback, void * user_data)
+    NIXC_NOEXCEPT
 {
     callback(str.data(), str.size(), user_data);
     return NIX_OK;
 }
 
-nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level)
+nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;

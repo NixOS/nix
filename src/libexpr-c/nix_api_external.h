@@ -44,7 +44,7 @@ typedef struct nix_string_context nix_string_context;
  * @param[out] str the nix_string_return to write to
  * @param[in]  c   The string to copy
  */
-void nix_set_string_return(nix_string_return * str, const char * c);
+void nix_set_string_return(nix_string_return * str, const char * c) NIXC_NOEXCEPT;
 
 /**
  * Print to the nix_printer
@@ -54,7 +54,7 @@ void nix_set_string_return(nix_string_return * str, const char * c);
  * @param[in] str The string to print
  * @returns NIX_OK if everything worked
  */
-nix_err nix_external_print(nix_c_context * context, nix_printer * printer, const char * str);
+nix_err nix_external_print(nix_c_context * context, nix_printer * printer, const char * str) NIXC_NOEXCEPT;
 
 /**
  * Add string context to the nix_string_context object
@@ -63,7 +63,8 @@ nix_err nix_external_print(nix_c_context * context, nix_printer * printer, const
  * @param[in] c The context string to add
  * @returns NIX_OK if everything worked
  */
-nix_err nix_external_add_string_context(nix_c_context * context, nix_string_context * string_context, const char * c);
+nix_err nix_external_add_string_context(nix_c_context * context, nix_string_context * string_context, const char * c)
+    NIXC_NOEXCEPT;
 
 /**
  * @brief Definition for a class of external values
@@ -179,7 +180,8 @@ typedef struct NixCExternalValueDesc
  * @returns external value, owned by the garbage collector
  * @see nix_init_external
  */
-ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v);
+ExternalValue *
+nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v) NIXC_NOEXCEPT;
 
 /**
  * @brief Extract the pointer from a Nix C API external value.
@@ -189,7 +191,7 @@ ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalV
  * API.
  * @see nix_get_external
  */
-void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b);
+void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b) NIXC_NOEXCEPT;
 
 // cffi end
 #ifdef __cplusplus

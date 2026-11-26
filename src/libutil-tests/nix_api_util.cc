@@ -53,7 +53,7 @@ TEST_F(nix_api_util_context, nix_setting_set)
 TEST_F(nix_api_util_context, nix_err_msg)
 {
     // no error
-    EXPECT_THROW(nix_err_msg(nullptr, ctx, NULL), nix::Error);
+    EXPECT_DEATH(nix_err_msg(nullptr, ctx, NULL), "nix_set_err_msg called without context");
 
     // set error
     nix_set_err_msg(ctx, NIX_ERR_UNKNOWN, "unknown test error");

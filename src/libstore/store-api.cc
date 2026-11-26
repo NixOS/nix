@@ -65,7 +65,7 @@ static std::string canonStoreDir(std::filesystem::path path)
 }
 
 StoreConfigBase::StoreDirSetting::StoreDirSetting(Config * options, FilePathType pathType)
-    : BaseSetting<std::string>(
+    : BaseSetting(
           [pathType]() -> std::string {
               auto envOverrides = getEnvOsNonEmpty(OS_STR("NIX_STORE_DIR")).or_else([] {
                   return getEnvOsNonEmpty(OS_STR("NIX_STORE"));

@@ -13,12 +13,12 @@
 
 extern "C" {
 
-void nix_set_string_return(nix_string_return * str, const char * c)
+void nix_set_string_return(nix_string_return * str, const char * c) NIXC_NOEXCEPT
 {
     str->str = c;
 }
 
-nix_err nix_external_print(nix_c_context * context, nix_printer * printer, const char * c)
+nix_err nix_external_print(nix_c_context * context, nix_printer * printer, const char * c) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -28,7 +28,7 @@ nix_err nix_external_print(nix_c_context * context, nix_printer * printer, const
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_external_add_string_context(nix_c_context * context, nix_string_context * ctx, const char * c)
+nix_err nix_external_add_string_context(nix_c_context * context, nix_string_context * ctx, const char * c) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -172,7 +172,7 @@ public:
 
 extern "C" {
 
-ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v)
+ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -188,7 +188,7 @@ ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalV
     NIXC_CATCH_ERRS_NULL
 }
 
-void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b)
+void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
