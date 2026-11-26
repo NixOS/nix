@@ -232,29 +232,13 @@ try {
         throw BadURL("'%s' is not a valid URL: %s", base.to_string(), e.code().message());
     }
 
-    boost::urls::url_view url;
     try {
-        url = urlS;
-        resolved.resolve(url).value();
+        resolved.resolve(boost::urls::url_view{urlS}).value();
     } catch (boost::system::system_error & e) {
         throw BadURL("'%s' is not a valid URL: %s", urlS, e.code().message());
     }
 
-    auto ret = fromBoostUrlView(resolved, /*lenient=*/false);
-
-    /* Hack: Boost `url_view` supports Zone IDs, but `url` does not.
-       Just manually take the authority from the original URL to work
-       around it. See https://github.com/boostorg/url/issues/919 for
-       details. */
-    if (!url.has_authority()) {
-        ret.authority = base.authority;
-    }
-
-    /* Hack, work around fragment of base URL improperly being preserved
-       https://github.com/boostorg/url/issues/920 */
-    ret.fragment = url.has_fragment() ? std::string{url.fragment()} : "";
-
-    return ret;
+    return fromBoostUrlView(resolved, /*lenient=*/false);
 } catch (BadURL & e) {
     e.addTrace({}, "while resolving possibly-relative url '%s' against base URL '%s'", urlS, base);
     throw;
