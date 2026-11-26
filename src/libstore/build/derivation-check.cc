@@ -84,7 +84,8 @@ void checkOutputs(
     const StorePath & drvPath,
     const BasicDerivation & drv,
     const decltype(DerivationOptions<StorePath>::outputChecks) & outputChecks,
-    const std::map<std::string, ValidPathInfo> & outputs)
+    const std::map<std::string, ValidPathInfo> & outputs,
+    const std::map<std::string, StorePath> & outputPaths)
 {
     std::map<StorePath, const ValidPathInfo &> outputsByPath;
     for (auto & output : outputs)
@@ -180,8 +181,19 @@ void checkOutputs(
                         overloaded{
                             [&](const StorePath & path) { spec.insert(path); },
                             [&](const OutputName & refOutputName) {
+                                /* First look among the outputs actually being
+                                   checked in this call (freshly built, or
+                                   rebuilt for bmCheck). If not found there,
+                                   fall back to `outputPaths`, which also
+                                   covers outputs that were already valid
+                                   before this build and so were never
+                                   re-registered (and thus never checked
+                                   themselves) -- they are still legitimate
+                                   targets for a sibling's reference check. */
                                 if (auto output = get(outputs, refOutputName))
                                     spec.insert(output->path);
+                                else if (auto path = get(outputPaths, refOutputName))
+                                    spec.insert(*path);
                                 else {
                                     throw BuildError(
                                         BuildResult::Failure::OutputRejected,
@@ -191,7 +203,7 @@ void checkOutputs(
                                         store.printStorePath(drvPath),
                                         outputName,
                                         refOutputName,
-                                        concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; }));
+                                        concatMapStringsSep(", ", drv.outputs, [](auto & o) { return o.first; }));
                                 }
                             }},
                         i);
