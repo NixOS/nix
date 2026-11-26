@@ -169,6 +169,9 @@ public:
 
 std::ostream & operator<<(std::ostream & str, const ExternalValueBase & v);
 
+/**
+ * The elements of a list value before Value::mkList().
+ */
 class ListBuilder
 {
     const size_t size_;

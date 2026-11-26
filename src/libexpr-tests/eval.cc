@@ -234,6 +234,21 @@ TEST_F(EvalStateTest, extensionHooks)
     ASSERT_EQ(ext.nrResets, 1);
 }
 
+/* Check the elements start out as nullptr, so that the C API can
+ * in turn check that the caller uses the API correctly. We are not
+ * required to do this, but since we fixed the documentation only
+ * in 2.37, the C API makes the extra effort to make sure the
+ * problems in the ecosystem are exposed in a clear way.
+ */
+TEST_F(EvalStateTest, buildList_elementsStartNull)
+{
+    for (size_t size = 0; size <= 4; size++) {
+        auto list = state.buildList(size);
+        EXPECT_EQ(std::vector<Value *>(size, nullptr), std::vector<Value *>(list.begin(), list.end()))
+            << "size " << size;
+    }
+}
+
 class PureEvalTest : public LibExprTest
 {
 public:
