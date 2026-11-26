@@ -58,7 +58,6 @@ if build_both_libraries
     'nixmainc',
     sources,
     kwargs : library_kwargs,
-    override_options : [ 'b_lto=false' ],
   )
 else
   this_library = library(

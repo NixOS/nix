@@ -66,7 +66,6 @@ if build_both_libraries
     'nixfetchersc',
     sources,
     kwargs : library_kwargs,
-    override_options : [ 'b_lto=false' ],
   )
 else
   this_library = library(
