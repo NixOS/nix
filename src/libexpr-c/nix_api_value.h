@@ -592,8 +592,13 @@ nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalVa
 /** @brief Create a list from a list builder
  * @ingroup value_create
  *
+ * The list has the size that was given to nix_make_list_builder().
+ *
  * After this call, the list builder becomes invalid and cannot be used again.
  * The only necessary next step is to free it with nix_list_builder_free().
+ *
+ * @pre Every index below the size has been set with nix_list_builder_insert().
+ * Otherwise, the behavior is undefined.
  *
  * @param[out] context Optional, stores error information
  * @param[in] list_builder list builder to use
@@ -607,15 +612,20 @@ nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, nix_v
  * @ingroup value_create
  * @param[out] context Optional, stores error information
  * @param[in] state nix evaluator state
- * @param[in] capacity how many bindings you'll add. Don't exceed.
+ * @param[in] size the size of the list that nix_make_list() creates
  * @return list builder. Call nix_list_builder_free() when you're done.
  */
-ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t capacity) NIXC_NOEXCEPT;
+ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t size) NIXC_NOEXCEPT;
 
-/** @brief Insert bindings into a builder
+/** @brief Set the list element at an index
+ * @ingroup value_create
+ *
+ * @pre `index` is less than the size that was given to nix_make_list_builder().
+ * Otherwise, the behavior is undefined.
+ *
  * @param[out] context Optional, stores error information
  * @param[in] list_builder ListBuilder to insert into
- * @param[in] index index to manipulate
+ * @param[in] index index of the element to set
  * @param[in] value value to insert
  * @return error code, NIX_OK on success.
  */

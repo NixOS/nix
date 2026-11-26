@@ -564,12 +564,12 @@ nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalVa
     NIXC_CATCH_ERRS
 }
 
-ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t capacity) NIXC_NOEXCEPT
+ListBuilder * nix_make_list_builder(nix_c_context * context, EvalState * state, size_t size) NIXC_NOEXCEPT
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto builder = state->state.buildList(capacity);
+        auto builder = state->state.buildList(size);
         return new
 #if NIX_USE_BOEHMGC
             (NoGC)
@@ -586,6 +586,13 @@ nix_err nix_list_builder_insert(
         context->last_err_code = NIX_OK;
     try {
         auto & e = check_value_not_null(value);
+        size_t size = list_builder->builder.size();
+        // This check may be removed. The header leaves an
+        // index at or above the size undefined.
+        if (index >= size)
+            nix::panic(
+                nix::fmt(
+                    "nix_list_builder_insert: index %d is out of bounds for a list builder of size %d", index, size));
         list_builder->builder[index] = &e;
     }
     NIXC_CATCH_ERRS
@@ -606,6 +613,17 @@ nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, nix_v
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_out(value);
+        // Note to readers: this check may be removed. It helps callers that
+        // followed the old documentation, which described the size as an upper bound.
+        size_t i = 0;
+        for (auto * e : list_builder->builder) {
+            if (!e)
+                nix::panic(
+                    nix::fmt(
+                        "nix_make_list: element %d was not set. The size given to nix_make_list_builder() must be the exact length of the list.",
+                        i));
+            i++;
+        }
         v.mkList(list_builder->builder);
     }
     NIXC_CATCH_ERRS
