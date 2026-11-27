@@ -1,0 +1,8 @@
+error:
+       … while evaluating a path segment
+         at /pwd/lang/eval-fail-bad-path-concat.nix:1:9:
+            1| ./foo + (x: x)
+             |         ^
+            2|
+
+       error: cannot coerce a function to a string: «lambda @ /pwd/lang/eval-fail-bad-path-concat.nix:1:10»

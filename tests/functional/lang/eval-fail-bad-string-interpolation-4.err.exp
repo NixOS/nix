@@ -1,5 +1,5 @@
 error:
-       … while evaluating a path segment
+       … while evaluating a string interpolation
          at /pwd/lang/eval-fail-bad-string-interpolation-4.nix:19:3:
            18| # The error message should not be too long.
            19| ''${pkgs}''
