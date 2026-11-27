@@ -8,6 +8,7 @@
 
 #include "unix/signals-private.hh"
 
+#include <mutex>
 #include <thread>
 
 namespace nix {
@@ -61,10 +62,21 @@ static Sync<SignalCallbacks> & getSignalCallbacks()
     return *_signalCallbacks;
 }
 
+/* Held while looking up and running a callback, and while deregistering
+   one, so that deregistration waits for running callbacks. This is
+   necessary because callbacks typically refer to objects that are
+   destroyed right after deregistration. */
+static std::mutex & getCallbackMutex()
+{
+    static std::mutex * callbackMutex = new std::mutex();
+    return *callbackMutex;
+}
+
 static void triggerSignalCallbacks(SignalType type)
 {
     SignalCallbacks::Token i = 0;
     while (true) {
+        std::lock_guard callbackLock(getCallbackMutex());
         std::function<void()> callback;
         {
             auto signalCallbacks(getSignalCallbacks().lock());
@@ -209,6 +221,7 @@ struct InterruptCallbackImpl : InterruptCallback
 
     ~InterruptCallbackImpl() override
     {
+        std::lock_guard callbackLock(getCallbackMutex());
         auto signalCallbacks(getSignalCallbacks().lock());
         signalCallbacks->callbacks[type].erase(token);
     }
