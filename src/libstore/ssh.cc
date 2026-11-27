@@ -1,5 +1,5 @@
 #include "nix/store/ssh.hh"
-
+#include "nix/store/filetransfer.hh"
 #include "store-config-private.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/environment-variables.hh"
@@ -120,6 +120,8 @@ void SSHMaster::addCommonSSHOpts(OsStrings & args)
 
     if (authority.port)
         args.push_back(string_to_os_string(fmt("-p%d", *authority.port)));
+
+    args.push_back(string_to_os_string((fmt("-oConnectTimeout=%d", fileTransferSettings.connectTimeout))));
 
     // We use this to make ssh signal back to us that the connection is established.
     // It really does run locally; see createSSHEnv which sets up SHELL to make
