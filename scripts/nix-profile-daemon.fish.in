@@ -24,6 +24,7 @@ end
 # Set up the per-user profile.
 
 set --local NIX_LINK "$HOME/.nix-profile"
+
 set --local NIX_LINK_NEW
 if test -n "$XDG_STATE_HOME"
     set NIX_LINK_NEW "$XDG_STATE_HOME/nix/profile"
