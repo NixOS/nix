@@ -1009,7 +1009,7 @@ void Value::mkPath(const SourcePath & path, EvalMemory & mem)
 }
 
 ListBuilder::ListBuilder(EvalMemory & mem, size_t size)
-    : size(size)
+    : size_(size)
     , elems(size <= 2 ? inlineElems : (Value **) mem.allocBytes<Value *>(size))
 {
 }

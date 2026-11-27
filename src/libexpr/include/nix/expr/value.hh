@@ -171,16 +171,16 @@ std::ostream & operator<<(std::ostream & str, const ExternalValueBase & v);
 
 class ListBuilder
 {
-    const size_t size;
+    const size_t size_;
     Value * inlineElems[2] = {nullptr, nullptr};
 public:
     Value ** elems;
     ListBuilder(EvalMemory & mem, size_t size);
 
     ListBuilder(ListBuilder && x) noexcept
-        : size(x.size)
+        : size_(x.size_)
         , inlineElems{x.inlineElems[0], x.inlineElems[1]}
-        , elems(size <= 2 ? inlineElems : x.elems)
+        , elems(size_ <= 2 ? inlineElems : x.elems)
     {
     }
 
@@ -194,6 +194,11 @@ public:
         return elems[n];
     }
 
+    size_t size() const noexcept
+    {
+        return size_;
+    }
+
     typedef Value ** iterator;
 
     iterator begin()
@@ -203,7 +208,7 @@ public:
 
     iterator end()
     {
-        return &elems[size];
+        return &elems[size_];
     }
 
     friend struct Value;
@@ -1412,7 +1417,7 @@ public:
 
     void mkList(const ListBuilder & builder) noexcept
     {
-        switch (builder.size) {
+        switch (builder.size()) {
         case 0:
             setStorage(List{.size = 0, .elems = nullptr});
             break;
@@ -1423,7 +1428,7 @@ public:
             setStorage(std::array<Value *, 2>{builder.inlineElems[0], builder.inlineElems[1]});
             break;
         default:
-            setStorage(List{.size = builder.size, .elems = builder.elems});
+            setStorage(List{.size = builder.size(), .elems = builder.elems});
             break;
         }
     }
