@@ -38,6 +38,11 @@ public:
     static constexpr std::size_t defaultReserveSize =
         sizeof(void *) >= 8 ? std::size_t(8) << 30 : std::size_t(64) << 20;
 
+    /* Whether new resources ask the kernel for transparent huge pages. A
+       process that creates many short-lived resources can turn this off: the
+       first fault in each huge page range may compact memory synchronously. */
+    static inline bool adviseHugePages = true;
+
     explicit BumpMemoryResource(
         std::size_t reserveSize = defaultReserveSize,
         std::pmr::memory_resource * upstream = std::pmr::new_delete_resource(),
