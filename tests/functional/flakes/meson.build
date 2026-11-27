@@ -4,6 +4,7 @@ suites += {
   'tests' : [
     'flakes.sh',
     'git-rev.sh',
+    'registry.sh',
     'develop.sh',
     'edit.sh',
     'run.sh',

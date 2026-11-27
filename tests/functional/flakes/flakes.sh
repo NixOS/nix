@@ -231,25 +231,6 @@ nix flake metadata --flake-registry '' flake1
 expectStderr 1 nix flake update --flake-registry '' --flake "$flake3Dir" | grepQuiet "cannot find flake 'flake:flake1' in the flake registries"
 rm "$TEST_HOME/.config/nix/registry.json"
 
-# A registry that exists but cannot be read is a warning, not an error.
-if [[ $(id -u) -ne 0 ]]; then
-    cp "$registry" "$TEST_HOME/.config/nix/registry.json"
-    chmod 000 "$TEST_HOME/.config/nix/registry.json"
-    nix registry list 2>&1 | grepQuiet "warning: cannot read flake registry"
-    rm -f "$TEST_HOME/.config/nix/registry.json"
-fi
-nix registry list --flake-registry /dev/null 2>&1 | grepQuiet "warning: cannot read flake registry"
-
-# A relative `--registry` path is relative to the current directory.
-(
-    cd "$TEST_ROOT"
-    nix registry add --registry rel-registry.json flake1 "git+file://$flake1Dir"
-    nix registry add --registry rel-registry.json flake3 "git+file://$percentEncodedFlake3Dir"
-    grepQuiet flake1 rel-registry.json
-    grepQuiet flake3 rel-registry.json
-)
-rm "$TEST_ROOT/rel-registry.json"
-
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf "$TEST_HOME/.cache"
