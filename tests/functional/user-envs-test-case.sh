@@ -213,3 +213,8 @@ mkdir -p "$TEST_ROOT"/real-home/alice/.nix-defexpr/channels
 ln -sfn "$TEST_ROOT"/real-home "$TEST_ROOT"/home
 ln -sfn "$(pwd)"/user-envs.nix "$TEST_ROOT"/home/alice/.nix-defexpr/channels/foo
 HOME=$TEST_ROOT/home/alice nix-env -i foo-0.1
+
+# A relative profile is wrongly taken relative to `/`, not the current
+# directory.
+expectStderr 1 env -C "$profiles" NIX_PROFILE=test nix-env -q \
+    | grepQuiet "path '/test/manifest.nix' does not exist"
