@@ -564,7 +564,7 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
 
         // Try to get the path from the local store or substituters
         try {
-            state.store->getBuilder()->ensurePath(expectedPath);
+            state.ensurePath(expectedPath);
             debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
             state.allowAndSetStorePathString(expectedPath, v);
             return;

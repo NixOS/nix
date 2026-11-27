@@ -159,6 +159,19 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     return res;
 }
 
+void EvalState::ensurePath(const StorePath & path)
+{
+    try {
+        store->getBuilder()->ensurePath(path);
+    } catch (Error &) {
+        /* As `realiseContext()` does for the outputs of import-from-derivation. */
+        buildStore->addTempRoot(path);
+        if (!buildStore->isValidPath(path))
+            throw;
+        copyClosure(*buildStore, *store, StorePathSet{path});
+    }
+}
+
 SourcePath EvalState::realisePath(
     const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks, CopyLazyPaths copyLazyPaths)
 {
@@ -2023,7 +2036,7 @@ static void prim_storePath(EvalState & state, CallSite callSite, Value * const *
         state.error<EvalError>("path '%1%' is not in the Nix store", sourcePath).atPos(noPos).debugThrow();
     auto storePath = state.store->toStorePath(sourcePath.path.abs()).first;
     if (!state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath))) && !settings.readOnlyMode)
-        state.store->getBuilder()->ensurePath(storePath);
+        state.ensurePath(storePath);
     context.insert(NixStringContextElem::Opaque{.path = storePath});
     v.mkString(sourcePath.path.abs(), context, state.mem);
 }
