@@ -132,26 +132,27 @@ LfsApiInfo getLfsApi(ParsedURL url)
 
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
 typedef std::unique_ptr<git_config_entry, Deleter<git_config_entry_free>> GitConfigEntry;
+typedef std::unique_ptr<git_remote, Deleter<git_remote_free>> GitRemote;
 
 static std::string getLfsEndpointUrl(git_repository * repo)
 {
     GitConfig config;
-    if (git_repository_config(Setter(config), repo)) {
+    if (!git_repository_config(Setter(config), repo)) {
         GitConfigEntry entry;
         if (!git_config_get_entry(Setter(entry), config.get(), "lfs.url")) {
-            auto value = std::string(entry->value);
-            if (!value.empty()) {
+            if (entry->value && entry->value[0] != '\0') {
+                auto value = std::string(entry->value);
                 debug("Found explicit lfs.url value: %s", value);
                 return value;
             }
         }
     }
 
-    git_remote * remote = nullptr;
-    if (git_remote_lookup(&remote, repo, "origin"))
+    GitRemote remote;
+    if (git_remote_lookup(Setter(remote), repo, "origin"))
         return "";
 
-    const char * url_c_str = git_remote_url(remote);
+    const char * url_c_str = git_remote_url(remote.get());
     if (!url_c_str)
         return "";
 
