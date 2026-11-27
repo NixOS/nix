@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <widechar_width.h>
 #include <cstdlib> // for ptsname and ptsname_r
+#include <optional>
 
 namespace {
 
@@ -100,21 +101,41 @@ bool shouldANSI(StandardOutputStream fileno)
     return cached[int(fileno) - 1];
 }
 
-static std::string_view eatEscape(std::string_view::const_iterator & i, std::string_view::const_iterator end)
+namespace {
+
+struct Escape
+{
+    std::string_view seq;
+    /**
+     * The bytes between `[` and the final byte of a CSI sequence.
+     */
+    std::string_view csiParams;
+    /**
+     * The final byte of a complete CSI sequence, e.g. `m` for SGR.
+     */
+    std::optional<char> csiFinal;
+};
+
+} // namespace
+
+static Escape eatEscape(std::string_view::const_iterator & i, std::string_view::const_iterator end)
 {
     auto start = i++;
+    std::string_view csiParams;
+    std::optional<char> csiFinal;
 
     if (i != end && *i == '[') {
-        i++;
+        auto paramsStart = ++i;
         // eat parameter bytes
         while (i != end && *i >= 0x30 && *i <= 0x3f)
             i++;
         // eat intermediate bytes
         while (i != end && *i >= 0x20 && *i <= 0x2f)
             i++;
+        csiParams = {paramsStart, i};
         // eat final byte
         if (i != end && *i >= 0x40 && *i <= 0x7e)
-            i++;
+            csiFinal = *i++;
     } else if (i != end && *i == ']') {
         // OSC
         i++;
@@ -137,7 +158,18 @@ static std::string_view eatEscape(std::string_view::const_iterator & i, std::str
             i++;
     }
 
-    return {start, i};
+    return {{start, i}, csiParams, csiFinal};
+}
+
+static unsigned int cursorForwardCount(std::string_view params)
+{
+    unsigned int n = 0;
+    for (char c : params) {
+        if (c < '0' || c > '9')
+            return 1;
+        n = std::min(n * 10 + (c - '0'), 1000u);
+    }
+    return std::max(n, 1u);
 }
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
@@ -150,10 +182,18 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
         if (*i == '\e') {
             auto e = eatEscape(i, s.end());
-            char last = e.size() > 2 && e[1] == '[' ? e.back() : 0;
 
-            if (!filterAll && last == 'm')
-                t += e;
+            if (!filterAll && e.csiFinal == 'm')
+                t += e.seq;
+            else if (e.csiFinal == 'C') {
+                // Cursor forward: some programs (e.g. Wine) move over a cell
+                // instead of printing a space, so keep the gap as spaces.
+                for (auto n = cursorForwardCount(e.csiParams); n > 0; --n) {
+                    if (++w > (size_t) width)
+                        return t;
+                    t += ' ';
+                }
+            }
         }
 
         else if (*i == '\t') {
@@ -188,9 +228,11 @@ std::string stripANSIEscapes(std::string_view s)
     auto i = s.begin();
 
     while (i != s.end()) {
-        if (*i == '\e')
-            eatEscape(i, s.end());
-        else
+        if (*i == '\e') {
+            auto e = eatEscape(i, s.end());
+            if (e.csiFinal == 'C')
+                t.append(cursorForwardCount(e.csiParams), ' ');
+        } else
             t += *i++;
     }
 
