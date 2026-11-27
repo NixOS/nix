@@ -21,6 +21,10 @@ nix __dump-cli | subcommands | while IFS= read -r cmd; do
     nix $cmd --help
 done
 
+# Help is styled on a terminal, or when forced, and plain otherwise.
+(( $(nix help build | grep -c $'\x1b') == 0 ))
+(( $(CLICOLOR_FORCE=1 nix help build | grep -c $'\x1b') > 0 ))
+
 [[ $(type -p man) ]] || skipTest "'man' not installed"
 
 # FIXME: we don't know whether we built the manpages, so we can't
