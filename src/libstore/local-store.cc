@@ -355,7 +355,8 @@ LocalStore::LocalStore(ref<const Config> config)
         state->db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
     state->stmts->UpdatePathInfo.create(
-        state->db, "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
+        state->db,
+        "update ValidPaths set deriver = coalesce(deriver, ?), narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
     state->stmts->AddReference.create(state->db, "insert or replace into Refs (referrer, reference) values (?, ?);");
     state->stmts->QueryPathInfo.create(
         state->db,
@@ -843,6 +844,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmts->UpdatePathInfo.use()
+        .apply(info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
         .apply(info.narSize, info.narSize != 0)
         .apply(info.narHash.to_string(HashFormat::Base16, true))
         .apply(info.ultimate ? 1 : 0, info.ultimate)
