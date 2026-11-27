@@ -220,6 +220,16 @@ const StorePath & DerivedPath::getBaseStorePath() const
     return getBaseStorePath_(*this);
 }
 
+std::vector<OutputName> SingleDerivedPath::Built::outputChain() const
+{
+    std::vector<OutputName> chain{output};
+    for (auto * drv = &*drvPath; auto * inner = std::get_if<SingleDerivedPath::Built>(&drv->raw());
+         drv = &*inner->drvPath)
+        chain.push_back(inner->output);
+    std::ranges::reverse(chain);
+    return chain;
+}
+
 bool SingleDerivedPath::Built::isDynamicDrvOutput() const
 {
     return std::holds_alternative<SingleDerivedPath::Built>(drvPath->raw());

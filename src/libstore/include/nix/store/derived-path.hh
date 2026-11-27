@@ -60,6 +60,13 @@ struct SingleDerivedPathBuilt
     const StorePath & getBaseStorePath() const;
 
     /**
+     * The output names from `getBaseStorePath()` outward, e.g.
+     * `foo`, `bar` for `drv^foo^bar`.
+     * The returned vector is never empty.
+     */
+    std::vector<OutputName> outputChain() const;
+
+    /**
      * Whether this is the output of a dynamic derivation, i.e. the
      * derivation path is itself `Built`.
      */

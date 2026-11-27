@@ -1,0 +1,15 @@
+error:
+       … while calling the 'appendContext' builtin
+         at /pwd/lang/eval-fail-appendContext-nested-without-dynamic-derivations.nix:1:1:
+            1| builtins.appendContext "" {
+             | ^
+            2|   "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = {
+
+       … while evaluating the outputs of string context '/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv'
+         at /pwd/lang/eval-fail-appendContext-nested-without-dynamic-derivations.nix:3:5:
+            2|   "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = {
+            3|     outputs = [
+             |     ^
+            4|       [
+
+       error: experimental Nix feature 'dynamic-derivations' is disabled (nested output selection is a dynamic derivations feature); add '--extra-experimental-features dynamic-derivations' to enable it
