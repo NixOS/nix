@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <cctype>
 #include <ranges>
 #include <optional>
 
@@ -743,6 +744,13 @@ TEST(parseURL, parseFileURL)
     ASSERT_EQ(s, parsed.to_string());
 }
 
+TEST(parseURL, emptyFilePathIsRoot)
+{
+    auto url = parseURL("file://");
+    EXPECT_EQ(url.path, (std::vector<std::string>{"", ""}));
+    EXPECT_EQ(url.to_string(), "file:///");
+}
+
 TEST(parseURL, parseFileURLWithAuthority)
 {
     auto s = "file://///of/your/business//";
@@ -1176,6 +1184,251 @@ INSTANTIATE_TEST_SUITE_P(
             .description = "queryFragmentRelative",
         }),
     [](const auto & info) { return info.param.description; });
+
+/**
+ * A test name from @p index and @p s, keeping only what gtest allows.
+ */
+static std::string testName(size_t index, std::string_view s)
+{
+    std::string res = std::to_string(index);
+    for (char c : s)
+        res += std::isalnum(static_cast<unsigned char>(c)) ? c : '_';
+    return res;
+}
+
+struct ResolveParam
+{
+    std::string_view base;
+    std::string_view relative;
+    std::string_view expected;
+};
+
+class ParseURLRelativeResolve : public ::testing::TestWithParam<ResolveParam>
+{};
+
+TEST_P(ParseURLRelativeResolve, resolves)
+{
+    auto & [base, relative, expected] = GetParam();
+    auto resolved = parseURLRelative(relative, parseURL(base));
+    EXPECT_EQ(resolved, parseURL(expected));
+    EXPECT_EQ(resolved.to_string(), expected);
+}
+
+/**
+ * The examples of RFC 3986, section 5.4, which all resolve against the
+ * same base, plus some with empty segments (`//`), which dot segment
+ * removal keeps (section 5.2.4) but the examples do not cover.
+ *
+ * Where Nix differs from the RFC, the expected value is what Nix gives,
+ * with the RFC's in a comment. Most of these are not about resolution:
+ * Nix drops queries without `=` (`?y`, and the base's `?q`), and
+ * percent-encodes `;` and `=` in paths (`;x`, and the base's `d;p`) and
+ * `/` in fragments (`g#s/./x`).
+ */
+INSTANTIATE_TEST_SUITE_P(
+    rfc3986Examples,
+    ParseURLRelativeResolve,
+    ::testing::ValuesIn([] {
+        static constexpr std::string_view base = "http://a/b/c/d;p?q";
+        return std::vector<ResolveParam>{
+            /* 5.4.1. Normal Examples */
+            {base, "g:h", "g:h"},
+            {base, "g", "http://a/b/c/g"},
+            {base, "./g", "http://a/b/c/g"},
+            {base, "g/", "http://a/b/c/g/"},
+            {base, "/g", "http://a/g"},
+            {base, "//g", "http://g"},
+            {base, "?y", "http://a/b/c/d%3Bp"},   // RFC: http://a/b/c/d;p?y
+            {base, "g?y", "http://a/b/c/g"},      // RFC: http://a/b/c/g?y
+            {base, "#s", "http://a/b/c/d%3Bp#s"}, // RFC: http://a/b/c/d;p?q#s
+            {base, "g#s", "http://a/b/c/g#s"},
+            {base, "g?y#s", "http://a/b/c/g#s"},       // RFC: http://a/b/c/g?y#s
+            {base, ";x", "http://a/b/c/%3Bx"},         // RFC: http://a/b/c/;x
+            {base, "g;x", "http://a/b/c/g%3Bx"},       // RFC: http://a/b/c/g;x
+            {base, "g;x?y#s", "http://a/b/c/g%3Bx#s"}, // RFC: http://a/b/c/g;x?y#s
+            {base, "", "http://a/b/c/d%3Bp"},          // RFC: http://a/b/c/d;p?q
+            {base, ".", "http://a/b/c/"},
+            {base, "./", "http://a/b/c/"},
+            {base, "..", "http://a/b/"},
+            {base, "../", "http://a/b/"},
+            {base, "../g", "http://a/b/g"},
+            {base, "../..", "http://a/"},
+            {base, "../../", "http://a/"},
+            {base, "../../g", "http://a/g"},
+            /* 5.4.2. Abnormal Examples */
+            {base, "../../../g", "http://a/g"},
+            {base, "../../../../g", "http://a/g"},
+            {base, "/./g", "http://a/g"},
+            {base, "/../g", "http://a/g"},
+            {base, "g.", "http://a/b/c/g."},
+            {base, ".g", "http://a/b/c/.g"},
+            {base, "g..", "http://a/b/c/g.."},
+            {base, "..g", "http://a/b/c/..g"},
+            {base, "./../g", "http://a/b/g"},
+            {base, "./g/.", "http://a/b/c/g/"},
+            {base, "g/./h", "http://a/b/c/g/h"},
+            {base, "g/../h", "http://a/b/c/h"},
+            {base, "g;x=1/./y", "http://a/b/c/g%3Bx%3D1/y"}, // RFC: http://a/b/c/g;x=1/y
+            {base, "g;x=1/../y", "http://a/b/c/y"},
+            {base, "g?y/./x", "http://a/b/c/g"},             // RFC: http://a/b/c/g?y/./x
+            {base, "g?y/../x", "http://a/b/c/g"},            // RFC: http://a/b/c/g?y/../x
+            {base, "g#s/./x", "http://a/b/c/g#s%2F.%2Fx"},   // RFC: http://a/b/c/g#s/./x
+            {base, "g#s/../x", "http://a/b/c/g#s%2F..%2Fx"}, // RFC: http://a/b/c/g#s/../x
+            {base, "http:g", "http:g"},
+            /* Empty segments are kept, unlike by `CanonPath`. */
+            {base, "g//h", "http://a/b/c/g//h"},
+            {base, "g//h/../i", "http://a/b/c/g//i"},
+            {base, "g//../i", "http://a/b/c/g/i"},
+            {base, "g//.", "http://a/b/c/g//"},
+            /* A network-path reference has its own path. */
+            {base, "//g/x/../y", "http://g/y"},
+            /* So does a reference with a scheme, and its dot segments are
+               removed too (section 5.2.2). */
+            {base, "http://g/x/../y", "http://g/y"},
+        };
+    }()),
+    [](const auto & info) { return testName(info.index, info.param.relative); });
+
+/**
+ * The empty-path branch of section 5.2.2, which the RFC's base, with its
+ * `;` and its query without `=`, cannot show.
+ */
+INSTANTIATE_TEST_SUITE_P(
+    emptyPath,
+    ParseURLRelativeResolve,
+    ::testing::Values(
+        ResolveParam{"http://a/b/c/d?k=v", "", "http://a/b/c/d?k=v"},
+        ResolveParam{"http://a/b/c/d?k=v", "#s", "http://a/b/c/d?k=v#s"},
+        ResolveParam{"http://a/b/c/d?k=v", "?y=1", "http://a/b/c/d?y=1"}),
+    [](const auto & info) { return testName(info.index, info.param.relative); });
+
+/**
+ * Only an empty path keeps the base's query: the network-path,
+ * absolute-path and merge branches of section 5.2.2 do not.
+ */
+INSTANTIATE_TEST_SUITE_P(
+    baseQuery,
+    ParseURLRelativeResolve,
+    ::testing::Values(
+        ResolveParam{
+            "https://www.example.org/path/index.html?z=3", "other.html", "https://www.example.org/path/other.html"},
+        ResolveParam{
+            "https://www.example.org/path/index.html?z=3", "/other.html", "https://www.example.org/other.html"},
+        ResolveParam{"https://www.example.org/path/index.html?z=3", "//other.org/x", "https://other.org/x"},
+        /* An empty base path, with an authority, merges as `/`
+           (section 5.2.3). */
+        ResolveParam{"http://example.org?z=3", "g", "http://example.org/g"},
+        /* Going above the root of a cache without a path. */
+        ResolveParam{
+            "https://cache.example", "../nar/x", "https://cache.example/../nar/x"}), // RFC: https://cache.example/nar/x
+    [](const auto & info) { return testName(info.index, info.param.relative); });
+
+/**
+ * Bases without an authority, where removing dot segments has to be
+ * careful about the start of the path.
+ */
+INSTANTIATE_TEST_SUITE_P(
+    noAuthority,
+    ParseURLRelativeResolve,
+    ::testing::Values(
+        ResolveParam{"foo:a/b", "../c", "foo:c"},      // RFC: foo:/c
+        ResolveParam{"foo:a/b/c", "../../g", "foo:g"}, // RFC: foo:/g
+        /* A `.` is kept in front of a `//`, which would otherwise be read
+           as an authority. */
+        ResolveParam{"foo:/a", "/.//x", "foo:/.//x"},
+        ResolveParam{"foo:/a", "/.///x", "foo:/.///x"}),
+    [](const auto & info) { return testName(info.index, info.param.relative); });
+
+struct ResolveErrorParam
+{
+    std::string_view base;
+    std::string_view relative;
+    std::string_view message;
+};
+
+class ParseURLRelativeResolveError : public ::testing::TestWithParam<ResolveErrorParam>
+{};
+
+TEST_P(ParseURLRelativeResolveError, throws)
+{
+    auto & [base, relative, message] = GetParam();
+    EXPECT_THAT(
+        [&] { parseURLRelative(relative, parseURL(base)); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher(std::string{message})));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    parseURLRelative,
+    ParseURLRelativeResolveError,
+    ::testing::Values(
+        /* As for `parseURL`, a `file:` URL may not get a host. */
+        ResolveErrorParam{"file:///foo", "//evil/x", "has unexpected authority 'evil'"},
+        /* Errors name the base URL. */
+        ResolveErrorParam{
+            "http://a/b",
+            "http://[bad",
+            "while resolving possibly-relative url 'http://[bad' against base URL 'http://a/b'"}),
+    [](const auto & info) { return testName(info.index, info.param.relative); });
+
+/* ----------------------------------------------------------------------------
+ * ParsedURL::canonicalise
+ * --------------------------------------------------------------------------*/
+
+struct CanonicaliseParam
+{
+    std::string_view url;
+    std::string_view expected;
+};
+
+class ParsedURLCanonicalise : public ::testing::TestWithParam<CanonicaliseParam>
+{};
+
+TEST_P(ParsedURLCanonicalise, canonicalises)
+{
+    auto & [url, expected] = GetParam();
+    EXPECT_EQ(parseURL(url).canonicalise(), parseURL(expected));
+    EXPECT_EQ(parseURL(url).canonicalise().to_string(), expected);
+}
+
+/* Unlike RFC 3986's dot segment removal (section 5.2.4), which is given
+   in the comments where it differs, this is `CanonPath`'s: empty
+   segments and a trailing `/` are dropped too, and the result always
+   starts with `/`. */
+INSTANTIATE_TEST_SUITE_P(
+    ParsedURL,
+    ParsedURLCanonicalise,
+    ::testing::Values(
+        CanonicaliseParam{"http://a/b/./c/../d", "http://a/b/d"},
+        CanonicaliseParam{"http://a/b/c/..", "http://a/b"},  // RFC: http://a/b/
+        CanonicaliseParam{"http://a/b/c/.", "http://a/b/c"}, // RFC: http://a/b/c/
+        CanonicaliseParam{"http://a/../../g", "http://a/g"},
+        CanonicaliseParam{"http://a/b//c/./d/", "http://a/b/c/d"}, // RFC: http://a/b//c/d/
+        CanonicaliseParam{"http://a/b//../c", "http://a/c"},       // RFC: http://a/b/c
+        CanonicaliseParam{"http://a/b/", "http://a/b"},            // RFC: http://a/b/
+        CanonicaliseParam{"foo:a/../b", "foo:/b"},
+        CanonicaliseParam{"foo:/.///x", "foo:/x"}), // RFC: foo:/.///x
+    [](const auto & info) { return testName(info.index, info.param.url); });
+
+/* What Git LFS gets from a remote URL: `Fetch` canonicalises it, and the
+   ssh branch passes the path to `git-lfs-authenticate` as is. */
+class GitLfsRemotePath : public ::testing::TestWithParam<CanonicaliseParam>
+{};
+
+TEST_P(GitLfsRemotePath, canonicalised)
+{
+    auto & [remote, path] = GetParam();
+    EXPECT_EQ(fixGitURL(remote).canonicalise().renderPath(false), path);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ParsedURL,
+    GitLfsRemotePath,
+    ::testing::Values(
+        CanonicaliseParam{"git@host:owner/repo/", "/owner/repo"},
+        CanonicaliseParam{"ssh://git@host/owner/repo/", "/owner/repo"},
+        CanonicaliseParam{"git@host:owner//repo", "/owner/repo"},
+        CanonicaliseParam{"https://git-server.com//", "/"}),
+    [](const auto & info) { return testName(info.index, info.param.url); });
 
 /* ----------------------------------------------------------------------------
  * decodeQuery
