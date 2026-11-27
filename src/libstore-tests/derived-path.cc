@@ -79,6 +79,27 @@ TEST_F(DerivedPathTest, built_built)
 }
 
 /**
+ * The legacy form, which the worker protocol uses, separates every
+ * layer of a doubly-nested `DerivedPath::Built` with `!`.
+ */
+TEST_F(DerivedPathTest, built_built_built_legacy)
+{
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "dynamic-derivations ca-derivations");
+
+    std::string_view built = "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv!foo!bar!baz";
+    auto elem = DerivedPath::parseLegacy(*store, built, mockXpSettings);
+    ASSERT_EQ(elem.to_string_legacy(*store), built);
+    ASSERT_EQ(DerivedPath::parseLegacy(*store, elem.to_string_legacy(*store), mockXpSettings), elem);
+    /* The form older versions printed, with `^` after the innermost
+       derivation. */
+    ASSERT_EQ(
+        DerivedPath::parseLegacy(
+            *store, "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv^foo!bar!baz", mockXpSettings),
+        elem);
+}
+
+/**
  * Without the right experimental features enabled, we cannot parse a
  * complex inductive derived path.
  */
@@ -89,12 +110,7 @@ TEST_F(DerivedPathTest, built_built_xp)
         MissingExperimentalFeature);
 }
 
-/* TODO: Disabled due to the following error:
-
-       path '00000000000000000000000000000000-0^0' is not a valid store path:
-       name '0^0' contains illegal character '^'
-*/
-RC_GTEST_FIXTURE_PROP(DerivedPathTest, DISABLED_prop_legacy_round_rip, (const DerivedPath & o))
+RC_GTEST_FIXTURE_PROP(DerivedPathTest, prop_legacy_round_rip, (const DerivedPath & o))
 {
     ExperimentalFeatureSettings xpSettings;
     xpSettings.set("experimental-features", "dynamic-derivations");

@@ -12,7 +12,7 @@ source common.sh
 # - build `producingDrv`
 # - check that the path of the output coincides with that of the original derivation
 
-out1=$(nix build -f ./text-hashed-output.nix hello --no-link)
+out1=$(nix build -f ./text-hashed-output.nix hello --no-link --print-out-paths)
 
 clearStore
 
@@ -21,6 +21,6 @@ drvDep=$(nix-instantiate ./text-hashed-output.nix -A producingDrv)
 # Store layer needs bugfix
 requireDaemonNewerThan "2.30pre20250515"
 
-out2=$(nix build "${drvDep}^out^out" --no-link)
+out2=$(nix build "${drvDep}^out^out" --no-link --print-out-paths)
 
 test "$out1" == "$out2"

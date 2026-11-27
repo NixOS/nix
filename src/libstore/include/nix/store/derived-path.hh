@@ -154,7 +154,8 @@ struct SingleDerivedPath : _SingleDerivedPathRaw
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     /**
-     * Uses `!` as the separator
+     * Uses `!` as the separator, and also accepts `^`, which older
+     * versions printed between the inner layers.
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
@@ -277,7 +278,8 @@ struct DerivedPath : _DerivedPathRaw
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     /**
-     * Uses `!` as the separator
+     * Uses `!` as the separator, and also accepts `^`, which older
+     * versions printed between the inner layers.
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
