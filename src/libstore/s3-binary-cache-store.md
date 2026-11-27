@@ -50,6 +50,10 @@ for authenticating requests to Amazon S3.
 Note that this means Nix will read environment variables and files with different idioms than with Nix's own settings, as implemented by the AWS SDK.
 Consult the documentation linked above for further details.
 
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` override the `profile` store setting, including `?profile=` in the store URL.
+Unset those variables if you intend the named profile to be used.
+This is the opposite of the AWS CLI, where `--profile` wins over environment credentials.
+
 ### Authenticated reads to your S3 binary cache
 
 Your bucket will need a bucket policy allowing the desired users to perform the `s3:GetObject`, `s3:GetBucketLocation`, and `s3:ListBucket` actions on all objects in the bucket.
