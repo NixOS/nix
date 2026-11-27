@@ -88,6 +88,8 @@ mkMesonExecutable (finalAttrs: {
         in
         runCommand "${finalAttrs.pname}-run"
           {
+            __structuredAttrs = true;
+            strictDeps = true;
             meta.broken = withUnitTests && !stdenv.hostPlatform.emulatorAvailable buildPackages;
             nativeBuildInputs = lib.optionals withUnitTests [
               writableTmpDirAsHomeHook

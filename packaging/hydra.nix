@@ -387,7 +387,11 @@ rec {
       };
     in
     pkgs.runCommand "docker-image-tarball-${components.nix-cli.version}"
-      { meta.description = "Docker image with Nix for ${system}"; }
+      {
+        __structuredAttrs = true;
+        strictDeps = true;
+        meta.description = "Docker image with Nix for ${system}";
+      }
       ''
         mkdir -p $out/nix-support
         image=$out/image.tar.gz
@@ -441,16 +445,22 @@ rec {
           components = nixComponentsFor.x86_64-linux.native;
           inherit (components._pkgs) runCommand;
         in
-        runCommand "eval-nixos" { buildInputs = [ components.nix-cli ]; } ''
-          type -p nix-env
-          # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
-          (
-            set -x
-            time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
-            [[ $(sha1sum < packages | cut -c1-40) = e01b031fc9785a572a38be6bc473957e3b6faad7 ]]
-          )
-          mkdir $out
-        '';
+        runCommand "eval-nixos"
+          {
+            __structuredAttrs = true;
+            strictDeps = true;
+            nativeBuildInputs = [ components.nix-cli ];
+          }
+          ''
+            type -p nix-env
+            # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
+            (
+              set -x
+              time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+              [[ $(sha1sum < packages | cut -c1-40) = e01b031fc9785a572a38be6bc473957e3b6faad7 ]]
+            )
+            mkdir $out
+          '';
 
       nixpkgsLibTests = forAllSystems (
         system:
@@ -480,6 +490,8 @@ rec {
           pkgs = components._pkgs;
         in
         pkgs.runCommand "daemon-compat-tests" {
+          __structuredAttrs = true;
+          strictDeps = true;
           againstSelf = testNixVersions components components.nix-cli;
           againstCurrentLatest = testNixVersions components pkgs.nixVersions.latest;
           againstLatestStable = testNixVersions components pkgs.nixVersions.stable;

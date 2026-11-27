@@ -38,7 +38,8 @@ $ nix-shell --attr devShells.x86_64-linux.native-clangStdenv
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ out="$(pwd)/outputs/out" dev=$out debug=$out mesonFlags+=" --prefix=${out}"
+[nix-shell]$ out="$(pwd)/outputs/out" dev=$out debug=$out
+[nix-shell]$ appendToVar mesonFlags "--prefix=${out}"
 [nix-shell]$ dontAddPrefix=1 configurePhase
 [nix-shell]$ buildPhase
 ```

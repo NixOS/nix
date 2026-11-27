@@ -31,14 +31,15 @@ To build the manual incrementally, [enter the development shell](./building.md) 
 
 ```console
 $ nix develop
-$ mesonFlags="$mesonFlags -Ddoc-gen=true" mesonConfigurePhase
+$ appendToVar mesonFlags "-Ddoc-gen=true"
+$ mesonConfigurePhase
 ```
 
 **If using direnv:**
 
 ```console
 $ direnv allow
-$ bash -c 'source $stdenv/setup && mesonFlags="$mesonFlags -Ddoc-gen=true" mesonConfigurePhase'
+$ bash -c 'source $stdenv/setup && appendToVar mesonFlags "-Ddoc-gen=true" && mesonConfigurePhase'
 ```
 
 Then build the manual:

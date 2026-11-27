@@ -92,9 +92,15 @@ rec {
     daemonCompat = hydraJobs.tests.daemonCompat.${system};
     nixpkgsLibTests = hydraJobs.tests.nixpkgsLibTests.${system};
     filetransfer-retry-backoff = hydraJobs.tests.filetransfer-retry-backoff.${system};
-    rl-next = pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
-      LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${../../../doc/manual/rl-next} >$out
-    '';
+    rl-next =
+      pkgs.buildPackages.runCommand "test-rl-next-release-notes"
+        {
+          __structuredAttrs = true;
+          strictDeps = true;
+        }
+        ''
+          LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${../../../doc/manual/rl-next} >$out
+        '';
     repl-completion = pkgs.callPackage ../../../tests/repl-completion.nix { inherit (packages') nix; };
 
     /**
@@ -249,6 +255,7 @@ rec {
         pkgs.runCommand "merged-profdata"
           {
             __structuredAttrs = true;
+            strictDeps = true;
             nativeBuildInputs = [ pkgs.llvmPackages.libllvm ];
             inherit coverageProfiles;
           }
@@ -271,6 +278,7 @@ rec {
               pkgs.jq
             ];
             __structuredAttrs = true;
+            strictDeps = true;
             nixComponents = nixComponentDrvs;
           }
           ''

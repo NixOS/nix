@@ -60,6 +60,8 @@ mkMesonExecutable (finalAttrs: {
       run =
         runCommand "${finalAttrs.pname}-run"
           {
+            __structuredAttrs = true;
+            strictDeps = true;
             meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
           }
           (

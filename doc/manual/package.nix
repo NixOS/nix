@@ -131,11 +131,16 @@ mkMesonDerivation (finalAttrs: {
             let
               plain = finalAttrs.finalPackage.site;
             in
-            runCommand "nix-manual-with-redirect-targets" { } ''
-              cp -r ${plain} $out
-              chmod -R u+w $out
-              cp ${redirect-targets}/redirect-targets.html $out/redirect-targets.html
-            '';
+            runCommand "nix-manual-with-redirect-targets"
+              {
+                __structuredAttrs = true;
+                strictDeps = true;
+              }
+              ''
+                cp -r ${plain} $out
+                chmod -R u+w $out
+                cp ${redirect-targets}/redirect-targets.html $out/redirect-targets.html
+              '';
           remap = {
             "^https://github\\.com/(?i:nixos/nix)/blob/master/" = "${
               builtins.path {

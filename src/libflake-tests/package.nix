@@ -55,8 +55,10 @@ mkMesonExecutable (finalAttrs: {
       run =
         runCommand "${finalAttrs.pname}-run"
           {
+            __structuredAttrs = true;
+            strictDeps = true;
             meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
-            buildInputs = [ writableTmpDirAsHomeHook ];
+            nativeBuildInputs = [ writableTmpDirAsHomeHook ];
           }
           (''
             export _NIX_TEST_UNIT_DATA=${resolvePath ./data}

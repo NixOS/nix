@@ -21,7 +21,10 @@ assert lib.assertMsg (stdenv.buildPlatform.canExecute stdenv.hostPlatform)
   "fuzz seed checks require a native build";
 
 runCommand "${package.pname}-fuzz-seeds${lib.optionalString (runs > 0) "-${toString runs}-runs"}"
-  { }
+  {
+    __structuredAttrs = true;
+    strictDeps = true;
+  }
   ''
     set -euo pipefail
 

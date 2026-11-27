@@ -70,6 +70,7 @@ let
       {
         __impure = true;
         __structuredAttrs = true;
+        strictDeps = true;
         nativeBuildInputs = [ pkgs.clangbuildanalyzer ];
         inherit componentBuildProfiles;
       }
