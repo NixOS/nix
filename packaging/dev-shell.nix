@@ -311,7 +311,10 @@ nixComponents.callPackage (
 
       mesonFlags = [
         (lib.mesonBool "json-schema-checks" (isActiveComponent "nix-json-schema-checks"))
-        (lib.mesonBool "plugin-c-api" (nixComponents.withPluginCAPI))
+      ]
+      ++ lib.optionals (nixComponents.nix-cli.passthru.exportsPluginCApi) [
+        "-Ddefault_library=both" # Need to compile both variants of C API.
+        (lib.mesonBool "plugin-c-api" true)
       ]
       ++ map (transformFlag "libutil") (ignoreCrossFile nixComponents.nix-util.mesonFlags)
       ++ map (transformFlag "libstore") (ignoreCrossFile nixComponents.nix-store.mesonFlags)

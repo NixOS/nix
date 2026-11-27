@@ -30,16 +30,68 @@ deps_private_maybe_subproject = [
 deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
-deps_plugin_c_apis = []
+link_args = []
+link_whole = []
+
 if get_option('plugin-c-api')
-  deps_plugin_c_apis = [
-    dependency('nix-util-c-whole-archive'),
-    dependency('nix-store-c-whole-archive'),
-    dependency('nix-fetchers-c-whole-archive'),
-    dependency('nix-expr-c-whole-archive'),
-    dependency('nix-flake-c-whole-archive'),
-    dependency('nix-main-c-whole-archive'),
-  ]
+  # TODO: Is there a better way to handle this?
+
+  c_api_libs = {
+    'nix-util-c' : {
+      'subproj' : 'libutil-c',
+      'archive' : 'libnixutilc.a',
+    },
+    'nix-store-c' : {
+      'subproj' : 'libstore-c',
+      'archive' : 'libnixstorec.a',
+    },
+    'nix-fetchers-c' : {
+      'subproj' : 'libfetchers-c',
+      'archive' : 'libnixfetchersc.a',
+    },
+    'nix-expr-c' : {
+      'subproj' : 'libexpr-c',
+      'archive' : 'libnixexprc.a',
+    },
+    'nix-flake-c' : {
+      'subproj' : 'libflake-c',
+      'archive' : 'libnixflakec.a',
+    },
+    'nix-main-c' : {
+      'subproj' : 'libmain-c',
+      'archive' : 'libnixmainc.a',
+    },
+  }
+
+  foreach name, info : c_api_libs
+    dep = dependency(name)
+    if dep.type_name() == 'internal'
+      # A sane limitation.
+      if get_option('default_library') not in [ 'static', 'both' ]
+        error(
+          'plugin-c-api=true requires building with -Ddefault_library=static or -Ddefault_library=both',
+        )
+      endif
+      # Fish out the static library for link_whole.
+      lib = subproject(info['subproj']).get_variable('this_library')
+      if get_option('default_library') == 'both'
+        lib = lib.get_static_lib()
+      endif
+      link_whole += lib
+    else
+      # For pkg-config dependency (in componentised builds), just link manually.
+      libfile = info['archive']
+      if host_machine.system() == 'darwin'
+        link_args += [
+          '-Wl,-force_load,' + dep.get_variable('libdir') / libfile,
+        ]
+      elif not host_machine.system().startswith('windows')
+        link_args += [ '-Wl,--whole-archive' ]
+        link_args += [ dep.get_variable('libdir') / libfile ]
+        link_args += [ '-Wl,--no-whole-archive' ]
+      endif
+    endif
+  endforeach
 endif
 
 mimalloc = dependency('mimalloc', required : get_option('mimalloc'))
@@ -198,7 +250,7 @@ endif
 
 include_dirs = [ include_directories('.') ]
 
-link_args = linker_export_flags
+link_args += linker_export_flags
 if host_machine.system() == 'darwin'
   # Bump the executable's stack size to facilitate deep recursion in the evaluator.
   # This is done statically so that we can use posix_spawn on macOS.
@@ -208,10 +260,13 @@ endif
 this_exe = executable(
   meson.project_name(),
   sources,
-  dependencies : deps_private_subproject + deps_private + deps_private_no_pkgconfig + deps_plugin_c_apis,
+  dependencies : deps_private_subproject + deps_private + deps_private_no_pkgconfig,
   include_directories : include_dirs,
   link_args : link_args,
-  export_dynamic : get_option('plugin-c-api'),
+  link_whole : link_whole,
+  # Export symbols to have C++ plugins working, even when internal libraries
+  # are linked statically into the executable.
+  export_dynamic : true,
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )

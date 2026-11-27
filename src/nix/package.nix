@@ -3,17 +3,20 @@
   lib,
   mkMesonExecutable,
 
+  nix-util,
   nix-store,
+  nix-fetchers,
   nix-expr,
+  nix-flake,
   nix-main,
   nix-cmd,
 
-  nix-expr-c,
-  nix-fetchers-c,
-  nix-flake-c,
-  nix-main-c,
-  nix-store-c,
   nix-util-c,
+  nix-store-c,
+  nix-fetchers-c,
+  nix-expr-c,
+  nix-main-c,
+  nix-flake-c,
 
   mimalloc,
 
@@ -84,21 +87,35 @@ mkMesonExecutable (finalAttrs: {
     ]
   );
 
-  buildInputs = [
-    nix-store
-    nix-expr
-    nix-main
-    nix-cmd
-  ]
-  ++ lib.optionals withPluginCApi [
-    nix-expr-c
-    nix-fetchers-c
-    nix-flake-c
-    nix-main-c
-    nix-store-c
-    nix-util-c
-  ]
-  ++ lib.optional withMimalloc mimalloc;
+  buildInputs =
+    let
+      getLib = p: p.buildInputs ++ [ (p.static or p.out) ];
+    in
+    (lib.concatMap getLib [
+      nix-util
+      nix-store
+      nix-fetchers
+      nix-expr
+      nix-flake
+      nix-main
+      nix-cmd
+    ])
+    ++ lib.optionals withPluginCApi [
+      nix-util-c.static
+      nix-store-c.static
+      nix-fetchers-c.static
+      nix-expr-c.static
+      nix-flake-c.static
+      nix-main-c.static
+    ]
+    ++ lib.optional withMimalloc mimalloc
+    # Headers.
+    ++ [
+      nix-store.dev
+      nix-expr.dev
+      nix-main.dev
+      nix-cmd.dev
+    ];
 
   mesonFlags = [
     (lib.mesonEnable "mimalloc" withMimalloc)

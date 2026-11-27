@@ -10,7 +10,6 @@
   # Configuration Options
 
   version,
-  withPluginCAPI,
 }:
 
 let
@@ -28,7 +27,7 @@ mkMesonLibrary (finalAttrs: {
     ../../.version
     ./.version
     ./meson.build
-    ./meson.options
+    # ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
     (fileset.fileFilter (file: file.hasExt "h") ./.)
@@ -42,7 +41,6 @@ mkMesonLibrary (finalAttrs: {
   ];
 
   mesonFlags = [
-    (lib.mesonBool "plugin-c-api" withPluginCAPI)
   ];
 
   meta = {

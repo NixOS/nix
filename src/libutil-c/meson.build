@@ -49,34 +49,16 @@ headers += files('nix_api_util_internal.h')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-# For linking -c bindings into the cli for plugins.
-build_both_libraries = get_option('plugin-c-api')
-
-library_kwargs = {
-  'soversion' : nix_soversion,
-  'dependencies' : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
-  'include_directories' : include_dirs,
-  'link_args' : linker_export_flags,
-  'install' : true,
-}
-
-if build_both_libraries
-  this_libraries = both_libraries(
-    'nixutilc',
-    sources,
-    config_priv_h,
-    kwargs : library_kwargs,
-  )
-else
-  this_library = library(
-    'nixutilc',
-    sources,
-    config_priv_h,
-    kwargs : library_kwargs,
-  )
-endif
-
-plugin_c_api_enabled = build_both_libraries
+this_library = library(
+  'nixutilc',
+  sources,
+  config_priv_h,
+  soversion : nix_soversion,
+  dependencies : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
+  include_directories : include_dirs,
+  link_args : linker_export_flags,
+  install : true,
+)
 
 install_headers(headers, preserve_path : true)
 
