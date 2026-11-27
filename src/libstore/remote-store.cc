@@ -862,6 +862,19 @@ void RemoteStore::optimiseStore()
     readInt(conn->from);
 }
 
+std::optional<nlohmann::json> RemoteStore::queryStoreStats()
+{
+    auto conn(getConnection());
+    if (!conn->protoVersion.features.contains(WorkerProto::featureQueryStoreStats))
+        return std::nullopt;
+    conn->to << WorkerProto::Op::QueryStoreStats;
+    conn.processStderr();
+    auto stats = nlohmann::json::parse(readString(conn->from));
+    if (stats.is_null())
+        return std::nullopt;
+    return stats;
+}
+
 bool RemoteStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     auto conn(getConnection());

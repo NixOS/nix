@@ -8,6 +8,8 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 void LocalOverlayStoreConfig::anchor() {}
@@ -237,6 +239,11 @@ void LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, uint
             LocalStore::deleteStorePath(path, bytesFreed, isKnownPath);
         }
     }
+}
+
+std::optional<nlohmann::json> LocalOverlayStore::queryStoreStats()
+{
+    return std::nullopt;
 }
 
 void LocalOverlayStore::optimiseStore()
