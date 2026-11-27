@@ -7,7 +7,9 @@ cd "$TEST_ROOT"
 mkdir -p dep
 cat <<EOF > dep/flake.nix
 {
-    outputs = i: { };
+    outputs = i: {
+        sampleOutput = 1;
+    };
 }
 EOF
 mkdir -p foo
@@ -75,3 +77,5 @@ NIX_GET_COMPLETIONS=3 nix build --option allow-import-from | grep -- "allow-impo
 [[ "$(NIX_GET_COMPLETIONS=4 nix eval --file ./foo/flake.nix outp)" == $'attrs\noutputs\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=4 nix eval --file ./err/flake.nix outp 2>&1)" == $'attrs' ]]
 [[ "$(NIX_GET_COMPLETIONS=2 nix eval ./err\# 2>&1)" == $'attrs' ]]
+# The inputs of `--inputs-from` are registry entries by then.
+[[ "$(NIX_GET_COMPLETIONS=4 nix eval --inputs-from ./foo a\#sam)" == $'attrs\na#sampleOutput\t' ]]

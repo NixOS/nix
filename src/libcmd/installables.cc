@@ -176,27 +176,30 @@ MixFlakeOptions::MixFlakeOptions()
         .category = category,
         .labels = {"flake-url"},
         .handler = {[&](std::string flakeRef) {
-            auto evalState = getEvalState();
-            auto flake = flake::lockFlake(
-                flakeSettings,
-                *evalState,
-                parseFlakeRef(flakeRef, absPath(getCommandBaseDir()).string()),
-                {.writeLockFile = false});
-            for (auto & [inputName, input] : flake.lockFile.root->inputs) {
-                auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
-                if (auto input3 = std::dynamic_pointer_cast<const flake::LockedNode>(input2)) {
-                    fetchers::Attrs extraAttrs;
+            /* The eval store may be of a type that a plugin provides. */
+            getRoot().deferredHandlers.push_back([this, flakeRef] {
+                auto evalState = getEvalState();
+                auto flake = flake::lockFlake(
+                    flakeSettings,
+                    *evalState,
+                    parseFlakeRef(flakeRef, absPath(getCommandBaseDir()).string()),
+                    {.writeLockFile = false});
+                for (auto & [inputName, input] : flake.lockFile.root->inputs) {
+                    auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
+                    if (auto input3 = std::dynamic_pointer_cast<const flake::LockedNode>(input2)) {
+                        fetchers::Attrs extraAttrs;
 
-                    if (!input3->lockedRef.subdir.empty()) {
-                        extraAttrs["dir"] = input3->lockedRef.subdir;
+                        if (!input3->lockedRef.subdir.empty()) {
+                            extraAttrs["dir"] = input3->lockedRef.subdir;
+                        }
+
+                        overrideRegistry(
+                            fetchers::Input::fromAttrs({{"type", "indirect"}, {"id", inputName}}),
+                            input3->lockedRef.input,
+                            extraAttrs);
                     }
-
-                    overrideRegistry(
-                        fetchers::Input::fromAttrs({{"type", "indirect"}, {"id", inputName}}),
-                        input3->lockedRef.input,
-                        extraAttrs);
                 }
-            }
+            });
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeRef(completions, getEvalState()->store, prefix);

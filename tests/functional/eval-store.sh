@@ -59,3 +59,16 @@ rm -rf "$eval_store"
 # Can't write .drv by default
 (! nix-instantiate dependencies.nix --eval-store "dummy://")
 nix-instantiate dependencies.nix --eval-store "dummy://?read-only=false"
+
+clearStore
+rm -rf "$eval_store"
+
+# An eval store given after `--inputs-from` is the one it uses.
+dep=$TEST_ROOT/inputs-from-dep
+mkdir -p "$dep"
+echo '{ outputs = _: { x = "hi"; }; }' > "$dep/flake.nix"
+top=$TEST_ROOT/inputs-from-top
+mkdir -p "$top"
+echo "{ inputs.dep.url = \"path:$dep\"; outputs = _: { }; }" > "$top/flake.nix"
+[[ $(nix eval --raw --inputs-from "$top" --eval-store "$eval_store" dep#x) = hi ]]
+ls "$eval_store"/nix/store/*-source

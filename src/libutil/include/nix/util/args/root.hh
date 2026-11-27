@@ -48,6 +48,13 @@ public:
 
     std::shared_ptr<Completions> completions;
 
+    /**
+     * Work of flag handlers that must see every flag and the loaded
+     * plugins, such as opening a store whose type a plugin provides.
+     * It runs once all flags are parsed and the plugins are loaded.
+     */
+    std::vector<std::function<void()>> deferredHandlers;
+
     std::filesystem::path getCommandBaseDir() const override;
 
 protected:

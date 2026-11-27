@@ -368,6 +368,9 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
     for (auto & f : flagExperimentalFeatures)
         experimentalFeatureSettings.require(f);
 
+    for (auto & handler : deferredHandlers)
+        handler();
+
     /* Now that all the other args are processed, run the deferred completions.
      */
     for (const auto & d : deferredCompletions)
