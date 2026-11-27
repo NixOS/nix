@@ -207,7 +207,7 @@ void nix_state_free(EvalState * state) NIXC_NOEXCEPT
 }
 
 #if NIX_USE_BOEHMGC
-boost::concurrent_flat_map<
+static boost::concurrent_flat_map<
     const void *,
     unsigned int,
     std::hash<const void *>,
