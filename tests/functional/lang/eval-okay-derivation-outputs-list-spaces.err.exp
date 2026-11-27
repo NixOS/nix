@@ -1,0 +1,11 @@
+warning:
+         … while evaluating derivation 'eval-okay-derivation-outputs-list-spaces'
+
+         … while evaluating the derivation attribute 'outputs'
+           at /pwd/lang/eval-okay-derivation-outputs-list-spaces.nix:6:3:
+              5|   builder = "/dontcare";
+              6|   outputs = [
+               |   ^
+              7|     "out dev"
+
+         warning: the item 'out dev' in the 'outputs' attribute list will be split into multiple elements. This behaviour is deprecated, and may change in a future version of Nix; split into separate list items instead.
