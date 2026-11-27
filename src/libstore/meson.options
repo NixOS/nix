@@ -53,3 +53,10 @@ option(
   value : '',
   description : 'the lsof program used by the garbage collector to find runtime roots (empty means: detect at build time, falling back to PATH lookup at run time)',
 )
+
+option(
+  'pasta-path',
+  type : 'string',
+  value : 'pasta',
+  description : 'Path to the location of pasta (provided by passt)',
+)

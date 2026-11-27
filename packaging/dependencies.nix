@@ -5,6 +5,7 @@
   pkgs,
 
   stdenv,
+  passtSrc,
 }:
 
 let
@@ -34,6 +35,10 @@ scope: {
     brotliSupport = true;
     zlibSupport = true;
   };
+
+  passt = pkgs.passt.overrideAttrs (prevAttrs: {
+    src = passtSrc;
+  });
 
   libblake3 = pkgs.libblake3.override {
     useTBB =

@@ -13,6 +13,8 @@
 #include "unix/current-process-private.hh"
 #include "util-unix-config-private.hh"
 
+#include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <cerrno>
 
@@ -42,6 +44,11 @@ namespace nix {
 
 namespace {
 
+/* We do the capability dance by hand to avoid a dependency on libcap, which
+   has a rather large build closure and many more features than we need. */
+constexpr uint32_t capabilityVersion = 0x20080522; /* _LINUX_CAPABILITY_VERSION_3 */
+constexpr size_t capabilityU32s = 2;               /* _LINUX_CAPABILITY_U32S_3 */
+
 /* This structure intentionally doesn't have any fancy classes from C++ like
    std::optional, because I don't trust those. Only plain pointers or integral
    types. */
@@ -62,6 +69,10 @@ struct ExecChildParams
     bool dieWithParent;
     bool setSid;
     bool restoreMounts;
+    /* Capability masks to keep across the uid/gid change and raise as
+       ambient. Precomputed in the parent, indexed like the capset(2) data. */
+    uint32_t capMasks[capabilityU32s];
+    bool setCaps;
 };
 
 /*
@@ -242,6 +253,11 @@ struct ExecChildParams
 #    define NIX_SYS_setgroups SYS_setgroups
 #  endif
 
+    /* Keep the permitted capabilities when changing away from uid 0, so that
+       the requested ones can be raised again below. */
+    if (params.setCaps && ::prctl(PR_SET_KEEPCAPS, 1) == -1)
+        dieWithErrno("setting keep-caps failed");
+
     if (params.setGid && ::syscall(NIX_SYS_setgid, params.gid) == -1)
         dieWithErrno("setgid failed");
 
@@ -251,6 +267,35 @@ struct ExecChildParams
 
     if (params.setUid && ::syscall(NIX_SYS_setuid, params.uid) == -1)
         dieWithErrno("setuid failed");
+
+    if (params.setCaps) {
+        if (::prctl(PR_SET_KEEPCAPS, 0) == -1)
+            dieWithErrno("clearing keep-caps failed");
+
+        struct
+        {
+            uint32_t version;
+            int pid;
+        } hdr = {capabilityVersion, 0};
+        struct
+        {
+            uint32_t effective;
+            uint32_t permitted;
+            uint32_t inheritable;
+        } data[capabilityU32s] = {};
+        for (size_t i = 0; i < capabilityU32s; ++i) {
+            data[i].permitted = params.capMasks[i];
+            data[i].inheritable = params.capMasks[i];
+        }
+        if (::syscall(SYS_capset, &hdr, data) == -1)
+            dieWithErrno("couldn't set capabilities");
+
+        for (size_t i = 0; i < capabilityU32s; ++i)
+            for (unsigned bit = 0; bit < 32; ++bit)
+                if ((params.capMasks[i] & (1u << bit))
+                    && ::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, i * 32 + bit, 0, 0) == -1)
+                    dieWithErrno("couldn't set ambient caps");
+    }
 
     /* Technically slightly racy, we might want to do something like what
        preserveDeathSignal does. */
@@ -341,7 +386,7 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
     const auto env = stringsToCharPtrs(env_);
     const auto args = stringsToCharPtrs(args_);
 
-    const ExecChildParams params = {
+    ExecChildParams params = {
         .program = options.program.c_str(),
         .chdir = options.chdir ? options.chdir->c_str() : nullptr,
         .environment = options.environment ? env.data() : environ,
@@ -359,7 +404,14 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
         .dieWithParent = options.dieWithParent,
         .setSid = options.setSid,
         .restoreMounts = options.restoreMounts,
+        .capMasks = {},
+        .setCaps = !options.caps.empty(),
     };
+
+    for (auto cap : options.caps) {
+        assert(cap >= 0 && static_cast<size_t>(cap) / 32 < capabilityU32s);
+        params.capMasks[cap / 32] |= 1u << (cap % 32);
+    }
 
     const auto savedErrno = errno;
 
