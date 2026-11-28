@@ -32,6 +32,7 @@ jobs:
           # required to find all branches
           fetch-depth: 0
           # We really do want to checkout a merged PR to backport it.
+          # zizmor: ignore[unsafe-checkout]
           allow-unsafe-pr-checkout: true
           persist-credentials: true
       - name: Create backport PRs
