@@ -174,6 +174,17 @@
 
 ## C API Changes
 
+- **Breaking**: New value type `NIX_TYPE_FAILED` for thunks whose evaluation failed [#15286](https://github.com/NixOS/nix/pull/15286)
+
+  Previously, a thunk whose evaluation failed had `nix_get_type()` return `NIX_TYPE_THUNK`.
+  Now `nix_get_type()` returns `NIX_TYPE_FAILED` for such a value.
+
+  **Resolution**
+
+  C API consumers that check for `NIX_TYPE_THUNK` must also check for `NIX_TYPE_FAILED`.
+  Forcing it behaves as forcing the thunk did in Nix 2.33 and earlier, except that an error from a primop is no longer retried unless it is recoverable.
+  See the next item, "Errors returned from your primops are not treated as recoverable by default".
+
 - **Breaking**: Errors returned from your primops are not treated as recoverable by default [#13930](https://github.com/NixOS/nix/pull/13930) [#15286](https://github.com/NixOS/nix/pull/15286)
 
   Nix 2.34 by default remembers the error in the thunk that triggered it.
