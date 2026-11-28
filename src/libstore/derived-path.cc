@@ -28,7 +28,7 @@ std::string SingleDerivedPath::Built::to_string(const StoreDirConfig & store) co
 
 std::string SingleDerivedPath::Built::to_string_legacy(const StoreDirConfig & store) const
 {
-    return drvPath->to_string(store) + "!" + output;
+    return drvPath->to_string_legacy(store) + "!" + output;
 }
 
 std::string DerivedPath::Built::to_string(const StoreDirConfig & store) const
