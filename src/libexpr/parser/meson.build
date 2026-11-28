@@ -69,11 +69,8 @@ parser_library = static_library(
   include_directories : include_dirs,
   # 1. Stdlib and regular assertions regress parser performance significantly, so build without
   # them for this one library when building in a release configuration.
-  # 2. Disable LTO for GCC because then inlining flags won't apply, since LTO in GCC is done
-  # by plonking down GIMPLE in the archive.
   override_options : [
     'b_ndebug=@0@'.format(not get_option('debug')),
-    'b_lto=@0@'.format(get_option('b_lto') and cxx.get_id() != 'gcc'),
   ],
 )
 

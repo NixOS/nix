@@ -153,6 +153,8 @@ let
     separateDebugInfo = !stdenv.hostPlatform.isStatic;
   };
 
+  buildBothLibraries = !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isStatic;
+
   mesonLibraryLayer = finalAttrs: prevAttrs: {
     preConfigure =
       let
@@ -172,7 +174,50 @@ let
         export CFLAGS="''${CFLAGS:-} ${toString interpositionFlags}"
         export CXXFLAGS="''${CXXFLAGS:-} ${toString interpositionFlags}"
       '';
-    outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
+
+    mesonFlags =
+      prevAttrs.mesonFlags or [ ] ++ lib.optional buildBothLibraries "-Ddefault_library=both";
+
+    # HACK: We want to link the nix-cli against static libraries, but pkg-config
+    # isn't expressive enough with its --static flag which applies to the whole closure.
+    # What we do is just build with default_library=both and massage the .pc files
+    # to allow linking static versions into executables / shared objects without passing
+    # in --static (which would be the wrong thing - we want to link our internal library
+    # closure statically with everything else being linked dynamically).
+    # Everything would be so much easier if we didn't have componentized builds...
+
+    postFixup =
+      prevAttrs.postFixup or ""
+      + lib.optionalString buildBothLibraries ''
+        mkdir -p $static/lib/pkgconfig
+        cp -v $dev/lib/pkgconfig/*.pc $static/lib/pkgconfig/
+        mv -v $out/lib/lib*.a $static/lib/
+
+        for pc in $static/lib/pkgconfig/*.pc; do
+          substituteInPlace "$pc" --replace-fail "prefix=$out" "prefix=$static"
+          awk '
+            /^(Requires|Libs)(\.private)?:/ {
+              key = $1; sub(/:$/, "", key); sub(/\.private$/, "", key)
+              val = $0; sub(/^[^:]*:[ \t]*/, "", val)
+              sep = (key == "Requires") ? ", " : " "
+              acc[key] = (key in acc) ? acc[key] sep val : val
+              next
+            }
+            { print }
+            END {
+              if ("Requires" in acc) print "Requires: " acc["Requires"]
+              if ("Libs" in acc)     print "Libs: " acc["Libs"]
+            }
+          ' "$pc" > "$pc.tmp" && mv "$pc.tmp" "$pc"
+        done
+      '';
+
+    outputs =
+      prevAttrs.outputs or [ "out" ]
+      ++ [ "dev" ]
+      # For the .pc file for the static library + the library itself. Only
+      # useful for development and projects linking statically with nix.
+      ++ lib.optional buildBothLibraries "static";
   };
 
   fixupStaticLayer = finalAttrs: prevAttrs: {
@@ -325,11 +370,6 @@ in
     Whether to use [unity builds](https://mesonbuild.com/Unity-builds.html#unity-builds).
   */
   withUnityBuild = true;
-
-  /**
-    Whether to embed the public C API into nix-cli so plugins can resolve those symbols from the executable.
-  */
-  withPluginCAPI = !(stdenv.hostPlatform.isWindows || stdenv.hostPlatform.isStatic);
 
   /**
     A user-provided extension function to apply to each component derivation.

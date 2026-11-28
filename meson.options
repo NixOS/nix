@@ -48,3 +48,16 @@ option(
   value : true,
   description : 'Check JSON schema validity of schemas and examples (requires jv)',
 )
+
+option(
+  'plugin-c-api',
+  type : 'boolean',
+  # Ideally we'd condition the default value on whether the executable is
+  # dynamically linked, but meson doesn't provide any conditional defaults for
+  # options or a nice way to query whether executables are built statically
+  # linked. This should be enabled pretty much always if we are to make proper
+  # use of plugins.
+  value : false,
+  yield : true,
+  description : 'Embed the public C API into nix so plugins can resolve those symbols from the executable',
+)

@@ -5,11 +5,17 @@ dl_dep = cpp.find_library('dl', required : false)
 plugin_test_deps = []
 plugin_tests = []
 
+# The executable re-exports C++ symbols for plugins.
 libplugintest = shared_module(
   'plugintest',
   'src/plugintest.cc',
   dependencies : [
-    dependency('nix-expr'),
+    # Since this is a plugin, it must not be linked against libexpr itself.
+    # The symbols are just resolved from the binary.
+    dependency('nix-expr').partial_dependency(
+      compile_args : true,
+      includes : true,
+    ),
   ],
   build_by_default : false,
 )

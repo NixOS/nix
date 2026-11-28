@@ -90,7 +90,7 @@ mkMesonDerivation (
     ];
 
     mesonFlags = [
-      (lib.mesonBool "plugin-c-api" nix-cli.exportsPluginCApi)
+      (lib.mesonBool "plugin-c-api" nix-cli.passthru.exportsPluginCApi)
     ];
 
     doCheck = true;
