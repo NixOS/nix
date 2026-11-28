@@ -38,6 +38,19 @@ struct Settings : public Config
         true,
         Xp::Flakes};
 
+    Setting<std::string> defaultFlakeRef{
+        this,
+        "nixpkgs",
+        "default-flake-ref",
+        R"(
+          The flake that bare installable names are resolved against.
+          For example, `nix shell hello` is equivalent to
+          `nix shell nixpkgs#hello`. If empty, this is disabled.
+        )",
+        {},
+        true,
+        std::nullopt};
+
     Setting<std::string> commitLockFileSummary{
         this,
         "",
