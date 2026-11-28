@@ -25,7 +25,7 @@ let
         name =
           assert progName != "fail";
           name;
-        inherit progName system;
+        inherit progName shell system;
         builder = ./user-envs.builder.sh;
       }
       // {
