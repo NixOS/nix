@@ -12,13 +12,25 @@
 namespace nix {
 
 /**
+ * A base listed before `BasicClientConnection`, not a member, so that the
+ * streams outlive its destructor, which flushes `to`.
+ */
+struct RemoteStore::ConnectionStreams
+{
+    std::unique_ptr<BufferedSink> ownedTo;
+    std::unique_ptr<BufferedSource> ownedFrom;
+};
+
+/**
  * Bidirectional connection (send and receive) used by the Remote Store
  * implementation.
  *
  * Contains `Source` and `Sink` for actual communication, along with
  * other information learned when negotiating the connection.
  */
-struct RemoteStore::Connection : WorkerProto::BasicClientConnection, WorkerProto::ClientHandshakeInfo
+struct RemoteStore::Connection : RemoteStore::ConnectionStreams,
+                                 WorkerProto::BasicClientConnection,
+                                 WorkerProto::ClientHandshakeInfo
 {
 private:
     /* VTable anchor to avoid weak linkage of the vtable - it breaks
@@ -26,6 +38,19 @@ private:
     virtual void anchor();
 
 public:
+    Connection(std::unique_ptr<BufferedSink> to, std::unique_ptr<BufferedSource> from)
+        : ConnectionStreams{std::move(to), std::move(from)}
+        , BasicClientConnection(*ownedTo, *ownedFrom)
+    {
+    }
+
+    /**
+     * `INVALID_DESCRIPTOR` if the stream has no descriptor behind it.
+     */
+    virtual Descriptor fromFd() const = 0;
+
+    virtual Descriptor toFd() const = 0;
+
     /**
      * Time this connection was established.
      */

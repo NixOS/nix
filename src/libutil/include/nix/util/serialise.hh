@@ -167,7 +167,7 @@ public:
     /**
      * Return true if the buffer is not empty.
      */
-    bool hasData();
+    virtual bool hasData();
 
 protected:
     /**
@@ -276,7 +276,7 @@ public:
      * Return true if the buffer is not empty after a non-blocking
      * read.
      */
-    bool hasData();
+    bool hasData() override;
 
     void skip(size_t len) override;
 

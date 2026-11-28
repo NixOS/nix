@@ -91,8 +91,9 @@ int Pid::kill(bool allowInterrupts)
 
     using namespace std::chrono_literals;
 
+    /* By value: `wait` sets `pid` to -1, and a late SIGKILL to -1 would hit every process. */
     if (killTimeout > 0ms && killSignal != SIGKILL)
-        killThread = std::thread([&]() {
+        killThread = std::thread([&killed, pid = pid, separatePG = separatePG, killTimeout = killTimeout]() {
             auto elapsed = 0ms;
             while (elapsed < killTimeout) {
                 std::this_thread::sleep_for(25ms);
@@ -100,7 +101,8 @@ int Pid::kill(bool allowInterrupts)
                 if (killed)
                     return;
             }
-            ::kill(separatePG ? -pid : pid, SIGKILL);
+            if (!killed)
+                ::kill(separatePG ? -pid : pid, SIGKILL);
         });
 
     /* Send the requested signal to the child.  If it has its own

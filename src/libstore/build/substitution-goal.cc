@@ -330,7 +330,7 @@ void PathSubstitutionGoal::cleanup()
         if (thr.joinable()) {
             // FIXME: signal worker thread to quit.
             thr.join();
-            worker.childTerminated(this, JobCategory::Substitution);
+            worker.childTerminated(this);
         }
     } catch (...) {
         ignoreExceptionInDestructor();
