@@ -195,7 +195,7 @@ struct LockFlags
     /**
      * The path to a lock file to read instead of the `flake.lock` file in the top-level flake
      */
-    std::optional<SourcePath> referenceLockFilePath;
+    std::optional<std::filesystem::path> referenceLockFilePath;
 
     /**
      * The path to a lock file to write to instead of the `flake.lock` file in the top-level flake

@@ -449,6 +449,13 @@ static LockFile readLockFile(const fetchers::Settings & fetchSettings, const Sou
                                      : LockFile();
 }
 
+static LockFile readLockFile(const fetchers::Settings & fetchSettings, const std::filesystem::path & lockFilePath)
+{
+    return std::filesystem::exists(lockFilePath)
+               ? LockFile(fetchSettings, readFile(lockFilePath), lockFilePath.string())
+               : LockFile();
+}
+
 LockedFlake lockFlake(
     const Settings & settings, EvalState & state, const FlakeRef & topRef, const LockFlags & lockFlags, Flake flake)
 {
@@ -468,8 +475,9 @@ LockedFlake lockFlake(
             throw Error("reference lock file was provided, but the `allow-dirty` setting is set to false");
         }
 
-        auto oldLockFile =
-            readLockFile(state.fetchSettings, lockFlags.referenceLockFilePath.value_or(flake.lockFilePath()));
+        auto oldLockFile = lockFlags.referenceLockFilePath
+                               ? readLockFile(state.fetchSettings, *lockFlags.referenceLockFilePath)
+                               : readLockFile(state.fetchSettings, flake.lockFilePath());
 
         debug("old lock file: %s", oldLockFile);
 
