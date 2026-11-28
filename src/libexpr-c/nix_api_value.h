@@ -44,7 +44,8 @@ extern "C" {
 // Type definitions
 /** @brief Represents the state of a Nix value
  *
- * Thunk values (NIX_TYPE_THUNK) change to their final, unchanging type when forced.
+ * Thunks (NIX_TYPE_THUNK and NIX_TYPE_FAILED) change to their final, unchanging type when forced successfully.
+ * Values of the other types do not change.
  *
  * @see https://nix.dev/manual/nix/latest/language/evaluation.html
  * @enum ValueType
@@ -101,6 +102,16 @@ typedef enum {
      * @see Externals
      */
     NIX_TYPE_EXTERNAL,
+    /** A thunk that caches its failed evaluation
+     *
+     * Handle it as a thunk: force it with nix_value_force() before reading it.
+     * Some thunks throw immediately. Some are recoverable, in which case they
+     * may still succeed when forced.
+     * Recoverable failures include interruption by the user or a primop error
+     * set with NIX_ERR_RECOVERABLE.
+     *
+     * @since Nix 2.34. Before Nix 2.34, a thunk whose evaluation failed stayed NIX_TYPE_THUNK.
+     */
     NIX_TYPE_FAILED,
 } ValueType;
 

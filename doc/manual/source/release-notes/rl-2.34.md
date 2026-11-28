@@ -174,14 +174,18 @@
 
 ## C API Changes
 
-- New store API methods [#14766](https://github.com/NixOS/nix/pull/14766) [#14768](https://github.com/NixOS/nix/pull/14768)
+- **Breaking**: New value type `NIX_TYPE_FAILED` for thunks whose evaluation failed [#15286](https://github.com/NixOS/nix/pull/15286)
 
-  The C API now includes additional methods:
+  Previously, a thunk whose evaluation failed had `nix_get_type()` return `NIX_TYPE_THUNK`.
+  Now `nix_get_type()` returns `NIX_TYPE_FAILED` for such a value.
 
-  - `nix_store_query_path_from_hash_part()` - Get the full store path given its hash part
-  - `nix_store_copy_path()` - Copy a single store path between two stores, allows repairs and configuring signature checking
+  **Resolution**
 
-- Errors returned from your primops are not treated as recoverable by default [#13930](https://github.com/NixOS/nix/pull/13930) [#15286](https://github.com/NixOS/nix/pull/15286)
+  C API consumers that check for `NIX_TYPE_THUNK` must also check for `NIX_TYPE_FAILED`.
+  Forcing it behaves as forcing the thunk did in Nix 2.33 and earlier, except that an error from a primop is no longer retried unless it is recoverable.
+  See the next item, "Errors returned from your primops are not treated as recoverable by default".
+
+- **Breaking**: Errors returned from your primops are not treated as recoverable by default [#13930](https://github.com/NixOS/nix/pull/13930) [#15286](https://github.com/NixOS/nix/pull/15286)
 
   Nix 2.34 by default remembers the error in the thunk that triggered it.
 
@@ -201,6 +205,13 @@
   -nix_set_err_msg(context, NIX_ERR_*, msg);
   +nix_set_err_msg(context, NIX_ERR_RECOVERABLE, msg);
   ```
+
+- New store API methods [#14766](https://github.com/NixOS/nix/pull/14766) [#14768](https://github.com/NixOS/nix/pull/14768)
+
+  The C API now includes additional methods:
+
+  - `nix_store_query_path_from_hash_part()` - Get the full store path given its hash part
+  - `nix_store_copy_path()` - Copy a single store path between two stores, allows repairs and configuring signature checking
 
 ## Bug fixes
 
