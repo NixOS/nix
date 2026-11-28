@@ -255,9 +255,10 @@ private:
 public:
 
     /**
-     * Hack for build-remote.cc.
+     * Hack for build-remote.cc. Synchronised because builds add to it
+     * while substitutions, on other threads, read it in `addToStore`.
      */
-    PathSet locksHeld;
+    Sync<PathSet> locksHeld;
 
     /**
      * Initialise the local store, upgrading the schema if
