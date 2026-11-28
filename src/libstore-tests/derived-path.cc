@@ -89,12 +89,7 @@ TEST_F(DerivedPathTest, built_built_xp)
         MissingExperimentalFeature);
 }
 
-/* TODO: Disabled due to the following error:
-
-       path '00000000000000000000000000000000-0^0' is not a valid store path:
-       name '0^0' contains illegal character '^'
-*/
-RC_GTEST_FIXTURE_PROP(DerivedPathTest, DISABLED_prop_legacy_round_rip, (const DerivedPath & o))
+RC_GTEST_FIXTURE_PROP(DerivedPathTest, prop_legacy_round_rip, (const DerivedPath & o))
 {
     ExperimentalFeatureSettings xpSettings;
     xpSettings.set("experimental-features", "dynamic-derivations");
