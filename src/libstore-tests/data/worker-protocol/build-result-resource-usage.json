@@ -1,0 +1,45 @@
+[
+  {
+    "builtOutputs": {
+      "foo": {
+        "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo",
+        "signatures": []
+      }
+    },
+    "cpuSystem": 604,
+    "cpuUser": 500,
+    "resourceUsage": {
+      "ioReadBytes": 4096,
+      "ioWriteBytes": 8192,
+      "memoryPeak": 1073741824,
+      "memorySwapPeak": 0,
+      "oomKilledProcessCount": 0
+    },
+    "startTime": 30,
+    "status": "Built",
+    "stopTime": 50,
+    "success": true,
+    "timesBuilt": 1
+  },
+  {
+    "errorMsg": "builder was killed",
+    "isNonDeterministic": false,
+    "resourceUsage": {
+      "memoryPeak": 2147483648,
+      "oomKilledProcessCount": 3
+    },
+    "startTime": 30,
+    "status": "PermanentFailure",
+    "stopTime": 50,
+    "success": false,
+    "timesBuilt": 1
+  },
+  {
+    "builtOutputs": {},
+    "startTime": 0,
+    "status": "AlreadyValid",
+    "stopTime": 0,
+    "success": true,
+    "timesBuilt": 0
+  }
+]

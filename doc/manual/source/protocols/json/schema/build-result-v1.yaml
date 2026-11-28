@@ -49,6 +49,50 @@ properties:
     description: |
       System CPU time the build took, in microseconds.
 
+  resourceUsage:
+    type: object
+    title: Resource Usage
+    description: |
+      Resource usage of the build. The Linux cgroup of the build measures this usage. Only present when Linux has [`use-cgroups`](@docroot@/command-ref/conf-file.md#conf-use-cgroups) enabled. Each statistic only exists when the kernel provides it. Later versions can add statistics.
+    additionalProperties:
+      type: integer
+      minimum: 0
+    properties:
+      memoryPeak:
+        type: integer
+        minimum: 0
+        title: Peak Memory
+        description: |
+          Peak memory usage of the build in bytes, including page cache. Read from `memory.peak`, which needs Linux 5.19 or later.
+
+      memorySwapPeak:
+        type: integer
+        minimum: 0
+        title: Peak of Swap Usage
+        description: |
+          Peak of swap usage for the build, in bytes. Read from `memory.swap.peak`. Available on Linux 6.5 or later with support for swap. Memory that the kernel moved to swap is no longer in `memoryPeak`. Add both values for the total.
+
+      ioReadBytes:
+        type: integer
+        minimum: 0
+        title: Bytes Read
+        description: |
+          Number of bytes the build read from block devices (from `io.stat`). Reads from page cache and from tmpfs don't count.
+
+      ioWriteBytes:
+        type: integer
+        minimum: 0
+        title: Bytes Written
+        description: |
+          Bytes the build wrote to block devices (from `io.stat`). Writes to tmpfs don't count. Buffered writes that reach disk after the build ends don't count either.
+
+      oomKilledProcessCount:
+        type: integer
+        minimum: 0
+        title: Processes Killed by Memory Exhaustion
+        description: |
+          The number of build processes that the kernel killed because the build ran out of memory (from the `oom_kill` line in `memory.events`)
+
 "$defs":
   success:
     type: object

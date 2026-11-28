@@ -160,6 +160,9 @@ void adl_serializer<nix::BuildResult>::to_json(json & res, const nix::BuildResul
     if (br.cpuSystem.has_value()) {
         res["cpuSystem"] = br.cpuSystem->count();
     }
+    if (!br.resourceUsageByStatisticName.empty()) {
+        res["resourceUsage"] = br.resourceUsageByStatisticName;
+    }
 
     // Handle success or failure variant
     std::visit(
@@ -197,6 +200,10 @@ nix::BuildResult adl_serializer<nix::BuildResult>::from_json(const json & _json)
     }
     if (auto cpuSystem = optionalValueAt(json, "cpuSystem")) {
         br.cpuSystem = std::chrono::microseconds(getUnsigned(*cpuSystem));
+    }
+    if (auto resourceUsage = optionalValueAt(json, "resourceUsage")) {
+        for (auto & [name, value] : getObject(*resourceUsage))
+            br.resourceUsageByStatisticName.insert_or_assign(name, getUnsigned(value));
     }
 
     // Determine success or failure based on success field

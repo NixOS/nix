@@ -192,6 +192,7 @@ schemas += [
       'success.json',
       'output-rejected.json',
       'not-deterministic.json',
+      'out-of-memory.json',
     ],
   },
   # Match exact variant
