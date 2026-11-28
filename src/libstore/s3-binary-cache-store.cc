@@ -35,7 +35,7 @@ public:
     }
 
     void upsertFile(
-        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
+        const CanonPath & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
 
 private:
     ref<S3BinaryCacheStoreConfig> s3Config;
@@ -134,7 +134,7 @@ private:
 };
 
 void S3BinaryCacheStore::upsertFile(
-    const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
+    const CanonPath & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
 {
     auto doUpload = [&](RestartableSource & src, uint64_t size, std::optional<Headers> headers) {
         Headers uploadHeaders = headers.value_or(Headers());
@@ -156,9 +156,9 @@ void S3BinaryCacheStore::upsertFile(
         }
 
         if (s3Config->multipartUpload && size > s3Config->multipartThreshold) {
-            uploadMultipart(path, src, size, mimeType, std::move(uploadHeaders));
+            uploadMultipart(path.rel(), src, size, mimeType, std::move(uploadHeaders));
         } else {
-            upload(path, src, size, mimeType, std::move(uploadHeaders));
+            upload(path.rel(), src, size, mimeType, std::move(uploadHeaders));
         }
     };
 
