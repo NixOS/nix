@@ -4,6 +4,7 @@ include_dirs = [ include_directories('../../..') ]
 
 headers = files(
   'derived-path.hh',
+  'forwarding-store.hh',
   'https-store.hh',
   'libstore-network.hh',
   'libstore.hh',
