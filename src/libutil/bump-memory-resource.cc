@@ -96,9 +96,18 @@ BumpMemoryResource::BumpMemoryResource(std::size_t reserveSize, std::pmr::memory
 #  ifdef MADV_HUGEPAGE
     /* The region is filled front to back and never freed, so huge pages
        waste little memory, but save most page faults and TLB misses. This
-       matters where transparent huge pages are only used on request. It is
-       only a hint, so failure is harmless. */
-    ::madvise(p, reserveSize, MADV_HUGEPAGE);
+       matters where transparent huge pages are only used on request.
+
+       Huge page allocation can be expensive due to compaction, and repeated
+       BumpMemoryResource creation amplifies that cost in brief usages, so we
+       use regular pages for the first `regularPagesPrefix` bytes. With the
+       kernel's default `defrag` setting, a fault in a huge page range
+       compacts memory synchronously, which can take milliseconds when memory
+       is fragmented. */
+    if (reserveSize > regularPagesPrefix) {
+        /* Only a hint, so failure is harmless. */
+        (void) ::madvise(static_cast<char *>(p) + regularPagesPrefix, reserveSize - regularPagesPrefix, MADV_HUGEPAGE);
+    }
 #  endif
 #endif
 }
