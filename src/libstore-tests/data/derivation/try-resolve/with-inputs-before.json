@@ -25,14 +25,30 @@
     "srcs": []
   },
   "name": "with-inputs",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "dev": {
+      "checks": null,
       "hashAlgo": "sha256",
-      "method": "nar"
+      "method": "nar",
+      "unsafeDiscardReferences": false
     },
     "out": {
+      "checks": null,
       "hashAlgo": "sha256",
-      "method": "nar"
+      "method": "nar",
+      "unsafeDiscardReferences": false
     }
   },
   "structuredAttrs": {
@@ -42,5 +58,5 @@
     }
   },
   "system": "x86_64-linux",
-  "version": 4
+  "version": 5
 }

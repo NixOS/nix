@@ -9,12 +9,26 @@
     "srcs": []
   },
   "name": "source",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
+      "checks": null,
       "hash": "sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8=",
-      "method": "nar"
+      "method": "nar",
+      "unsafeDiscardReferences": false
     }
   },
   "system": "x86_64-linux",
-  "version": 4
+  "version": 5
 }

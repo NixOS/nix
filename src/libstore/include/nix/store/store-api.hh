@@ -40,10 +40,18 @@ namespace derivation {
 template<typename Inputs, typename Out>
 struct Derivation;
 struct Output;
+
+namespace v2 {
+template<typename Input>
+struct DerivationT;
+} // namespace v2
+
+template<typename Input>
+class Interface;
 } // namespace derivation
 
-using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
-using Derivation = derivation::Derivation<std::set<SingleDerivedPath>, derivation::Output>;
+using BasicDerivation = derivation::Derivation<StorePath, derivation::Output>;
+using Derivation = derivation::Derivation<SingleDerivedPath, derivation::Output>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;
@@ -915,6 +923,14 @@ public:
     virtual StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair);
 
     /**
+     * Write a version 2 derivation to the Nix store, recording the
+     * output paths static speculation computes for it, and return its
+     * path.
+     */
+    virtual StorePath
+    writeDerivation(const derivation::v2::DerivationT<SingleDerivedPath> & drv, RepairFlag repair = NoRepair);
+
+    /**
      * Read a derivation (which must already be valid).
      */
     virtual Derivation readDerivation(const StorePath & drvPath);
@@ -923,6 +939,17 @@ public:
      * Read a derivation from a potentially invalid path.
      */
     virtual Derivation readInvalidDerivation(const StorePath & drvPath);
+
+    /**
+     * Read a derivation, as the version 1 or version 2 derivation it is.
+     *
+     * @param requireValidPath Whether the derivation must be valid.
+     *
+     * @todo Replaces `readDerivation` and `readInvalidDerivation` once
+     * their callers have moved to it.
+     */
+    ref<const derivation::Interface<SingleDerivedPath>>
+    readDerivationInterface(const StorePath & drvPath, bool requireValidPath = true);
 
     /**
      * @param [out] out Place in here the set of all store paths in the

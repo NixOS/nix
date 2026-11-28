@@ -27,8 +27,12 @@ echo "evaluating c..."
 # outputs.
 drvPath=$(nix-instantiate multiple-outputs.nix -A c)
 #[ "$drvPath" = "$drvPath2" ]
-grepQuiet 'multiple-outputs-a.drv",\["first","second"\]' "$drvPath"
-grepQuiet 'multiple-outputs-b.drv",\["out"\]' "$drvPath"
+# Only `derivation` has derivation-deep string context; `drvPath` of a
+# version 2 derivation refers to just the derivation.
+if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    grepQuiet 'multiple-outputs-a.drv",\["first","second"\]' "$drvPath"
+    grepQuiet 'multiple-outputs-b.drv",\["out"\]' "$drvPath"
+fi
 
 # While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)

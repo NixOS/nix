@@ -11,10 +11,8 @@
     },
     "srcs": []
   },
-  "name": "parent",
   "outputs": {
     "out": {}
   },
-  "system": "x86_64-linux",
-  "version": 4
+  "system": "x86_64-linux"
 }

@@ -5,16 +5,21 @@
 
 #include "nix/util/types.hh"
 #include "nix/store/path.hh"
+#include "nix/util/fun.hh"
 
 namespace nix {
 
 class Store;
 
 namespace derivation {
-
-template<typename Input>
-struct Options;
+template<typename Input, typename Out>
+struct Derivation;
 struct Output;
+} // namespace derivation
+
+using BasicDerivation = derivation::Derivation<StorePath, derivation::Output>;
+
+namespace derivation {
 
 struct StructuredAttrs
 {
@@ -60,11 +65,17 @@ struct StructuredAttrs
      */
     static void checkKeyNotInUse(const StringPairs & env);
 
+    /**
+     * @param exportReferencesGraph Each key gets the references graph
+     * of its store paths.
+     * @param renderOutput How to write out the path of each output.
+     */
     nlohmann::json::object_t prepareStructuredAttrs(
         Store & store,
-        const Options<StorePath> & drvOptions,
+        const std::map<std::string, StorePathSet, std::less<>> & exportReferencesGraph,
         const StorePathSet & inputPaths,
-        const std::map<std::string, Output> & outputs) const;
+        const StringSet & outputNames,
+        const fun<std::string(const std::string &)> & renderOutput) const;
 
     /**
      * As a convenience to bash scripts, write a shell file that
@@ -79,6 +90,16 @@ struct StructuredAttrs
      */
     static std::string writeShell(const nlohmann::json::object_t & prepared);
 };
+
+/**
+ * The JSON form of an exported references graph: a list of store object
+ * infos, in the format builders have long consumed (and which therefore
+ * must not change), for the closure `storePaths`.
+ *
+ * Used both under its key in the structured attributes of a version 1
+ * derivation, and on its own, in a file, by a version 2 derivation.
+ */
+nlohmann::json exportReferencesGraphToJSON(Store & store, const StorePathSet & storePaths);
 
 } // namespace derivation
 

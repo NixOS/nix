@@ -1,7 +1,9 @@
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
-#include "nix/store/derivation/masked.hh"
+#include "nix/store/derivation/v1/aterm.hh"
+#include "nix/store/derivation/v1/masked.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 #include "nix/store/derivation/full-inputs.hh"
+#include "../aterm-combinators.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
@@ -22,6 +24,8 @@
 namespace nix {
 
 namespace derivation {
+
+using namespace aterm;
 
 /* --------------------------------------------------------------------------
    ATerm parser and printer pairs
@@ -44,9 +48,6 @@ namespace derivation {
 template<typename T>
 struct ATermSerializer;
 
-/* Defined with the other printers below; declared here because the
-   key serializers write their keys with it. */
-static void printStorePathString(std::string & res, std::string_view pathS, bool supportWindowsStoreDir);
 
 /* One macro per family, in the manner of `JSON_IMPL`: what the members
    are is a property of the family, so only the type varies. */
@@ -142,283 +143,6 @@ struct RawOutputView
    ATerm parsing
    -------------------------------------------------------------------------- */
 
-namespace {
-/**
- * This mimics std::istream to some extent. We use this much smaller implementation
- * instead of plain istreams because the sentry object overhead is too high.
- */
-struct StringViewStream
-{
-    std::string_view remaining;
-
-    int peek() const
-    {
-        if (remaining.empty())
-            return EOF;
-        return static_cast<unsigned char>(remaining[0]);
-    }
-
-    int get()
-    {
-        auto c = peek();
-        if (c != EOF)
-            remaining.remove_prefix(1);
-        return c;
-    }
-};
-
-/**
- * Maps a character to its counterpart in an escape sequence, with
- * `'\0'` meaning "no such escape". That is a usable sentinel because it
- * is neither an escape character nor the meaning of one.
- */
-struct EscapeMap
-{
-    using Map = std::array<char, 256>;
-
-    constexpr EscapeMap(Map map)
-        : map(map)
-    {
-    }
-
-    constexpr std::optional<char> lookup(char c) const
-    {
-        auto res = map[(unsigned char) c];
-        return res ? std::optional{res} : std::nullopt;
-    }
-
-private:
-    Map map;
-};
-
-/* The character an escape sequence stands for, e.g. `'n'` -> `'\n'`. */
-constexpr EscapeMap escapes = [] {
-    EscapeMap::Map map{};
-    map[(unsigned char) 'n'] = '\n';
-    map[(unsigned char) 'r'] = '\r';
-    map[(unsigned char) 't'] = '\t';
-    map[(unsigned char) '\\'] = '\\';
-    map[(unsigned char) '\"'] = '\"';
-    return EscapeMap{map};
-}();
-
-/* The inverse of `escapes`: the character which must be escaped to
-   write the given one, e.g. `'\n'` -> `'n'`. */
-constexpr EscapeMap unescapes = [] {
-    EscapeMap::Map map{};
-    for (size_t i = 0; i < map.size(); i++)
-        if (auto escaped = escapes.lookup((char) i))
-            map[(unsigned char) *escaped] = char(i);
-    return EscapeMap{map};
-}();
-
-} // namespace
-
-/* Read string `s' from stream `str'. */
-static void expect(StringViewStream & str, std::string_view s)
-{
-    if (!str.remaining.starts_with(s))
-        throw FormatError("expected string '%1%'", s);
-    str.remaining.remove_prefix(s.size());
-}
-
-static void expect(StringViewStream & str, char c)
-{
-    if (str.remaining.empty() || str.remaining[0] != c)
-        throw FormatError("expected '%1%' character", c);
-    str.remaining.remove_prefix(1);
-}
-
-/**
- * Read a C-style string from stream `str'.
- *
- * This is for the fields whose contents are arbitrary, and so may need
- * escaping: the environment variables, the builder, and its arguments.
- */
-static BackedStringView parseString(StringViewStream & str)
-{
-    expect(str, '"');
-
-    const auto next = [&]() -> char {
-        auto ch = str.get();
-        if (ch == EOF) {
-            throw FormatError("unterminated string in derivation");
-        }
-        return (char) ch;
-    };
-
-    std::string res;
-
-    while (true) {
-        auto ch = next();
-        if (ch == '"') {
-            return res;
-        } else if ((char) ch == '\\') {
-            ch = next();
-            auto escaped = escapes.lookup(ch);
-            if (!escaped.has_value()) {
-                throw FormatError("unknown escape '\\%1%'", ch);
-            }
-            res.push_back(escaped.value());
-        } else if (unescapes.lookup(ch).has_value()) {
-            // Characters that can be escaped must be escaped
-            throw FormatError("invalid character in string");
-        } else {
-            res.push_back(ch);
-        }
-    }
-}
-
-/**
- * Read a string which must not contain any escape sequence, and so can
- * be taken verbatim from the input.
- *
- * This is for the fields drawn from restricted alphabets: store paths,
- * output names, and the platform. An escape in one of those is not
- * merely redundant but a second encoding of the same value, so it is
- * rejected.
- */
-static BackedStringView parseUnquotedString(StringViewStream & str)
-{
-    expect(str, '"');
-    auto end = str.remaining.find('"');
-    if (end == std::string_view::npos)
-        throw FormatError("unterminated string in derivation");
-    auto content = str.remaining.substr(0, end);
-    // Already know that it ends in an endquote from the find, no need to check again
-    str.remaining.remove_prefix(end + 1);
-    if (content.find('\\') != std::string_view::npos)
-        throw FormatError("unexpected escape sequence in unquoted string");
-
-    return content;
-}
-
-/**
- * Read the string of a store path.
- *
- * Unless the store directory needs escaping, it is written verbatim,
- * and an escape in it is rejected. See
- * `defaultSupportWindowsStoreDir`.
- *
- * Separate from `parseStorePath` because an output's path field shares
- * the encoding but may also be empty, which is no store path at all.
- */
-static BackedStringView parseStorePathString(StringViewStream & str, bool supportWindowsStoreDir)
-{
-    return supportWindowsStoreDir ? parseString(str) : parseUnquotedString(str);
-}
-
-/* Store paths in derivations must be written in their canonical form. */
-static StorePath parseStorePath(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir)
-{
-    return store.parseStorePathCanonical(*parseStorePathString(str, supportWindowsStoreDir));
-}
-
-/**
- * Parse a `[...]`-delimited list, calling `parseItem` for each item.
- */
-static void parseList(StringViewStream & str, auto parseItem)
-{
-    expect(str, '[');
-
-    /* The empty list is the one case with no item to parse. */
-    if (str.peek() == ']') {
-        str.get();
-        return;
-    }
-
-    while (true) {
-        parseItem();
-        auto ch = str.get();
-        if (ch == ']')
-            return;
-        if (ch != ',')
-            throw FormatError("invalid list");
-    }
-}
-
-/**
- * The key of a container element: the element itself for a set, and the
- * first half of the pair for a map.
- */
-template<typename T>
-static const T & keyOf(const T & elem)
-{
-    return elem;
-}
-
-template<typename K, typename V>
-static const K & keyOf(const std::pair<const K, V> & elem)
-{
-    return elem.first;
-}
-
-/**
- * Check that `key` may be appended to an ordered container: the ATerm
- * encoding is canonical, so items must appear in ascending order, and
- * not be duplicated, lest the same value have multiple encodings.
- *
- * Comparing against the last element rather than inspecting an insert
- * result means the caller can then insert with a hint of `end()`, which
- * is amortized constant time rather than logarithmic.
- *
- * @param describe renders the offending item for the error message. It
- * is a callback because rendering can be expensive, and we only need it
- * when something is wrong.
- */
-static void checkMonotonic(const auto & c, const auto & key, auto describe)
-{
-    if (c.empty())
-        return;
-    const auto & last = keyOf(*c.rbegin());
-    if (last == key) [[unlikely]] /* Must not be duplicated. */
-        throw FormatError("duplicate %s", describe());
-    if (!(last < key)) [[unlikely]]
-        throw FormatError("%s does not appear in a sorted order", describe());
-}
-
-/**
- * Parse a list of `(key, value)` pairs into an ordered map, requiring
- * the keys to be monotonic per `checkMonotonic`.
- *
- * @param parseKey parses a key
- * @param parseValue parses the value belonging to the just-parsed key
- * @param describe renders a key for error messages
- */
-static void parseMap(StringViewStream & str, auto & map, auto parseKey, auto parseValue, auto describe)
-{
-    parseList(str, [&] {
-        expect(str, '(');
-        auto key = parseKey();
-        expect(str, ',');
-        auto value = parseValue(key);
-        checkMonotonic(map, key, [&] { return describe(key); });
-        map.emplace_hint(map.end(), std::move(key), std::move(value));
-        expect(str, ')');
-    });
-}
-
-static StringSet parseStrings(StringViewStream & str)
-{
-    StringSet res;
-    parseList(str, [&] {
-        auto content = parseUnquotedString(str).toOwned();
-        checkMonotonic(res, content, [&] { return fmt("set item '%s'", content); });
-        res.insert(res.end(), std::move(content));
-    });
-    return res;
-}
-
-static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir)
-{
-    StorePathSet res;
-    parseList(str, [&] {
-        auto path = parseStorePath(store, str, supportWindowsStoreDir);
-        checkMonotonic(res, path, [&] { return fmt("store path '%s'", store.printStorePath(path)); });
-        res.insert(res.end(), std::move(path));
-    });
-    return res;
-}
 
 /* An `inputDrvs` key is a derivation path in the regular form, a hash
    in the masked one. `StorePath` is written the same way, and is what
@@ -466,17 +190,20 @@ Hash ATermSerializer<Hash>::parse(const StoreDirConfig & store, StringViewStream
  */
 template<typename Inputs, typename Out>
     requires RenderableDerivation<Inputs, Out>
-struct ATermSerializer<Derivation<Inputs, Out>>
+struct ATermSerializer<TraditionalParsedT<Inputs, Out>>
 {
-    static Derivation<Inputs, Out> parse(
+    static TraditionalParsedT<Inputs, Out> parse(
         const StoreDirConfig & store,
         std::string && s,
         std::string_view name,
         bool supportWindowsStoreDir,
         const ExperimentalFeatureSettings & xpSettings);
 
-    static std::string
-    unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir);
+    static std::string unparse(
+        const TraditionalParsedT<Inputs, Out> & drv,
+        const StoreDirConfig & store,
+        std::string_view name,
+        bool supportWindowsStoreDir);
 };
 
 /**
@@ -768,7 +495,7 @@ bool ATermSerializer<DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNod
 
 template<typename Inputs, typename Out>
     requires RenderableDerivation<Inputs, Out>
-Derivation<Inputs, Out> ATermSerializer<Derivation<Inputs, Out>>::parse(
+TraditionalParsedT<Inputs, Out> ATermSerializer<TraditionalParsedT<Inputs, Out>>::parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
@@ -777,9 +504,7 @@ Derivation<Inputs, Out> ATermSerializer<Derivation<Inputs, Out>>::parse(
 {
     using namespace std::literals::string_view_literals;
 
-    Derivation<Inputs, Out> drv{
-        .name = std::string{name},
-    };
+    TraditionalParsedT<Inputs, Out> drv;
 
     StringViewStream str{s};
     expect(str, 'D');
@@ -877,7 +602,7 @@ Derivation<Inputs, Out> ATermSerializer<Derivation<Inputs, Out>>::parse(
     expect(str, ',');
     parseList(str, [&] { drv.args.push_back(parseString(str).toOwned()); });
 
-    /* Parse the environment variables. */
+    /* Parse the environment variables, kept verbatim. */
     expect(str, ',');
     parseMap(
         str,
@@ -886,164 +611,58 @@ Derivation<Inputs, Out> ATermSerializer<Derivation<Inputs, Out>>::parse(
         [&](const auto &) { return parseString(str).toOwned(); },
         [](const auto & name) { return fmt("environment variable '%s'", name); });
 
-    /* Structured attrs are just an ordinary environment variable as far
-       as the ATerm is concerned, so only take them out once the whole
-       map is parsed, and the ordering checks have seen them. */
-    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
-
     expect(str, ')');
     if (!str.remaining.empty())
         throw FormatError("expected end of file, found '%s'", str.remaining);
+
     return drv;
 }
 
 template<typename Inputs, typename Out>
-    requires ParsableDerivation<Inputs, Out>
-Derivation<Inputs, Out> parse(
+TraditionalParsedT<Inputs, Out> TraditionalParsedT<Inputs, Out>::parse(
+    const StoreDirConfig & store,
+    std::string && s,
+    std::string_view name,
+    bool supportWindowsStoreDir,
+    const ExperimentalFeatureSettings & xpSettings)
+    requires RenderableDerivation<Inputs, Out>
+{
+    return ATermSerializer<TraditionalParsedT>::parse(store, std::move(s), name, supportWindowsStoreDir, xpSettings);
+}
+
+/* Every shape `RenderableDerivation` admits. Only the regular one is
+   read in production; the others are read back by the tests, to check
+   that reading gives back what was printed. */
+template TraditionalParsed TraditionalParsed::parse(
+    const StoreDirConfig &, std::string &&, std::string_view, bool, const ExperimentalFeatureSettings &);
+template TraditionalParsedT<FullInputs, Output::Deferred> TraditionalParsedT<FullInputs, Output::Deferred>::parse(
+    const StoreDirConfig &, std::string &&, std::string_view, bool, const ExperimentalFeatureSettings &);
+template TraditionalParsedT<FullInputs, Output::InputAddressed>
+TraditionalParsedT<FullInputs, Output::InputAddressed>::parse(
+    const StoreDirConfig &, std::string &&, std::string_view, bool, const ExperimentalFeatureSettings &);
+template masked::Drv<Output::Deferred> masked::Drv<Output::Deferred>::parse(
+    const StoreDirConfig &, std::string &&, std::string_view, bool, const ExperimentalFeatureSettings &);
+template masked::Drv<Output::InputAddressed> masked::Drv<Output::InputAddressed>::parse(
+    const StoreDirConfig &, std::string &&, std::string_view, bool, const ExperimentalFeatureSettings &);
+
+Full parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
     bool supportWindowsStoreDir,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    /* The flat set of inputs is what callers of the regular form want,
-       but it is not what the ATerm holds; parse the nested form and
-       then flatten. The masked form is already flat. */
-    if constexpr (std::is_same_v<Inputs, std::set<SingleDerivedPath>>)
-        return ATermSerializer<Derivation<FullInputs, Out>>::parse(
-                   store, std::move(s), name, supportWindowsStoreDir, xpSettings)
-            .mapInputs([](const FullInputs & inputs) { return inputs.toSet(); });
-    else
-        return ATermSerializer<Derivation<Inputs, Out>>::parse(
-            store, std::move(s), name, supportWindowsStoreDir, xpSettings);
+    return elaborate(
+        TraditionalParsed::parse(store, std::move(s), name, supportWindowsStoreDir, xpSettings),
+        store,
+        name,
+        xpSettings);
 }
-
-template Full parse(
-    const StoreDirConfig & store,
-    std::string && s,
-    std::string_view name,
-    bool supportWindowsStoreDir,
-    const ExperimentalFeatureSettings &);
-template Derivation<masked::HashInputs, Output::Deferred> parse(
-    const StoreDirConfig & store,
-    std::string && s,
-    std::string_view name,
-    bool supportWindowsStoreDir,
-    const ExperimentalFeatureSettings &);
-template FullDeferred parse(
-    const StoreDirConfig & store,
-    std::string && s,
-    std::string_view name,
-    bool supportWindowsStoreDir,
-    const ExperimentalFeatureSettings &);
-template FullInputAddressed parse(
-    const StoreDirConfig & store,
-    std::string && s,
-    std::string_view name,
-    bool supportWindowsStoreDir,
-    const ExperimentalFeatureSettings &);
-template Derivation<masked::HashInputs, Output::InputAddressed> parse(
-    const StoreDirConfig & store,
-    std::string && s,
-    std::string_view name,
-    bool supportWindowsStoreDir,
-    const ExperimentalFeatureSettings &);
 
 /* --------------------------------------------------------------------------
    ATerm unparsing
    -------------------------------------------------------------------------- */
 
-/**
- * Print a derivation string literal to an `std::string`.
- *
- * This syntax does not generalize to the expression language, which needs to
- * escape `$`.
- *
- * @param res Where to print to
- * @param s Which logical string to print
- */
-static void printString(std::string & res, std::string_view s)
-{
-    res += '"';
-    static constexpr auto chunkSize = 1024;
-    std::array<char, 2 * chunkSize + 2> buffer;
-    while (!s.empty()) {
-        auto chunk = s.substr(0, /*n=*/chunkSize);
-        s.remove_prefix(chunk.size());
-        char * buf = buffer.data();
-        char * p = buf;
-        for (auto c : chunk) {
-            auto escape = unescapes.lookup(c);
-            if (escape.has_value()) {
-                *p++ = '\\';
-                *p++ = escape.value();
-            } else {
-                *p++ = c;
-            }
-        }
-        res.append(buf, p - buf);
-    }
-    res += '"';
-}
-
-static void printUnquotedString(std::string & res, std::string_view s)
-{
-    res += '"';
-    res.append(s);
-    res += '"';
-}
-
-/**
- * Print a `[...]`-delimited list, calling `printItem` for each item.
- */
-static void printList(std::string & res, const auto & items, auto printItem)
-{
-    res += '[';
-    bool first = true;
-    for (auto & item : items) {
-        if (first)
-            first = false;
-        else
-            res += ',';
-        printItem(item);
-    }
-    res += ']';
-}
-
-/**
- * Print a map as a list of `(key,value)` pairs, calling `printKey` and
- * `printValue` for each entry. The map is already in the ascending order
- * `parseMap` requires.
- */
-static void printMap(std::string & res, const auto & map, auto printKey, auto printValue)
-{
-    printList(res, map, [&](const auto & entry) {
-        res += '(';
-        printKey(entry.first);
-        res += ',';
-        printValue(entry.first, entry.second);
-        res += ')';
-    });
-}
-
-static void printStrings(std::string & res, const auto & strings)
-{
-    printList(res, strings, [&](const auto & s) { printString(res, s); });
-}
-
-static void printUnquotedStrings(std::string & res, const auto & strings)
-{
-    printList(res, strings, [&](const auto & s) { printUnquotedString(res, s); });
-}
-
-/* The counterpart of `parseStorePathString`. */
-static void printStorePathString(std::string & res, std::string_view pathS, bool supportWindowsStoreDir)
-{
-    if (supportWindowsStoreDir)
-        printString(res, pathS);
-    else
-        printUnquotedString(res, pathS);
-}
 
 static void printStorePaths(
     const StoreDirConfig & store, std::string & res, const StorePathSet & paths, bool supportWindowsStoreDir)
@@ -1148,8 +767,11 @@ RawOutput ATermSerializer<Output>::unparse(
 
 template<typename Inputs, typename Out>
     requires RenderableDerivation<Inputs, Out>
-std::string ATermSerializer<Derivation<Inputs, Out>>::unparse(
-    const Derivation<Inputs, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
+std::string ATermSerializer<TraditionalParsedT<Inputs, Out>>::unparse(
+    const TraditionalParsedT<Inputs, Out> & drv,
+    const StoreDirConfig & store,
+    std::string_view drvName,
+    bool supportWindowsStoreDir)
 {
     using namespace std::literals::string_view_literals;
 
@@ -1178,7 +800,7 @@ std::string ATermSerializer<Derivation<Inputs, Out>>::unparse(
         drv.outputs,
         [&](const auto & outputName) { printUnquotedString(s, outputName); },
         [&](const auto & outputName, const auto & output) {
-            auto raw = ATermSerializer<Out>::unparse(store, output, drv.name, outputName);
+            auto raw = ATermSerializer<Out>::unparse(store, output, drvName, outputName);
             printStorePathString(s, raw.path, supportWindowsStoreDir);
             s += ',';
             printUnquotedString(s, raw.hashAlgo);
@@ -1209,55 +831,100 @@ std::string ATermSerializer<Derivation<Inputs, Out>>::unparse(
 
     s += ',';
 
-    auto unparseEnv = [&](const StringPairs & atermEnv) {
-        printMap(
-            s,
-            atermEnv,
-            [&](const auto & name) { printString(s, name); },
-            [&](const auto &, const auto & value) { printString(s, value); });
-    };
-
-    StructuredAttrs::checkKeyNotInUse(drv.env);
-    if (drv.structuredAttrs) {
-        StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
-        unparseEnv(scratch);
-    } else {
-        unparseEnv(drv.env);
-    }
+    printMap(
+        s,
+        drv.env,
+        [&](const auto & name) { printString(s, name); },
+        [&](const auto &, const auto & value) { printString(s, value); });
 
     s += ')';
 
     return s;
 }
 
-/* The public entry point is a thin wrapper over the serializer, as
-   `parse` is. */
 template<typename Inputs, typename Out>
+std::string TraditionalParsedT<Inputs, Out>::to_string(
+    const StoreDirConfig & store, std::string_view drvName, bool supportWindowsStoreDir) const
     requires RenderableDerivation<Inputs, Out>
-std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
 {
-    return ATermSerializer<Derivation<Inputs, Out>>::unparse(drv, store, supportWindowsStoreDir);
+    return ATermSerializer<TraditionalParsedT>::unparse(*this, store, drvName, supportWindowsStoreDir);
 }
 
-/* The masked hash intermediate forms, unparsed by `masked.cc`. */
-template std::string unparse(const masked::Drv<Output::Deferred> & drv, const StoreDirConfig & store, bool);
-template std::string unparse(const masked::Drv<Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
+/* The same shapes as `parse`. `masked.cc` hashes the two masked ones. */
+template std::string TraditionalParsed::to_string(const StoreDirConfig &, std::string_view, bool) const;
+template std::string
+TraditionalParsedT<FullInputs, Output::Deferred>::to_string(const StoreDirConfig &, std::string_view, bool) const;
+template std::string
+TraditionalParsedT<FullInputs, Output::InputAddressed>::to_string(const StoreDirConfig &, std::string_view, bool) const;
+template std::string masked::Drv<Output::Deferred>::to_string(const StoreDirConfig &, std::string_view, bool) const;
+template std::string
+masked::Drv<Output::InputAddressed>::to_string(const StoreDirConfig &, std::string_view, bool) const;
 
-template<typename Out>
-std::string unparse(
-    const Derivation<std::set<SingleDerivedPath>, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
+/**
+ * The shared part of the two `lower` overloads: everything but the
+ * inputs, which are the one field whose shape differs.
+ */
+template<typename Inputs, typename Input>
+static TraditionalParsedT<Inputs> lowerCommon(const Derivation<Input, Output> & drv)
 {
-    // Convert to FullInputs for ATerm serialization
-    return unparse(
-        drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }),
-        store,
-        supportWindowsStoreDir);
+    /* Only version 1 derivations have the traditional shape. This is
+       also what keeps version 2 derivations from being sent over the
+       protocols that use it, which would silently lose their options. */
+    if (drv.version != Version::V1)
+        throw Error(
+            "version 2 derivation '%s' cannot be represented in the version 1 (traditional) form", drv.name);
+
+    StringPairs env;
+    for (auto & [name, var] : drv.env)
+        env.insert_or_assign(name, var.value);
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (drv.structuredAttrs)
+        env.insert(drv.structuredAttrs->unparse());
+
+    Outputs<Output> outputs;
+    for (auto & [outputName, output] : drv.outputs)
+        outputs.insert_or_assign(outputName, output.output);
+
+    return {
+        .outputs = std::move(outputs),
+        .platform = drv.platform,
+        .builder = drv.builder,
+        .args = drv.args,
+        .env = std::move(env),
+    };
 }
 
-template std::string unparse(const Full & drv, const StoreDirConfig & store, bool);
-template std::string unparse(const FullDeferred & drv, const StoreDirConfig & store, bool);
-template std::string unparse(const FullInputAddressed & drv, const StoreDirConfig & store, bool);
+TraditionalParsed lower(const Full & drv)
+{
+    auto res = lowerCommon<FullInputs>(drv);
+    res.inputs = FullInputs::fromSet(drv.inputs);
+    return res;
+}
+
+BasicTraditionalParsed lower(const Basic & drv)
+{
+    auto res = lowerCommon<StorePathSet>(drv);
+    res.inputs = drv.inputs;
+    return res;
+}
+
+std::string unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
+{
+    auto lowered = lower(drv);
+
+    /* Lowering to the ATerm format drops the parsed options and
+       structured attributes; it is only faithful if re-parsing the
+       environment gets them back. This is the case for all derivations
+       whose options actually stem from the legacy environment-variable
+       encoding. */
+    if (elaborate(lowered, store, drv.name) != drv)
+        throw Error(
+            "derivation '%s' is not representable in the ATerm format: "
+            "its fields are not in sync with their environment-variable encoding",
+            drv.name);
+
+    return lowered.to_string(store, drv.name, supportWindowsStoreDir);
+}
 
 /* --------------------------------------------------------------------------
    Wire protocol serialisation
@@ -1281,10 +948,8 @@ static Output readOutput(Source & in, const StoreDirConfig & store, std::string_
         experimentalFeatureSettings);
 }
 
-Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name)
+Source & read(Source & in, const StoreDirConfig & store, BasicTraditionalParsed & drv, std::string_view name)
 {
-    drv.name = name;
-
     drv.outputs.clear();
     auto nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
@@ -1297,41 +962,30 @@ Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::strin
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
+    drv.env.clear();
     nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
         auto key = readString(in);
         auto value = readString(in);
-        drv.env[key] = value;
+        drv.env.insert_or_assign(std::move(key), std::move(value));
     }
-    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
     return in;
 }
 
-void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
+void write(Sink & out, const StoreDirConfig & store, const BasicTraditionalParsed & drv, std::string_view name)
 {
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
-        auto raw = ATermSerializer<Output>::unparse(store, i.second, drv.name, i.first);
+        auto raw = ATermSerializer<Output>::unparse(store, i.second, name, i.first);
         out << i.first << raw.path << raw.hashAlgo << raw.hash;
     }
     CommonProto::write(store, CommonProto::WriteConn{.to = out}, drv.inputs);
     out << drv.platform << drv.builder << drv.args;
 
-    auto writeEnv = [&](const StringPairs atermEnv) {
-        out << atermEnv.size();
-        for (auto & [k, v] : atermEnv)
-            out << k << v;
-    };
-
-    StructuredAttrs::checkKeyNotInUse(drv.env);
-    if (drv.structuredAttrs) {
-        StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
-        writeEnv(scratch);
-    } else {
-        writeEnv(drv.env);
-    }
+    out << drv.env.size();
+    for (auto & [k, v] : drv.env)
+        out << k << v;
 }
 
 } // namespace derivation

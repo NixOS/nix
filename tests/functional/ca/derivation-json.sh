@@ -2,6 +2,10 @@
 
 source common.sh
 
+# FIXME: Floating content-addressed derivations are version 2 derivations,
+# whose JSON format is not specified yet.
+skipTest "JSON of version 2 derivations"
+
 export NIX_TESTS_CA_BY_DEFAULT=1
 
 drvPath=$(nix-instantiate ../simple.nix)

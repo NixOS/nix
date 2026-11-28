@@ -1,14 +1,14 @@
 "$schema": "http://json-schema.org/draft-04/schema"
-"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-resolved-v4.json"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-resolved-v5.json"
 title: Resolved Derivation
 description: |
-  Experimental JSON representation of a resolved Nix derivation (version 4).
+  Experimental JSON representation of a resolved Nix derivation (version 5).
 
   This schema describes the JSON representation of Nix's `BasicDerivation` type,
   which is a derivation with all input derivation dependencies resolved to store paths.
   This is the result of `Derivation::tryResolve`.
 
-  This is called "version 4" because we wish to keep it in sync with the
+  This is called "version 5" because we wish to keep it in sync with the
   [primary (not necessarily resolved) JSON schema](@docroot@/protocols/json/derivation/index.md),
   but actually it is the first version for this format.
 
@@ -28,15 +28,23 @@ required:
   - builder
   - args
   - env
+  - options
 properties:
-  name: { "$ref": "derivation-v4.yaml#/$defs/common/properties/name" }
-  version: { "$ref": "derivation-v4.yaml#/$defs/common/properties/version" }
-  outputs: { "$ref": "derivation-v4.yaml#/$defs/common/properties/outputs" }
-  system: { "$ref": "derivation-v4.yaml#/$defs/common/properties/system" }
-  builder: { "$ref": "derivation-v4.yaml#/$defs/common/properties/builder" }
-  args: { "$ref": "derivation-v4.yaml#/$defs/common/properties/args" }
-  env: { "$ref": "derivation-v4.yaml#/$defs/common/properties/env" }
-  structuredAttrs: { "$ref": "derivation-v4.yaml#/$defs/common/properties/structuredAttrs" }
+  name: { "$ref": "derivation-v5.yaml#/$defs/common/properties/name" }
+  version: { "$ref": "derivation-v5.yaml#/$defs/common/properties/version" }
+  outputs: { "$ref": "derivation-v5.yaml#/$defs/common/properties/outputs" }
+  system: { "$ref": "derivation-v5.yaml#/$defs/common/properties/system" }
+  builder: { "$ref": "derivation-v5.yaml#/$defs/common/properties/builder" }
+  args: { "$ref": "derivation-v5.yaml#/$defs/common/properties/args" }
+  env: { "$ref": "derivation-v5.yaml#/$defs/common/properties/env" }
+  structuredAttrs: { "$ref": "derivation-v5.yaml#/$defs/common/properties/structuredAttrs" }
+  options:
+    title: Derivation options (resolved)
+    description: |
+      The [derivation options](derivation-top-options-v1.yaml), in their resolved form:
+      references within the options (e.g. in output checks and `exportReferencesGraph`)
+      are plain store paths, since all derivation dependencies have been resolved away.
+    "$ref": "derivation-top-options-v1.yaml#/$defs/resolved"
 
   inputs:
     type: array

@@ -102,6 +102,37 @@ String context elements come in different forms:
   [`builtins.addDrvOutputDependencies`]: ./builtins.md#builtins-addDrvOutputDependencies
   [`builtins.unsafeDiscardOutputDependency`]: ./builtins.md#builtins-unsafeDiscardOutputDependency
 
+## Placeholders {#placeholders}
+
+Sometimes a string must refer to a [store object] whose [store path] is not known yet.
+For that, Nix puts a *placeholder* in its place: an opaque string of the form `/<hash>`.
+There are two kinds:
+
+- [Output placeholders]{#output-placeholder}, returned by [`builtins.placeholder`], stand for one of the outputs of the derivation being defined, which cannot be known until the derivation itself is.
+
+- [Input placeholders]{#input-placeholder}, returned by [`builtins.outputOf`] when needed, stand for an output of another derivation whose store path is not known in advance, because that derivation is [floating content-addressed](@docroot@/store/derivation/outputs/content-address.md#floating), say, or is itself the output of a derivation.
+  The string's context records the [output deriving path](#string-context-output) the placeholder stands for.
+
+Placeholders are an artifact of the language, which only has strings with which to write such references.
+How they end up in a [derivation](./derivations.md) depends on its [version]:
+
+- When a [version 2] derivation is created, each placeholder in its strings is turned into a [reference](@docroot@/protocols/derivation-aterm/v2.md#interpolated), to the output or input it stands for, so the derivation itself contains no placeholders.
+
+- A [version 1] derivation never has inputs whose store paths are not known in advance, so it never needs input placeholders.
+  Output placeholders are left in its strings as they are, and replaced when it is built; see [output placeholders in version 1 derivations](@docroot@/store/derivation/index.md#output-placeholder).
+
+> **Note**
+>
+> Ideally placeholders would not be visible in the language at all, and strings would carry references instead, as version 2 derivations do.
+> They remain visible for now, for compatibility.
+
+[`builtins.placeholder`]: ./builtins.md#builtins-placeholder
+[store object]: @docroot@/store/store-object.md
+[store path]: @docroot@/store/store-path.md
+[version]: @docroot@/store/derivation/versions.md
+[version 1]: @docroot@/store/derivation/versions.md#version-1
+[version 2]: @docroot@/store/derivation/versions.md#version-2
+
 ## Inspecting string contexts
 
 Most basically, [`builtins.hasContext`] will tell whether a string has a non-empty context.

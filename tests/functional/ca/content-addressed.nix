@@ -64,7 +64,7 @@ rec {
       echo ${dependentCA} > $out
     '';
   };
-  dependentNonCA = mkDerivation {
+  dependentNonCA = mkDerivationV2 {
     name = "dependent-non-ca";
     buildCommand = ''
       echo "Didn't cut-off"
@@ -82,7 +82,7 @@ rec {
       touch $out
     '';
   };
-  dependentForBuildNonCA = mkDerivation {
+  dependentForBuildNonCA = mkDerivationV2 {
     name = "dependent-for-build-non-ca";
     buildCommand = ''
       echo "Depends on rootCA for building only"
@@ -91,7 +91,7 @@ rec {
       touch $out
     '';
   };
-  dependentFixedOutput = mkDerivation {
+  dependentFixedOutput = mkDerivationV2 {
     name = "dependent-fixed-output";
     outputHashMode = "recursive";
     outputHash = "sha512-7aJcmSuEuYP5tGKcmGY8bRr/lrCjJlOxP2mIUjO/vMQeg6gx/65IbzRWES8EKiPDOs9z+wF30lEfcwxM/cT4pw==";

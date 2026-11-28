@@ -18,7 +18,7 @@
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/resolution.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
@@ -645,7 +645,11 @@ static void performOp(
          * it cannot be trusted that its outPath was calculated
          * correctly.
          */
-        derivation::read(conn.from, *store, drv, Derivation::nameFromPath(drvPath));
+        {
+            derivation::BasicTraditionalParsed drvATerm;
+            derivation::read(conn.from, *store, drvATerm, Derivation::nameFromPath(drvPath));
+            drv = derivation::elaborate(drvATerm, *store, Derivation::nameFromPath(drvPath));
+        }
         auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 

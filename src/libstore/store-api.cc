@@ -6,8 +6,11 @@
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/v2/aterm.hh"
+#include "nix/store/derivation/v2/convert.hh"
 #include "nix/store/derivation/resolution.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/aterm.hh"
+#include "nix/store/derivation/v1.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"
 #include "nix/store/store-open.hh"
@@ -1212,6 +1215,62 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
     return readDerivation(drvPath);
 }
 
+/**
+ * Parse a version 2 derivation, checking the output paths it records
+ * against static speculation.
+ */
+static derivation::v2::Parsed<SingleDerivedPath>
+parseV2Derivation(Store & store, std::string_view contents, std::string_view name)
+{
+    auto parsed = derivation::v2::parse<SingleDerivedPath>(store, contents, name);
+
+    auto computed = derivation::v2::staticOutputPaths(store, parsed.drv, derivation::v2::staticPathOf(store));
+    if (parsed.recordedOutputPaths != computed.value_or(decltype(parsed.recordedOutputPaths){}))
+        throw FormatError(
+            computed && !computed->empty() && parsed.recordedOutputPaths.empty()
+                ? "output paths that can be known in advance are not recorded"
+                : "recorded output paths do not agree with static speculation");
+
+    return parsed;
+}
+
+/**
+ * A version 2 derivation's elaborated form.
+ */
+static Derivation readV2Derivation(Store & store, std::string_view contents, std::string_view name)
+{
+    auto parsed = parseV2Derivation(store, contents, name);
+    return derivation::v2::toElaborated(store, parsed.drv, derivation::v2::staticPathOf(store));
+}
+
+ref<const derivation::FullInterface> Store::readDerivationInterface(const StorePath & drvPath, bool requireValidPath)
+{
+    auto accessor = requireStoreObjectAccessor(drvPath, requireValidPath);
+    auto contents = accessor->readFile(CanonPath::root);
+    auto name = Derivation::nameFromPath(drvPath);
+
+    try {
+        /* Special case for an empty file to show the user a better message */
+        if (contents.empty())
+            throw FormatError("file is empty (possible filesystem corruption)");
+
+        if (derivation::v2::isV2(contents)) {
+            auto parsed = parseV2Derivation(*this, contents, name);
+            return make_ref<const derivation::v2::Derivation<SingleDerivedPath>>(
+                std::move(parsed.drv), std::move(parsed.recordedOutputPaths));
+        }
+
+        return std::visit(
+            [](auto && drv) -> ref<const derivation::FullInterface> {
+                return make_ref<const std::decay_t<decltype(drv)>>(std::move(drv));
+            },
+            derivation::v1::fromParsed(
+                derivation::TraditionalParsed::parse(*this, std::move(contents), name), std::string{name}, *this));
+    } catch (FormatError & e) {
+        throw Error("error parsing derivation '%s': %s", printStorePath(drvPath), e.message());
+    }
+}
+
 static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
 {
     auto accessor = store.requireStoreObjectAccessor(drvPath, requireValidPath);
@@ -1221,6 +1280,9 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
         /* Special case for an empty file to show the user a better message */
         if (contents.empty())
             throw FormatError("file is empty (possible filesystem corruption)");
+
+        if (derivation::v2::isV2(contents))
+            return readV2Derivation(store, contents, Derivation::nameFromPath(drvPath));
 
         return derivation::parse(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
@@ -1246,12 +1308,16 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         return path;
 
     auto drv = readDerivation(path);
-    if (!type(drv).hasKnownOutputPaths()) {
+    if (!type(drv).hasKnownOutputPaths() && shouldResolve(drv)) {
         // The build log is actually attached to the corresponding
-        // resolved derivation, so we need to get it first
+        // resolved derivation, so we need to get it first. That is
+        // only so if the derivation is built resolved at all, as
+        // `shouldResolve` decides.
         auto resolvedDrv = tryResolve(drv, *this);
-        if (resolvedDrv)
+        if (resolvedDrv) {
+            // TODO check options compatibility with ATerm.
             return nix::computeStorePath(*this, unresolve(*resolvedDrv));
+        }
     }
 
     return path;

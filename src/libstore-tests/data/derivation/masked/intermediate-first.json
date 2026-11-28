@@ -17,14 +17,30 @@
     "srcs": []
   },
   "name": "intermediate",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "dev": {
-      "path": "xgskw9kbh807ah56r4f4kxdh0fa1i0ip-intermediate-dev"
+      "checks": null,
+      "path": "xgskw9kbh807ah56r4f4kxdh0fa1i0ip-intermediate-dev",
+      "unsafeDiscardReferences": false
     },
     "out": {
-      "path": "jlzxv2xpqj0adi22cy93573vyf9xr6fw-intermediate"
+      "checks": null,
+      "path": "jlzxv2xpqj0adi22cy93573vyf9xr6fw-intermediate",
+      "unsafeDiscardReferences": false
     }
   },
   "system": "x86_64-linux",
-  "version": 4
+  "version": 5
 }

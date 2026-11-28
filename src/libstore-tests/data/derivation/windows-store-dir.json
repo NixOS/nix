@@ -13,11 +13,25 @@
     ]
   },
   "name": "windows-store-dir",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
-      "path": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo"
+      "checks": null,
+      "path": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo",
+      "unsafeDiscardReferences": false
     }
   },
   "system": "x86_64-windows",
-  "version": 4
+  "version": 5
 }

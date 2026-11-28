@@ -33,14 +33,16 @@ constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Hashes);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
-        .tag = Xp::CaDerivations,
-        .name = "ca-derivations",
+        .tag = Xp::DerivationsV2,
+        .name = "derivations-v2",
         .description = R"(
-            Allow derivations to be content-addressed in order to prevent
-            rebuilds when changes to the derivation do not result in changes to
-            the derivation's output. See
-            [__contentAddressed](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed)
-            for details.
+            Allow [version 2](@docroot@/store/derivation/versions.md) derivations,
+            created with [`builtins.derivationStrictV2`](@docroot@/language/derivations/v2.md),
+            and with them [floating content-addressed](@docroot@/store/derivation/outputs/content-address.md#floating)
+            outputs and [dynamic derivations](@docroot@/store/derivation/index.md#dynamic).
+
+            The old names `ca-derivations` and `dynamic-derivations` are aliases
+            of this feature.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/35",
     },
@@ -187,20 +189,6 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/36",
     },
     {
-        .tag = Xp::DynamicDerivations,
-        .name = "dynamic-derivations",
-        .description = R"(
-            Allow the use of a few things related to dynamic derivations:
-
-              - "text hashing" derivation outputs, so we can build .drv
-                files.
-
-              - dependencies in derivations on the outputs of
-                derivations that are themselves derivations outputs.
-        )",
-        .trackingUrl = "https://github.com/NixOS/nix/milestone/39",
-    },
-    {
         .tag = Xp::ParseTomlTimestamps,
         .name = "parse-toml-timestamps",
         .description = R"(
@@ -291,6 +279,8 @@ const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::str
         auto reverseXpMap = std::make_unique<ReverseXpMap>();
         for (auto & xpFeature : xpFeatureDetails)
             (*reverseXpMap)[xpFeature.name] = xpFeature.tag;
+        (*reverseXpMap)["ca-derivations"] = Xp::DerivationsV2;
+        (*reverseXpMap)["dynamic-derivations"] = Xp::DerivationsV2;
         return reverseXpMap;
     }();
 

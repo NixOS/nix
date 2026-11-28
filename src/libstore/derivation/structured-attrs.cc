@@ -1,7 +1,7 @@
 #include "nix/store/derivation/structured-attrs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/options.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 
 #include <nlohmann/json.hpp>
 #include <cassert>
@@ -77,7 +77,7 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
  * mechanism to allow this to evolve again and get back in sync, but for
  * now we must not change - not even extend - the behavior.
  */
-static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePaths)
+nlohmann::json exportReferencesGraphToJSON(Store & store, const StorePathSet & storePaths)
 {
     using nlohmann::json;
 
@@ -121,22 +121,23 @@ static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePa
 
 nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
     Store & store,
-    const DerivationOptions<StorePath> & drvOptions,
+    const std::map<std::string, StorePathSet, std::less<>> & exportReferencesGraph,
     const StorePathSet & inputPaths,
-    const std::map<std::string, Output> & outputs) const
+    const StringSet & outputNames,
+    const fun<std::string(const std::string &)> & renderOutput) const
 {
     /* Copy to then modify */
     auto json = structuredAttrs;
 
     /* Add an "outputs" object containing the output paths. */
     nlohmann::json outputsJson;
-    for (auto & i : outputs)
-        outputsJson[i.first] = hashPlaceholder(i.first);
+    for (auto & outputName : outputNames)
+        outputsJson[outputName] = renderOutput(outputName);
     json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
-    for (auto & [key, storePaths] : drvOptions.exportReferencesGraph) {
-        json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, inputPaths));
+    for (auto & [key, storePaths] : exportReferencesGraph) {
+        json[key] = exportReferencesGraphToJSON(store, store.exportReferences(storePaths, inputPaths));
     }
 
     return json;

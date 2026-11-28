@@ -50,6 +50,7 @@ In particular, the specification decides:
 In addition to the output specification above, a derivation may mandate additional *checks* on its outputs:
 properties that must hold for the produced store objects in order for the build to be considered successful.
 Checks may be specified separately for each output, or once for all outputs of the derivation.
+(Not every [version](../versions.md) of derivation can express both; see [Options](../index.md#options).)
 
 ### Reference checks
 
@@ -168,6 +169,8 @@ The rules for this are fairly concise:
 
      > There is no use for this forth combination.
      > The sole purpose of an output's store path being fixed is to support the derivation being impure.
+
+The type of a derivation is independent of its [version](../versions.md), though not every combination is supported yet; see [Versions and types of derivations](../versions.md#versions-and-types).
 
 [xp-feature-ca-derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
 [xp-feature-git-hashing]: @docroot@/development/experimental-features.md#xp-feature-git-hashing

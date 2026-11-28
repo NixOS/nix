@@ -31,14 +31,18 @@ PackageInfo::PackageInfo(EvalState & state, ref<Store> store, const std::string 
     if (selectedOutputs.size() > 1)
         throw Error("building more than one derivation output is not supported, in '%s'", drvPathWithOutputs);
 
-    outputName = selectedOutputs.empty() ? getOr(drv.env, "outputName", "out") : *selectedOutputs.begin();
+    outputName = selectedOutputs.empty() ? [&]() -> std::string {
+        auto i = drv.env.find("outputName");
+        return i != drv.env.end() ? i->second.value : "out";
+    }()
+        : *selectedOutputs.begin();
 
     auto i = drv.outputs.find(outputName);
     if (i == drv.outputs.end())
         throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
     auto & [outputName, output] = *i;
 
-    outPath = {output.path(*store, drv.name, outputName)};
+    outPath = {output.output.path(*store, drv.name, outputName)};
 }
 
 std::string PackageInfo::queryName() const

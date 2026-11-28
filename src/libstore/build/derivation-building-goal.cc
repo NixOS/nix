@@ -369,15 +369,6 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
        build hook. */
     co_await yield();
 
-    auto drvOptions = [&] {
-        try {
-            return derivation::optionsFromStructuredAttrs(worker.store, drv->env, get(drv->structuredAttrs));
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-            throw;
-        }
-    }();
-
     std::map<std::string, InitialOutput> initialOutputs;
 
     /* Recheck at this point. In particular, whereas before we were
@@ -432,7 +423,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
             wrongStore.badPlatform = WrongLocalStore::Pair<std::string>{drv->platform, settings.thisSystem.get()};
 
         {
-            auto required = drvOptions.getRequiredSystemFeatures(*drv);
+            auto required = drv->getRequiredSystemFeatures();
             auto & available = worker.store.config.systemFeatures.get();
             if (std::ranges::any_of(required, [&](const std::string & f) { return !available.count(f); }))
                 wrongStore.missingFeatures = WrongLocalStore::Pair<StringSet>{required, available};
@@ -532,7 +523,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                     .builtOutputs = checkPathValidity(initialOutputs).second,
                 }};
 
-            switch (tryBuildHook(drvOptions)) {
+            switch (tryBuildHook()) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -564,7 +555,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                 if (valid)
                     break;
 
-                switch (tryBuildHook(drvOptions)) {
+                switch (tryBuildHook()) {
                 case rpAccept:
                     /* Yes, it has started doing so.  Wait until we get
                        EOF from the hook. */
@@ -602,7 +593,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                     .builtOutputs = checkPathValidity(initialOutputs).second,
                 }};
 
-            co_return co_await buildLocally(*cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks));
+            co_return co_await buildLocally(*cap, inputPaths, initialOutputs, std::move(outputLocks));
         }
 
         co_return std::nullopt;
@@ -615,7 +606,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
             // Check and repair modes operate on the state of this store specifically,
             // so they must always build locally.
             local = co_await tryBuildLocally();
-        } else if (drvOptions.preferLocalBuild) {
+        } else if (drv->options.preferLocalBuild) {
             // Local is preferred, so try it first. If it's not available, fall back to the hook.
             local = co_await tryBuildLocally();
             if (!local)
@@ -865,7 +856,6 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
     LocalBuildCapability localBuildCap,
     const StorePathSet & inputPaths,
     std::map<std::string, InitialOutput> & initialOutputs,
-    const DerivationOptions<StorePath> & drvOptions,
     PathLocks outputLocks)
 {
     co_await yield();
@@ -989,7 +979,7 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
             }
 
             try {
-                desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
+                desugaredEnv = DesugaredEnv::create(worker.store, *drv, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
                 co_return std::move(e);
@@ -999,7 +989,6 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
                 .drvPath = drvPath,
                 .buildResult = buildResult,
                 .drv = *drv,
-                .drvOptions = drvOptions,
                 .inputPaths = inputPaths,
                 .initialOutputs = initialOutputs,
                 .buildMode = buildMode,
@@ -1102,7 +1091,7 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
         /* Compute the FS closure of the outputs and register them as
            being valid. With builder-rpc-v0 the builder already submitted
            the outputs, so check those instead. */
-        builtOutputs = drvOptions.getRequiredSystemFeatures(*drv).count(std::string{drvFeatureBuilderRpcV0})
+        builtOutputs = drv->getRequiredSystemFeatures().count(std::string{drvFeatureBuilderRpcV0})
                            ? builder->checkSubmittedOutputs(localBuildCap.localStore)
                            : builder->registerOutputs(localBuildCap.localStore);
         builder->cleanupBuild(true);
@@ -1203,7 +1192,7 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
+HookReply DerivationBuildingGoal::tryBuildHook()
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1221,8 +1210,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 
         /* Send the request to the hook. */
         worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
-                          << drv->platform << worker.store.printStorePath(drvPath)
-                          << drvOptions.getRequiredSystemFeatures(*drv);
+                          << drv->platform << worker.store.printStorePath(drvPath) << drv->getRequiredSystemFeatures();
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -1338,7 +1326,7 @@ std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPar
        we do best-effort with static information. */
     std::map<std::string, std::optional<StorePath>> res;
     for (auto & [name, output] : drv->outputs)
-        res.insert_or_assign(name, output.path(worker.store, drv->name, name));
+        res.insert_or_assign(name, output.output.path(worker.store, drv->name, name));
     return res;
 }
 

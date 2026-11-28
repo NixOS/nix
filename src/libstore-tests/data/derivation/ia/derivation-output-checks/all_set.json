@@ -1,0 +1,12 @@
+{
+  "checks": {
+    "allowedReferences": null,
+    "allowedRequisites": null,
+    "disallowedReferences": [],
+    "disallowedRequisites": [],
+    "ignoreSelfRefs": false,
+    "maxClosureSize": 5909,
+    "maxSize": 789
+  },
+  "unsafeDiscardReferences": true
+}

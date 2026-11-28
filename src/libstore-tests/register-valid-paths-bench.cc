@@ -1,7 +1,7 @@
 #include <benchmark/benchmark.h>
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/v1/aterm.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/file-system.hh"
@@ -37,11 +37,11 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
             auto drvPath = StorePath::random(drvName + ".drv");
 
             Derivation drv{
-                .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+                .name = drvName,
+                .outputs = {{"out", {.output = DerivationOutput{DerivationOutput::Deferred{}}}}},
                 .platform = "x86_64-linux",
                 .builder = "foo",
-                .env = {{"out", ""}},
-                .name = drvName,
+                .env = {{"out", {.value = ""}}},
             };
             fillInOutputPaths(drv, *localStore);
 

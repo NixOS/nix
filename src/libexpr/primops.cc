@@ -1,5 +1,8 @@
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/masked.hh"
+#include "nix/store/derivation/v2.hh"
+#include "nix/store/derivation/v1.hh"
+#include "nix/store/derivation/v1/masked.hh"
+#include "nix/store/derivation/v1/elaborate.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
@@ -230,11 +233,11 @@ void derivationToValue(EvalState & state, const SourcePath & path, const StorePa
                 NixStringContextElem::DrvDeep{.drvPath = storePath},
             },
             state.mem);
-    attrs.alloc(state.s.name).mkString(drv.env["name"], state.mem);
+    attrs.alloc(state.s.name).mkString(drv.env["name"].value, state.mem);
 
     auto list = state.buildList(drv.outputs.size());
     for (const auto & [i, o] : enumerate(drv.outputs)) {
-        mkOutputString(state, attrs, storePath, o);
+        mkOutputString(state, attrs, storePath, {o.first, o.second.output});
         (list[i] = state.allocValue())->mkString(o.first, state.mem);
     }
     attrs.alloc(state.s.outputs).mkList(list);
@@ -1788,7 +1791,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     for (auto & j : refs) {
                         drv.inputs.insert(SingleDerivedPath::Opaque{j});
                         if (j.isDerivation()) {
-                            for (auto & outputName : state.store->readDerivation(j).outputNames()) {
+                            for (auto & outputName : state.store->readDerivationInterface(j)->outputNames()) {
                                 drv.inputs.insert(
                                     SingleDerivedPath::Built{
                                         .drvPath = makeConstantStorePathRef(j),
@@ -1819,6 +1822,44 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
     if (drv.platform == "")
         state.error<EvalError>("required attribute 'system' missing").atPos(v).debugThrow();
+
+    /* `derivation` only creates version 1 derivations; anything they cannot
+       express needs a version 2 derivation instead. */
+    if (!outputHash && (contentAddressed || isImpure))
+        state
+            .error<EvalError>(
+                "%s derivations are version 2 derivations, which are created with 'builtins.derivationStrictV2'",
+                isImpure ? "impure" : "floating content-addressed")
+            .atPos(v)
+            .debugThrow();
+    for (auto & input : drv.inputs)
+        if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw())) {
+            auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&built->drvPath->raw());
+            if (!opaque)
+                state
+                    .error<EvalError>(
+                        "an input that is an output of an output of a derivation needs a version 2 derivation, which is created with 'builtins.derivationStrictV2'")
+                    .atPos(v)
+                    .debugThrow();
+            /* An input derivation that cannot be read, e.g. because it was
+               only computed in read-only mode, is not checked here. */
+            /* Which version a derivation is is just what this is about, so
+               this is one of the few places to look past the interface. */
+            bool isV2 = false;
+            try {
+                isV2 = dynamic_cast<const derivation::v2::Derivation<SingleDerivedPath> *>(
+                           &*state.store->readDerivationInterface(opaque->path, false))
+                       != nullptr;
+            } catch (Error &) {
+            }
+            if (isV2)
+                state
+                    .error<EvalError>(
+                        "a version 1 derivation cannot depend on the version 2 derivation '%s'",
+                        state.store->printStorePath(opaque->path))
+                    .atPos(v)
+                    .debugThrow();
+        }
 
     /* Check whether the derivation name is valid. */
     if (isDerivationFileName(drvName)
@@ -1855,35 +1896,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         };
 
         if (!isSubmittingOutputs)
-            drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
-        drv.outputs.insert_or_assign("out", std::move(dof));
-    }
-
-    else if (contentAddressed || isImpure) {
-        if (contentAddressed && isImpure)
-            state.error<EvalError>("derivation cannot be both content-addressed and impure").atPos(v).debugThrow();
-
-        auto ha = outputHashAlgo.value_or(HashAlgorithm::SHA256);
-        auto method = ingestionMethod.value_or(ContentAddressMethod::Raw::NixArchive);
-
-        for (auto & i : outputs) {
-            if (!isSubmittingOutputs)
-                drv.env[i] = hashPlaceholder(i);
-            if (isImpure)
-                drv.outputs.insert_or_assign(
-                    i,
-                    DerivationOutput::Impure{
-                        .method = method,
-                        .hashAlgo = ha,
-                    });
-            else
-                drv.outputs.insert_or_assign(
-                    i,
-                    DerivationOutput::CAFloating{
-                        .method = method,
-                        .hashAlgo = ha,
-                    });
-        }
+            drv.env["out"] = {.value = state.store->printStorePath(dof.path(*state.store, drvName, "out"))};
+        drv.outputs.insert_or_assign("out", decltype(drv.outputs)::mapped_type{.output = std::move(dof)});
     }
 
     else {
@@ -1894,12 +1908,23 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
            that changes in the set of output names do get reflected in
            the hash. */
         for (auto & i : outputs) {
-            drv.env[i] = "";
-            drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
+            drv.env[i] = {};
+            drv.outputs.insert_or_assign(i, decltype(drv.outputs)::mapped_type{.output = DerivationOutput::Deferred{}});
         }
-
-        fillInOutputPaths(drv, *state.store);
     }
+
+    /* The options of a version 1 derivation are decoded from its
+       environment variables (or structured attributes), and are only a
+       cache of them: so construct it from that encoding. Must happen
+       after the outputs are populated, so per-output checks have
+       somewhere to land, and before output paths are filled in, which
+       consults the options. The warnings for dubious values were
+       already emitted above. */
+    drv = derivation::v1::elaborated(derivation::v1::fromParsed(
+        derivation::lower(drv), std::string{drvName}, *state.store, experimentalFeatureSettings, /*shouldWarn=*/false));
+
+    if (!outputHash)
+        fillInOutputPaths(drv, *state.store);
 
     /* Write the resulting term into the Nix store directory.
 
@@ -1929,7 +1954,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             },
             state.mem);
     for (auto & i : drv.outputs)
-        mkOutputString(state, result, drvPath, i);
+        mkOutputString(state, result, drvPath, {i.first, i.second.output});
 
     v.mkAttrs(result);
 }
@@ -1961,7 +1986,7 @@ static RegisterPrimOp primop_placeholder({
     .args = {"output"},
     .doc = R"(
       Return an
-      [output placeholder string](@docroot@/store/derivation/index.md#output-placeholder)
+      [output placeholder string](@docroot@/language/string-context.md#output-placeholder)
       for the specified *output* that will be substituted by the corresponding
       [output path](@docroot@/glossary.md#gloss-output-path)
       at build time.
@@ -2555,7 +2580,7 @@ static RegisterPrimOp primop_outputOf({
     .args = {"derivation-reference", "output-name"},
     .doc = R"(
       Return the output path of a derivation, literally or using an
-      [input placeholder string](@docroot@/store/derivation/index.md#input-placeholder)
+      [input placeholder string](@docroot@/language/string-context.md#input-placeholder)
       if needed.
 
       If the derivation has a statically-known output path (i.e. the derivation output is input-addressed, or fixed content-addressed), the output path is returned.

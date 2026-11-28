@@ -70,7 +70,7 @@ The arguments *args* map to store paths in a number of possible ways:
 
 - If *args* are [store paths] that do not point to store derivations, then these are [realised] and installed.
 
-- By default all [outputs](@docroot@/language/derivations.md#attr-outputs) are installed for each [store derivation].
+- By default all [outputs](@docroot@/language/derivations/v1.md#attr-outputs) are installed for each [store derivation].
   This can be overridden by adding a `meta.outputsToInstall` attribute on the derivation listing a subset of the output names.
 
   Example:

@@ -1,0 +1,26 @@
+{
+  "additionalSandboxProfile": "sandcastle",
+  "allOutputChecks": null,
+  "allowLocalNetworking": true,
+  "allowSubstitutes": false,
+  "exportReferencesGraph": {
+    "refs1": [
+      "p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"
+    ],
+    "refs2": [
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
+    ]
+  },
+  "impureEnvVars": [
+    "UNICORN"
+  ],
+  "impureHostDeps": [
+    "/usr/bin/ditto"
+  ],
+  "noChroot": true,
+  "preferLocalBuild": true,
+  "requiredSystemFeatures": [
+    "rainbow",
+    "uid-range"
+  ]
+}

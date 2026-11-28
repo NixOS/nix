@@ -17,7 +17,7 @@ namespace nix {
  * `.cc` file as well.
  */
 enum struct ExperimentalFeature {
-    CaDerivations,
+    DerivationsV2,
     ImpureDerivations,
     Flakes,
     FetchTree,
@@ -27,7 +27,6 @@ enum struct ExperimentalFeature {
     FetchClosure,
     AutoAllocateUids,
     Cgroups,
-    DynamicDerivations,
     ParseTomlTimestamps,
     ReadOnlyLocalStore,
     LocalOverlayStore,
@@ -37,6 +36,12 @@ enum struct ExperimentalFeature {
     PipeOperators,
     ExternalBuilders,
     BLAKE3Hashes,
+
+    /* Old names, now covered by `DerivationsV2`. Not in
+       `xpFeatureDetails`; `parseExperimentalFeature` maps their names
+       to it. */
+    CaDerivations = DerivationsV2,
+    DynamicDerivations = DerivationsV2,
 };
 
 /**

@@ -167,7 +167,7 @@
 
 - [fixed-output derivation]{#gloss-fixed-output-derivation} (FOD)
 
-  A [store derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute, and where the [`builder`](@docroot@/language/derivations.md#attr-builder) executable has access to the network.
+  A [store derivation] where a cryptographic hash of the [output] is determined in advance using the [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute, and where the [`builder`](@docroot@/language/derivations/v1.md#attr-builder) executable has access to the network.
 
 - [hermetic]{#gloss-hermetic}
 
@@ -252,7 +252,7 @@
 - [output]{#gloss-output}
 
   A [store object] produced by a [store derivation].
-  See [the `outputs` argument to the `derivation` function](@docroot@/language/derivations.md#attr-outputs) for details.
+  See [the `outputs` argument to the `derivation` function](@docroot@/language/derivations/v1.md#attr-outputs) for details.
 
   [output]: #gloss-output
 

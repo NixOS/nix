@@ -25,7 +25,7 @@ rec {
     outputHashAlgo = "sha256";
   };
 
-  wrapper = mkDerivation {
+  wrapper = mkDerivationV2 {
     name = "use-dynamic-drv-in-non-dynamic-drv";
     buildCommand = ''
       echo "Copying the output of the dynamic derivation"
@@ -33,7 +33,7 @@ rec {
     '';
   };
 
-  failingWrapper = mkDerivation {
+  failingWrapper = mkDerivationV2 {
     name = "use-dynamic-drv-in-non-dynamic-drv-wrong";
     buildCommand = ''
       echo "Fail at copying the output of the dynamic derivation"

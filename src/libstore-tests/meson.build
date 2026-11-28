@@ -45,6 +45,8 @@ sources = files(
   'derivation/masked.cc',
   'derivation/path.cc',
   'derivation/resolution.cc',
+  'derivation/v1-interface.cc',
+  'derivation/v2.cc',
   'derivation/write.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',

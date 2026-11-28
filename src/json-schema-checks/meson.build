@@ -76,15 +76,37 @@ schemas = [
     ],
   },
   {
-    'stem' : 'derivation-options',
-    'schema' : schema_dir / 'derivation-options-v1.yaml',
+    'stem' : 'derivation-top-options',
+    'schema' : schema_dir / 'derivation-top-options-v1.yaml',
     'files' : [
-      'ia' / 'derivation-options' / 'defaults.json',
-      'ia' / 'derivation-options' / 'all_set.json',
-      'ia' / 'derivation-options' / 'structuredAttrs_defaults.json',
-      'ia' / 'derivation-options' / 'structuredAttrs_all_set.json',
-      'ca' / 'derivation-options' / 'all_set.json',
-      'ca' / 'derivation-options' / 'structuredAttrs_all_set.json',
+      'ia' / 'derivation-top-options' / 'defaults.json',
+      'ia' / 'derivation-top-options' / 'all_set.json',
+      'ia' / 'derivation-top-options' / 'structuredAttrs_defaults.json',
+      'ia' / 'derivation-top-options' / 'structuredAttrs_all_set.json',
+      'ca' / 'derivation-top-options' / 'all_set.json',
+      'ca' / 'derivation-top-options' / 'structuredAttrs_all_set.json',
+    ],
+  },
+  # The input-addressed examples only refer to store paths (and outputs
+  # of the derivation itself), so they are also valid as *resolved*
+  # derivation options. (The content-addressed ones contain real
+  # deriving paths, and so are not.)
+  {
+    'stem' : 'derivation-top-options',
+    'schema' : schema_dir / 'derivation-top-options-v1.yaml#/$defs/resolved',
+    'files' : [
+      'ia' / 'derivation-top-options' / 'defaults.json',
+      'ia' / 'derivation-top-options' / 'all_set.json',
+      'ia' / 'derivation-top-options' / 'structuredAttrs_defaults.json',
+      'ia' / 'derivation-top-options' / 'structuredAttrs_all_set.json',
+    ],
+  },
+  {
+    'stem' : 'derivation-output-checks',
+    'schema' : schema_dir / 'derivation-output-checks-v1.yaml',
+    'files' : [
+      'ia' / 'derivation-output-checks' / 'defaults.json',
+      'ia' / 'derivation-output-checks' / 'all_set.json',
     ],
   },
 ]
@@ -94,7 +116,7 @@ schemas += [
   # Match overall
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v4.yaml',
+    'schema' : schema_dir / 'derivation-v5.yaml',
     'files' : [
       'dyn-dep-derivation.json',
       'simple-derivation.json',
@@ -105,7 +127,7 @@ schemas += [
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-resolved-v4.yaml',
+    'schema' : schema_dir / 'derivation-resolved-v5.yaml',
     'files' : [
       'try-resolve' / 'no-inputs-after.json',
       'try-resolve' / 'with-inputs-after.json',
@@ -113,7 +135,7 @@ schemas += [
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/overall',
+    'schema' : schema_dir / 'derivation-v5.yaml#/$defs/output/overall',
     'files' : [
       'output-caFixedFlat.json',
       'output-caFixedNAR.json',
@@ -127,14 +149,14 @@ schemas += [
   # Match exact variant
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/inputAddressed',
+    'schema' : schema_dir / 'derivation-v5.yaml#/$defs/output/inputAddressed',
     'files' : [
       'output-inputAddressed.json',
     ],
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFixed',
+    'schema' : schema_dir / 'derivation-v5.yaml#/$defs/output/caFixed',
     'files' : [
       'output-caFixedFlat.json',
       'output-caFixedNAR.json',
@@ -143,21 +165,21 @@ schemas += [
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFloating',
+    'schema' : schema_dir / 'derivation-v5.yaml#/$defs/output/caFloating',
     'files' : [
       'output-caFloating.json',
     ],
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/deferred',
+    'schema' : schema_dir / 'derivation-v5.yaml#/$defs/output/deferred',
     'files' : [
       'output-deferred.json',
     ],
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/impure',
+    'schema' : schema_dir / 'derivation-v5.yaml#/$defs/output/impure',
     'files' : [
       'output-impure.json',
     ],

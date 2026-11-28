@@ -15,4 +15,7 @@ a Nix expression evaluates.
 `nix derivation add` takes a single derivation in the JSON format.
 See [the manual](@docroot@/protocols/json/derivation/index.md) for a documentation of this format.
 
+Both the current format version and the previous one are accepted; the
+`version` field of the given JSON says which is being used.
+
 )""

@@ -19,7 +19,7 @@ Each of *paths* is processed as follows:
         Determine the output paths to realise by querying content-addressed realisation entries in the [Nix database].
     - For any store paths that cannot be substituted, produce the required store objects:
       1. Realise all outputs of the derivation's dependencies
-      2. Run the derivation's [`builder`](@docroot@/language/derivations.md#attr-builder) executable
+      2. Run the derivation's [`builder`](@docroot@/language/derivations/v1.md#attr-builder) executable
          <!-- TODO: Link to build process page #8888 -->
 - Otherwise, and if the path is not already valid: Try to fetch the associated [store objects] in the path's [closure] from [substituters].
 
