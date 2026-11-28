@@ -79,6 +79,7 @@ TEST_F(ValuePrintingTests, tList)
     vTwo.mkInt(2);
 
     auto list = state.buildList(3);
+    EXPECT_EQ(list.size(), 3);
     list.elems[0] = &vOne;
     list.elems[1] = &vTwo;
     Value vList;
@@ -605,6 +606,7 @@ TEST_F(ValuePrintingTests, listRepeated)
     vEmpty.mkAttrs(emptyBuilder.finish());
 
     auto list = state.buildList(2);
+    EXPECT_EQ(list.size(), 2);
     list.elems[0] = &vEmpty;
     list.elems[1] = &vEmpty;
     Value vList;
