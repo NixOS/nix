@@ -84,6 +84,11 @@ blake3 = dependency(
 )
 deps_private += blake3
 
+# Boost.URL before 1.90 has bugs resolving relative URLs (see
+# https://github.com/boostorg/url/issues/919 and
+# https://github.com/boostorg/url/issues/920) that `parseURLRelative`
+# relies on being fixed, and 1.90 through 1.92 have other Boost.URL
+# bugs, such as a regression in 1.91.
 boost = dependency(
   'boost',
   modules : [
@@ -93,7 +98,7 @@ boost = dependency(
     'url',
   ],
   include_type : 'system',
-  version : '>=1.87.0',
+  version : '>=1.93.0',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately.
 deps_public_no_pkgconfig += boost

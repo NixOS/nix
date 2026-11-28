@@ -45,10 +45,30 @@ scope: {
       );
   };
 
+  # Boost 1.93 is still in beta, so Nixpkgs doesn't have it yet. This
+  # mirrors how Nixpkgs builds its `boostNNN` attributes: `b2` is built
+  # from the same source as the libraries.
+  #
+  boost193 = lib.fix (
+    self:
+    # TODO Before the next Nix release, upstream `boost193` (the final
+    # 1.93.0) to Nixpkgs and use `pkgs.boost193` instead of this.
+    pkgs.callPackage (pkgs.path + "/pkgs/development/libraries/boost/generic.nix") {
+      boost-build = pkgs.buildPackages.boost-build.override {
+        useBoost = self;
+      };
+      version = "1.93.0";
+      src = pkgs.fetchurl {
+        url = "https://archives.boost.io/beta/1.93.0.beta1/source/boost_1_93_0_b1.tar.bz2";
+        # SHA256 from https://archives.boost.io/beta/1.93.0.beta1/source/boost_1_93_0_b1.tar.bz2.json
+        sha256 = "d195115f488cf1a30670a005967f28a933471f00151e4eef37b63e085f60528d";
+      };
+    }
+  );
+
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
-  # TODO Boost 1.91 has a regression in boost.url :(
   boost =
-    (pkgs.boost189.override {
+    (scope.boost193.override {
       extraB2Args = [
         "--with-container"
         "--with-context"
