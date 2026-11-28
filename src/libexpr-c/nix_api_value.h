@@ -412,13 +412,13 @@ nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value
 nix_value * nix_get_attr_byname_lazy(
     nix_c_context * context, const nix_value * value, EvalState * state, const char * name) NIXC_NOEXCEPT;
 
-/** @brief Check if an attribute name exists on a value
+/** @brief Whether an attribute set has an attribute with the given name
  * @ingroup value_extract
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @param[in] state nix evaluator state
  * @param[in] name attribute name
- * @return value, error info via context
+ * @return true if the attribute exists, false otherwise; error info via context
  */
 bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalState * state, const char * name)
     NIXC_NOEXCEPT;

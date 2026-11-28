@@ -118,11 +118,11 @@ nix_err nix_store_get_storedir(
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path) NIXC_NOEXCEPT;
 
 /**
- * @brief Check if a StorePath is valid (i.e. that corresponding store object and its closure of references exists in
+ * @brief Whether a StorePath is valid (i.e. that corresponding store object and its closure of references exists in
  * the store)
  * @param[out] context Optional, stores error information
  * @param[in] store Nix Store reference
- * @param[in] path Path to check
+ * @param[in] path Path to look up
  * @return true or false, error info in context
  */
 bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path) NIXC_NOEXCEPT;
