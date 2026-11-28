@@ -8,6 +8,7 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/derivations.hh"
+#include "nix/expr/eval-cache.hh"
 #include "nix/expr/nixexpr.hh"
 #include "nix/store/profiles.hh"
 #include "nix/cmd/repl.hh"
@@ -154,6 +155,15 @@ EvalCommand::~EvalCommand()
 {
     if (evalState)
         evalState->maybePrintStats();
+}
+
+void EvalCommand::run()
+{
+    try {
+        StoreConfigCommand::run();
+    } catch (eval_cache::CachedEvalError & e) {
+        e.force();
+    }
 }
 
 ref<Store> EvalCommand::getEvalStore()
