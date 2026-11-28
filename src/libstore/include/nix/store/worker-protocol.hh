@@ -157,6 +157,21 @@ struct WorkerProto
     static constexpr std::string_view featureAddTempRoots = "addTempRoots";
 
     /**
+     * Gate the existing `verboseBuild` flag of `SetOptions` so that
+     * we ignore the `verboseBuild` value from old, buggy clients.
+     *
+     * Clients from 2.4 until 2.37 relied on the daemon ignoring
+     * `verboseBuild`, which masked their bug of sending
+     * `settings.verboseBuild` instead of whether they show build logs:
+     * `false` from `nix`, also with `-L`, and `true` from the legacy
+     * commands, also with `-Q`. Before 2.4, `-Q` cleared
+     * `settings.verboseBuild`, and the daemon used it. A daemon that
+     * honours the flag leaves the log tail out of a build failure when
+     * the client shows build logs.
+     */
+    static constexpr std::string_view featureClientSendsVerboseBuildFlag = "client-sends-verbose-build-flag";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */

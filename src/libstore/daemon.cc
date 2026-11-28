@@ -72,10 +72,23 @@ struct TunnelLogger : public Logger
 
     WorkerProto::Version clientVersion;
 
+    /**
+     * Whether the client shows build logs.
+     *
+     * May be wrongly false for client Nix 2.4 until 2.37;
+     * see `featureClientSendsVerboseBuildFlag`.
+     */
+    bool clientShowsBuildLogs = false;
+
     TunnelLogger(FdSink & to, WorkerProto::Version clientVersion)
         : to(to)
         , clientVersion(clientVersion)
     {
+    }
+
+    bool isVerbose() override
+    {
+        return clientShowsBuildLogs;
     }
 
     void enqueueMsg(const std::string & s) noexcept
@@ -844,7 +857,8 @@ static void performOp(
         clientSettings.maxBuildJobs = readInt(conn.from);
         clientSettings.maxSilentTime = readInt(conn.from);
         readInt(conn.from); // obsolete useBuildHook
-        clientSettings.verboseBuild = (readInt(conn.from) == 0);
+        // See RemoteStore::setOptions
+        clientSettings.verboseBuild = (readInt(conn.from) == std::to_underlying(lvlError));
         readInt(conn.from); // obsolete logType
         readInt(conn.from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(conn.from);
@@ -856,6 +870,9 @@ static void performOp(
             auto value = readString(conn.from);
             clientSettings.overrides.emplace(name, value);
         }
+
+        if (conn.protoVersion.features.contains(WorkerProto::featureClientSendsVerboseBuildFlag))
+            logger->clientShowsBuildLogs = clientSettings.verboseBuild;
 
         logger->startWork();
 

@@ -134,11 +134,14 @@ void RemoteStore::initConnection(Connection & conn)
 
 void RemoteStore::setOptions(Connection & conn)
 {
+    /* verboseBuild is sent in a field that held a log level, the build
+       output verbosity, before Nix 2.0. Since then it is a boolean,
+       encoded as lvlError for true and lvlVomit for false. */
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
             << settings.getWorkerSettings().tryFallback << std::to_underlying(verbosity)
             << settings.getWorkerSettings().maxBuildJobs << settings.getWorkerSettings().maxSilentTime << true
-            << std::to_underlying(settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
-            << 0                                                                    /* obsolete print build trace */
+            << std::to_underlying(logger->isVerbose() ? lvlError : lvlVomit) << 0 // obsolete log type
+            << 0                                                                  /* obsolete print build trace */
             << settings.getLocalSettings().buildCores << settings.getWorkerSettings().useSubstitutes;
 
     std::map<std::string, nix::Config::SettingInfo> overrides;

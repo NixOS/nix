@@ -293,7 +293,13 @@ std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 /**
  * Create a logger that sends log messages to `mainLogger` and the
  * list of loggers in `extraLoggers`. Only `mainLogger` is used for
- * writing to stdout and getting user input.
+ * writing to stdout and getting user input, so `mainLogger` must be
+ * the logger that manages stdout and stderr, such as `ProgressBar`.
+ *
+ * @param mainLogger The logger that shows build logs to the user.
+ *
+ * @return A logger that logs to all loggers and whose
+ *         `isVerbose()` returns `mainLogger`'s answer.
  */
 std::unique_ptr<Logger>
 makeTeeLogger(std::unique_ptr<Logger> mainLogger, std::vector<std::unique_ptr<Logger>> && extraLoggers);
