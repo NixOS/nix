@@ -174,14 +174,7 @@
 
 ## C API Changes
 
-- New store API methods [#14766](https://github.com/NixOS/nix/pull/14766) [#14768](https://github.com/NixOS/nix/pull/14768)
-
-  The C API now includes additional methods:
-
-  - `nix_store_query_path_from_hash_part()` - Get the full store path given its hash part
-  - `nix_store_copy_path()` - Copy a single store path between two stores, allows repairs and configuring signature checking
-
-- Errors returned from your primops are not treated as recoverable by default [#13930](https://github.com/NixOS/nix/pull/13930) [#15286](https://github.com/NixOS/nix/pull/15286)
+- **Breaking**: Errors returned from your primops are not treated as recoverable by default [#13930](https://github.com/NixOS/nix/pull/13930) [#15286](https://github.com/NixOS/nix/pull/15286)
 
   Nix 2.34 by default remembers the error in the thunk that triggered it.
 
@@ -201,6 +194,13 @@
   -nix_set_err_msg(context, NIX_ERR_*, msg);
   +nix_set_err_msg(context, NIX_ERR_RECOVERABLE, msg);
   ```
+
+- New store API methods [#14766](https://github.com/NixOS/nix/pull/14766) [#14768](https://github.com/NixOS/nix/pull/14768)
+
+  The C API now includes additional methods:
+
+  - `nix_store_query_path_from_hash_part()` - Get the full store path given its hash part
+  - `nix_store_copy_path()` - Copy a single store path between two stores, allows repairs and configuring signature checking
 
 ## Bug fixes
 
