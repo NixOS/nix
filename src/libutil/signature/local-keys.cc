@@ -12,6 +12,25 @@ namespace nix {
 namespace {
 
 /**
+ * Check that a key name is non-empty printable ASCII without
+ * whitespace or `:`. Signatures and keys are stored and configured as
+ * whitespace-separated lists of `<name>:<base64-data>`, so any other
+ * character would make them fail to parse back.
+ */
+void checkKeyName(std::string_view name, std::string_view typeName)
+{
+    if (name.empty())
+        throw FormatError("%s has an empty key name", typeName);
+    for (unsigned char c : name) {
+        /* Visible ASCII, i.e. no space, control characters, DEL or
+           non-ASCII bytes. */
+        bool isVisibleAscii = c >= 0x21 && c <= 0x7e;
+        if (!isVisibleAscii || c == ':')
+            throw FormatError("%s key name '%s' contains invalid character 0x%02x", typeName, name, c);
+    }
+}
+
+/**
  * Parse a colon-separated string where the second part is Base64-encoded.
  *
  * @param s The string to parse in the format `<name>:<base64-data>`.
@@ -27,8 +46,10 @@ std::pair<std::string, std::string> parseColonBase64(std::string_view s, std::st
     auto name = std::string(s.substr(0, colon));
     auto data = base64::decode(s.substr(colon + 1));
 
-    if (name.empty() || data.empty())
+    if (data.empty())
         throw FormatError("%s is corrupt", typeName);
+
+    checkKeyName(name, typeName);
 
     return {std::move(name), std::move(data)};
 }
@@ -128,6 +149,8 @@ PublicKey SecretKey::toPublicKey() const
 
 SecretKey SecretKey::generate(std::string_view name)
 {
+    checkKeyName(name, "key");
+
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
     unsigned char sk[crypto_sign_SECRETKEYBYTES];
     if (crypto_sign_keypair(pk, sk) != 0)
@@ -190,8 +213,10 @@ nix::Signature adl_serializer<nix::Signature>::from_json(const json & j)
     if (j.is_string())
         return Signature::parse(getString(j));
     auto obj = getObject(j);
+    auto keyName = getString(valueAt(obj, "keyName"));
+    checkKeyName(keyName, "signature");
     return Signature{
-        .keyName = getString(valueAt(obj, "keyName")),
+        .keyName = std::move(keyName),
         .sig = base64::decode(getString(valueAt(obj, "sig"))),
     };
 }
