@@ -77,8 +77,8 @@ private:
     /**
      * The states.
      */
-    Co<ExitCode> init(bool storeDerivation);
-    Co<BuildResult> haveDerivation(bool storeDerivation);
+    asio::awaitable<ExitCode> init(bool storeDerivation);
+    asio::awaitable<BuildResult> haveDerivation(bool storeDerivation);
 
     /**
      * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
@@ -95,7 +95,7 @@ private:
      */
     UnkeyedRealisation assertPathValidity();
 
-    Co<BuildResult> repairClosure();
+    asio::awaitable<BuildResult> repairClosure();
 
     BuildResult success(BuildResult::Success::Status status, UnkeyedRealisation builtOutput);
 

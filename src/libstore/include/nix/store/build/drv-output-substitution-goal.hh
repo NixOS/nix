@@ -7,7 +7,6 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/build/goal.hh"
 #include "nix/store/realisation.hh"
-#include "nix/util/muxable-pipe.hh"
 
 namespace nix {
 
@@ -41,7 +40,7 @@ public:
      */
     std::shared_ptr<const UnkeyedRealisation> outputInfo;
 
-    Co<ExitCode> init();
+    asio::awaitable<ExitCode> init();
 
     std::string key() override;
 

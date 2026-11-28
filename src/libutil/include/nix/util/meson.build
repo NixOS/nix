@@ -66,7 +66,6 @@ headers = [ config_pub_h ] + files(
   'memory-source-accessor.hh',
   'merkle-files.hh',
   'mounted-source-accessor.hh',
-  'muxable-pipe.hh',
   'nar-accessor.hh',
   'nar-cache.hh',
   'nar-listing.hh',

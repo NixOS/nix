@@ -23,7 +23,7 @@ std::string DerivationResolutionGoal::key()
     return "dc$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-Goal::Co<DerivationResolutionGoal::InputsGoalMap>
+asio::awaitable<DerivationResolutionGoal::InputsGoalMap>
 DerivationResolutionGoal::realiseInputs(const Derivation & drv, BuildMode buildMode)
 {
     Goals waitees;
@@ -77,7 +77,7 @@ DerivationResolutionGoal::realiseInputs(const Derivation & drv, BuildMode buildM
     co_return inputGoals;
 }
 
-Goal::Co<decltype(DerivationResolutionGoal::resolvedDrv)>
+asio::awaitable<decltype(DerivationResolutionGoal::resolvedDrv)>
 DerivationResolutionGoal::resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals)
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -136,13 +136,13 @@ DerivationResolutionGoal::resolveDerivation(const Derivation & drv, const Inputs
     co_return std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), std::move(*attempt));
 }
 
-Goal::Co<Goal::ExitCode> DerivationResolutionGoal::init(ref<const Derivation> drv, BuildMode buildMode)
+asio::awaitable<Goal::ExitCode> DerivationResolutionGoal::init(ref<const Derivation> drv, BuildMode buildMode)
 {
     buildResult = co_await resolve(std::move(drv), buildMode);
     co_return buildResult.tryGetSuccess() ? ecSuccess : ecFailed;
 }
 
-Goal::Co<BuildResult> DerivationResolutionGoal::resolve(ref<const Derivation> drv, BuildMode buildMode)
+asio::awaitable<BuildResult> DerivationResolutionGoal::resolve(ref<const Derivation> drv, BuildMode buildMode)
 {
     auto inputGoals = co_await realiseInputs(*drv, buildMode);
 

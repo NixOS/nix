@@ -11,12 +11,35 @@
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/associated_cancellation_slot.hpp>
+#include <boost/asio/error.hpp>
+#include <boost/system/system_error.hpp>
 
 #include <concepts>
 
 namespace nix {
 
 namespace asio = boost::asio;
+
+/**
+ * Whether an exception means that an asynchronous operation was
+ * cancelled (including by the user interrupting), as opposed to having
+ * failed. Such exceptions end a coroutine without that being an error
+ * of its own.
+ */
+inline bool isCancellationException(std::exception_ptr ex)
+{
+    try {
+        std::rethrow_exception(ex);
+    } catch (const Interrupted &) {
+        return true;
+    } catch (const Cancelled &) {
+        return true;
+    } catch (const boost::system::system_error & e) {
+        return e.code() == asio::error::operation_aborted;
+    } catch (...) {
+        return false;
+    }
+}
 
 template<typename T, std::invocable<Callback<T>> F, typename CompletionToken>
 auto callbackToAwaitable(F && initiate, CompletionToken && token)
