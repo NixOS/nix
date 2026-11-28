@@ -25,4 +25,21 @@ INSTANTIATE_TEST_SUITE_P(
         std::pair{"https://git-server.com//", "https://git-server.com//.git/info/lfs"},
         std::pair{"https://git-server.com/foo/bar/", "https://git-server.com/foo/bar.git/info/lfs"}));
 
+/* As `Fetch` gets it, from a remote URL it canonicalises first. */
+class GitLFSCanonicalisedTestFixture : public ::testing::TestWithParam<std::pair<std::string, std::string>>
+{};
+
+TEST_P(GitLFSCanonicalisedTestFixture, get_lfs_api)
+{
+    auto & [remote, expected] = GetParam();
+    EXPECT_EQ(getLfsApi(fixGitURL(remote).canonicalise()).endpoint, expected);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    GitLFSTests,
+    GitLFSCanonicalisedTestFixture,
+    ::testing::Values(
+        std::pair{"https://git-server.com//", "https://git-server.com/.git/info/lfs"},
+        std::pair{"https://git-server.com/foo//bar/", "https://git-server.com/foo/bar.git/info/lfs"}));
+
 } // namespace nix::lfs
