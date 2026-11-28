@@ -1,12 +1,19 @@
 #include "nix/util/tarfile.hh"
+#include "nix/util/canon-path.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/config.hh"
 #include "nix/util/system-error.hh"
 #include "nix/util/finally.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/tests/test-data.hh"
 
 #include <boost/context/detail/exception.hpp>
 
+#include <map>
+
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace nix {
@@ -86,6 +93,61 @@ TEST(TarArchive, runOnCoroutine)
     sink->finish();
 
     ASSERT_EQ(res, "hello there");
+}
+
+/**
+ * Unpack the tarball @p name from the test data, made by its
+ * `generate.sh`, into a `TarSink` that records the files created.
+ */
+static std::map<std::string, std::string> unpackTestTarball(std::string_view name)
+{
+    struct RecordingTarSink : TarSink
+    {
+        std::map<std::string, std::string> files;
+
+        void createDirectory(const CanonPath & path) override {}
+
+        void createRegularFile(const CanonPath & path, bool isExecutable, fun<void(Sink &)> callback) override
+        {
+            StringSink sink;
+            callback(sink);
+            files.insert_or_assign(path.abs(), std::move(sink.s));
+        }
+
+        void createSymlink(const CanonPath & path, const std::string & target) override {}
+
+        void createHardlink(const CanonPath & path, const CanonPath & target) override
+        {
+            files.insert_or_assign(path.abs(), files.at(target.abs()));
+        }
+    };
+
+    auto tarball = readFile(getUnitTestData() / "tarfile" / (std::string{name} + ".tar"));
+    StringSource source{tarball};
+    TarArchive archive(source);
+    RecordingTarSink sink;
+    unpackTarfileToSink(archive, sink);
+    return std::move(sink.files);
+}
+
+TEST(TarArchive, rejectsDotDot)
+{
+    using ::testing::AllOf;
+    using testing::HasSubstrIgnoreANSIMatcher;
+    using ::testing::ThrowsMessage;
+
+    EXPECT_EQ(unpackTestTarball("ok"), (std::map<std::string, std::string>{{"/a/b", "contents\n"}}));
+    EXPECT_THAT(
+        [] { unpackTestTarball("dotdot"); },
+        ThrowsMessage<BadCanonPath>(AllOf(
+            HasSubstrIgnoreANSIMatcher("must not contain '..' components"),
+            HasSubstrIgnoreANSIMatcher("in archive member 'a/../b'"))));
+    /* The target of a hard link too. */
+    EXPECT_THAT(
+        [] { unpackTestTarball("hardlink-dotdot"); },
+        ThrowsMessage<BadCanonPath>(AllOf(
+            HasSubstrIgnoreANSIMatcher("must not contain '..' components"),
+            HasSubstrIgnoreANSIMatcher("in the target of hard link 'd'"))));
 }
 
 TEST(TarArchive, ReadError)

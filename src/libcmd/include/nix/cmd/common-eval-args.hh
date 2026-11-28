@@ -83,6 +83,24 @@ private:
 };
 
 /**
+ * The path @p path on the host file system, as given on the command
+ * line or in settings, in the evaluator's root filesystem.
+ *
+ * Resolved with `SourceAccessor::resolvePath`, so the result
+ * never had any `..` removed lexically, and resolving its symlinks later
+ * is sound. Nothing more is resolved, so that, for instance, `./.` in a
+ * file named via a symlink is where the symlink is, not its target.
+ *
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary#gloss-base-directory),
+ * for a relative @p path; by default, the current directory.
+ *
+ * @todo On Windows, a host path has a drive and `\` separators, which
+ * this does not handle: it makes the whole path one component.
+ */
+SourcePath
+lookupHostPath(EvalState & state, const std::filesystem::path & path, const std::filesystem::path * baseDir = nullptr);
+
+/**
  * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary#gloss-base-directory)
  */
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::filesystem::path * baseDir = nullptr);

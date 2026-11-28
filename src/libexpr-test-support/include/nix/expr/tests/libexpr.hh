@@ -149,7 +149,9 @@ MATCHER_P(IsPathEq, p, fmt("Is a path equal to \"%1%\"", p))
         return false;
     } else {
         auto path = arg.path();
-        if (path.path != CanonPath(p)) {
+        /* As `UnresolvedPath`s, so that `..` in @p p is not removed. */
+        const UnresolvedPath & actual = path.path;
+        if (actual != UnresolvedPath(p)) {
             *result_listener << "Expected a path that equals \"" << p << "\" but got: " << path.path;
             return false;
         }

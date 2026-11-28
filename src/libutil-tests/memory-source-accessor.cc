@@ -88,17 +88,17 @@ TEST_F(MemorySourceAccessorTestErrors, readFileNotFound)
     accessor->addDirectory(CanonPath::root);
 
     EXPECT_THAT(
-        [&] { accessor->readFile(CanonPath("nonexistent")); },
+        [&] { accessor->readFile("nonexistent"_filename); },
         ThrowsMessage<FileNotFound>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/nonexistent"), HasSubstrIgnoreANSIMatcher("does not exist"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, readFileNotARegularFile)
 {
-    accessor->addDirectory(CanonPath("subdir"));
+    accessor->addDirectory("subdir"_filename);
 
     EXPECT_THAT(
-        [&] { accessor->readFile(CanonPath("subdir")); },
+        [&] { accessor->readFile("subdir"_filename); },
         ThrowsMessage<NotARegularFile>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/subdir"), HasSubstrIgnoreANSIMatcher("is not a regular file"))));
 }
@@ -108,17 +108,17 @@ TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotFound)
     accessor->addDirectory(CanonPath::root);
 
     EXPECT_THAT(
-        [&] { accessor->readDirectory(CanonPath("nonexistent")); },
+        [&] { accessor->readDirectory("nonexistent"_filename); },
         ThrowsMessage<FileNotFound>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/nonexistent"), HasSubstrIgnoreANSIMatcher("does not exist"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotADirectory)
 {
-    accessor->addFile(CanonPath("file"), "");
+    accessor->addFile("file"_filename, "");
 
     EXPECT_THAT(
-        [&] { accessor->readDirectory(CanonPath("file")); },
+        [&] { accessor->readDirectory("file"_filename); },
         ThrowsMessage<NotADirectory>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/file"), HasSubstrIgnoreANSIMatcher("is not a directory"))));
 }
@@ -128,27 +128,27 @@ TEST_F(MemorySourceAccessorTestErrors, readLinkNotFound)
     accessor->addDirectory(CanonPath::root);
 
     EXPECT_THAT(
-        [&] { accessor->readLink(CanonPath("nonexistent")); },
+        [&] { accessor->readLink("nonexistent"_filename); },
         ThrowsMessage<FileNotFound>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/nonexistent"), HasSubstrIgnoreANSIMatcher("does not exist"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, readLinkNotASymlink)
 {
-    accessor->addFile(CanonPath("file"), "");
+    accessor->addFile("file"_filename, "");
 
     EXPECT_THAT(
-        [&] { accessor->readLink(CanonPath("file")); },
+        [&] { accessor->readLink("file"_filename); },
         ThrowsMessage<NotASymlink>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/file"), HasSubstrIgnoreANSIMatcher("is not a symbolic link"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, addFileParentNotDirectory)
 {
-    accessor->addFile(CanonPath("file"), "");
+    accessor->addFile("file"_filename, "");
 
     EXPECT_THAT(
-        [&] { accessor->addFile(CanonPath("file/child"), "contents"); },
+        [&] { accessor->addFile("/file/child"_canonPath, "contents"); },
         ThrowsMessage<Error>(AllOf(
             HasSubstrIgnoreANSIMatcher("somepath/file/child"),
             HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
@@ -156,20 +156,20 @@ TEST_F(MemorySourceAccessorTestErrors, addFileParentNotDirectory)
 
 TEST_F(MemorySourceAccessorTestErrors, addFileNotARegularFile)
 {
-    accessor->addDirectory(CanonPath("subdir"));
+    accessor->addDirectory("subdir"_filename);
 
     EXPECT_THAT(
-        [&] { accessor->addFile(CanonPath("subdir"), "contents"); },
+        [&] { accessor->addFile("subdir"_filename, "contents"); },
         ThrowsMessage<NotARegularFile>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/subdir"), HasSubstrIgnoreANSIMatcher("is not a regular file"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, addDirectoryParentNotDirectory)
 {
-    accessor->addFile(CanonPath("file"), "");
+    accessor->addFile("file"_filename, "");
 
     EXPECT_THAT(
-        [&] { accessor->addDirectory(CanonPath("file/child")); },
+        [&] { accessor->addDirectory("/file/child"_canonPath); },
         ThrowsMessage<Error>(AllOf(
             HasSubstrIgnoreANSIMatcher("somepath/file/child"),
             HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
@@ -177,10 +177,10 @@ TEST_F(MemorySourceAccessorTestErrors, addDirectoryParentNotDirectory)
 
 TEST_F(MemorySourceAccessorTestErrors, addSymlinkParentNotDirectory)
 {
-    accessor->addFile(CanonPath("file"), "");
+    accessor->addFile("file"_filename, "");
 
     EXPECT_THAT(
-        [&] { accessor->addSymlink(CanonPath("file/child"), "target"); },
+        [&] { accessor->addSymlink("/file/child"_canonPath, "target"); },
         ThrowsMessage<Error>(AllOf(
             HasSubstrIgnoreANSIMatcher("somepath/file/child"),
             HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
@@ -188,10 +188,10 @@ TEST_F(MemorySourceAccessorTestErrors, addSymlinkParentNotDirectory)
 
 TEST_F(MemorySourceAccessorTestErrors, addSymlinkNotASymlink)
 {
-    accessor->addFile(CanonPath("file"), "");
+    accessor->addFile("file"_filename, "");
 
     EXPECT_THAT(
-        [&] { accessor->addSymlink(CanonPath("file"), "target"); },
+        [&] { accessor->addSymlink("file"_filename, "target"); },
         ThrowsMessage<NotASymlink>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/file"), HasSubstrIgnoreANSIMatcher("is not a symbolic link"))));
 }
@@ -220,35 +220,35 @@ TEST_F(MemorySourceAccessorTestErrors, createChildAlreadyExists)
         });
     });
 
-    EXPECT_EQ(accessor->readFile(CanonPath("subdir/file")), "first");
+    EXPECT_EQ(accessor->readFile("/subdir/file"_canonPath), "first");
 }
 
 TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughRegularFile)
 {
-    accessor->addFile(CanonPath("file"), "");
-    EXPECT_FALSE(accessor->pathExists(CanonPath("file/child")));
+    accessor->addFile("file"_filename, "");
+    EXPECT_FALSE(accessor->pathExists("/file/child"_canonPath));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, maybeLstatThroughRegularFile)
 {
-    accessor->addFile(CanonPath("file"), "");
-    EXPECT_FALSE(accessor->maybeLstat(CanonPath("file/child")));
+    accessor->addFile("file"_filename, "");
+    EXPECT_FALSE(accessor->maybeLstat("/file/child"_canonPath));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughSymlink)
 {
-    accessor->addSymlink(CanonPath("link"), "target");
+    accessor->addSymlink("link"_filename, "target");
     EXPECT_THAT(
-        [&] { accessor->pathExists(CanonPath("link/child")); },
+        [&] { accessor->pathExists("/link/child"_canonPath); },
         ThrowsMessage<SymlinkNotAllowed>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/link"), HasSubstrIgnoreANSIMatcher("is a symlink"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, addFileThroughSymlink)
 {
-    accessor->addSymlink(CanonPath("link"), "target");
+    accessor->addSymlink("link"_filename, "target");
     EXPECT_THAT(
-        [&] { accessor->addFile(CanonPath("link/child"), "contents"); },
+        [&] { accessor->addFile("/link/child"_canonPath, "contents"); },
         ThrowsMessage<SymlinkNotAllowed>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/link"), HasSubstrIgnoreANSIMatcher("is a symlink"))));
 }
@@ -306,5 +306,83 @@ INSTANTIATE_TEST_SUITE_P(
             "complex",
             *memory_source_accessor::exampleComplex(),
         }));
+
+/* ----------------------------------------------------------------------------
+ * resolvePath
+ * --------------------------------------------------------------------------*/
+
+class MemorySourceAccessorResolvePath : public ::testing::Test
+{
+protected:
+    ref<MemorySourceAccessor> accessor = make_ref<MemorySourceAccessor>();
+
+    void SetUp() override
+    {
+        accessor->setPathDisplay("somepath");
+        accessor->addDirectory("a"_filename);
+        accessor->addDirectory("/a/b"_canonPath);
+        accessor->addFile("/a/b/file"_canonPath, "");
+        accessor->addFile("/a/file"_canonPath, "");
+        accessor->addSymlink("link"_filename, "a/b");
+        accessor->addSymlink("/a/filelink"_canonPath, "file");
+        accessor->addDirectory("x"_filename);
+        accessor->addSymlink("/x/link"_canonPath, "/a/b");
+        accessor->addSymlink("loop"_filename, "loop");
+    }
+};
+
+TEST_F(MemorySourceAccessorResolvePath, dotDotAfterSymlink)
+{
+    /* The parent of the link's target, not the directory containing
+       the link, as removing `..` lexically would have it. */
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/link/..")), "/a"_canonPath);
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/link/../b/file")), "/a/b/file"_canonPath);
+}
+
+TEST_F(MemorySourceAccessorResolvePath, absoluteTarget)
+{
+    /* Absolute targets are relative to the root of the accessor. */
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/x/link/..")), "/a"_canonPath);
+    EXPECT_EQ(accessor->resolveSymlinks("/x/link/file"_canonPath), "/a/b/file"_canonPath);
+}
+
+TEST_F(MemorySourceAccessorResolvePath, onlyAsNeeded)
+{
+    /* The symlink before the `..` is resolved, so it is the parent of
+       its target... */
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/link/../file")), "/a/file"_canonPath);
+    /* ...but those after it are kept. */
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/link/../filelink")), "/a/filelink"_canonPath);
+    /* So, without `..`, nothing is resolved. */
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/link")), "/link"_canonPath);
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/a/filelink")), "/a/filelink"_canonPath);
+    /* Nor does it need anything to exist then. */
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/nonexistent/x")), "/nonexistent/x"_canonPath);
+}
+
+TEST_F(MemorySourceAccessorResolvePath, notSymlinks)
+{
+    /* What is missing, or not a directory, is not a symlink either, as
+       for `resolveSymlinks`, rather than an error. */
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/nonexistent/..")), CanonPath::root);
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/a/file/..")), "/a"_canonPath);
+    EXPECT_EQ(accessor->resolvePath(UnresolvedPath("/..")), CanonPath::root);
+}
+
+TEST_F(MemorySourceAccessorResolvePath, infiniteRecursionSaysWhere)
+{
+    /* The error is about where it went wrong, the trace about the
+       whole path. */
+    EXPECT_THAT(
+        [&] { accessor->resolveSymlinks("/loop/x"_canonPath); },
+        ThrowsMessage<Error>(AllOf(
+            HasSubstrIgnoreANSIMatcher("infinite symlink recursion at 'somepath/loop'"),
+            HasSubstrIgnoreANSIMatcher("while resolving the symlinks in 'somepath/loop/x'"))));
+    EXPECT_THAT(
+        [&] { accessor->resolvePath(UnresolvedPath("/loop/..")); },
+        ThrowsMessage<Error>(AllOf(
+            HasSubstrIgnoreANSIMatcher("infinite symlink recursion at 'somepath/loop'"),
+            HasSubstrIgnoreANSIMatcher("while resolving 'somepath/loop/..'"))));
+}
 
 } // namespace nix

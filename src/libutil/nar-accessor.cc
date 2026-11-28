@@ -2,6 +2,7 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/error.hh"
 #include "nix/util/system-error.hh"
+#include "nix/util/path-iterator.hh"
 
 namespace nix {
 

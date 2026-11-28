@@ -71,16 +71,16 @@ TEST_F(FSSourceAccessorTest, works)
 
     {
         auto accessor = makeFSSourceAccessor(tmpDir);
-        EXPECT_THAT(accessor, testing::HasContents(CanonPath("file1"), "content1"));
-        EXPECT_THAT(accessor, testing::HasContents(CanonPath("subdir/file2"), "content2"));
+        EXPECT_THAT(accessor, testing::HasContents("file1"_filename, "content1"));
+        EXPECT_THAT(accessor, testing::HasContents("/subdir/file2"_canonPath, "content2"));
 
-        EXPECT_TRUE(accessor->pathExists(CanonPath("file1")));
-        EXPECT_FALSE(accessor->pathExists(CanonPath("nonexistent")));
+        EXPECT_TRUE(accessor->pathExists("file1"_filename));
+        EXPECT_FALSE(accessor->pathExists("nonexistent"_filename));
 
-        EXPECT_THROW(accessor->readFile(CanonPath("a/dirlink/file2")), SymlinkNotAllowed);
-        EXPECT_THROW(accessor->maybeLstat(CanonPath("a/dirlink/file2")), SymlinkNotAllowed);
-        EXPECT_THROW(accessor->readDirectory(CanonPath("a/dirlink")), SymlinkNotAllowed);
-        EXPECT_THROW(accessor->pathExists(CanonPath("a/dirlink/file2")), SymlinkNotAllowed);
+        EXPECT_THROW(accessor->readFile("/a/dirlink/file2"_canonPath), SymlinkNotAllowed);
+        EXPECT_THROW(accessor->maybeLstat("/a/dirlink/file2"_canonPath), SymlinkNotAllowed);
+        EXPECT_THROW(accessor->readDirectory("/a/dirlink"_canonPath), SymlinkNotAllowed);
+        EXPECT_THROW(accessor->pathExists("/a/dirlink/file2"_canonPath), SymlinkNotAllowed);
     }
 
     {
@@ -90,7 +90,7 @@ TEST_F(FSSourceAccessorTest, works)
     {
         auto accessor = makeFSSourceAccessor(tmpDir, {.trackLastModified = true});
         EXPECT_EQ(accessor->getLastModified(), 0);
-        accessor->maybeLstat(CanonPath("file1"));
+        accessor->maybeLstat("file1"_filename);
         EXPECT_GT(accessor->getLastModified(), 0);
     }
 }
@@ -198,7 +198,7 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
     createDirs(tmpDir / "a" / "b");
     writeFile(tmpDir / "a" / "b" / "f", "old");
 
-    EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/f")));
+    EXPECT_TRUE(accessor->pathExists("/a/b/f"_canonPath));
 
     deletePath(tmpDir / "a" / "b");
     createDirs(tmpDir / "a" / "b");
@@ -207,11 +207,11 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
 
     accessor->invalidateCache();
 
-    EXPECT_FALSE(accessor->pathExists(CanonPath("a/b/f")));
-    EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/g")));
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("a/b/g"), "new"));
-    EXPECT_THAT(accessor, testing::HasDirectory(CanonPath("a/b"), (std::set<std::string>{"g", "l"})));
-    EXPECT_THAT(accessor, testing::HasSymlink(CanonPath("a/b/l"), "g"));
+    EXPECT_FALSE(accessor->pathExists("/a/b/f"_canonPath));
+    EXPECT_TRUE(accessor->pathExists("/a/b/g"_canonPath));
+    EXPECT_THAT(accessor, testing::HasContents("/a/b/g"_canonPath, "new"));
+    EXPECT_THAT(accessor, testing::HasDirectory("/a/b"_canonPath, (std::set<std::string>{"g", "l"})));
+    EXPECT_THAT(accessor, testing::HasSymlink("/a/b/l"_canonPath, "g"));
 }
 
 /* At the moment, the dir-fd cache resolves a miss by walking up to the deepest cached
@@ -235,22 +235,22 @@ TEST_F(FSSourceAccessorTest, dirFdCacheReanchorsOnIntermediateHit)
     auto accessor = makeFSSourceAccessor(tmpDir);
 
     /* Populate the cache all the way down one branch. */
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ccc/f"), "in-ccc"));
+    EXPECT_THAT(accessor, testing::HasContents("/aaa/bbb/ccc/f"_canonPath, "in-ccc"));
 
     /* Sibling of the deepest cached directory: misses, re-anchors on `aaa/bbb`. */
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ddd/f"), "in-ddd"));
+    EXPECT_THAT(accessor, testing::HasContents("/aaa/bbb/ddd/f"_canonPath, "in-ddd"));
 
     /* Shallower sibling: re-anchors on `aaa` instead. */
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/zzz/f"), "in-zzz"));
+    EXPECT_THAT(accessor, testing::HasContents("/aaa/zzz/f"_canonPath, "in-zzz"));
 
     /* Re-read everything, now served from the cache rather than walked. */
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ccc/f"), "in-ccc"));
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/bbb/ddd/f"), "in-ddd"));
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("aaa/zzz/f"), "in-zzz"));
+    EXPECT_THAT(accessor, testing::HasContents("/aaa/bbb/ccc/f"_canonPath, "in-ccc"));
+    EXPECT_THAT(accessor, testing::HasContents("/aaa/bbb/ddd/f"_canonPath, "in-ddd"));
+    EXPECT_THAT(accessor, testing::HasContents("/aaa/zzz/f"_canonPath, "in-zzz"));
 
     /* A genuine miss under a cached ancestor must stay a miss. */
-    EXPECT_FALSE(accessor->pathExists(CanonPath("aaa/bbb/eee/f")));
-    EXPECT_FALSE(accessor->pathExists(CanonPath("aaa/bbb/ccc/nope")));
+    EXPECT_FALSE(accessor->pathExists("/aaa/bbb/eee/f"_canonPath));
+    EXPECT_FALSE(accessor->pathExists("/aaa/bbb/ccc/nope"_canonPath));
 }
 
 /* Directories that are traversable but not listable (mode 0111) should
@@ -274,19 +274,19 @@ TEST_F(FSSourceAccessorTest, searchOnlyDirectories)
     /* Search-only accessor root (#16164). */
     auto accessor = makeFSSourceAccessor(tmpDir / "root");
     /* Path resolution through a search-only intermediate directory (#16165). */
-    EXPECT_THAT(accessor, testing::HasContents(CanonPath("mid/sub/f"), "content"));
+    EXPECT_THAT(accessor, testing::HasContents("/mid/sub/f"_canonPath, "content"));
     /* A readable directory can be listed even if its parent is search-only. */
-    EXPECT_THAT(accessor, testing::HasDirectory(CanonPath("mid/sub"), std::set<std::string>{"f"}));
+    EXPECT_THAT(accessor, testing::HasDirectory("/mid/sub"_canonPath, std::set<std::string>{"f"}));
     /* `fstat` on the search-only root descriptor itself. */
     EXPECT_EQ(accessor->lstat(CanonPath::root).type, SourceAccessor::tDirectory);
     /* `fstatat` relative to the search-only root descriptor. */
-    EXPECT_EQ(accessor->lstat(CanonPath("mid")).type, SourceAccessor::tDirectory);
+    EXPECT_EQ(accessor->lstat("mid"_filename).type, SourceAccessor::tDirectory);
 
     /* Listing them still requires read permission. */
     EXPECT_THAT(
         [&] { accessor->readDirectory(CanonPath::root); }, testing::ThrowsSystemError(std::errc::permission_denied));
     EXPECT_THAT(
-        [&] { accessor->readDirectory(CanonPath("mid")); }, testing::ThrowsSystemError(std::errc::permission_denied));
+        [&] { accessor->readDirectory("mid"_filename); }, testing::ThrowsSystemError(std::errc::permission_denied));
 #endif
 }
 
@@ -331,7 +331,7 @@ TEST_F(FSSourceAccessorTest, RestoreSinkTrailingSeparator)
                 "file"_filename, [](auto & s) { s.createRegularFile(false, [](auto & crf) { crf("content"); }); });
         });
     }
-    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "dir"), testing::HasContents(CanonPath("file"), "content"));
+    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "dir"), testing::HasContents("file"_filename, "content"));
 
     EXPECT_THAT(
         [&] {
